@@ -33,16 +33,16 @@ func seaLevelAir() atmosphere.Refraction {
 // TestNilModelMatchesExplicitSOFAModel pins the one duplication this design
 // accepts on purpose.
 //
-// GeocentricToObserved does not call atmosphere at all when Model is nil: it
-// applies SOFA's series through refractLikeAtioq, using the Refa and Refb
-// constants Apco13 already cached for the epoch. That is a real performance
-// decision — recomputing them per call would cost a Refco on a path measured
-// in hundreds of nanoseconds.
+// A Context does not call atmosphere at all when Model is nil: it applies the
+// refraction from the Refa and Refb constants NewContext computed once for the
+// epoch. That is a real performance decision — recomputing them per call would
+// cost a Refco on a path measured in hundreds of nanoseconds.
 //
-// So the same model exists twice: once as cached constants inside coord, once
-// as atmosphere.RefractionSOFA, which recomputes them and is what a nil Model
-// resolves to everywhere else. Two copies of one model can drift, and nothing
-// would say so — which is what this test is for.
+// So the same model is reached twice: once from cached constants inside coord,
+// once as atmosphere.RefractionSOFA, which recomputes them and is what a nil
+// Model resolves to everywhere else. Since #588 both run the arithmetic in
+// internal/refraction, so only the constants could drift, and nothing would
+// say so — which is what this test is for.
 //
 // Measured agreement over 2000 above-horizon directions: 0.012 arcsec above 3
 // degrees, 0.7 milliarcsecond above 5 degrees. The residual is the difference

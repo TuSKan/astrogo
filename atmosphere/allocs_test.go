@@ -33,21 +33,22 @@ import (
 // test allocating concurrently would be counted here.
 func TestRefractionAndAirmassDoNotAllocate(t *testing.T) {
 	var (
-		rigorous    = RefractionRigorous{}
-		approximate = RefractionApproximate{}
-		env         = StandardRefraction()
-		alt         = angle.Deg(30)
-		horizon     = angle.Deg(0.5)
+		bennett = RefractionBennett{}
+		sofa    = RefractionSOFA{}
+		env     = StandardRefraction()
+		alt     = angle.Deg(30)
+		horizon = angle.Deg(0.5)
 	)
 
 	for _, tc := range []struct {
 		name string
 		f    func()
 	}{
-		{"RefractionRigorous.RefractFromTrue", func() { _ = rigorous.RefractFromTrue(alt, env) }},
-		{"RefractionRigorous.RefractFromApparent", func() { _ = rigorous.RefractFromApparent(alt, env) }},
-		{"RefractionRigorous near the horizon", func() { _ = rigorous.RefractFromTrue(horizon, env) }},
-		{"RefractionApproximate.RefractFromTrue", func() { _ = approximate.RefractFromTrue(alt, env) }},
+		{"RefractionBennett.RefractFromTrue", func() { _ = bennett.RefractFromTrue(alt, env) }},
+		{"RefractionBennett.RefractFromApparent", func() { _ = bennett.RefractFromApparent(alt, env) }},
+		{"RefractionBennett near the horizon", func() { _ = bennett.RefractFromTrue(horizon, env) }},
+		{"RefractionSOFA.RefractFromTrue", func() { _ = sofa.RefractFromTrue(alt, env) }},
+		{"RefractionSOFA near the horizon", func() { _ = sofa.RefractFromTrue(horizon, env) }},
 		{"Airmass", func() { _, _ = Airmass(alt) }},
 		{"AtAltitude", func() { _ = AtAltitude(2635) }},
 	} {

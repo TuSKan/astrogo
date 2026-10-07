@@ -37,7 +37,7 @@ func TestAtmosphere_SurfaceRoundTrip(t *testing.T) {
 }
 
 func TestBuilder_Refraction(t *testing.T) {
-	model := RefractionRigorous{}
+	model := RefractionBennett{}
 
 	atm, err := NewBuilder().
 		Surface(1013.25, 288.15).

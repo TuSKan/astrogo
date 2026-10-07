@@ -15,10 +15,11 @@ import (
 //
 // The additive term that keeps each fit stable near the horizon carries its
 // tangent argument past 90° near the zenith — Saemundsson's h + 10.3/(h+5.11)
-// reaches 90.108° at h = 90°, Bennett's h + 7.31/(h+4.4) reaches 90.077°. tan
-// is negative just beyond its asymptote, so both formulas returned negative
+// reached 90.108° at h = 90°, Bennett's h + 7.31/(h+4.4) 90.077°. tan is
+// negative just beyond its asymptote, so both formulas returned negative
 // refraction: −0.114″ and −0.080″ at the zenith, crossing zero at 89.8916° and
-// 89.9225°.
+// 89.9225°. Bennett-NA's h + 7.32/(h+4.32), which replaced both (#588), does
+// the same just short of the zenith.
 //
 // Small, but wrong in a way a magnitude check cannot see. Refraction raises an
 // object or, at the zenith, does nothing; it never lowers one.
@@ -36,8 +37,7 @@ func TestRefractionIsNeverNegative(t *testing.T) {
 		name string
 		m    RefractionModel
 	}{
-		{"RefractionApproximate", RefractionApproximate{}},
-		{"RefractionRigorous", RefractionRigorous{}},
+		{"RefractionBennett", RefractionBennett{}},
 		{"RefractionSOFA", RefractionSOFA{}},
 		{"RefractionNone", RefractionNone{}},
 	}
@@ -59,12 +59,12 @@ func TestRefractionIsNeverNegative(t *testing.T) {
 			t.Run(model.name+"/"+dir.name, func(t *testing.T) {
 				// 0.001° steps through the region where the sign flipped, and
 				// across the whole evaluated range besides.
-				for h := lowAltitudeCutoffDeg - 1.0; h <= 90.0; h += 0.001 {
+				for h := -6.0; h <= 90.0; h += 0.001 {
 					got := dir.f(model.m, angle.Deg(h))
 					if got < 0 {
 						t.Fatalf("at %.4f deg altitude: %.6f arcsec.\n"+
 							"  Refraction is never negative — check the tangent "+
-							"argument against zenithArgumentLimit.",
+							"argument against its limit at the zenith.",
 							h, got.Arcseconds())
 					}
 				}
@@ -76,8 +76,8 @@ func TestRefractionIsNeverNegative(t *testing.T) {
 // TestRefractionVanishesAtTheZenith pins the physical limit.
 //
 // Light arriving along the normal is not bent, so refraction at the zenith is
-// zero. After clamping the tangent argument, both empirical models return a
-// literal zero there; RefractionSOFA returns 5.7e-5 arcsec, because iauAtioq
+// zero. After clamping the tangent argument, Bennett-NA returns a literal
+// zero there; RefractionSOFA returns 5.7e-5 arcsec, because iauAtioq
 // clamps cos(altitude) at celMin rather than letting it reach zero. Both are
 // correct — the distinction is carried by the exact field below rather than
 // papered over with one loose tolerance.
@@ -94,8 +94,7 @@ func TestRefractionVanishesAtTheZenith(t *testing.T) {
 		// is eleven orders below anything this library claims.
 		exact bool
 	}{
-		{"RefractionApproximate", RefractionApproximate{}, true},
-		{"RefractionRigorous", RefractionRigorous{}, true},
+		{"RefractionBennett", RefractionBennett{}, true},
 		{"RefractionSOFA", RefractionSOFA{}, false},
 	} {
 		t.Run(model.name, func(t *testing.T) {
@@ -128,35 +127,39 @@ func TestRefractionVanishesAtTheZenith(t *testing.T) {
 // throws away, so "return zero up there" is a measured decision rather than an
 // assumption.
 //
-// The clamp takes effect exactly where each formula crosses zero, so the
-// largest value it discards is the one the formula gives immediately below the
-// crossing. Both fits quote about 0.1 arcmin (6 arcsec) of accuracy, so the
+// The clamp takes effect exactly where the formula crosses zero, the apparent
+// altitude at which h + 7.32/(h + 4.32) reaches 90°, so the largest value it
+// discards is the one the formula gives immediately below it. The fit is good
+// to about 0.1 arcmin (6 arcsec) against the almanac's table, so the
 // discarded amount has to be far under that to be free.
 func TestZenithClampCostsLessThanTheModelsOwnAccuracy(t *testing.T) {
 	env := StandardRefraction()
 
-	// The quoted accuracy of the empirical fits, in arcseconds.
+	// The fit's accuracy against the almanac, in arcseconds.
 	const quotedAccuracy = 0.1 * 60.0
 
+	// h² + (4.32 − 90)h + (7.32 − 90·4.32) = 0, the root near the zenith.
+	b, c := 4.32-90.0, 7.32-90.0*4.32
+	crossing := (-b + math.Sqrt(b*b-4*c)) / 2
+
 	for _, tc := range []struct {
-		name       string
-		f          func(angle.Angle) angle.Angle
-		crossingAt float64 // measured by bisection before the clamp existed
+		name string
+		f    func(angle.Angle) angle.Angle
 	}{
-		{"Saemundsson (RefractFromTrue)", func(a angle.Angle) angle.Angle {
-			return RefractionRigorous{}.RefractFromTrue(a, env)
-		}, 89.8916},
-		{"Bennett (RefractFromApparent)", func(a angle.Angle) angle.Angle {
-			return RefractionRigorous{}.RefractFromApparent(a, env)
-		}, 89.9225},
+		{"RefractFromApparent", func(a angle.Angle) angle.Angle {
+			return RefractionBennett{}.RefractFromApparent(a, env)
+		}},
+		{"RefractFromTrue", func(a angle.Angle) angle.Angle {
+			return RefractionBennett{}.RefractFromTrue(a, env)
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Just inside the fitted range: the most this clamp can discard.
-			discarded := tc.f(angle.Deg(tc.crossingAt - 0.001)).Arcseconds()
+			discarded := tc.f(angle.Deg(crossing - 0.001)).Arcseconds()
 
 			if discarded < 0 {
 				t.Fatalf("the formula is already negative %.3f deg below the "+
-					"recorded crossing; the crossing has moved", 0.001)
+					"crossing at %.4f deg", 0.001, crossing)
 			}
 
 			if discarded > quotedAccuracy/10 {
@@ -165,40 +168,13 @@ func TestZenithClampCostsLessThanTheModelsOwnAccuracy(t *testing.T) {
 			}
 
 			// And immediately above the crossing it is clamped, not evaluated.
-			if got := tc.f(angle.Deg(tc.crossingAt + 0.001)); got != 0 {
+			if got := tc.f(angle.Deg(crossing + 0.001)); got != 0 {
 				t.Errorf("above the crossing: %.6f arcsec, want exactly 0",
 					got.Arcseconds())
 			}
 
-			t.Logf("clamp discards at most %.4f arcsec, against %.1f arcsec quoted",
-				discarded, quotedAccuracy)
+			t.Logf("clamp at %.4f deg discards at most %.4f arcsec, against %.1f arcsec quoted",
+				crossing, discarded, quotedAccuracy)
 		})
-	}
-}
-
-// TestZenithClampLeavesTheUsefulRangeUntouched checks the fix is local: every
-// altitude a real observation cares about must return what it did before.
-func TestZenithClampLeavesTheUsefulRangeUntouched(t *testing.T) {
-	env := StandardRefraction()
-
-	// Values recorded on main before the clamp, in arcseconds.
-	for _, tc := range []struct {
-		altDeg float64
-		want   float64
-	}{
-		{89, 0.937318},
-		{88, 1.989153},
-		{85, 5.154335},
-		{80, 10.501172},
-		{60, 34.592363},
-		{45, 59.868502},
-		{30, 103.217851},
-		{10, 319.687275},
-	} {
-		got := RefractionRigorous{}.RefractFromTrue(angle.Deg(tc.altDeg), env).Arcseconds()
-		if math.Abs(got-tc.want) > 1e-5 {
-			t.Errorf("at %.0f deg: %.4f arcsec, want %.4f — the clamp reached "+
-				"below the zenith region", tc.altDeg, got, tc.want)
-		}
 	}
 }

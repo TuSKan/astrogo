@@ -62,21 +62,28 @@ func farVector(c coord.ICRS) vector.Vec3 {
 // path applied 0.16°. And the model was the uncorrected series, missing the
 // Newton-Raphson step Atioq applies even where it converges.
 //
-// # Why this compares increments
+// # Why this compares increments, each with the model
 //
 // The two pipelines answer different questions and their absolute altitudes
 // legitimately differ (see refractionScene). Differencing each against its own
-// atmosphere-free Context isolates the one quantity that must match.
+// atmosphere-free Context isolates the refraction it applied, and that must be
+// atmosphere's own at that pipeline's geometric altitude.
+//
+// Until #588 the two increments were compared with each other. That held only
+// because SOFA's clamp made the refraction flat below 2.87°: it now follows
+// the horizon, about 10′ per degree there, and the pipelines' 9.5″ apart in
+// altitude put 1.6″ between their increments with both exactly right.
 func TestRefractionMatchesTheStellarPipeline(t *testing.T) {
 	t.Parallel()
 
 	withAtm, noAtm := refractionScene(t)
 
-	// One arcsecond, which is the bound #100 asked for. Measured agreement is
-	// far tighter — a few milliarcsec below the clamp, under 0.2 arcsec above
-	// it — so this has room for platform rounding without admitting a
-	// regression.
-	const toleranceArcsec = 1.0
+	// Both pipelines refract their own geometric altitude through the same
+	// arithmetic as atmosphere's model, from the same constants, so what is
+	// left is the rounding of differencing two altitudes.
+	const toleranceArcsec = 1e-6
+
+	atm := withAtm.Refraction()
 
 	var checked int
 
@@ -105,11 +112,19 @@ func TestRefractionMatchesTheStellarPipeline(t *testing.T) {
 
 		stellarRefraction := sr.Alt().Degrees() - sg.Alt().Degrees()
 
-		if d := math.Abs(vectorRefraction-stellarRefraction) * 3600; d > toleranceArcsec {
-			t.Errorf("at geometric %+.3f°: the vector pipeline refracts by %.5f° and the "+
-				"stellar pipeline by %.5f°, a difference of %.2f arcsec.\n"+
-				"  Both must be SOFA's Atioq model — reproduce the routine rather than "+
-				"re-deriving it.", geometric, vectorRefraction, stellarRefraction, d)
+		for _, p := range []struct {
+			name       string
+			geometric  float64
+			refraction float64
+		}{
+			{"vector", geometric, vectorRefraction},
+			{"stellar", sg.Alt().Degrees(), stellarRefraction},
+		} {
+			want := atm.RefractFromTrue(angle.Deg(p.geometric)).Degrees()
+			if d := math.Abs(p.refraction-want) * 3600; d > toleranceArcsec {
+				t.Errorf("at geometric %+.5f°: the %s pipeline refracts by %.7f° and the "+
+					"model by %.7f°, %.2e arcsec apart", p.geometric, p.name, p.refraction, want, d)
+			}
 		}
 	}
 
@@ -138,6 +153,13 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 	// admits a plausible model and excludes a diverging one.
 	const maxDegrees = 1.0
 
+	// Since #588 a line of sight more than about 4° below the horizon is not
+	// refracted at all, so there the two Contexts' altitudes are the same
+	// number reached twice, and on arm64, where Go fuses multiply-adds, they
+	// came out a hair apart, below zero. 1e-9° is 3.6 microarcseconds: noise
+	// passes it, any refraction that lowers an object does not.
+	const noiseDegrees = 1e-9
+
 	type sample struct {
 		geometric, refraction float64
 	}
@@ -154,9 +176,9 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 		switch {
 		case math.IsNaN(refraction) || math.IsInf(refraction, 0):
 			t.Fatalf("at geometric %+.3f°: refraction is %v", geometric, refraction)
-		case refraction < 0:
-			t.Errorf("at geometric %+.3f°: refraction is %.4f°, but refraction raises "+
-				"an object, never lowers it", geometric, refraction)
+		case refraction < -noiseDegrees:
+			t.Errorf("at geometric %+.3f°: refraction is %.3g arcsec, but refraction raises "+
+				"an object, never lowers it", geometric, refraction*3600)
 		case refraction > maxDegrees:
 			t.Errorf("at geometric %+.3f°: refraction is %.4f°, which exceeds anything "+
 				"physical — the series has diverged. This is the +7028° defect's "+
@@ -205,4 +227,68 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 	}
 
 	t.Logf("%d samples bounded; monotonic above %.1f°", len(samples), monotonicAbove)
+}
+
+// TestAltAzToICRSInvertsRefractionNearTheHorizon: going to the observed place
+// and back returns the catalog place, from 3° below the horizon to 15° above,
+// for the default model and for an explicit one. Below 10° the inverse takes
+// refraction out through the hand-over to Bennett-NA (#588), and below 5° it
+// is the exact inverse of the forward direction; between, the round trip is
+// as good as SOFA's own two directions, whose disagreement the forward one
+// carries through the hand-over; above 10° it is SOFA's Atioq and Atoiq.
+//
+// Measured with the default model: 8e-8 arcsec below 5°, 0.025 through the
+// hand-over and 0.015 from 10° to 15°. RefractionBennett inverts its own
+// formula, so with it the round trip is exact at every altitude.
+func TestAltAzToICRSInvertsRefractionNearTheHorizon(t *testing.T) {
+	t.Parallel()
+
+	withAtm, _ := refractionScene(t)
+
+	bennett := withAtm.Refraction()
+	bennett.Model = atmosphere.RefractionBennett{}
+
+	explicit := coord.NewContext(withAtm.Time(), withAtm.Site(), bennett)
+
+	var checked int
+
+	for _, c := range []struct {
+		name string
+		ctx  *coord.Context
+	}{{"default", withAtm}, {"RefractionBennett", explicit}} {
+		for raDeg := 0.0; raDeg < 360.0; raDeg += 0.05 {
+			icrs := coord.NewICRS(angle.Deg(raDeg), angle.Deg(-20))
+
+			aa, err := c.ctx.ICRSToAltAz(icrs)
+			if err != nil {
+				t.Fatalf("ICRSToAltAz: %v", err)
+			}
+
+			alt := aa.Alt().Degrees()
+			if alt < -3 || alt > 15 {
+				continue
+			}
+
+			back, err := c.ctx.AltAzToICRS(aa)
+			if err != nil {
+				t.Fatalf("AltAzToICRS: %v", err)
+			}
+
+			checked++
+
+			tolerance := 0.05 // arcseconds: SOFA's own directions, through the hand-over
+			if alt < 5 || c.ctx == explicit {
+				tolerance = 1e-5
+			}
+
+			if d := coord.Separation(icrs, back).Arcseconds(); d > tolerance {
+				t.Errorf("%s, observed %.3f°: back %.4f arcsec from the catalog place, beyond %g",
+					c.name, alt, d, tolerance)
+			}
+		}
+	}
+
+	if checked < 100 {
+		t.Fatalf("only %d places between -3° and 15°; the sweep is not exercising the horizon", checked)
+	}
 }

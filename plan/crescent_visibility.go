@@ -267,14 +267,11 @@ func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.
 // semi-diameter SD′, raised by refraction at the site's pressure and
 // temperature.
 //
-// The refraction is Saemundsson's (1986), which holds to the horizon. The
-// default model, SOFA's A·tan z + B·tan³ z, holds refraction at about 10′
-// below 3° of altitude, where these crescents are, against 29′ on the
-// horizon, and would put every lower limb near the horizon a third of a
-// degree low.
+// The refraction is the site's own, which holds to the horizon, where these
+// crescents are. Until #588 it had to be forced to Saemundsson's formula: the
+// default then held SOFA's series at about 10′ below 3° of altitude, and
+// would have put every lower limb near the horizon a third of a degree low.
 func apparentLowerLimb(g crescentGeometry, site atmosphere.Refraction) float64 {
-	site.Model = atmosphere.RefractionRigorous{}
-
 	limb := angle.Deg(g.moonTopo.Alt().Degrees() - g.topocentricSemiDiameterArcmin()/60)
 
 	return limb.Degrees() + site.RefractFromTrue(limb).Degrees()

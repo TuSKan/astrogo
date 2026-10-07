@@ -209,11 +209,11 @@ tables you can check against published references.
 - `coord.SubPoint`/`SmallCircle` — the geodetic point where a distant body (Sun, Moon, planet) is at the zenith, and a spherical small-circle sampler for drawing it (used by `plan.Terminator` below)
 
 ### Atmospheric Modeling (`atmosphere`)
-- **SOFA-rigorous refraction by default** at all altitudes (ICAO standard atmosphere)
+- **Refraction to the horizon by default** (ICAO standard atmosphere): SOFA's series above 10° altitude, handed over to Bennett-NA below 5°, within 13″ of Hohenkerk & Sinclair's ray tracing on the horizon
 - Pluggable `RefractionModel` interface with bidirectional refraction
 - `RefractionNone` — bypass refraction
-- `RefractionApproximate` — Saemundsson/Bennett tangent formula (~12 ns/call)
-- `RefractionRigorous` — full pressure/temperature/humidity/wavelength correction (~14 ns/call)
+- `RefractionBennett` — Bennett's formula as refitted to the Nautical Almanac's tables, with pressure, temperature and wavelength; the almanac's table to 0.12′
+- `RefractionSOFA` — the default above
 - Pickering (2002) airmass — stable down to 0° altitude (overcomes Kasten & Young limitations)
 - Chromatic atmospheric dispersion via `Reducer.Disperse()`
 

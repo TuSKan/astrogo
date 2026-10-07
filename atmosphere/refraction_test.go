@@ -11,8 +11,8 @@ import (
 
 // ── Refraction Correctness ───────────────────────────────────────────────────
 
-func TestRefractionRigorous_KnownValues(t *testing.T) {
-	model := RefractionRigorous{}
+func TestRefractionBennett_KnownValues(t *testing.T) {
+	model := RefractionBennett{}
 	env := StandardRefraction()
 
 	tests := []struct {
@@ -26,8 +26,8 @@ func TestRefractionRigorous_KnownValues(t *testing.T) {
 		{"medium_20", 20, 2.4, 2.8},
 		{"low_10", 10, 5.0, 5.6},
 		{"horizon_0", 0, 28.0, 40.0},
-		// Below horizon: should return 0
-		{"below_-10", -10, 0.0, 0.001},
+		// A line of sight well into the ground is not refracted.
+		{"below_-10", -10, 0.0, 0.0},
 	}
 
 	for _, tt := range tests {
@@ -48,89 +48,107 @@ func TestRefractionRigorous_KnownValues(t *testing.T) {
 	}
 }
 
-func TestRefractionApproximate_KnownValues(t *testing.T) {
-	model := RefractionApproximate{}
+// TestRefractionBennettRoundTripsExactly: the true-to-observed direction is
+// the observed-to-true formula inverted, so going there and back returns the
+// altitude. The two directions used to be separate fits, Saemundsson's and
+// Bennett's, 38 arcseconds apart at a true altitude of −1° (#588).
+func TestRefractionBennettRoundTripsExactly(t *testing.T) {
 	env := StandardRefraction()
 
-	// At 45° altitude, Saemundsson and Bennett should agree within ~0.1 arcmin.
-	refTrue := model.RefractFromTrue(angle.Deg(45), env)
-	refApp := model.RefractFromApparent(angle.Deg(45), env)
+	for h := -6.0; h <= 90; h += 0.25 {
+		r := RefractionBennett{}.RefractFromTrue(angle.Deg(h), env)
+		back := RefractionBennett{}.RefractFromApparent(angle.Deg(h)+r, env)
 
-	diffArcmin := math.Abs(refTrue.Degrees()-refApp.Degrees()) * 60.0
-	if diffArcmin > 0.15 {
-		t.Errorf("true vs apparent at 45°: diff=%.3f arcmin, want <0.15", diffArcmin)
+		if d := (back - r).Arcseconds(); math.Abs(d) > 1e-6 {
+			t.Errorf("true %.2f°: %.6f″ forward, %.6f″ back, %+.2e″ apart",
+				h, r.Arcseconds(), back.Arcseconds(), d)
+		}
 	}
 }
 
-// TestRefraction_LowAltitudeCutoffClearsSingularities is a regression test
-// for R13: the cutoff used to be -5.0°, which is past Bennett's (1982)
-// 7.31/(h+4.4) singularity at h=-4.4° — for h in [-5.0, -4.4), the formula
-// still evaluated and could spike arbitrarily (a huge tan() argument reduced
-// mod 360° lands unpredictably). lowAltitudeCutoffDeg (-4.0°) must clear
-// both RefractFromTrue's (-5.11°) and RefractFromApparent's (-4.4°)
-// singularities with margin, so no altitude in the evaluated range should
-// ever produce a wildly large correction.
-func TestRefraction_LowAltitudeCutoffClearsSingularities(t *testing.T) {
-	env := StandardRefraction()
+// TestRefractionBennettTapersBelowItsTurnover: below an apparent altitude of
+// √7.32 − 4.32 ≈ −1.61° the formula's argument grows again, and it would fall
+// from 52.5′ to 3′ at −4° and then through its pole at −4.32°. Instead it
+// tapers smoothly to zero, at −4.24° at 10 °C and 1010 hPa, so a line of
+// sight into the ground is not refracted. Until #588 the old pair of formulas
+// fell through that region and then dropped to zero at a cutoff of −4°.
+//
+// Three properties: the refraction is continuous across the turnover and the
+// taper, it is zero below the taper, and the apparent altitude rises with the
+// true one all the way down, so the forward direction can be inverted. The
+// last is checked in the coldest, densest air the taper has to survive and
+// at SOFA's shortest wavelength, which double the refraction.
+func TestRefractionBennettTapersBelowItsTurnover(t *testing.T) {
+	turnover := math.Sqrt(7.32) - 4.32
 
-	for _, model := range []RefractionModel{RefractionApproximate{}, RefractionRigorous{}} {
-		for h := lowAltitudeCutoffDeg; h <= 10; h += 0.05 {
-			refTrue := model.RefractFromTrue(angle.Deg(h), env)
-			refApp := model.RefractFromApparent(angle.Deg(h), env)
-
-			// A legitimate refraction correction near the horizon is at most
-			// a few tens of arcminutes (~35' at h=0); anything above 1°
-			// indicates the formula has hit the near-singularity blow-up
-			// this test guards against.
-			const maxSaneArcmin = 60.0
-
-			if math.Abs(refTrue.Degrees())*60 > maxSaneArcmin {
-				t.Errorf("%T.RefractFromTrue(%.2f) = %v arcmin, want <%v (near-singularity blow-up)",
-					model, h, refTrue.Degrees()*60, maxSaneArcmin)
-			}
-
-			if math.Abs(refApp.Degrees())*60 > maxSaneArcmin {
-				t.Errorf("%T.RefractFromApparent(%.2f) = %v arcmin, want <%v (near-singularity blow-up)",
-					model, h, refApp.Degrees()*60, maxSaneArcmin)
-			}
-		}
-	}
-
-	// Below the cutoff, both models must return exactly zero.
-	below := angle.Deg(lowAltitudeCutoffDeg - 0.01)
-	for _, model := range []RefractionModel{RefractionApproximate{}, RefractionRigorous{}} {
-		if r := model.RefractFromTrue(below, env); r != 0 {
-			t.Errorf("%T.RefractFromTrue below cutoff = %v, want 0", model, r)
+	for _, env := range []Refraction{
+		{Pressure: 1010, Temperature: 10},
+		{Pressure: 1080, Temperature: -60, Wavelength: 0.1},
+	} {
+		at := func(h float64) float64 {
+			return RefractionBennett{}.RefractFromApparent(angle.Deg(h), env).Arcminutes()
 		}
 
-		if r := model.RefractFromApparent(below, env); r != 0 {
-			t.Errorf("%T.RefractFromApparent below cutoff = %v, want 0", model, r)
+		if d := math.Abs(at(turnover+1e-9) - at(turnover-1e-9)); d > 1e-6 {
+			t.Errorf("%+v: the refraction steps by %.2e′ at the turnover", env, d)
+		}
+
+		r0 := at(turnover)
+		zero := turnover - 3*r0/60
+
+		if got := at(zero - 0.01); got != 0 {
+			t.Errorf("%+v: %.4f′ at %.2f°, below the taper's end at %.2f°; want 0", env, got, zero-0.01, zero)
+		}
+
+		if got := at(zero + 0.01); got <= 0 {
+			t.Errorf("%+v: %.4f′ at %.2f°, just inside the taper; want it still positive", env, got, zero+0.01)
+		}
+
+		prevApparent := math.Inf(-1)
+
+		for h := -30.0; h <= 20; h += 0.001 {
+			apparent := h + RefractionBennett{}.RefractFromTrue(angle.Deg(h), env).Degrees()
+			if apparent <= prevApparent {
+				t.Fatalf("%+v: true %.3f°: apparent %.5f° is not above the %.5f° of the true altitude below it",
+					env, h, apparent, prevApparent)
+			}
+
+			prevApparent = apparent
 		}
 	}
 }
 
 func TestRefraction_ZeroPressure(t *testing.T) {
-	model := RefractionRigorous{}
 	env := Refraction{Pressure: 0, Temperature: 15, Humidity: 0.5, Wavelength: 0.55}
 
-	ref := model.RefractFromTrue(angle.Deg(45), env)
-	if ref.Degrees() != 0 {
-		t.Errorf("zero pressure should produce zero refraction, got %v", ref)
+	for _, model := range []RefractionModel{RefractionBennett{}, RefractionSOFA{}} {
+		for _, alt := range []float64{-2, 0, 3, 45} {
+			if ref := model.RefractFromTrue(angle.Deg(alt), env); ref != 0 {
+				t.Errorf("%T at %g°: zero pressure should produce zero refraction, got %v", model, alt, ref)
+			}
+
+			if ref := model.RefractFromApparent(angle.Deg(alt), env); ref != 0 {
+				t.Errorf("%T at apparent %g°: zero pressure should produce zero refraction, got %v", model, alt, ref)
+			}
+		}
 	}
 }
 
 func TestRefraction_WavelengthDependence(t *testing.T) {
-	model := RefractionRigorous{}
 	envBlue := Refraction{Pressure: 1013.25, Temperature: 15, Humidity: 0.5, Wavelength: 0.40}
 	envRed := Refraction{Pressure: 1013.25, Temperature: 15, Humidity: 0.5, Wavelength: 0.70}
 
-	refBlue := model.RefractFromTrue(angle.Deg(20), envBlue)
-	refRed := model.RefractFromTrue(angle.Deg(20), envRed)
+	for _, model := range []RefractionModel{RefractionBennett{}, RefractionSOFA{}} {
+		for _, alt := range []float64{0, 3, 20} {
+			refBlue := model.RefractFromTrue(angle.Deg(alt), envBlue)
+			refRed := model.RefractFromTrue(angle.Deg(alt), envRed)
 
-	// Shorter wavelength (blue) should refract MORE than longer wavelength (red).
-	if refBlue.Degrees() <= refRed.Degrees() {
-		t.Errorf("blue (λ=0.40μm) should refract more than red (λ=0.70μm): blue=%.4f° red=%.4f°",
-			refBlue.Degrees(), refRed.Degrees())
+			// Shorter wavelength (blue) should refract MORE than longer wavelength (red).
+			if refBlue.Degrees() <= refRed.Degrees() {
+				t.Errorf("%T at %g°: blue (λ=0.40μm) should refract more than red (λ=0.70μm): blue=%.4f° red=%.4f°",
+					model, alt, refBlue.Degrees(), refRed.Degrees())
+			}
+		}
 	}
 }
 

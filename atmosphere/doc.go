@@ -7,10 +7,12 @@
 // pluggable [RefractionModel] interface and its three concrete
 // implementations:
 //
-//   - [RefractionNone]          — disables refraction entirely.
-//   - [RefractionApproximate]   — Saemundsson/Bennett tangent formula (~0.1 arcmin above 15°).
-//   - [RefractionRigorous]      — Saemundsson (1986) / Bennett (1982) with pressure, temperature,
-//     humidity, and wavelength corrections.
+//   - [RefractionNone]    — disables refraction entirely.
+//   - [RefractionBennett] — Bennett's formula as refitted to the Nautical
+//     Almanac's tables, scaled by pressure, temperature and wavelength; the
+//     almanac's table to 0.12′, from the horizon up.
+//   - [RefractionSOFA]    — SOFA's A·tan z + B·tan³ z above 10° altitude,
+//     handed over to RefractionBennett below 5°; the default.
 //
 // The package also provides the [Airmass] function (Pickering 2002) and the
 // [ZenithDistance] helper.

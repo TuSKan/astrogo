@@ -58,8 +58,9 @@ func TestAltAzRoundTrip(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	// Round-trip through refraction and Earth rotation should be very close,
-	// but Saemundsson / Bennett empirical models are not algebraically perfect inverses.
-	// Tolerating ~3.6 arcsec (1e-3 deg) which is standard for mixed empirical mappings.
+	// but SOFA's forward and reverse refraction series are not exact inverses
+	// (0.018 arcsec apart at 10 degrees, more lower down).
+	// Tolerating ~3.6 arcsec (1e-3 deg).
 	testutil.AssertNear(t, "AltAz RoundTrip RA", back.RA().Degrees(), icrs.RA().Degrees(), 1e-3)
 	testutil.AssertNear(t, "AltAz RoundTrip Dec", back.Dec().Degrees(), icrs.Dec().Degrees(), 1e-3)
 }
@@ -185,15 +186,15 @@ func TestRefractionModes(t *testing.T) {
 	ctxNone := coord.NewContext(obsTime, site, atmNone)
 	obsNone := ctxNone.AstrometricToObserved(astro)
 
-	// 2. SOFA (Native) Refraction Model
+	// 2. SOFA Refraction Model, set explicitly
 	atmSOFA := atmosphere.StandardRefraction()
-	atmSOFA.Model = atmosphere.RefractionRigorous{}
+	atmSOFA.Model = atmosphere.RefractionSOFA{}
 	ctxSOFA := coord.NewContext(obsTime, site, atmSOFA)
 	obsSOFA := ctxSOFA.AstrometricToObserved(astro)
 
-	// 3. Approximate Refraction Model
+	// 3. Bennett Refraction Model
 	atmApprox := atmosphere.StandardRefraction()
-	atmApprox.Model = atmosphere.RefractionApproximate{}
+	atmApprox.Model = atmosphere.RefractionBennett{}
 	ctxApprox := coord.NewContext(obsTime, site, atmApprox)
 	obsApprox := ctxApprox.AstrometricToObserved(astro)
 

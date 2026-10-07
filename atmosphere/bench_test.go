@@ -8,8 +8,8 @@ import (
 
 // ── Refraction Model Benchmarks ──────────────────────────────────────────────
 
-func BenchmarkRefractionRigorous_FromTrue(b *testing.B) {
-	model := RefractionRigorous{}
+func BenchmarkRefractionBennett_FromTrue(b *testing.B) {
+	model := RefractionBennett{}
 	env := StandardRefraction()
 	alt := angle.Deg(30)
 
@@ -18,8 +18,8 @@ func BenchmarkRefractionRigorous_FromTrue(b *testing.B) {
 	}
 }
 
-func BenchmarkRefractionRigorous_FromApparent(b *testing.B) {
-	model := RefractionRigorous{}
+func BenchmarkRefractionBennett_FromApparent(b *testing.B) {
+	model := RefractionBennett{}
 	env := StandardRefraction()
 	alt := angle.Deg(30)
 
@@ -28,8 +28,18 @@ func BenchmarkRefractionRigorous_FromApparent(b *testing.B) {
 	}
 }
 
-func BenchmarkRefractionApproximate_FromTrue(b *testing.B) {
-	model := RefractionApproximate{}
+func BenchmarkRefractionBennett_Horizon(b *testing.B) {
+	model := RefractionBennett{}
+	env := StandardRefraction()
+	alt := angle.Deg(0) // worst case: horizon
+
+	for b.Loop() {
+		_ = model.RefractFromTrue(alt, env)
+	}
+}
+
+func BenchmarkRefractionSOFA_FromTrue(b *testing.B) {
+	model := RefractionSOFA{}
 	env := StandardRefraction()
 	alt := angle.Deg(30)
 
@@ -38,10 +48,10 @@ func BenchmarkRefractionApproximate_FromTrue(b *testing.B) {
 	}
 }
 
-func BenchmarkRefractionRigorous_Horizon(b *testing.B) {
-	model := RefractionRigorous{}
+func BenchmarkRefractionSOFA_Horizon(b *testing.B) {
+	model := RefractionSOFA{}
 	env := StandardRefraction()
-	alt := angle.Deg(0) // worst case: horizon
+	alt := angle.Deg(0) // the hand-over to Bennett-NA, inverted
 
 	for b.Loop() {
 		_ = model.RefractFromTrue(alt, env)

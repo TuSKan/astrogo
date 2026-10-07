@@ -50,6 +50,12 @@ const goldenTol = 1e-12
 // Moon. Their numbers still move with the date, through the zodiacal light's
 // dependence on solar elongation, which is why all four tables were regenerated
 // together rather than two of them being left alone.
+//
+// #588 moved the zodiacal rows of GAMBONSFull and Observatory, and the totals
+// with them, by up to 3e-5 relative and nothing else: their scattered-light
+// integrals sample the sky below 10° of altitude, where refraction now hands
+// over to Bennett-NA instead of holding SOFA's clamp, and the zodiacal table
+// is the one smooth enough to follow the arcminutes that moved.
 func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
 	tb.Helper()
 
@@ -208,30 +214,30 @@ var gambonsFullGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.9185382323796635e-10},
 	{90, skybrightness.DiffuseGalactic, 4.2844393144166162e-11},
 	{90, skybrightness.Extragalactic, 1.238079005964017e-11},
-	{90, skybrightness.Zodiacal, 1.6718224844499058e-09},
+	{90, skybrightness.Zodiacal, 1.6718188028253846e-09},
 	{90, skybrightness.AirglowContinuum, 2.5788686481672761e-09},
-	{90, totalSurfaceBrightness, 21.181520287614802},
+	{90, totalSurfaceBrightness, 21.181521040173887},
 
 	{60, skybrightness.Starlight, 9.8960429863641313e-10},
 	{60, skybrightness.DiffuseGalactic, 4.2747222054880267e-11},
 	{60, skybrightness.Extragalactic, 1.2352710426156573e-11},
-	{60, skybrightness.Zodiacal, 1.7161712961133313e-09},
+	{60, skybrightness.Zodiacal, 1.7161670056261378e-09},
 	{60, skybrightness.AirglowContinuum, 2.9516262945475295e-09},
-	{60, totalSurfaceBrightness, 21.099855920294669},
+	{60, totalSurfaceBrightness, 21.099856733594549},
 
 	{30, skybrightness.Starlight, 9.7624049428941108e-10},
 	{30, skybrightness.DiffuseGalactic, 4.2169955451747658e-11},
 	{30, skybrightness.Extragalactic, 1.2185897079127065e-11},
-	{30, skybrightness.Zodiacal, 1.0578527754513231e-09},
+	{30, skybrightness.Zodiacal, 1.0578449423765218e-09},
 	{30, skybrightness.AirglowContinuum, 4.7739343029753323e-09},
-	{30, totalSurfaceBrightness, 20.901617682536759},
+	{30, totalSurfaceBrightness, 20.901618917197496},
 
 	{10, skybrightness.Starlight, 9.1001151633863401e-10},
 	{10, skybrightness.DiffuseGalactic, 3.9309110131218376e-11},
 	{10, skybrightness.Extragalactic, 1.135919555047209e-11},
-	{10, skybrightness.Zodiacal, 8.4306057588171762e-10},
+	{10, skybrightness.Zodiacal, 8.4304185880121422e-10},
 	{10, skybrightness.AirglowContinuum, 8.8603798273970605e-09},
-	{10, totalSurfaceBrightness, 20.426833405804501},
+	{10, totalSurfaceBrightness, 20.426835296328466},
 }
 
 // The GAMBONS web preset produces exactly the numbers it produced when they
@@ -329,38 +335,38 @@ var observatoryGolden = []goldenRow{
 	{90, skybrightness.Starlight, 1.0066020303432268e-09},
 	{90, skybrightness.DiffuseGalactic, 4.3481460793234216e-11},
 	{90, skybrightness.Extragalactic, 1.2564884178802038e-11},
-	{90, skybrightness.Zodiacal, 1.6930999299633406e-09},
+	{90, skybrightness.Zodiacal, 1.693095058467329e-09},
 	{90, skybrightness.AirglowContinuum, 2.6478108272245852e-09},
 	{90, skybrightness.Moonlight, 1.0222952902998189e-07},
 	{90, skybrightness.Artificial, 8.4639173450219717e-08},
-	{90, totalSurfaceBrightness, 17.278020958172576},
+	{90, totalSurfaceBrightness, 17.278020985809246},
 
 	{60, skybrightness.Starlight, 1.0062187658169592e-09},
 	{60, skybrightness.DiffuseGalactic, 4.3464905192341308e-11},
 	{60, skybrightness.Extragalactic, 1.2560100089124851e-11},
-	{60, skybrightness.Zodiacal, 1.7404191874449971e-09},
+	{60, skybrightness.Zodiacal, 1.7404135103067849e-09},
 	{60, skybrightness.AirglowContinuum, 3.0341282189366305e-09},
 	{60, skybrightness.Moonlight, 8.8363621001293378e-08},
 	{60, skybrightness.Artificial, 1.1741516319643428e-07},
-	{60, totalSurfaceBrightness, 17.172947207598689},
+	{60, totalSurfaceBrightness, 17.172947236833163},
 
 	{30, skybrightness.Starlight, 1.0022793132197267e-09},
 	{30, skybrightness.DiffuseGalactic, 4.3294735504132998e-11},
 	{30, skybrightness.Extragalactic, 1.2510925972522657e-11},
-	{30, skybrightness.Zodiacal, 1.0931127926279629e-09},
+	{30, skybrightness.Zodiacal, 1.093102427966267e-09},
 	{30, skybrightness.AirglowContinuum, 4.9242262169215958e-09},
 	{30, skybrightness.Moonlight, 7.4085189493413251e-08},
 	{30, skybrightness.Artificial, 2.6030405951465619e-07},
-	{30, totalSurfaceBrightness, 16.654599098071458},
+	{30, totalSurfaceBrightness, 16.654599131112203},
 
 	{10, skybrightness.Starlight, 9.6671969658419908e-10},
 	{10, skybrightness.DiffuseGalactic, 4.1758692430553132e-11},
 	{10, skybrightness.Extragalactic, 1.2067053964519993e-11},
-	{10, skybrightness.Zodiacal, 9.1720208255802415e-10},
+	{10, skybrightness.Zodiacal, 9.1717731626735636e-10},
 	{10, skybrightness.AirglowContinuum, 9.2177897305315865e-09},
 	{10, skybrightness.Moonlight, 1.2972639735517454e-07},
 	{10, skybrightness.Artificial, 7.8099677446004759e-07},
-	{10, totalSurfaceBrightness, 15.580433954602917},
+	{10, totalSurfaceBrightness, 15.580433983678223},
 }
 
 // checkPresetGolden compares one preset against its own locked table.
