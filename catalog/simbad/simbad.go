@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -125,6 +126,12 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // brightest-first — the bulk counterpart to Resolve/Search's name-driven
 // lookup (see BuildBrightQuery for why this can't reuse ResolveObject's
 // query/parse path directly).
+//
+// With req.Limit set it returns at most that many. Without one it returns
+// every object, up to 50,000, SIMBAD's own default output limit; a bound
+// faint enough to pass that (about V 8.1) gets the 50,000 brightest followed
+// by an error wrapping [ErrBrightTruncated], never a short list that looks
+// complete. Only a complete list is cached.
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -133,6 +140,13 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 
 	adql := BuildBrightQuery(req)
 	v := TAPRequest(adql)
+
+	// The service stops at its default 50,000 rows unless asked for more, and
+	// a CSV answer does not say it stopped. One row past the cap is what
+	// tells a cut list from a complete one.
+	if req.Limit <= 0 {
+		v.Set("MAXREC", strconv.Itoa(brightRowCap+1))
+	}
 
 	return func(yield func(resolve.Target, error) bool) {
 		body, err := p.client.PostForm(ctx, remote.SIMBAD, "", v)
@@ -154,7 +168,10 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 			return
 		}
 
-		if err := p.cache.Set(cacheKey, targets); err != nil {
+		truncated := req.Limit <= 0 && len(targets) > brightRowCap
+		if truncated {
+			targets = targets[:brightRowCap]
+		} else if err := p.cache.Set(cacheKey, targets); err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
@@ -163,6 +180,11 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 			if !yield(t, nil) {
 				return
 			}
+		}
+
+		if truncated {
+			yield(resolve.Target{}, fmt.Errorf("%w: SIMBAD has more than %d objects brighter than V %g",
+				ErrBrightTruncated, brightRowCap, req.MaxVMag))
 		}
 	}
 }
