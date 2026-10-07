@@ -82,7 +82,7 @@ module does not grow a private copy of atmospheric physics or photometry.
 | Capability | Home | Rationale |
 | :--- | :--- | :--- |
 | Rayleigh and aerosol scattering, molecular absorption, transmission, vertical profiles, spherical airmass, cloud optical properties | `atmosphere` | Already owns `Atmosphere`, `Aerosol`, `CloudLayer`, `CloudPhase`, `VerticalProfile`, `Airmass`. A weather or seeing constraint needs the same physics. |
-| Passbands, response curves, AB/Vega/ST systems, surface brightness | `magnitude` | Already owns photometric conversion (`GaiaGToJohnsonV`, `StarApparent`, `ExtinctionAtAltitude`). |
+| Passbands, response curves, AB/Vega/ST systems, surface brightness | `magnitude` | Already owns photometric conversion (`GaiaGToJohnsonV`, `StarApparent`). |
 | Throughput, detector QE/PDE, collecting area, pixel solid angle, photon and electron rates | `optics` | Already owns `Telescope`, `Eyepiece`, `Sensor`. One `Sensor` definition then serves both optical arithmetic and background rates. |
 | Spectral quantity types, the shared wavelength axis | `unit` | `SpectralRadiance`, `WavelengthNM`, `SpectralGrid` and friends. Must sit below both `magnitude` and `skybrightness`. |
 | Physical constants | `constants` | `PhotonEnergyJ`, `ToPhoton`/`ToEnergy`, `ArcsecondSquaredToSteradian`, `SI2019`. |

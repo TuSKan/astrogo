@@ -505,34 +505,14 @@ func TestSatelliteMolczanPredictsFainterForTheSameObject(t *testing.T) {
 // Star — Extinction
 // ══════════════════════════════════════════════════════════════════════════════
 
-func TestStarApparent_ZeroAirmass(t *testing.T) {
-	m := magnitude.StarApparent(5.0, 0.0)
-	assertNear(t, "star X=0", m, 5.0, 0.001)
-}
-
-func TestStarApparent_DefaultExtinction(t *testing.T) {
-	// k(V)=0.20, X=2: m = 5.0 + 0.20*2 = 5.40
-	m := magnitude.StarApparent(5.0, 2.0)
-	assertNear(t, "star X=2", m, 5.4, 0.001)
-}
-
-func TestStarApparent_BandExtinction(t *testing.T) {
-	// B-band: k=0.30, X=1.5: m = 3.0 + 0.30*1.5 = 3.45
-	m := magnitude.StarApparent(3.0, 1.5, magnitude.ExtinctionB)
-	assertNear(t, "star B X=1.5", m, 3.45, 0.001)
-}
-
-func TestExtinctionAtAltitude(t *testing.T) {
-	k0 := magnitude.ExtinctionAtAltitude(0.20, 0)
-	assertNear(t, "sea level", k0, 0.20, 0.001)
-
-	// 2500m: ~75% of sea level.
-	k2500 := magnitude.ExtinctionAtAltitude(0.20, 2500)
-	if k2500 >= 0.20 || k2500 < 0.10 {
-		t.Errorf("2500m: k=%.3f, expected ~0.15", k2500)
-	}
-
-	t.Logf("k(V) at 2500m = %.4f", k2500)
+// StarApparent is Bouguer's law with the caller's coefficient: the catalog
+// magnitude plus k per airmass, nothing added at zero airmass and nothing at
+// zero extinction.
+func TestStarApparentIsBouguersLaw(t *testing.T) {
+	assertNear(t, "X=2, k=0.2", magnitude.StarApparent(5.0, 2.0, 0.2), 5.4, 1e-12)
+	assertNear(t, "X=1.5, k=0.3", magnitude.StarApparent(3.0, 1.5, 0.3), 3.45, 1e-12)
+	assertNear(t, "X=0", magnitude.StarApparent(5.0, 0, 0.2), 5.0, 0)
+	assertNear(t, "k=0", magnitude.StarApparent(5.0, 2.0, 0), 5.0, 0)
 }
 
 // The direction of the G to V transformation, anchored on a star whose

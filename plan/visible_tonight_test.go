@@ -254,7 +254,8 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if want := magnitude.StarApparent(grazer.VMag, horizon); math.Abs(got.ApparentMag-want) > 1e-9 {
+	k := extinctionV(t, defaultNight(t, site.Height()))
+	if want := magnitude.StarApparent(grazer.VMag, horizon, k); math.Abs(got.ApparentMag-want) > 1e-9 {
 		t.Errorf("ApparentMag %.4f, want %.4f: the catalog magnitude extinguished at the horizon's airmass", got.ApparentMag, want)
 	}
 }
@@ -348,10 +349,10 @@ func TestVisibleTonight_SortedByApparentMag(t *testing.T) {
 // results even though its real, extinction-adjusted brightness (the
 // ApparentMag actually reported) was fainter than magLimit — live testing
 // at magLimit=2 surfaced results as faint as mag +8.5 this way.
-// magnitude.StarApparent's extinction (catMag + k*airmass, default
-// k=ExtinctionV≈0.20) always adds at least the zenith minimum, since
-// airmass is never below 1 — so a star cataloged within that margin of
-// magLimit must always be excluded once extinction is applied, a fact
+// Extinction (catMag + k*airmass, with k the default air's at V, about 0.15
+// mag per airmass at this 835 m site) always adds at least the zenith
+// minimum, since airmass is never below 1 — so a star cataloged within 0.1
+// of magLimit must always be excluded once extinction is applied, a fact
 // this test exploits to stay robust without hardcoding a specific
 // real-world altitude/airmass value.
 func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T) {
