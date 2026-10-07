@@ -153,6 +153,13 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 	// admits a plausible model and excludes a diverging one.
 	const maxDegrees = 1.0
 
+	// Since #588 a line of sight more than about 4° below the horizon is not
+	// refracted at all, so there the two Contexts' altitudes are the same
+	// number reached twice, and on arm64, where Go fuses multiply-adds, they
+	// came out a hair apart, below zero. 1e-9° is 3.6 microarcseconds: noise
+	// passes it, any refraction that lowers an object does not.
+	const noiseDegrees = 1e-9
+
 	type sample struct {
 		geometric, refraction float64
 	}
@@ -169,9 +176,9 @@ func TestRefractionIsPhysicallyBounded(t *testing.T) {
 		switch {
 		case math.IsNaN(refraction) || math.IsInf(refraction, 0):
 			t.Fatalf("at geometric %+.3f°: refraction is %v", geometric, refraction)
-		case refraction < 0:
-			t.Errorf("at geometric %+.3f°: refraction is %.4f°, but refraction raises "+
-				"an object, never lowers it", geometric, refraction)
+		case refraction < -noiseDegrees:
+			t.Errorf("at geometric %+.3f°: refraction is %.3g arcsec, but refraction raises "+
+				"an object, never lowers it", geometric, refraction*3600)
 		case refraction > maxDegrees:
 			t.Errorf("at geometric %+.3f°: refraction is %.4f°, which exceeds anything "+
 				"physical — the series has diverged. This is the +7028° defect's "+
