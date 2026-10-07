@@ -1,54 +1,22 @@
 package magnitude
 
-import "math"
-
 // ── Star Apparent Magnitude ──────────────────────────────────────────────────
 
-// Default Bouguer extinction coefficients for a clear night at sea level (mag/airmass).
-const (
-	ExtinctionV = 0.20 // Johnson V band
-	ExtinctionB = 0.30 // Johnson B band
-	ExtinctionU = 0.55 // Johnson U band
-	ExtinctionR = 0.12 // Cousins R band
-	ExtinctionI = 0.07 // Cousins I band
-)
-
-// StarApparent computes the observed apparent magnitude of a star after
-// atmospheric extinction:
+// StarApparent returns a star's magnitude as seen through the atmosphere, by
+// Bouguer's law:
 //
-//	V_obs = V_cat + k(λ) · X
+//	m_obs = m_cat + k * X
 //
-// Parameters:
-//   - catMag: catalog magnitude (any photometric band)
-//   - airmass: relative airmass at the observation altitude (use atmosphere.Airmass)
-//   - extinctionCoeff: optional Bouguer coefficient k(λ) in mag/airmass;
-//     defaults to ExtinctionV (0.20) if not provided
+// catMag is the catalog magnitude in any band, airmass the airmass X along
+// the line of sight (see [github.com/TuSKan/astrogo/atmosphere.Airmass]), and
+// k the extinction coefficient for that band, in magnitudes per airmass.
 //
-// The extinction coefficient scales with altitude above sea level.
-// Use ExtinctionAtAltitude to get altitude-corrected values.
-func StarApparent(catMag, airmass float64, extinctionCoeff ...float64) float64 {
-	k := ExtinctionV
-	if len(extinctionCoeff) > 0 {
-		k = extinctionCoeff[0]
-	}
-
+// There is no default coefficient. Extinction is the site's air: its pressure,
+// its ozone and its aerosol, which differ between sites and between nights.
+// [github.com/TuSKan/astrogo/atmosphere.Atmosphere.Extinction] gives k for a
+// particular air at a wavelength.
+func StarApparent(catMag, airmass, k float64) float64 {
 	return catMag + k*airmass
-}
-
-// ExtinctionAtAltitude returns the Bouguer extinction coefficient adjusted
-// for the observer's altitude above sea level. Extinction decreases
-// approximately exponentially with altitude:
-//
-//	k(h) = k₀ · exp(−h / H)
-//
-// where H ≈ 8500 m is the atmospheric scale height.
-//
-// Parameters:
-//   - k0: sea-level extinction coefficient (e.g. ExtinctionV)
-//   - altitudeM: observer altitude in meters
-func ExtinctionAtAltitude(k0, altitudeM float64) float64 {
-	const scaleHeight = 8500.0 // meters
-	return k0 * math.Exp(-altitudeM/scaleHeight)
 }
 
 // ── Photometric System Transformations ───────────────────────────────────────

@@ -34,12 +34,13 @@ type VisibleObject struct {
 	// Constellation/ConstellationAbbr are computed at PeakTime.
 	Constellation     string
 	ConstellationAbbr string
-	// ApparentMag is extinction-adjusted (via atmosphere.Airmass +
-	// magnitude.StarApparent's generic linear-extinction model — the
-	// physics doesn't care whether the photons came from a star, planet,
-	// asteroid, or comet), evaluated at PeakTime. A peak below 0° — above an
-	// elevated site's dipped horizon but not the astronomical one — takes
-	// the horizon's airmass, so its extinction there is a lower bound.
+	// ApparentMag is the catalog magnitude dimmed by tonight's air along the
+	// line of sight at PeakTime: magnitude.StarApparent with the air's
+	// extinction coefficient at V (see WithAtmosphere) and atmosphere.Airmass.
+	// The physics doesn't care whether the photons came from a star, planet,
+	// asteroid, or comet. A peak below 0° — above an elevated site's dipped
+	// horizon but not the astronomical one — takes the horizon's airmass, so
+	// its extinction there is a lower bound.
 	ApparentMag float64
 	// RiseTime/TransitTime/SetTime are the real geometric event instants
 	// within [start, end] — each is zero (time.Time{}) if that event
@@ -94,7 +95,31 @@ type visibleTonightConfig struct {
 	step                  unit.Duration
 	includeMoons          bool
 	forceSmallBodyKernels bool
+	air                   *atmosphere.Atmosphere
+
+	// extinctionV is air's extinction coefficient at V, in magnitudes per
+	// airmass, filled in once by VisibleTonight.
+	extinctionV float64
 }
+
+// The air VisibleTonight assumes when the caller names none, and the
+// wavelength its V magnitudes are dimmed at.
+const (
+	// defaultOzoneDU is the ozone column: 258 DU, the mean Patat et al.
+	// (2011, A&A 527, A91) derive at Paranal (RMS 14 DU), against the median
+	// of 257.4 Buton et al. (2013, A&A 549, A8) give Mauna Kea. Both sites are
+	// subtropical, and Buton et al. note that their 260 DU mean over Hawaii is
+	// lower than the worldwide one, so a site at higher latitude has more.
+	defaultOzoneDU = 258
+
+	// vPivotNM is the pivot wavelength of Bessell's V passband, the band
+	// catalog V magnitudes are in: 547.77 nm for SVO's Generic/Bessell.V, an
+	// energy-counting profile. One wavelength stands in for the band because
+	// extinction is close to linear across V; measured against the band
+	// average for a flat spectrum, the difference is at most 0.0007 mag per
+	// airmass (TestVExtinctionAtThePivotIsTheBandAverage).
+	vPivotNM = 547.8
+)
 
 // VisibleTonightOption configures VisibleTonight.
 type VisibleTonightOption func(*visibleTonightConfig)
@@ -127,6 +152,25 @@ func WithStep(d unit.Duration) VisibleTonightOption {
 // this option only controls whether VisibleTonight asks for them at all.
 func WithPlanetaryMoons() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.includeMoons = true }
+}
+
+// WithAtmosphere names tonight's air, the air every object's light is dimmed
+// by before magLimit applies to it: its surface pressure, its ozone column and
+// its aerosol. ApparentMag is the catalog V magnitude plus this air's
+// [atmosphere.Atmosphere.Extinction] at 547.8 nm, V's pivot wavelength, times
+// the airmass.
+//
+// Without it, VisibleTonight assumes a clean night at the site's height: the
+// standard atmosphere's pressure there, 258 DU of ozone, and Paranal's median
+// aerosol, [atmosphere.CleanMountainAOD550] under OPAC's continental clean
+// type. That is a clear night at a good site, which gives 0.162 mag per
+// airmass in V at sea level and 0.132 at Paranal, where Patat et al. (2011)
+// measured 0.129 to 0.131. A low or hazy site has more aerosol than that. A
+// caller who knows tonight's air should name it, for instance from
+// [github.com/TuSKan/astrogo/atmosphere/dataset/cams.AOD550], which reads the
+// Copernicus analysis for a site and an hour. A nil air restores the default.
+func WithAtmosphere(air *atmosphere.Atmosphere) VisibleTonightOption {
+	return func(c *visibleTonightConfig) { c.air = air }
 }
 
 // WithSmallBodyKernels forces every asteroid/comet/dwarf-planet/
@@ -268,6 +312,21 @@ func VisibleTonight(
 	for _, opt := range opts {
 		opt(&cfg)
 	}
+
+	air := cfg.air
+	if air == nil {
+		var err error
+		if air, err = defaultNightAir(site); err != nil {
+			return nil, fmt.Errorf("plan: visible tonight: default air: %w", err)
+		}
+	}
+
+	extinctionV, err := air.Extinction(vPivotNM)
+	if err != nil {
+		return nil, fmt.Errorf("plan: visible tonight: extinction: %w", err)
+	}
+
+	cfg.extinctionV = extinctionV
 
 	// AstronomicalDawnDusk finds the first dawn and first dusk independently
 	// within [start, end) — not "tonight's dusk paired with the dawn that
@@ -809,7 +868,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		return skipped("airmass", err)
 	}
 
-	vo.ApparentMag = magnitude.StarApparent(rawMag, airmass)
+	vo.ApparentMag = magnitude.StarApparent(rawMag, airmass, cfg.extinctionV)
 	if vo.ApparentMag >= magLimit {
 		return VisibleObject{}, false, nil
 	}
@@ -823,6 +882,14 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	}
 
 	return vo, true, nil
+}
+
+// defaultNightAir is the air VisibleTonight assumes when the caller names
+// none; see WithAtmosphere.
+func defaultNightAir(site *Site) (*atmosphere.Atmosphere, error) {
+	return atmosphere.ContinentalCleanAerosol(site.Height(), atmosphere.CleanMountainAOD550).
+		Ozone(defaultOzoneDU).
+		Build()
 }
 
 // rawMagnitude returns obj's magnitude before atmospheric extinction —

@@ -240,7 +240,7 @@ tables you can check against published references.
 - **Asteroids**: H,G · H,G₁,G₂ · H,G₁₂* · **sHG1G2** (Carry et al. 2024) — 7-parameter spin-geometry model
 - **Comets**: IAU standard M₁/k₁ (total) + M₂/k₂ (nuclear)
 - **Satellites**: McCants/Molczan sphere/cylinder phase functions
-- **Stars**: Bouguer atmospheric extinction with altitude scaling, Gaia G→V/B transformations
+- **Stars**: Bouguer extinction with the coefficient from a site's own air (`atmosphere.Atmosphere.Extinction`), Gaia G→V/B transformations
 - **Sun/Moon**: Distance modulus + Allen (2000) phase polynomial
 - **Validated against FINK/ZTF phunk pipeline** — 100% match at 0.025 mag (186 r-band observations)
 
@@ -267,7 +267,7 @@ tables you can check against published references.
 - **WCS** — pixel-to-sky mapping with TAN (Gnomonic) projection and `ExtractWCS` header parser
 
 ### Visibility & Planning
-- `plan.VisibleTonight` — "what's visible in the sky tonight brighter than magnitude X", across stars, deep-sky objects, planets, the Moon, asteroids, and comets in one call, each annotated with its constellation and extinction-adjusted apparent magnitude; `plan.WithPlanetaryMoons()` opts into the 21 major moons of Mars/Jupiter/Saturn/Uranus/Neptune/Pluto too (off by default — their SPK kernels run ~64 MB–1.1 GB each)
+- `plan.VisibleTonight` — "what's visible in the sky tonight brighter than magnitude X", across stars, deep-sky objects, planets, the Moon, asteroids, and comets in one call, each annotated with its constellation and its apparent magnitude through the site's air (`plan.WithAtmosphere`, by default a clean night at the site's height); `plan.WithPlanetaryMoons()` opts into the 21 major moons of Mars/Jupiter/Saturn/Uranus/Neptune/Pluto too (off by default — their SPK kernels run ~64 MB–1.1 GB each)
 - `plan.PlanetaryMoon`/`NewPlanetaryMoon` — dedicated type for natural satellites of planets other than Earth (Io, Titan, Triton, Charon, ...), embedding the same H-G reflectance model `Asteroid` uses; `Parent()` returns the NAIF ID of the planet it orbits
 - `plan.MeteorShower`/`MeteorShowerNames`/`NewMeteorShower` — the 9 IMO "Class I" annual showers (Quadrantids through Ursids); `RadiantAt`/`IsActive` key off the Sun's real ecliptic longitude, referred to the equinox J2000.0 as IMO tabulates it (year-independent, not calendar date), and `ObservedRate` predicts meteors/hour for a real site/time/sky-brightness condition via IMO's own ZHR formula
 - `plan.AngularDiameter`/`BodyEquatorialRadius` — apparent angular diameter for the Sun, Moon, and planets, auto-populating `TargetDetails.AngularSize`
