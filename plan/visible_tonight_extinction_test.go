@@ -153,6 +153,25 @@ func TestVisibleTonightDefaultAirFollowsTheSite(t *testing.T) {
 	t.Logf("default k(V): sea level %.4f, Paranal %.4f (Patat et al. %.3f)", kSea, kParanal, patat550)
 }
 
+// A site higher than the standard atmosphere reaches, about 44 km, has no
+// default air: the call fails before anything is evaluated, rather than
+// dimming every object through a pressure that is not a number.
+func TestVisibleTonightRefusesASiteAboveTheStandardAtmosphere(t *testing.T) {
+	t.Parallel()
+
+	site, err := plan.NewSiteEarthLocation("50 km up", -22.528478, -46.473002, 50000)
+	if err != nil {
+		t.Fatalf("NewSiteEarthLocation: %v", err)
+	}
+
+	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
+
+	_, err = plan.VisibleTonight(context.Background(), site, testNight, 2, sources, ephemeris.Default())
+	if !errors.Is(err, atmosphere.ErrAtmosphereBuilder) {
+		t.Fatalf("VisibleTonight 50 km up = %v, want ErrAtmosphereBuilder", err)
+	}
+}
+
 // An air whose extinction cannot be computed fails the call rather than
 // passing every object through undimmed. The zero Atmosphere has no surface
 // pressure.

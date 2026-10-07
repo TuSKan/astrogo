@@ -169,6 +169,8 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // caller who knows tonight's air should name it, for instance from
 // [github.com/TuSKan/astrogo/atmosphere/dataset/cams.AOD550], which reads the
 // Copernicus analysis for a site and an hour. A nil air restores the default.
+// A site above about 44 km, beyond the standard atmosphere, has no default,
+// and the call fails unless an air is named.
 func WithAtmosphere(air *atmosphere.Atmosphere) VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.air = air }
 }
@@ -886,8 +888,14 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 
 // defaultNightAir is the air VisibleTonight assumes when the caller names
 // none; see WithAtmosphere.
+//
+// The surface is set again through SurfaceAtAltitude, which the preset does
+// not do, so that the builder checks it. Above about 44 km the standard
+// atmosphere's temperature falls below absolute zero and its pressure is not
+// a number, and a site there has no default air to see through.
 func defaultNightAir(site *Site) (*atmosphere.Atmosphere, error) {
 	air, err := atmosphere.ContinentalCleanAerosol(site.Height(), atmosphere.CleanMountainAOD550).
+		SurfaceAtAltitude(site.Height()).
 		Ozone(defaultOzoneDU).
 		Build()
 	if err != nil {
