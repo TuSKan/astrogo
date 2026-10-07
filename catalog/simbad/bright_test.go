@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/remote"
 )
 
 // With no limit the bright query asks for every object, one row past the cap
@@ -70,7 +70,7 @@ func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Va
 	}))
 	t.Cleanup(server.Close)
 
-	redirect(t, remote.SIMBAD, server.URL)
+	redirect(t, server.URL)
 
 	return hits, maxrec
 }
@@ -105,7 +105,7 @@ func TestSearchBrightReturnsEveryObjectBelowTheCap(t *testing.T) {
 		t.Fatalf("got %d targets and errors %v, want all 3 and none", len(targets), errs)
 	}
 
-	if got := maxrec.Load(); got != fmt.Sprint(brightRowCap+1) {
+	if got := maxrec.Load(); got != strconv.Itoa(brightRowCap+1) {
 		t.Errorf("MAXREC = %v, want %d", got, brightRowCap+1)
 	}
 
