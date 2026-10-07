@@ -116,3 +116,38 @@ func TestSimbadNetworkSearchBright(t *testing.T) {
 		}
 	}
 }
+
+// A bright search with no limit returns every object brighter than the
+// bound. It used to return 100, the brightest of them down to V 2.46,
+// whatever the bound (#603). SIMBAD held 953 objects brighter than V 4.5 when
+// this was written; the bound below leaves room for its catalog to change.
+func TestSimbadSearchBrightReturnsEveryObject(t *testing.T) {
+	requireSimbad(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var n int
+
+	New().SearchBright(ctx, resolve.BrightRequest{MaxVMag: 4.5})(func(tgt resolve.Target, err error) bool {
+		testutil.SkipOnUpstreamFailure(t, err)
+
+		if err != nil {
+			t.Fatalf("SearchBright: %v", err)
+		}
+
+		if !tgt.HasCoord {
+			t.Errorf("%s has no position; the bright query should leave such objects out", tgt.ID)
+		}
+
+		n++
+
+		return true
+	})
+
+	if n < 800 {
+		t.Errorf("SearchBright(V < 4.5) returned %d objects; SIMBAD holds some 950", n)
+	}
+
+	t.Logf("SIMBAD objects brighter than V 4.5: %d", n)
+}
