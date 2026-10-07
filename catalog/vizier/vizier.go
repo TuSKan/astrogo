@@ -76,6 +76,12 @@ func (p *Provider) Search(_ context.Context, _ string) ([]resolve.Target, error)
 // (II/246/out), this package's original behavior. Querying a table not
 // present in this package's schema registry (tables.go) returns
 // ErrUnknownTable.
+//
+// It returns the req.Limit sources nearest the center, nearest first, or the
+// 100 nearest when req.Limit is not set. Without the ordering a TAP service
+// returns the first rows it reaches, so a cone holding more sources than the
+// limit came back as an arbitrary subset of it, as likely from the edge as
+// from the center (#605).
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	tableName := req.Table
 	if tableName == "" {
@@ -100,10 +106,13 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	rad := req.Radius.Degrees()
 
 	adql := fmt.Sprintf(`SELECT TOP %d
-	%s as designation, %s as ra, %s as dec
+	%s as designation, %s as ra, %s as dec,
+	DISTANCE(POINT('ICRS', %s, %s), POINT('ICRS', %f, %f)) AS dist
 	FROM "%s"
-	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %f, %f, %f))`,
-		limit, schema.DesigCol, schema.RACol, schema.DecCol, tableName, schema.RACol, schema.DecCol, ra, dec, rad)
+	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %f, %f, %f))
+	ORDER BY dist ASC`,
+		limit, schema.DesigCol, schema.RACol, schema.DecCol, schema.RACol, schema.DecCol, ra, dec,
+		tableName, schema.RACol, schema.DecCol, ra, dec, rad)
 
 	// The table name is part of the cache key: two different tables queried
 	// with the same cone would otherwise collide on the same entry.
