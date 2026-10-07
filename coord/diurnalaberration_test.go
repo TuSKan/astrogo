@@ -97,7 +97,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 
 	time.RegisterModel(fixedEOP{dut1: dut1Seconds, xp: xp, yp: yp})
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	utc1, utc2 := diurnalEpoch.UTC().JDParts()

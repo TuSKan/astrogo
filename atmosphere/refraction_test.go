@@ -13,7 +13,7 @@ import (
 
 func TestRefractionRigorous_KnownValues(t *testing.T) {
 	model := RefractionRigorous{}
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	tests := []struct {
 		name   string
@@ -50,7 +50,7 @@ func TestRefractionRigorous_KnownValues(t *testing.T) {
 
 func TestRefractionApproximate_KnownValues(t *testing.T) {
 	model := RefractionApproximate{}
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	// At 45° altitude, Saemundsson and Bennett should agree within ~0.1 arcmin.
 	refTrue := model.RefractFromTrue(angle.Deg(45), env)
@@ -71,7 +71,7 @@ func TestRefractionApproximate_KnownValues(t *testing.T) {
 // singularities with margin, so no altitude in the evaluated range should
 // ever produce a wildly large correction.
 func TestRefraction_LowAltitudeCutoffClearsSingularities(t *testing.T) {
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	for _, model := range []RefractionModel{RefractionApproximate{}, RefractionRigorous{}} {
 		for h := lowAltitudeCutoffDeg; h <= 10; h += 0.05 {
@@ -136,7 +136,7 @@ func TestRefraction_WavelengthDependence(t *testing.T) {
 
 func TestRefractionNone(t *testing.T) {
 	model := RefractionNone{}
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	ref := model.RefractFromTrue(angle.Deg(10), env)
 	if ref != 0 {

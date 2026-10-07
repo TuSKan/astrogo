@@ -351,14 +351,18 @@ func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Refraction
 // StandardRefraction returns a typical sea-level refraction environment
 // using the rigorous backend.
 //
-// Renamed from StandardAtmosphere alongside the Atmosphere→Refraction
-// rename, for consistency between the type and its standard-value var.
-var StandardRefraction = Refraction{
-	Pressure:    1013.25,
-	Temperature: 15.0,
-	Humidity:    0.5,
-	Wavelength:  0.55,
-	Model:       RefractionRigorous{},
+// It is a function returning a fresh value, not a var, so that no importer
+// can change it for every other one in the process (#537): as a var, one
+// `atmosphere.StandardRefraction.Model = nil` anywhere in a program switched
+// every caller's refraction model.
+func StandardRefraction() Refraction {
+	return Refraction{
+		Pressure:    1013.25,
+		Temperature: 15.0,
+		Humidity:    0.5,
+		Wavelength:  0.55,
+		Model:       RefractionRigorous{},
+	}
 }
 
 // ── Observational Metrics ─────────────────────────────────────────────────────
@@ -435,16 +439,14 @@ func HorizonDip(h unit.Length) angle.Angle {
 // [RefractionSOFA]. StandardRefraction's own RefractionRigorous is *not*
 // inherited, which this comment used to claim.
 func AtAltitude(height unit.Length) Refraction {
+	std := StandardRefraction()
+
 	if height <= 0 {
 		// Sea level: use standard ISA values but let SOFA handle refraction
 		// (Model: nil) for consistency with all other altitudes.
-		return Refraction{
-			Pressure:    StandardRefraction.Pressure,
-			Temperature: StandardRefraction.Temperature,
-			Humidity:    StandardRefraction.Humidity,
-			Wavelength:  StandardRefraction.Wavelength,
-			Model:       nil,
-		}
+		std.Model = nil
+
+		return std
 	}
 
 	const (
@@ -465,8 +467,8 @@ func AtAltitude(height unit.Length) Refraction {
 	return Refraction{
 		Pressure:    pressure,
 		Temperature: temperature,
-		Humidity:    StandardRefraction.Humidity,
-		Wavelength:  StandardRefraction.Wavelength,
+		Humidity:    std.Humidity,
+		Wavelength:  std.Wavelength,
 		Model:       nil, // Let SOFA compute refraction rigorously via Atcoq
 	}
 }

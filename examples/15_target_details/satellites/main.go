@@ -46,7 +46,7 @@ func main() {
 
 	// Use satellite epoch for calculation (you can use time.Date/Now() as well)
 	t := catTarget.Epoch
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 
 	details, err := iss.GetDetails(ctx, plan.DetailOverrides{Description: "International Space Station", Source: "NORAD TLE"})
 	if err != nil {

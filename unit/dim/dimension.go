@@ -83,8 +83,14 @@ func (d Dimension) PowInt(p int) Dimension {
 
 // ── Common Dimensions ────────────────────────────────────────────────────────
 
-// SI base and derived dimensions — immutable physical constants.
-// SI base and derived dimensions — immutable physical constants.
+// SI base and derived dimensions.
+//
+// They are vars because a Dimension is a struct, which Go cannot declare
+// const, and nothing stops an importer assigning to one. Treat them as
+// read-only: they are definitions every quantity in the module is checked
+// against. docsguard's inventory of exported vars lists this family and why
+// it is one (#537); this comment used to call them immutable, which they are
+// not.
 //
 // Unprefixed, which is the reason this package exists: unit.Length is the
 // quantity type a caller passes and dim.Length is the dimension it has, and

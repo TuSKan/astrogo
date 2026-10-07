@@ -50,7 +50,7 @@ func TestAltAzRoundTrip(t *testing.T) {
 	tm := time.FromJD(2460000.5, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(100), angle.Deg(20))
 
-	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction())
 	aa, err := ctx.ICRSToAltAz(icrs)
 	testutil.AssertNoError(t, err)
 
@@ -77,7 +77,7 @@ func TestAltAzEdgeCases(t *testing.T) {
 
 	// Zenith test
 	icrsAtZenith := coord.NewICRS(angle.Deg(280.4606), angle.Deg(0)) // Simplified
-	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction())
 	aa, _ := ctx.ICRSToAltAz(icrsAtZenith)
 	// Just check it doesn't crash and returns reasonable values.
 	if aa.Alt().Degrees() > 90 || aa.Alt().Degrees() < -90 {
@@ -162,7 +162,7 @@ func TestICRSToHourAngle(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
 	tm := time.FromJD(2451545.0, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(0), angle.Deg(0))
-	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(tm, site, atmosphere.StandardRefraction())
 	ha, err := ctx.ICRSToHourAngle(icrs)
 	testutil.AssertNoError(t, err)
 
@@ -180,19 +180,19 @@ func TestRefractionModes(t *testing.T) {
 	astro := coord.NewAstrometric(angle.Deg(270.0), angle.Deg(10.0))
 
 	// 1. No Refraction Model
-	atmNone := atmosphere.StandardRefraction
+	atmNone := atmosphere.StandardRefraction()
 	atmNone.Model = atmosphere.RefractionNone{}
 	ctxNone := coord.NewContext(obsTime, site, atmNone)
 	obsNone := ctxNone.AstrometricToObserved(astro)
 
 	// 2. SOFA (Native) Refraction Model
-	atmSOFA := atmosphere.StandardRefraction
+	atmSOFA := atmosphere.StandardRefraction()
 	atmSOFA.Model = atmosphere.RefractionRigorous{}
 	ctxSOFA := coord.NewContext(obsTime, site, atmSOFA)
 	obsSOFA := ctxSOFA.AstrometricToObserved(astro)
 
 	// 3. Approximate Refraction Model
-	atmApprox := atmosphere.StandardRefraction
+	atmApprox := atmosphere.StandardRefraction()
 	atmApprox.Model = atmosphere.RefractionApproximate{}
 	ctxApprox := coord.NewContext(obsTime, site, atmApprox)
 	obsApprox := ctxApprox.AstrometricToObserved(astro)
@@ -236,7 +236,7 @@ func TestAstrometricToCIRS(t *testing.T) {
 	obsTime := time.Date(2010, 1, 1, 12, 0, 0, 0, time.LocationUTC)
 
 	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction())
 	apparent := ctx.AstrometricToCIRS(astro)
 
 	// Basic sanity bounds checking — it should be a completely valid number
@@ -269,7 +269,7 @@ func TestCIRSToObserved(t *testing.T) {
 	apparent := coord.NewCIRS(angle.Deg(10.0), angle.Deg(45.0))
 
 	// Standard atmosphere
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 
 	ctx := coord.NewContext(obsTime, site, atm)
 	observed := ctx.CIRSToObserved(apparent)
@@ -294,7 +294,7 @@ func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
 
 	geom := coord.NewICRS(angle.Deg(150), angle.Deg(30))
 
-	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction())
 
 	// Compute using ICRSToAltAz
 	altaz1, _ := ctx.ICRSToAltAz(geom)
@@ -318,7 +318,7 @@ func TestTransformNearPole(t *testing.T) {
 	}
 
 	starNorth := coord.NewICRS(angle.Deg(0), angle.Deg(89.9))
-	ctxN := coord.NewContext(tm, locN, atmosphere.StandardRefraction)
+	ctxN := coord.NewContext(tm, locN, atmosphere.StandardRefraction())
 	aaN, err := ctxN.ICRSToAltAz(starNorth)
 	testutil.AssertNoError(t, err)
 
@@ -333,7 +333,7 @@ func TestTransformNearPole(t *testing.T) {
 	}
 
 	starEq := coord.NewICRS(angle.Deg(0), angle.Deg(0))
-	ctxS := coord.NewContext(tm, locS, atmosphere.StandardRefraction)
+	ctxS := coord.NewContext(tm, locS, atmosphere.StandardRefraction())
 	aaS, err := ctxS.ICRSToAltAz(starEq)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "Altitude at S.Pole Horizon", aaS.Alt().Degrees(), 0, 0.5)
@@ -346,7 +346,7 @@ func TestTransformBoundaryRA(t *testing.T) {
 	}
 
 	tm := fixedEpoch()
-	ctx := coord.NewContext(tm, loc, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(tm, loc, atmosphere.StandardRefraction())
 
 	// Test RA 359.999 vs 0.001 should yield very similar results
 	s1 := coord.NewICRS(angle.Deg(359.999), angle.Deg(45))
@@ -376,8 +376,8 @@ func TestNegativeLongitude(t *testing.T) {
 	tm := fixedEpoch()
 	star := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
-	ctx1 := coord.NewContext(tm, loc1, atmosphere.StandardRefraction)
-	ctx2 := coord.NewContext(tm, loc2, atmosphere.StandardRefraction)
+	ctx1 := coord.NewContext(tm, loc1, atmosphere.StandardRefraction())
+	ctx2 := coord.NewContext(tm, loc2, atmosphere.StandardRefraction())
 	aa1, _ := ctx1.ICRSToAltAz(star)
 	aa2, _ := ctx2.ICRSToAltAz(star)
 

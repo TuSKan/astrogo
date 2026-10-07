@@ -184,7 +184,7 @@ func TestPlutoElementsCarryTheObliquityRotation(t *testing.T) {
 	for y := 1800; y <= 2050; y++ {
 		at := time.Date(y, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-		pos, _, err := kepler.PlutoElements.StateAt(at)
+		pos, _, err := kepler.PlutoElements().StateAt(at)
 		if err != nil {
 			t.Fatalf("StateAt(%d): %v", y, err)
 		}

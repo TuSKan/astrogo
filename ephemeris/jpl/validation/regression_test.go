@@ -127,7 +127,7 @@ func TestScientificStability(t *testing.T) {
 
 	// Airless on both sides: the corpus manifest records that Horizons sent
 	// no APPARENT parameter, so its Az/El are unrefracted.
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	belowHorizon := 0

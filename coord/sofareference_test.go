@@ -89,7 +89,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	// RefractionNone rather than a pressure: it makes NewContext pass zero
 	// pressure to Apco13, which is the airless case Atco13 gets below, and
 	// makes the model's own contribution exactly zero rather than small.
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	type namedSite struct {
