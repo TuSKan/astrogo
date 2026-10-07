@@ -110,6 +110,7 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 		basic.ra,
 		basic.dec,
 		basic.otype,
+		otypedef.path AS otype_path,
 		basic.pmra,
 		basic.pmdec,
 		basic.plx_value,
@@ -119,6 +120,7 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 	FROM basic
 	JOIN ident ON basic.oid = ident.oidref
 	LEFT JOIN allfluxes ON basic.oid = allfluxes.oidref
+	LEFT JOIN otypedef ON basic.otype = otypedef.otype
 	WHERE basic.oid IN (SELECT oidref FROM ident WHERE id IN (%s))`,
 		limit, quoteADQL(variants))
 }
@@ -149,6 +151,7 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 		basic.ra,
 		basic.dec,
 		basic.otype,
+		otypedef.path AS otype_path,
 		basic.pmra,
 		basic.pmdec,
 		basic.plx_value,
@@ -158,6 +161,7 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 	FROM basic
 	JOIN ident ON basic.oid = ident.oidref
 	LEFT JOIN allfluxes ON basic.oid = allfluxes.oidref
+	LEFT JOIN otypedef ON basic.otype = otypedef.otype
 	WHERE ident.id LIKE '%s%%'
 	ORDER BY vmag ASC, basic.main_id ASC`, limit, safeQ)
 }
@@ -185,6 +189,7 @@ func BuildBrightQuery(req resolve.BrightRequest) string {
 		basic.ra,
 		basic.dec,
 		basic.otype,
+		otypedef.path AS otype_path,
 		basic.pmra,
 		basic.pmdec,
 		basic.plx_value,
@@ -192,6 +197,7 @@ func BuildBrightQuery(req resolve.BrightRequest) string {
 		allfluxes.V AS vmag
 	FROM basic
 	JOIN allfluxes ON basic.oid = allfluxes.oidref
+	LEFT JOIN otypedef ON basic.otype = otypedef.otype
 	WHERE allfluxes.V < %f
 	ORDER BY vmag ASC`, limit, req.MaxVMag)
 }

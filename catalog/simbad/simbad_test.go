@@ -278,42 +278,107 @@ func TestBuildBrightQuery(t *testing.T) {
 	}
 }
 
-// TestMapSimbadKind_RealBrightStarOtypes is a regression test for a real
-// bug found via live testing: the original switch only recognized "Star",
-// "V*", and "Em*" as stellar, mapping every other real SIMBAD otype to
-// KindOther — live SearchBright calls showed ordinary bright stars
-// (Sirius, Canopus, Vega, Alpha Centauri, ...) actually come back as
-// "SB*"/"PM*"/"dS*"/"RG*"/"s*b", none of which matched, so nearly every
-// real star was mislabeled. SIMBAD's own OTYPES nomenclature ends every
-// single-star classification in "*"; "**" (double/multiple star system)
-// is the one documented exception, which maps to KindDoubleStar instead.
-func TestMapSimbadKind_RealBrightStarOtypes(t *testing.T) {
+// simbadKind follows SIMBAD's own object-type hierarchy. Each row is a code
+// and the path SIMBAD's otypedef table gives it, copied from the live service,
+// with the kind an observer would call it.
+//
+// Stars that the old string match lost, because a candidate code drops the
+// '*': Aldebaran is "LP?". Galaxies it lost: M33 is "GiG", M77 "Sy2". Clusters
+// it flattened, associations it called stars, and the detection-only codes
+// that stay KindOther because SIMBAD has not said what the source is (#601).
+//
+// It was first written against SIMBAD's real bright-star codes, after a
+// switch that knew only "Star", "V*" and "Em*" mislabeled nearly every real
+// star; "Star" turned out not to be a code at all.
+func TestSimbadKindFollowsSIMBADsHierarchy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		otype string
-		want  resolve.Kind
+		otype, path string
+		want        resolve.Kind
 	}{
-		{"SB*", resolve.KindStar},  // Sirius, Canopus
-		{"PM*", resolve.KindStar},  // high proper-motion star
-		{"dS*", resolve.KindStar},  // delta Scuti variable (Vega)
-		{"RG*", resolve.KindStar},  // red giant (Arcturus)
-		{"s*b", resolve.KindStar},  // blue supergiant (Rigel)
-		{"s*r", resolve.KindStar},  // red supergiant (Betelgeuse)
-		{"WD*", resolve.KindStar},  // white dwarf
-		{"V*", resolve.KindStar},   // variable star
-		{"Em*", resolve.KindStar},  // emission-line star
-		{"Star", resolve.KindStar}, // generic
-		{"**", resolve.KindDoubleStar},
-		{"G", resolve.KindGalaxy},
-		{"PN", resolve.KindNebula},
-		{"unknown-otype", resolve.KindOther},
+		{"*", "*", resolve.KindStar},
+		{"SB*", "* > ** > SB*", resolve.KindStar},
+		{"PM*", "* > PM*", resolve.KindStar},
+		{"dS*", "* > MS* > dS*", resolve.KindStar},
+		{"RG*", "* > Ev* > RG*", resolve.KindStar},
+		{"s*b", "* > Ma* > sg* > s*b", resolve.KindStar},
+		{"s*r", "* > Ma* > sg* > s*r", resolve.KindStar},
+		{"WD*", "* > Ev* > WD*", resolve.KindStar},
+		{"V*", "* > V*", resolve.KindStar},
+		{"Em*", "* > Em*", resolve.KindStar},
+		{"EB*", "* > ** > EB*", resolve.KindStar},
+		{"LP?", "* > Ev* > LP*", resolve.KindStar},
+		{"bC?", "* > Ma* > bC*", resolve.KindStar},
+		{"EB?", "* > ** > EB*", resolve.KindStar},
+		{"s?r", "* > Ma* > sg* > s*r", resolve.KindStar},
+		{"Y*?", "* > Y*O", resolve.KindStar},
+		{"HXB", "* > ** > XB* > HXB", resolve.KindStar},
+		{"**", "* > **", resolve.KindDoubleStar},
+		{"**?", "* > **", resolve.KindDoubleStar},
+		{"PN", "* > Ev* > PN", resolve.KindNebula},
+		{"PN?", "* > Ev* > PN", resolve.KindNebula},
+		{"OpC", "Cl* > OpC", resolve.KindOpenCluster},
+		{"GlC", "Cl* > GlC", resolve.KindGlobularCluster},
+		{"Gl?", "Cl* > GlC", resolve.KindGlobularCluster},
+		{"Cl*", "Cl*", resolve.KindStarCluster},
+		{"Cl?", "Cl*", resolve.KindStarCluster},
+		{"As*", "As*", resolve.KindStarCluster},
+		{"St*", "As* > St*", resolve.KindStarCluster},
+		{"MGr", "As* > MGr", resolve.KindStarCluster},
+		{"G", "G", resolve.KindGalaxy},
+		{"AGN", "G > AGN", resolve.KindGalaxy},
+		{"Sy2", "G > AGN > SyG > Sy2", resolve.KindGalaxy},
+		{"GiG", "G > GiG", resolve.KindGalaxy},
+		{"SBG", "G > SBG", resolve.KindGalaxy},
+		{"QSO", "G > AGN > QSO", resolve.KindGalaxy},
+		{"BLL", "G > AGN > QSO > Bla > BLL", resolve.KindGalaxy},
+		{"GrG", "GrG", resolve.KindGalaxy},
+		{"ClG", "ClG", resolve.KindGalaxy},
+		{"PaG", "PaG", resolve.KindGalaxy},
+		{"IG", "IG", resolve.KindGalaxy},
+		{"HII", "ISM > HII", resolve.KindNebula},
+		{"GNe", "ISM > Cld > GNe", resolve.KindNebula},
+		{"RNe", "ISM > Cld > GNe > RNe", resolve.KindNebula},
+		{"DNe", "ISM > Cld > DNe", resolve.KindNebula},
+		{"Cld", "ISM > Cld", resolve.KindNebula},
+		{"SNR", "ISM > SNR", resolve.KindSupernovaRemnant},
+		{"SR?", "ISM > SNR", resolve.KindSupernovaRemnant},
+		{"X", "X", resolve.KindOther},
+		{"UV", "UV", resolve.KindOther},
+		{"Rad", "Rad", resolve.KindOther},
+		{"IR", "IR", resolve.KindOther},
+		{"EmO", "Opt > EmO", resolve.KindOther},
+		{"gLe", "grv > gLS > gLe", resolve.KindOther},
+		{"reg", "reg", resolve.KindOther},
+		{"?", "", resolve.KindOther},
+		{"err", "err", resolve.KindOther},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.otype, func(t *testing.T) {
-			if got := mapSimbadKind(tt.otype); got != tt.want {
-				t.Errorf("mapSimbadKind(%q) = %q, want %q", tt.otype, got, tt.want)
-			}
-		})
+		if got := simbadKind(tt.otype, tt.path); got != tt.want {
+			t.Errorf("simbadKind(%q, %q) = %q, want %q", tt.otype, tt.path, got, tt.want)
+		}
+	}
+}
+
+// With no path, which only an otype missing from otypedef would have, the
+// code stands in for a one-level path: the hierarchy's roots still classify.
+func TestSimbadKindWithoutAPath(t *testing.T) {
+	t.Parallel()
+
+	for otype, want := range map[string]resolve.Kind{
+		"*":             resolve.KindStar,
+		"G":             resolve.KindGalaxy,
+		"Cl*":           resolve.KindStarCluster,
+		"As*":           resolve.KindStarCluster,
+		"ISM":           resolve.KindNebula,
+		"unknown-otype": resolve.KindOther,
+		"":              resolve.KindOther,
+	} {
+		if got := simbadKind(otype, ""); got != want {
+			t.Errorf("simbadKind(%q, \"\") = %q, want %q", otype, got, want)
+		}
 	}
 }
 
