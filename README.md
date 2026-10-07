@@ -11,7 +11,7 @@
 
 **Observatory-grade astronomy and observation-planning engine for Go.**
 
-Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · sub-minute rise/set accuracy · spectral all-sky brightness · production scheduling · validated against USNO, JPL Horizons, NASA Eclipse Catalogs and GAMBONS.
+Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · rise/set within a minute of USNO · spectral all-sky brightness · production scheduling · validated against USNO, JPL Horizons, NASA Eclipse Catalogs and GAMBONS.
 
 ---
 
@@ -301,6 +301,7 @@ Every component traces to primary literature: artificial skyglow follows Kocifaj
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
 - **Visibility Events**: Rise/Set ≤0.6 min vs USNO, Transit ≤0.5 min — 41/41 edge cases passing (polar, equatorial, 8849m altitude)
+- **Horizon refraction**: the almanacs' 34′ by default, so rises and sets agree with USNO's; `plan.WithHorizonRefraction` sets the air the horizon refracts through instead. Against the real sky, refraction near the horizon limits any rise or set to about 2 minutes, whatever the model (Wilson 2018)
 - **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
 - **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition (Ecliptic Longitude), Greatest Elongation, Quadrature
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
