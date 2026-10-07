@@ -24,6 +24,7 @@ var (
 	errAerosolAsymmetry   = errors.New("Aerosol: asymmetry parameter must be in [-1,1]")
 	errCloudFraction      = errors.New("AddCloud: Fraction must be in [0,1]")
 	errCloudOpticalDepth  = errors.New("AddCloud: OpticalDepth must be >= 0")
+	errOzoneColumn        = errors.New("Ozone: column must be finite and >= 0 DU")
 )
 
 // CloudPhase distinguishes the thermodynamic phase of a cloud layer.
@@ -401,8 +402,16 @@ func (b *Builder) MultipleScattering(on bool) *Builder {
 }
 
 // Ozone sets the total-column ozone amount, in Dobson units.
+//
+// A negative or non-finite column is refused: it would make ozone emit rather
+// than absorb, and [Atmosphere.Extinction] would brighten a star with it.
 func (b *Builder) Ozone(du float64) *Builder {
+	if !(du >= 0) || math.IsInf(du, 1) {
+		b.errs = append(b.errs, errOzoneColumn)
+	}
+
 	b.s.ozone = unit.OzoneColumnDU(du)
+
 	return b
 }
 

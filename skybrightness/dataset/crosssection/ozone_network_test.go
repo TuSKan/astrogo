@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/crosssection"
 	"github.com/TuSKan/astrogo/time"
@@ -75,4 +76,93 @@ func TestOzoneMatchesItsKnownBands(t *testing.T) {
 			t.Fatalf("%v nm gives tau = %v", grid.At(i), v)
 		}
 	}
+}
+
+// atmosphere.Extinction carries ozone as 10 nm means of this same file, so
+// that a planning call needs no download. Every one of those means is
+// recomputed here from the file, with the rule the table was built by: the
+// node at 600 nm is the mean of every sample from 595 up to, not including,
+// 605 nm.
+//
+// The table is read back through Extinction, as the difference a column of
+// ozone makes to it, since Extinction is its only door. Its values are printed
+// to five significant figures, so rounding is at most 5e-5 of a value; 1e-4
+// leaves room for nothing else. Measured: 2.7e-5, at 380 nm.
+func TestExtinctionOzoneIsTheDatasetBinned(t *testing.T) {
+	testutil.RequireReachable(t, "www.uv-vis-spectral-atlas-mainz.org:443")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	remote.EnableDownloads(16<<20, remote.MPIMainzCrossSections)
+	defer remote.DisableDownloads(remote.MPIMainzCrossSections)
+
+	xs, err := crosssection.Ozone(ctx)
+	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Ozone: %v", err)
+	}
+
+	const (
+		column    = 1000.0 // DU
+		magPerTau = 2.5 * math.Log10E
+		bound     = 1e-4 // relative
+	)
+
+	without, err := atmosphere.NewBuilder().Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	with, err := atmosphere.NewBuilder().Ozone(column).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	perSigma := magPerTau * column * atmosphere.DobsonUnitMoleculesPerCM2()
+
+	var worst, worstAt float64
+
+	for node := 320.0; node <= 1000; node += 10 {
+		var sum float64
+
+		var n int
+
+		for i, nm := range xs.WavelengthNM {
+			if float64(nm) >= node-5 && float64(nm) < node+5 {
+				sum += xs.SigmaCM2[i]
+				n++
+			}
+		}
+
+		if n == 0 {
+			t.Fatalf("the file has no samples within 5 nm of %g nm", node)
+		}
+
+		want := sum / float64(n)
+
+		a, err := with.Extinction(unit.WavelengthNM(node))
+		if err != nil {
+			t.Fatalf("Extinction at %g nm: %v", node, err)
+		}
+
+		b, err := without.Extinction(unit.WavelengthNM(node))
+		if err != nil {
+			t.Fatalf("Extinction at %g nm: %v", node, err)
+		}
+
+		got := (a - b) / perSigma
+
+		rel := got/want - 1
+		if math.Abs(rel) > math.Abs(worst) {
+			worst, worstAt = rel, node
+		}
+
+		if math.Abs(rel) > bound {
+			t.Errorf("%g nm: Extinction carries %.5g cm^2, the file's mean over %d samples is %.5g "+
+				"(%+.2e relative)", node, got, n, want, rel)
+		}
+	}
+
+	t.Logf("worst %+.2e relative, at %g nm", worst, worstAt)
 }
