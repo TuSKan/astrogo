@@ -6,62 +6,20 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/internal/refraction"
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// lowAltitudeCutoffDeg is the true/apparent altitude below which
-// RefractionApproximate and RefractionRigorous return zero refraction
-// instead of evaluating Saemundsson (1986) or Bennett (1982).
-//
-// Both formulas divide by (h + a constant) — Saemundsson's tangent argument
-// has 10.3/(h+5.11), Bennett's has 7.31/(h+4.4) — so as h approaches -5.11°
-// or -4.4° respectively, that term diverges and, because it then feeds a
-// tan()/atan() a huge argument reduced mod 360°, the result stops being a
-// smooth extrapolation and becomes effectively arbitrary (it can spike or
-// flip sign depending on where the reduced angle lands). -4.0° clears both
-// singularities with margin (0.4° from Bennett's, 1.11° from Saemundsson's)
-// while still covering the entire physically relevant range: real
-// observations never need refraction correction this far below the horizon.
-//
-// This is a different, independently-justified cutoff from the one used in
-// coord/context.go's SOFA-Refa/Refb path (-1°, i.e. z < 91°) — that model's
-// tan(z) series is well-behaved much closer to the horizon, so it can safely
-// extend further down than the two empirical tangent formulas here.
-const lowAltitudeCutoffDeg = -4.0
-
-// zenithArgumentLimit is the other end of the same problem, and the reason all
-// four empirical methods check their tangent argument against 90°.
-//
-// The additive term that keeps each fit stable near the horizon also carries
-// its argument *past* 90° near the zenith: Saemundsson's h + 10.3/(h+5.11) is
-// 90.108° at h = 90°, and Bennett's h + 7.31/(h+4.4) is 90.077°. tan is
-// negative just beyond its asymptote, so both formulas reported negative
-// refraction — measured at −0.114″ and −0.080″ at the zenith, turning negative
-// above 89.8916° and 89.9225° respectively.
-//
-// Refraction is never negative in a normal atmosphere: it raises an object, or
-// at the zenith does nothing, because light arriving along the normal is not
-// bent. Zero is the correct limit, and it is what SOFA returns there.
-//
-// Returning zero at and above the crossing discards at most 0.11″ — the value
-// the formula itself gives just below it — against a fit whose own quoted
-// accuracy is about 0.1 arcmin, i.e. 60 times larger. So this clamp costs
-// nothing measurable and removes a sign error.
-//
-// Expressed as a limit on the argument rather than on the altitude because the
-// two formulas cross at different altitudes, and because the argument is where
-// the problem actually is.
-const zenithArgumentLimit = 90.0
-
-// RefractionModel defines an algorithm that computes the angular refraction shift.
-// It explicitly parses the distinction between forward and reverse tracing.
+// RefractionModel computes atmospheric refraction in either direction: the
+// amount it raises a true altitude to the observed one, and the amount to
+// take off an observed altitude to recover the true one. Both are positive.
 type RefractionModel interface {
-	// RefractFromTrue computes the atmospheric refraction correction by propagating a True geometric altitude
-	// forward linearly into refracted Observed appearance (Saemundsson 1986).
+	// RefractFromTrue is the refraction that carries the true (geometric)
+	// altitude trueAlt to the observed one: observed = true + this.
 	RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle
 
-	// RefractFromApparent computes the atmospheric refraction correction necessary to un-refract an
-	// Observed visual altitude backwards into pure geometric Truth (Bennett 1982).
+	// RefractFromApparent is the refraction to take off the observed altitude
+	// obsAlt to recover the true one: true = observed − this.
 	RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle
 }
 
@@ -82,6 +40,9 @@ type RefractionModel interface {
 // Atmosphere.Refraction() returns one of these directly, letting a caller
 // with a full Atmosphere reach real refraction-model machinery without a
 // second, parallel pressure/temperature representation.
+//
+// Pressure is in hPa, Temperature in °C, Humidity a fraction from 0 to 1,
+// and Wavelength in micrometers.
 type Refraction struct {
 	Model       RefractionModel
 	Pressure    float64
@@ -149,81 +110,74 @@ func (RefractionNone) RefractFromApparent(_ angle.Angle, _ Refraction) angle.Ang
 	return 0
 }
 
-// RefractionApproximate computes refraction extremely quickly using Saemundsson's
-// tangent formula. Accurate to ~0.1 arcmin over 15 degrees.
-type RefractionApproximate struct{}
+// RefractionBennett is Bennett's (1982) formula as Hohenkerk refitted it to
+// the Nautical Almanac's refraction tables, which since 2004 are Hohenkerk &
+// Sinclair's ray tracing at 10 °C, 1010 hPa, 80% humidity and 0.50169 µm:
+//
+//	R = 0.28·P/(T + 273) · 0°.0167 / tan(h + 7.32/(h + 4.32))
+//
+// for the apparent altitude h in degrees, P in hPa and T in °C. It reproduces
+// the almanac's table within 0.12′ from the horizon to the zenith, where
+// Bennett's own constants, 7.31 and 4.4, are 0.7′ high on the horizon. Its
+// wavelength scales it by the refractivity of dry air, as SOFA's does; it
+// ignores humidity, which the almanac fixes.
+//
+// The true-to-observed direction inverts the same formula, so the two agree
+// exactly. Below an apparent altitude of about −1.61° the formula stops
+// being a fit to anything, turning down through its pole at −4.32°; there
+// the refraction tapers smoothly from its value at −1.61°, 52.5′ at the
+// standard pressure and temperature, to zero at −4.24°, so a line of sight
+// into the ground is not refracted.
+//
+// This is the model to use near the horizon on its own. It runs 2–3% high
+// against Hohenkerk & Sinclair's ray tracing between 70° and 30° altitude,
+// about 1.6″ at 45°, which the almanac's table, in tenths of an arcminute,
+// cannot show, and which [RefractionSOFA] does not have.
+type RefractionBennett struct{}
 
-// RefractFromTrue applies Saemundsson's refraction formula (S&T 1986).
-func (RefractionApproximate) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
-	h := trueAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0 // Avoid absurd refraction below horizon
-	}
-
-	inner := h + 10.3/(h+5.11)
-	if inner >= zenithArgumentLimit {
-		return 0 // see zenithArgumentLimit
-	}
-
-	// Refraction R in arcminutes
-	R := 1.02 / math.Tan(inner*math.Pi/180.0)
-
-	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((R * factor) / 60.0)
+// RefractFromTrue is Bennett-NA's refraction at the observed altitude a true
+// altitude refracts to.
+func (RefractionBennett) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
+	return angle.Rad(refraction.BennettFromTrue(trueAlt.Radians(), env.Pressure, env.Temperature, env.Wavelength))
 }
 
-// RefractFromApparent applies Bennett's empirical fraction.
-func (RefractionApproximate) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
-	h := obsAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0
-	}
-
-	inner := h + 7.31/(h+4.4)
-	if inner >= zenithArgumentLimit {
-		return 0 // see zenithArgumentLimit
-	}
-
-	R := 1.0 / math.Tan(inner*math.Pi/180.0)
-	factor := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((R * factor) / 60.0)
+// RefractFromApparent is Bennett-NA's refraction at the observed altitude.
+func (RefractionBennett) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
+	return angle.Rad(refraction.Bennett(obsAlt.Radians(), env.Pressure, env.Temperature, env.Wavelength))
 }
 
-// RefractionSOFA is the refraction model SOFA itself uses: the two-term series
-// dz = A·tan z + B·tan³ z, with A and B derived from the pressure,
-// temperature, humidity and wavelength in the [Refraction] passed to it.
+// RefractionSOFA is SOFA's refraction, A·tan z + B·tan³ z with A and B from
+// iauRefco for the pressure, temperature, humidity and wavelength given,
+// handed over to [RefractionBennett] near the horizon.
 //
 // This is the model a nil [Refraction.Model] resolves to when a pressure is
 // set — see [Refraction.EffectiveModel]. It exists so that "nil means SOFA"
 // is a statement atmosphere can act on, rather than a convention each consumer
 // has to reimplement.
 //
-// Unlike the Saemundsson and Bennett formulas beside it, the constants are not
-// a fixed empirical fit rescaled by a pressure ratio: gofa's Refco integrates
-// the refractive index of moist air for the specific conditions given.
-// [RefractionRigorous] borrows its wavelength law — the same refractivity
-// formula, as a ratio — so the two disperse alike.
+// # The hand-over
+//
+// iauRefco says its series is for "applications where performance at low
+// altitudes is not paramount", and SOFA clamps it at 2.87°, so that it holds
+// everything lower at the refraction there. Against Hohenkerk & Sinclair's
+// ray tracing it is within 0.7″ down to 10° altitude, 23″ short at 5°, and
+// 23′ short on the horizon: 10.3′ there at sea level against the almanacs'
+// 34′. For an observation planner the horizon is where it matters most.
+//
+// So above 10° of observed altitude this is SOFA's series, exactly as
+// iauAtioq and iauAtoiq apply it; below 5° it is Bennett-NA, within 13″ of
+// the ray tracing down to the horizon; and between the two the weight passes
+// smoothly from one to the other. At radio wavelengths, above 100 µm, there
+// is no hand-over, since Bennett-NA is an optical fit.
+//
+// Unlike Bennett-NA, A and B are not an empirical fit rescaled by a pressure
+// ratio: iauRefco integrates the refractive index of moist air for the
+// conditions given.
 type RefractionSOFA struct{}
 
-// Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
-//
-// selMin bounds sin(altitude) at 0.05 — about 2.87° — so the tangent series is
-// never evaluated where it diverges. celMin bounds cos(altitude) away from
-// zero at the zenith, where the horizontal component vanishes.
-//
-// coord/context.go carries the same two constants for its own vector-form copy
-// of Atioq. They are duplicated rather than shared because they belong to the
-// algorithm, not to either package, and neither should import the other.
-const (
-	selMin = 0.05
-	celMin = 1e-6
-)
-
-// RefractFromTrue applies Atioq's Newton-corrected form of the series, which is
-// the direction SOFA uses when going from a true topocentric direction to the
-// observed one.
+// RefractFromTrue is the refraction carrying a true altitude to the observed
+// one: iauAtioq's Newton-corrected series wherever the observed altitude is
+// above 10°.
 func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
 	if env.Pressure <= 0 {
 		return 0
@@ -231,19 +185,12 @@ func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle
 
 	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
 
-	// In units of sine and cosine of altitude, as Atioq works on a unit vector.
-	z := math.Max(math.Sin(trueAlt.Radians()), selMin)
-	r := math.Max(math.Cos(trueAlt.Radians()), celMin)
-
-	tz := r / z
-	w := refb * tz * tz
-
-	return angle.Rad((refa + w) * tz / (1.0 + (refa+3.0*w)/(z*z)))
+	return angle.Rad(refraction.FromTrue(trueAlt.Radians(), refa, refb, env.Pressure, env.Temperature, env.Wavelength))
 }
 
-// RefractFromApparent applies the series in its defining form, where the
-// zenith distance is the observed one — which is how gofa's Refco documents A
-// and B, so no correction term belongs here.
+// RefractFromApparent is the refraction to take off an observed altitude: the
+// series in its defining form above 10°, where the zenith distance is the
+// observed one, as iauAtoiq removes it.
 func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
 	if env.Pressure <= 0 {
 		return 0
@@ -251,105 +198,13 @@ func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) an
 
 	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
 
-	z := math.Max(math.Sin(obsAlt.Radians()), selMin)
-	r := math.Max(math.Cos(obsAlt.Radians()), celMin)
-
-	tz := r / z
-
-	return angle.Rad(refa*tz + refb*tz*tz*tz)
+	return angle.Rad(refraction.FromApparent(obsAlt.Radians(), refa, refb, env.Pressure, env.Temperature, env.Wavelength))
 }
 
-// dispersionFactor is the refractivity of air at wavelength wl, in
-// micrometers, relative to its value at 0.55 µm, which is where the Bennett
-// and Saemundsson formulas below are taken to hold. A wavelength of zero or
-// less means unspecified and gives 1.
-//
-// The refractivity is the IAG (1999) optical formula for dry air, in the form
-// SOFA's iauRefco uses it (Rueger 2002): proportional to
-// 77.53484e-6 + (4.39108e-7 + 3.666e-9/λ²)/λ². Water vapor adds a term that
-// does not depend on wavelength and is under a percent of the dry one, so it
-// is left out of the ratio. Between 0.40 and 0.70 µm the factor changes by
-// 2.5%, which is atmospheric dispersion: 2.4 arcsec at 30 degrees altitude,
-// as SOFA's own model gives.
-//
-// It replaced an unsourced 1 + 0.005·(0.55 − λ), which changed refraction by
-// 0.15% over the same span and made this model's dispersion 16 times too
-// small (#527).
-func dispersionFactor(wl float64) float64 {
-	if wl <= 0 {
-		return 1
-	}
-
-	return dryAirRefractivity(wl) / dryAirRefractivity(0.55)
-}
-
-// dryAirRefractivity is the wavelength-dependent part of iauRefco's optical
-// refractivity, wl in micrometers. Only its ratio is used.
-func dryAirRefractivity(wl float64) float64 {
-	wlsq := wl * wl
-
-	return 77.53484e-6 + (4.39108e-7+3.666e-9/wlsq)/wlsq
-}
-
-// RefractionRigorous explicitly represents the analytical integration model derived from physical meteorological parameters.
-type RefractionRigorous struct{}
-
-// RefractFromTrue calculates the atmospheric refraction based on the rigorous Saemundsson (1986)
-// model which remains stable and valid down to the true horizon.
-func (RefractionRigorous) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
-	h := trueAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0
-	}
-
-	if env.Pressure <= 0 {
-		return 0
-	}
-
-	// Saemundsson (1986) formula in arcminutes for true (geometric) altitude h
-	denom := h + 5.11
-
-	inner := h + (10.3 / denom)
-	if inner >= zenithArgumentLimit {
-		return 0 // see zenithArgumentLimit
-	}
-
-	r0 := 1.02 / math.Tan(inner*math.Pi/180.0)
-
-	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((r0 * correction * dispersionFactor(env.Wavelength)) / 60.0)
-}
-
-// RefractFromApparent derives atmospheric refraction analytically based on the observed visual altitude.
-// Standardized on the robust Bennett (1982) formula which handles zero-altitude gracefully.
-func (RefractionRigorous) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
-	h := obsAlt.Degrees()
-	if h < lowAltitudeCutoffDeg {
-		return 0
-	}
-
-	if env.Pressure <= 0 {
-		return 0
-	}
-
-	// Bennett (1982) formula in arcminutes for observed (apparent) altitude h
-	denom := h + 4.4
-
-	inner := h + (7.31 / denom)
-	if inner >= zenithArgumentLimit {
-		return 0 // see zenithArgumentLimit
-	}
-
-	r0 := 1.0 / math.Tan(inner*math.Pi/180.0)
-
-	correction := (env.Pressure / 1010.0) * (283.0 / (273.15 + env.Temperature))
-
-	return angle.Deg((r0 * correction * dispersionFactor(env.Wavelength)) / 60.0)
-}
-
-// StandardRefraction returns a typical sea-level refraction environment
-// using the rigorous backend.
+// StandardRefraction returns a typical sea-level refraction environment: the
+// ICAO standard atmosphere's 1013.25 hPa and 15 °C, half humidity, at
+// 0.55 µm, with no model set, so [RefractionSOFA] applies. It is
+// [AtAltitude] at zero height.
 //
 // It is a function returning a fresh value, not a var, so that no importer
 // can change it for every other one in the process (#537): as a var, one
@@ -361,7 +216,6 @@ func StandardRefraction() Refraction {
 		Temperature: 15.0,
 		Humidity:    0.5,
 		Wavelength:  0.55,
-		Model:       RefractionRigorous{},
 	}
 }
 
@@ -434,18 +288,13 @@ func HorizonDip(h unit.Length) angle.Angle {
 //   - M  = 0.0289644 kg/mol (molar mass of dry air)
 //   - R* = 8.31447 J/(mol·K) (universal gas constant)
 //
-// Humidity and wavelength are inherited from [StandardRefraction]; the model
-// is deliberately left nil, which [Refraction.EffectiveModel] resolves to
-// [RefractionSOFA]. StandardRefraction's own RefractionRigorous is *not*
-// inherited, which this comment used to claim.
+// Humidity and wavelength are inherited from [StandardRefraction], and the
+// model is left nil, which [Refraction.EffectiveModel] resolves to
+// [RefractionSOFA].
 func AtAltitude(height unit.Length) Refraction {
 	std := StandardRefraction()
 
 	if height <= 0 {
-		// Sea level: use standard ISA values but let SOFA handle refraction
-		// (Model: nil) for consistency with all other altitudes.
-		std.Model = nil
-
 		return std
 	}
 
@@ -469,6 +318,5 @@ func AtAltitude(height unit.Length) Refraction {
 		Temperature: temperature,
 		Humidity:    std.Humidity,
 		Wavelength:  std.Wavelength,
-		Model:       nil, // Let SOFA compute refraction rigorously via Atcoq
 	}
 }

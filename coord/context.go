@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/internal/refraction"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -81,9 +82,11 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	t = t.UTC()
 	eop := t.EOP()
 
+	// A custom model refracts outside SOFA, so SOFA is given no atmosphere;
+	// see [Context.refract].
 	p := atm.Pressure
 	if atm.Model != nil {
-		p = 0.0 // Custom model overrides internal SOFA refraction
+		p = 0.0
 	}
 
 	// UT1 through time rather than by adding DUT1 to the UTC Julian Date: on
@@ -260,13 +263,7 @@ func (ctx *Context) ObsVec() vector.Vec3 { return ctx.obsVec }
 // AstrometricToCIRS computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
 func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
-	ri, di := gofaext.Atciq(
-		c.RA().Radians(), c.Dec().Radians(),
-		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
-		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
-		&ctx.astrom,
-	)
+	ri, di := ctx.atciq(c)
 
 	return NewCIRS(angle.Rad(ri).Wrap360(), angle.Rad(di))
 }
@@ -274,36 +271,17 @@ func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
 // CIRSToObserved converts geocentric CIRS coordinates to local Observed AltAz
 // taking into account Earth rotation, polar motion, and atmospheric refraction.
 func (ctx *Context) CIRSToObserved(c CIRS) AltAz {
-	az, zd, _, _, _ := gofaext.Atioq(
-		c.RA().Radians(), c.Dec().Radians(),
-		&ctx.astrom,
-	)
+	alt, az, _ := ctx.observed(c.RA().Radians(), c.Dec().Radians())
 
-	alt := angle.Rad(math.Pi/2 - zd)
-	if ctx.atm.Model != nil {
-		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
-	}
-
-	return NewAltAz(alt, angle.Rad(az).Wrap360())
+	return NewAltAz(alt, az)
 }
 
 // AstrometricToObserved collapses the entire apparent pipeline from an Astrometric catalog
 // point explicitly to a refracted local AltAz position.
 func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
-	az, zd, _, _, _ := gofaext.Atcoq(
-		c.RA().Radians(), c.Dec().Radians(),
-		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
-		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
-		&ctx.astrom,
-	)
+	alt, az, _ := ctx.observed(ctx.atciq(c))
 
-	alt := angle.Rad(math.Pi/2 - zd)
-	if ctx.atm.Model != nil {
-		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
-	}
-
-	return NewAltAz(alt, angle.Rad(az).Wrap360())
+	return NewAltAz(alt, az)
 }
 
 // GeocentricToObserved converts a geocentric ICRS position vector to local observed AltAz
@@ -320,16 +298,8 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 // carries the observer's own rotation velocity would double-count it; nothing
 // in astrogo produces one.
 //
-// Atmospheric refraction is applied using the Context's refraction model.
-// When no explicit model is set (Model == nil) but atmospheric pressure is
-// nonzero, refractLikeAtioq applies SOFA's own two-term series from the Refa
-// and Refb constants Apco13 already cached — the same resolution
-// [atmosphere.Refraction.EffectiveModel] makes, reached by a faster route.
-//
-// atmosphere.RefractionSOFA is that model in portable form, recomputing the
-// constants per call rather than reusing the cache. The two are pinned against
-// each other by TestNilModelMatchesExplicitSOFAModel, which measures agreement
-// to 0.012 arcsec above 3 degrees and 0.7 milliarcsecond above 5 degrees.
+// Atmospheric refraction is applied as on every other path; see
+// [Context.refract].
 //
 // The result carries the topocentric distance, |v − observer|, with v read in
 // AU as the observer vector is. It used to carry none: Dist() was zero, while
@@ -360,100 +330,10 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	// exactly a unit vector, and Atioq itself takes the altitude this way.
 	altitude := math.Atan2(U, math.Hypot(E, N))
 
-	alt := angle.Rad(altitude)
-
-	switch {
-	case ctx.atm.Model != nil:
-		alt += ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
-	case ctx.atm.Pressure > 0:
-		alt = refractLikeAtioq(E, N, U, 1, ctx.astrom.Refa, ctx.astrom.Refb)
-	}
-
-	aa := NewAltAz(alt, angle.Rad(azimuth))
+	aa := NewAltAz(ctx.refract(angle.Rad(altitude)), angle.Rad(azimuth))
 	aa.SetDist(unit.AU(topoVec.Norm()))
 
 	return aa
-}
-
-// Refraction clamps, copied from SOFA's iauAtioq rather than chosen here.
-//
-// selMin bounds sin(altitude) at 0.05 — about 2.87° — so the series is never
-// evaluated where it diverges. celMin bounds cos(altitude) away from zero at
-// the zenith, where the horizontal component vanishes.
-const (
-	selMin = 0.05
-	celMin = 1e-6
-)
-
-// refractLikeAtioq applies refraction to a topocentric ENU direction exactly as
-// SOFA's Atioq does, and returns the refracted altitude.
-//
-// # Why this reproduces Atioq instead of approximating it
-//
-// This branch exists so the vector pipeline agrees with the stellar one, which
-// goes through Atioq. It previously wrote out what looked like the same model —
-//
-//	dR := Refa*tan(z) + Refb*tan³(z)
-//
-// — guarded only by z < 91° and dR > 0, and it was wrong three ways at once.
-//
-// It had no clamp. tan(z) diverges at z = 90°, which is the horizon, not the
-// 91° the guard allowed: at alt −0.076° the cubic term flips sign to about
-// +61 rad and the dR > 0 test waves it straight through. Measured, that
-// returned an altitude of +7028°. The guard meant to reject bad values was
-// admitting only the catastrophic ones, because it rejected the honest
-// negatives.
-//
-// Between about 0° and 2° the cubic term cancels the linear one instead, dR
-// went non-positive, and refraction was dropped entirely — 0.000° where the
-// stellar path applied 0.16°.
-//
-// And the model itself was the uncorrected series. Atioq applies a
-// Newton-Raphson correction, dividing by 1 + (A + 3B·tan²z)/sin²(alt), which
-// the raw form omits even where it converges.
-//
-// Reproducing the routine rather than re-deriving it is what makes the two
-// pipelines agree by construction. TestRefractionMatchesTheStellarPipeline pins that.
-//
-// # A consequence worth stating
-//
-// Because sin(altitude) is clamped, a target below the horizon is refracted as
-// though it were at 2.87°, so this reports about 0.17° of refraction for
-// something that has already set. That is arguable physics and it is precisely
-// what the stellar path does; matching it is the point. A caller wanting
-// geometric altitude should use a Context with no atmosphere.
-func refractLikeAtioq(e, n, u, norm, refa, refb float64) angle.Angle {
-	if norm == 0 {
-		return 0
-	}
-
-	// Atioq works on a unit vector, so the clamps are in units of sine and
-	// cosine of altitude.
-	ue, un, uu := e/norm, n/norm, u/norm
-
-	r := math.Hypot(ue, un)
-	if r <= celMin {
-		r = celMin
-	}
-
-	z := uu
-	if z <= selMin {
-		z = selMin
-	}
-
-	// A·tan(z) + B·tan³(z) with Atioq's Newton-Raphson correction.
-	tz := r / z
-	w := refb * tz * tz
-	del := (refa + w) * tz / (1.0 + (refa+3.0*w)/(z*z))
-
-	// Rotate the direction by del, as Atioq does. The clamped r and z drive
-	// the rotation; the unclamped components are what it rotates.
-	cosdel := 1.0 - del*del/2.0
-	f := cosdel - del*z/r
-	eo, no := ue*f, un*f
-	uo := cosdel*uu + del*r
-
-	return angle.Rad(math.Pi/2 - math.Atan2(math.Hypot(eo, no), uo))
 }
 
 // ICRSToAltAz converts ICRS coordinates to local observed AltAz utilizing the
@@ -470,14 +350,13 @@ func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 // ICRSToHourAngle converts ICRS coordinates to local observed Hour Angle.
 // If the ICRS carries kinematics, they are forwarded to SOFA for rigorous
 // space-motion propagation.
+//
+// Observed means refracted: the hour angle of the direction [Context.ICRSToAltAz]
+// returns, rotated from the horizon to the equator as iauAtioq rotates it,
+// with the latitude corrected for polar motion. Until #588 a Context with an
+// explicit refraction model returned the unrefracted hour angle.
 func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
-	_, _, ha, _, _ := gofaext.Atcoq(
-		c.RA().Radians(), c.Dec().Radians(),
-		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
-		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
-		&ctx.astrom,
-	)
+	_, _, ha := ctx.observed(ctx.atciq(c.Astrometric()))
 
 	return angle.Rad(ha).Wrap180(), nil
 }
@@ -491,17 +370,18 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 // so at SOFA's own TT and UT1 rather than this Context's: on the days #474
 // names, the inverse of ICRSToAltAz was not ICRSToAltAz's inverse.
 func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
-	geomAlt := c.Alt()
+	var ri, di float64
 
-	// The astrometry already carries this Context's refraction constants,
-	// built with zero pressure when a custom model is in charge; that model's
-	// refraction is taken out here instead.
-	if ctx.atm.Model != nil {
-		R := ctx.atm.Model.RefractFromApparent(c.Alt(), ctx.atm)
-		geomAlt = angle.Rad(c.Alt().Radians() - R.Radians())
+	switch {
+	case ctx.sofaRefracts() && c.Alt().Radians() >= refraction.SOFAAbove:
+		// SOFA takes out its own refraction, as on the forward path.
+		ri, di = gofaext.Atoiq("A", c.Az().Radians(), math.Pi/2-c.Alt().Radians(), &ctx.astrom)
+	default:
+		geo := ctx.geometric()
+		geomAlt := ctx.unrefract(c.Alt())
+		ri, di = gofaext.Atoiq("A", c.Az().Radians(), math.Pi/2-geomAlt.Radians(), &geo)
 	}
 
-	ri, di := gofaext.Atoiq("A", c.Az().Radians(), math.Pi/2-geomAlt.Radians(), &ctx.astrom)
 	ra, dec := gofaext.Aticq(ri, di, &ctx.astrom)
 
 	return NewICRS(angle.Rad(ra).Wrap360(), angle.Rad(dec)), nil
@@ -521,6 +401,110 @@ func (ctx *Context) BarycentricVelocity() vector.Vec3 {
 	kmPerSec := constants.SI2019.SpeedOfLight.Value / 1000.0
 
 	return vector.V3(ctx.astrom.V[0], ctx.astrom.V[1], ctx.astrom.V[2]).MulScalar(kmPerSec)
+}
+
+// refract carries a true altitude to the observed one under this Context's
+// refraction: an explicit model's, or for none, [atmosphere.RefractionSOFA]
+// from the constants in the astrometry, which is SOFA's series exactly as
+// iauAtioq applies it wherever the observed altitude is above 10°, handed over
+// to Bennett-NA below. A zero pressure is no atmosphere.
+//
+// The vector path always comes here. The stellar paths let SOFA's own
+// routines refract where they agree with this, above 10° of observed
+// altitude, which keeps the common case as fast as SOFA; below it they redo
+// the place with SOFA's refraction switched off and come here, so near the
+// horizon the two paths agree by construction.
+//
+// # History
+//
+// The stellar path used to leave refraction to iauAtioq, and the vector path
+// reproduced Atioq's arithmetic to match it. Before that reproduction it had
+// no clamp at all, and at −0.076° returned an altitude of +7028° (#100). And
+// SOFA's clamp held every altitude below 2.87° at the refraction there, so a
+// set target was still raised 0.17° and the horizon got 10′ where the
+// almanacs give 34′ (#588).
+func (ctx *Context) refract(alt angle.Angle) angle.Angle {
+	switch {
+	case ctx.atm.Model != nil:
+		return alt + ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
+	case ctx.atm.Pressure > 0:
+		return alt + angle.Rad(refraction.FromTrue(alt.Radians(), ctx.astrom.Refa, ctx.astrom.Refb,
+			ctx.atm.Pressure, ctx.atm.Temperature, ctx.atm.Wavelength))
+	default:
+		return alt
+	}
+}
+
+// atciq is SOFA's Atciq for a catalog place: its CIRS right ascension and
+// declination, in radians, unwrapped, as Atcoq hands them on to Atioq.
+func (ctx *Context) atciq(c Astrometric) (ri, di float64) {
+	return gofaext.Atciq(
+		c.RA().Radians(), c.Dec().Radians(),
+		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
+		// rate. See [dRAdt].
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
+		&ctx.astrom,
+	)
+}
+
+// observed is SOFA's Atioq for a CIRS place, in radians: the observed
+// altitude, azimuth and hour angle under this Context's refraction.
+//
+// Where SOFA refracts for this Context and the observed altitude is above
+// 10°, Atioq's own answer is it, so the common case costs one Atioq. Below,
+// the place is taken again with SOFA's refraction switched off and refracted
+// by [Context.refract], at the cost of a second Atioq; Atciq, the expensive
+// half of Atcoq, is not repeated.
+func (ctx *Context) observed(ri, di float64) (alt, az angle.Angle, ha float64) {
+	a, zd, h, _, _ := gofaext.Atioq(ri, di, &ctx.astrom)
+
+	if ctx.sofaRefracts() {
+		if obs := math.Pi/2 - zd; obs >= refraction.SOFAAbove {
+			return angle.Rad(obs), angle.Rad(a).Wrap360(), h
+		}
+
+		geo := ctx.geometric()
+		a, zd, _, _, _ = gofaext.Atioq(ri, di, &geo)
+	}
+
+	alt = ctx.refract(angle.Rad(math.Pi/2 - zd))
+
+	// The hour angle of the refracted direction, rotated from the horizon
+	// to the equator as Atioq rotates it, in its frame (x south, y east,
+	// z up), with the latitude corrected for polar motion.
+	sinAlt, cosAlt := math.Sincos(alt.Radians())
+	sinAz, cosAz := math.Sincos(a)
+	x, y, z := -cosAz*cosAlt, sinAz*cosAlt, sinAlt
+
+	return alt, angle.Rad(a).Wrap360(), -math.Atan2(y, ctx.astrom.Sphi*x+ctx.astrom.Cphi*z)
+}
+
+// sofaRefracts reports whether SOFA's own routines refract for this Context:
+// the default model, with an atmosphere.
+func (ctx *Context) sofaRefracts() bool {
+	return ctx.atm.Model == nil && ctx.atm.Pressure > 0
+}
+
+// geometric is this Context's astrometry with SOFA's refraction switched off.
+func (ctx *Context) geometric() gofaext.ASTROM {
+	geo := ctx.astrom
+	geo.Refa, geo.Refb = 0, 0
+
+	return geo
+}
+
+// unrefract is [Context.refract]'s inverse: the true altitude of an observed
+// one.
+func (ctx *Context) unrefract(alt angle.Angle) angle.Angle {
+	switch {
+	case ctx.atm.Model != nil:
+		return alt - ctx.atm.Model.RefractFromApparent(alt, ctx.atm)
+	case ctx.atm.Pressure > 0:
+		return alt - angle.Rad(refraction.FromApparent(alt.Radians(), ctx.astrom.Refa, ctx.astrom.Refb,
+			ctx.atm.Pressure, ctx.atm.Temperature, ctx.atm.Wavelength))
+	default:
+		return alt
+	}
 }
 
 // aberrateDiurnal applies diurnal aberration to a topocentric ENU direction,

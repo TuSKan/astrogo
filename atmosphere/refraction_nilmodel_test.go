@@ -64,13 +64,13 @@ func TestEffectiveModelResolvesTheNilConvention(t *testing.T) {
 	}{
 		{
 			"an explicit model wins",
-			atmosphere.Refraction{Model: atmosphere.RefractionApproximate{}, Pressure: 1013},
-			atmosphere.RefractionApproximate{},
+			atmosphere.Refraction{Model: atmosphere.RefractionBennett{}, Pressure: 1013},
+			atmosphere.RefractionBennett{},
 		},
 		{
 			"an explicit model wins even at zero pressure",
-			atmosphere.Refraction{Model: atmosphere.RefractionRigorous{}},
-			atmosphere.RefractionRigorous{},
+			atmosphere.Refraction{Model: atmosphere.RefractionBennett{}},
+			atmosphere.RefractionBennett{},
 		},
 		{
 			"nil with a pressure means SOFA",
@@ -100,10 +100,8 @@ func typeName(m atmosphere.RefractionModel) string {
 	switch m.(type) {
 	case atmosphere.RefractionNone:
 		return "RefractionNone"
-	case atmosphere.RefractionApproximate:
-		return "RefractionApproximate"
-	case atmosphere.RefractionRigorous:
-		return "RefractionRigorous"
+	case atmosphere.RefractionBennett:
+		return "RefractionBennett"
 	case atmosphere.RefractionSOFA:
 		return "RefractionSOFA"
 	default:
@@ -183,37 +181,35 @@ func TestRefractionSOFADispersesByWavelength(t *testing.T) {
 	}
 }
 
-// TestRefractionRigorousDispersesLikeSOFA holds the empirical model's
+// TestRefractionBennettDispersesLikeSOFA holds the empirical model's
 // wavelength law to SOFA's.
 //
-// The two models differ in total refraction: the Bennett and Saemundsson fits
-// sit 3 to 5 percent above SOFA's A·tan z + B·tan³ z at sea-level standard
-// conditions, which is the empirical calibration and not this test's subject.
-// What must agree is how refraction scales with wavelength, so this compares
-// dispersion as a fraction of each model's own refraction. Measured, they
-// agree to 0.1 percent from 80 down to 5 degrees.
+// The two models differ in total refraction: Bennett-NA sits 2 to 3 percent
+// above SOFA's A·tan z + B·tan³ z at moderate altitudes, which is the
+// empirical calibration and not this test's subject. What must agree is how
+// refraction scales with wavelength, so this compares dispersion as a
+// fraction of each model's own refraction, from 80 degrees down to the 10 at
+// which RefractionSOFA starts handing over to Bennett-NA itself.
 //
-// It used to scale by an unsourced 1 + 0.005·(0.55 − λ), and a test here
-// pinned that as the smaller of the two: 0.155 arcsec of dispersion between
-// 0.40 and 0.70 µm at 30 degrees, against SOFA's 2.467 (#527). A caller of
-// coord.Reducer.Disperse with atmosphere.StandardRefraction, which carries
-// this model, was told dispersion was 16 times smaller than it is.
-//
-// Below 5 degrees SOFA's tan z expansion is itself the weaker model, and
-// the comparison stops meaning anything.
-func TestRefractionRigorousDispersesLikeSOFA(t *testing.T) {
+// The empirical model used to scale by an unsourced 1 + 0.005·(0.55 − λ), and
+// a test here pinned that as the smaller of the two: 0.155 arcsec of
+// dispersion between 0.40 and 0.70 µm at 30 degrees, against SOFA's 2.467
+// (#527). A caller of coord.Reducer.Disperse with
+// atmosphere.StandardRefraction, which then carried that model, was told
+// dispersion was 16 times smaller than it is.
+func TestRefractionBennettDispersesLikeSOFA(t *testing.T) {
 	base := atmosphere.Refraction{Pressure: 1013.25, Temperature: 15.0, Humidity: 0.5}
 
-	for _, alt := range []float64{80, 60, 45, 30, 20, 15, 10, 5} {
+	for _, alt := range []float64{80, 60, 45, 30, 20, 15, 10} {
 		sofa := fractionalDispersion(base, angle.Deg(alt))
 
-		rig := base
-		rig.Model = atmosphere.RefractionRigorous{}
+		bennett := base
+		bennett.Model = atmosphere.RefractionBennett{}
 
-		empirical := fractionalDispersion(rig, angle.Deg(alt))
+		empirical := fractionalDispersion(bennett, angle.Deg(alt))
 
 		if rel := empirical/sofa - 1; math.Abs(rel) > 0.01 {
-			t.Errorf("at %.0f degrees: RefractionRigorous disperses %.5f of its refraction between "+
+			t.Errorf("at %.0f degrees: RefractionBennett disperses %.5f of its refraction between "+
 				"0.40 and 0.70 µm and SOFA %.5f, %.1f%% apart; want within 1%%",
 				alt, empirical, sofa, 100*rel)
 		}

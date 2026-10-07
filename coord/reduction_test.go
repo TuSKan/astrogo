@@ -165,19 +165,22 @@ func TestReducer_Group2_RefractionWeakensAtZenith(t *testing.T) {
 func TestReducer_Group2_LowAltitudeGuard(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 
-	// Geometric altitude heavily below the horizon (-6 degrees)
-	shiftDeep := atm.Model.RefractFromTrue(angle.Deg(-6.0), atm)
+	// Geometric altitude well below the horizon (-6 degrees): a line of sight
+	// into the ground, which is not refracted. Until #588 SOFA's clamp raised
+	// it as though it were at 2.87 degrees.
+	shiftDeep := atm.RefractFromTrue(angle.Deg(-6.0))
 	if shiftDeep != 0 {
-		t.Errorf("Expected Refraction model to guard deeply depressed altitudes correctly (return 0), got %v", shiftDeep.Degrees())
+		t.Errorf("Expected no refraction 6 degrees below the horizon, got %v arcmin", shiftDeep.Arcminutes())
 	}
 
 	// Geometric altitude right on the horizon
-	shiftHz := atm.Model.RefractFromTrue(angle.Deg(0), atm)
+	shiftHz := atm.RefractFromTrue(angle.Deg(0))
 	assertFinite(t, float64(shiftHz), "Horizon Refraction")
 
-	// Rigorous Saemundsson expectation near 0 is roughly ~34 arcminutes (+0.5667 ish)
+	// A true altitude of zero is raised about 29 arcmin, to where the
+	// observed refraction is that much.
 	if shiftHz.Degrees() < 0.4 || shiftHz.Degrees() > 0.7 {
-		t.Errorf("Expected realistic horizon refraction ~0.56 degrees, got %v deg", shiftHz.Degrees())
+		t.Errorf("Expected realistic horizon refraction ~0.48 degrees, got %v deg", shiftHz.Degrees())
 	}
 }
 

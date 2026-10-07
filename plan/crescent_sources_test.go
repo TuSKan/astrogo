@@ -266,10 +266,10 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 }
 
 // The SAAO criterion reads the apparent altitude of the lower limb: the
-// airless topocentric limb raised by refraction. Saemundsson's refraction is
-// about 0.19° at Port of Spain's 4°, and 0.46° on the horizon at Quinta
-// Calixto, 835 m up, where the default SOFA model would give 0.17° and put
-// the limb 0.3° low.
+// airless topocentric limb raised by refraction. The site's refraction is
+// 0.185° at Port of Spain's 4°, and 0.46° on the horizon at Quinta Calixto,
+// 835 m up, where SOFA's series alone, clamped, gave 0.17° until #588 and
+// would have put the limb 0.3° low.
 func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 	t.Parallel()
 

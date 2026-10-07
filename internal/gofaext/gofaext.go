@@ -313,12 +313,6 @@ func Atioq(ri, di float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
 	return aob, zob, hob, dob, rob
 }
 
-// Atcoq collapses Atciq and Atioq: quick ICRS to observed.
-func Atcoq(rc, dc, pr, pd, px, rv float64, astrom *ASTROM) (aob, zob, hob, dob, rob float64) {
-	ri, di := Atciq(rc, dc, pr, pd, px, rv, astrom)
-	return Atioq(ri, di, astrom)
-}
-
 // Ae2hd converts horizon coordinates, azimuth az (from north through east)
 // and elevation el, to hour angle and declination for a site at latitude phi,
 // all in radians. ha is in [-pi, pi], negative east of the meridian.

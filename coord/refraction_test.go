@@ -62,21 +62,28 @@ func farVector(c coord.ICRS) vector.Vec3 {
 // path applied 0.16°. And the model was the uncorrected series, missing the
 // Newton-Raphson step Atioq applies even where it converges.
 //
-// # Why this compares increments
+// # Why this compares increments, each with the model
 //
 // The two pipelines answer different questions and their absolute altitudes
 // legitimately differ (see refractionScene). Differencing each against its own
-// atmosphere-free Context isolates the one quantity that must match.
+// atmosphere-free Context isolates the refraction it applied, and that must be
+// atmosphere's own at that pipeline's geometric altitude.
+//
+// Until #588 the two increments were compared with each other. That held only
+// because SOFA's clamp made the refraction flat below 2.87°: it now follows
+// the horizon, about 10′ per degree there, and the pipelines' 9.5″ apart in
+// altitude put 1.6″ between their increments with both exactly right.
 func TestRefractionMatchesTheStellarPipeline(t *testing.T) {
 	t.Parallel()
 
 	withAtm, noAtm := refractionScene(t)
 
-	// One arcsecond, which is the bound #100 asked for. Measured agreement is
-	// far tighter — a few milliarcsec below the clamp, under 0.2 arcsec above
-	// it — so this has room for platform rounding without admitting a
-	// regression.
-	const toleranceArcsec = 1.0
+	// Both pipelines refract their own geometric altitude through the same
+	// arithmetic as atmosphere's model, from the same constants, so what is
+	// left is the rounding of differencing two altitudes.
+	const toleranceArcsec = 1e-6
+
+	atm := withAtm.Refraction()
 
 	var checked int
 
@@ -105,11 +112,19 @@ func TestRefractionMatchesTheStellarPipeline(t *testing.T) {
 
 		stellarRefraction := sr.Alt().Degrees() - sg.Alt().Degrees()
 
-		if d := math.Abs(vectorRefraction-stellarRefraction) * 3600; d > toleranceArcsec {
-			t.Errorf("at geometric %+.3f°: the vector pipeline refracts by %.5f° and the "+
-				"stellar pipeline by %.5f°, a difference of %.2f arcsec.\n"+
-				"  Both must be SOFA's Atioq model — reproduce the routine rather than "+
-				"re-deriving it.", geometric, vectorRefraction, stellarRefraction, d)
+		for _, p := range []struct {
+			name       string
+			geometric  float64
+			refraction float64
+		}{
+			{"vector", geometric, vectorRefraction},
+			{"stellar", sg.Alt().Degrees(), stellarRefraction},
+		} {
+			want := atm.RefractFromTrue(angle.Deg(p.geometric)).Degrees()
+			if d := math.Abs(p.refraction-want) * 3600; d > toleranceArcsec {
+				t.Errorf("at geometric %+.5f°: the %s pipeline refracts by %.7f° and the "+
+					"model by %.7f°, %.2e arcsec apart", p.geometric, p.name, p.refraction, want, d)
+			}
 		}
 	}
 
