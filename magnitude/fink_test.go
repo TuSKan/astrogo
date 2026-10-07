@@ -22,12 +22,14 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/fink"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -51,9 +53,34 @@ import (
 
 const finkBaseURL = "https://api.ztf.fink-portal.org"
 
-// finkSSOQuery queries the /api/v1/sso endpoint for a named SSO.
+// finkSSOQuery returns FINK's observations of numberOrDesig, fetched once per
+// test run (#501).
+//
+// # Why it caches, retries and asks a control
+//
+// FINK has twice answered a request it serves every other time with a 200
+// that held nothing usable: an empty list in 0.15 s where the full answer
+// takes about six, and records without the residuals asked for. Each failed
+// whichever test was unlucky, three times in two days. CLAUDE.md's rule is to
+// skip on a degraded service and fail on wrong data from a working one, so an
+// unusable answer is tried once more, and if it is still unusable a control
+// that cannot be empty decides which it is: 433 Eros's observation dates. An
+// empty control means FINK is degraded and the test skips; a control with
+// data means FINK is working and the answer is wrong, and the test fails.
+//
+// The cache is why the package sends two of these ~850 KB queries per run
+// instead of five, to a service that may be throttling. A failed fetch is not
+// cached, so the next test asks again.
 func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem bool) []map[string]any { //nolint:unparam // designed for reuse
 	t.Helper()
+
+	finkMu.Lock()
+	defer finkMu.Unlock()
+
+	key := finkKey{numberOrDesig, withResiduals, withEphem}
+	if records, ok := finkCache[key]; ok {
+		return records
+	}
 
 	body := map[string]any{
 		"n_or_d":        numberOrDesig,
@@ -61,6 +88,71 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 		"withEphem":     withEphem,
 		"output-format": "json",
 	}
+
+	records := finkPost(t, body)
+
+	if !finkUsable(records, withResiduals) {
+		time.Sleep(finkRetryPause)
+
+		records = finkPost(t, body)
+	}
+
+	if !finkUsable(records, withResiduals) {
+		control := finkPost(t, map[string]any{"n_or_d": "433", "columns": "i:jd", "output-format": "json"})
+		if len(control) == 0 {
+			t.Skipf("FINK answered %s with %d records and no usable ones, twice, and its control "+
+				"query for 433 Eros came back empty too: the service is degraded (#501)", numberOrDesig, len(records))
+		}
+
+		t.Fatalf("FINK answered %s with %d records and no usable ones, twice, while its control query "+
+			"for 433 Eros returned %d: wrong data from a working service", numberOrDesig, len(records), len(control))
+	}
+
+	finkCache[key] = records
+
+	return records
+}
+
+type finkKey struct {
+	object               string
+	residuals, ephemeris bool
+}
+
+var (
+	finkMu    sync.Mutex
+	finkCache = map[finkKey][]map[string]any{}
+)
+
+// finkRetryPause is how long an unusable answer waits before it is asked
+// again: long enough for a throttle to lift, short beside the six seconds a
+// full answer takes.
+const finkRetryPause = 3 * time.Second
+
+// finkUsable reports whether an answer can be tested at all: it has records,
+// and if residuals were asked for, at least one carries one. How many it
+// needs is each test's business.
+func finkUsable(records []map[string]any, withResiduals bool) bool {
+	if len(records) == 0 {
+		return false
+	}
+
+	if !withResiduals {
+		return true
+	}
+
+	for _, r := range records {
+		if _, ok := getFloat(r, "residuals_shg1g2"); ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// finkPost sends one SSO query. A transport failure or a 5xx skips, as an
+// outage; any other non-200 fails.
+func finkPost(t *testing.T, body map[string]any) []map[string]any {
+	t.Helper()
 
 	raw, err := json.Marshal(body)
 	if err != nil {
@@ -82,12 +174,11 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 		t.Fatalf("FINK SSO request: %v", err)
 	}
 
-	t.Cleanup(func() {
-		err := resp.Body.Close()
-		if err != nil {
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
 			t.Errorf("failed to close response body: %v", err)
 		}
-	})
+	}()
 
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= http.StatusInternalServerError {
@@ -544,3 +635,29 @@ func TestFINK_ResidualStatistics(t *testing.T) {
 
 // Ensure imports are used.
 var _ = fmt.Sprintf
+
+// TestFinkUsableRecognizesADegradedAnswer pins what finkSSOQuery treats as an
+// answer worth testing (#501): FINK has returned a 200 with an empty list, and
+// one whose records lacked the residuals asked for.
+func TestFinkUsableRecognizesADegradedAnswer(t *testing.T) {
+	t.Parallel()
+
+	withResidual := map[string]any{"residuals_shg1g2": 0.01}
+	without := map[string]any{"residuals_shg1g2": nil}
+
+	for _, c := range []struct {
+		name      string
+		records   []map[string]any
+		residuals bool
+		want      bool
+	}{
+		{"empty", nil, false, false},
+		{"records", []map[string]any{without}, false, true},
+		{"residuals asked, none carried", []map[string]any{without, without}, true, false},
+		{"residuals asked, one carried", []map[string]any{without, withResidual}, true, true},
+	} {
+		if got := finkUsable(c.records, c.residuals); got != c.want {
+			t.Errorf("%s: finkUsable = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
