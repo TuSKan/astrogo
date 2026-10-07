@@ -558,3 +558,39 @@ func TestNewKnownSiteReturnsSharedInstanceWithoutOpts(t *testing.T) {
 		t.Errorf("NewKnownSite with no opts should return the shared registry *Site, got distinct pointers")
 	}
 }
+
+// TestSiteHorizonDipIsTheApparentDip pins Site.HorizonDip to its doc (#566):
+// 1.76′·√h, the dip with terrestrial refraction, which is smaller than the
+// geometric dip. The doc called it geometric and quoted the geometric 0.90°
+// at 786 m for a function returning 0.82°.
+func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		height              float64 // meters
+		apparent, geometric float64 // degrees
+	}{
+		{786, 0.822, 0.899},
+		{8849, 2.759, 3.016},
+	} {
+		site, err := NewSiteEarthLocation("dip", 0, 0, c.height)
+		if err != nil {
+			t.Fatalf("NewSiteEarthLocation: %v", err)
+		}
+
+		if dip := site.HorizonDip().Degrees(); math.Abs(dip-c.apparent) > 5e-4 {
+			t.Errorf("HorizonDip at %.0f m = %.4f°, want the apparent dip %.3f°", c.height, dip, c.apparent)
+		}
+
+		// The geometric dip, with no refraction, for the doc's comparison.
+		r := earthEquatorialRadiusKm * 1000
+		if geometric := math.Acos(r/(r+c.height)) * 180 / math.Pi; math.Abs(geometric-c.geometric) > 5e-4 {
+			t.Errorf("geometric dip at %.0f m = %.4f°, want %.3f°", c.height, geometric, c.geometric)
+		}
+
+		if got := site.RiseSetThreshold().Degrees(); got != -site.HorizonDip().Degrees() {
+			t.Errorf("RiseSetThreshold at %.0f m = %.4f°, want the dip alone, %.4f°",
+				c.height, got, -site.HorizonDip().Degrees())
+		}
+	}
+}

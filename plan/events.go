@@ -842,8 +842,10 @@ type TwilightEvent struct {
 // Rise and set thresholds come from the Site: SunRiseSetThreshold,
 // MoonRiseSetThreshold and RiseSetThreshold.
 //
-// Each is the conventional sum of a standard refraction of 34', the body's
-// semi-diameter, and the geometric horizon dip for the site's elevation. The
+// SunRiseSetThreshold and MoonRiseSetThreshold are each the conventional sum
+// of a standard refraction of 34', the body's semi-diameter, and the horizon
+// dip for the site's elevation, 1.76'√h, which includes terrestrial
+// refraction. RiseSetThreshold, for any other target, is the dip alone. The
 // 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
 // Almanac define rise and set the same way, so that two implementations agree on
 // an instant that is otherwise sensitive to the air on the night. SOFA's
@@ -853,7 +855,7 @@ type TwilightEvent struct {
 
 // SunEvents returns all rise, set, and transit events for the Sun in the given interval.
 // The threshold accounts for atmospheric refraction (34'), solar semi-diameter (16'),
-// and geometric horizon dip from the site's elevation.
+// and the horizon dip from the site's elevation.
 func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
 	sun := NewSun(provider)
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
@@ -893,7 +895,7 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 
 // MoonEvents returns all rise, set, and transit events for the Moon in the given interval.
 // The threshold accounts for atmospheric refraction, mean lunar semi-diameter,
-// horizontal parallax, and geometric horizon dip from the site's elevation.
+// horizontal parallax, and the horizon dip from the site's elevation.
 func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
 	moon := NewMoon(provider)
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
@@ -1195,8 +1197,8 @@ func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, 
 }
 
 // VisibilityEvents returns all rise, transit, and set events for a target at the given site.
-// The rise/set threshold is automatically computed from the site's elevation, accounting
-// for standard atmospheric refraction (34') and geometric horizon dip.
+// The rise/set threshold is the site's dipped horizon alone, from its elevation; no
+// atmospheric refraction is added. See [Site.RiseSetThreshold].
 func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Event, error) {
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{

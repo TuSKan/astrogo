@@ -318,7 +318,8 @@ correctly yielding zero rise/set events.
 
 ### High Altitude — Mount Everest (8849m)
 
-At extreme elevation the geometric horizon dip is ~2.76°, which shifts
+At extreme elevation the horizon dip is ~2.76°: 1.76′√h, which includes
+terrestrial refraction (the geometric dip would be 3.02°). It shifts
 rise/set times significantly (sunrise earlier, sunset later).
 
 > **USNO API Limitation:** The `height` parameter has no effect on the
