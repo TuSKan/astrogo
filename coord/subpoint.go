@@ -5,31 +5,36 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// SubPoint returns the geodetic point on Earth's reference ellipsoid where
-// a distant body in direction geocentric (a geocentric position vector in
-// GCRS, as produced by eph.Position/MovingBody.GeocentricVec throughout this
-// codebase) would be observed exactly at the zenith, at time t. Only
-// geocentric's direction matters, not its length/units — it need not be a
-// unit vector.
+// SubPoint returns the geodetic point on Earth's reference ellipsoid where a
+// body at geocentric position geocentric (GCRS, in AU, as eph.Position and
+// MovingBody.GeocentricVec produce throughout this codebase) is observed
+// exactly at the zenith, at time t: the foot of the WGS84 ellipsoid normal
+// that passes through the body, at height zero.
 //
-// The direction is used as given: for the point where a body is *seen*
+// The position is used as given: for the point where a body is *seen*
 // overhead, pass its apparent place, with light time and aberration in it.
 // plan.SubsolarPoint and plan.SublunarPoint do.
 //
-// "At the zenith" means the ellipsoid's local normal is parallel to the
-// body's direction. By definition, geodetic latitude IS the angle between
-// the equatorial plane and the ellipsoid's normal at a point — so the
-// sub-point's geodetic latitude equals the body's declination in the
-// Earth-fixed frame directly, with no further ellipsoidal correction, and its
-// longitude is the Earth-fixed frame's right-ascension-like angle. This
-// differs from the GEOCENTRIC sub-point (the same declination reinterpreted
-// as geocentric latitude) by up to ~11.5′ at mid-latitudes — the well-known
-// geodetic-vs-geocentric latitude discrepancy under WGS84 flattening.
+// # Why the position and not only the direction
+//
+// The ellipsoid normal at a point does not pass through Earth's centre; it
+// is tilted from the geocentric radius by the difference between geodetic
+// and geocentric latitude, up to 11.5′ at mid-latitudes. So the point whose
+// normal is merely parallel to the body's geocentric direction sees the body
+// off the zenith by R⊕ times that tilt over the body's distance. For the Sun
+// and the planets that is under a milliarcsecond, and the two answers are
+// the same. For the Moon, at 60 Earth radii, it is up to about 10″, 0.3 km on
+// the ground: SubPoint used only the direction and called the Moon
+// "effectively infinite" until #579. A direction given without a meaningful
+// length (a unit vector) is taken as a body that many AU away, where the two
+// answers agree. A satellite's position works too: the foot of the normal
+// through it is its sub-satellite point.
 //
 // # The rotation into the Earth-fixed frame
 //
@@ -43,15 +48,6 @@ import (
 // distance at the point returned: 15 arcsec at J2000 itself, from nutation,
 // 0.38° — 42 km — in October 2026, and growing at the general precession's
 // 50 arcsec a year.
-//
-// # Not for a nearby body
-//
-// Only the direction is used, so this is the sub-point of a body at
-// effectively infinite distance: the Sun, the Moon, a planet. For a
-// satellite, whose distance is part of the geometry, the point overhead is
-// where the ellipsoid normal passes through the body — [FromECEF] of its
-// Earth-fixed position. The two differ in latitude by up to the 11.5′ above
-// scaled by R/(R+h): about 10.8′ for the ISS at 420 km.
 //
 // Returns [ErrZeroVector] for a zero vector, and an error when UT1 cannot be
 // had for t, as [time.Time.UT1] reports it.
@@ -72,14 +68,21 @@ func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 	rc2t := gofaext.C2t06a(tt1, tt2, u1, u2, eop.XP, eop.YP)
 	itrs := gofaext.Rxp(rc2t, [3]float64{geocentric.X, geocentric.Y, geocentric.Z})
 
-	// No ellipsoidal ECEF→geodetic fit, per the doc comment above: the
-	// direction's declination and right ascension in ITRS are the geodetic
-	// latitude and longitude. FromUnitVector is scale-invariant, so itrs need
-	// not be normalized.
-	g := &Geodetic{}
-	g.FromUnitVector(vector.V3(itrs[0], itrs[1], itrs[2]))
+	// The foot of the normal through the body: its Earth-fixed position, in
+	// meters, through FromECEF, keeping latitude and longitude.
+	au := constants.IAU.AstronomicalUnit.Value
 
-	return g, nil
+	g, err := FromECEF(vector.V3(itrs[0]*au, itrs[1]*au, itrs[2]*au), WGS84())
+	if err != nil {
+		return nil, fmt.Errorf("coord: subpoint: %w", err)
+	}
+
+	foot, err := NewGeodetic(g.Lon(), g.Lat(), 0)
+	if err != nil {
+		return nil, fmt.Errorf("coord: subpoint: %w", err)
+	}
+
+	return foot, nil
 }
 
 // SmallCircle returns n points forming a spherical small circle of the

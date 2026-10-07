@@ -28,8 +28,8 @@ func (k TwilightKind) zenithAngle() angle.Angle {
 }
 
 // SubsolarPoint returns the geodetic point on Earth where the Sun is
-// exactly at the zenith at time t — see coord.SubPoint for the underlying
-// geometry and how it differs from a nearby-body sub-point.
+// exactly at the zenith at time t: the foot of the ellipsoid normal through
+// the Sun's apparent position (see coord.SubPoint).
 //
 // The Sun's direction is its apparent place, with light time and annual
 // aberration in it, the same one every other altitude in this package is
@@ -56,11 +56,15 @@ func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 }
 
 // SublunarPoint returns the geodetic point on Earth where the Moon is
-// exactly at the zenith at time t — see coord.SubPoint for the underlying
-// geometry and how it differs from a nearby-body sub-point. Note this uses
-// the same distance-independent direction-only definition as
-// SubsolarPoint, from the Moon's apparent place; it is not the
-// "sub-satellite" point, where the ellipsoid normal passes through the body.
+// exactly at the zenith at time t: the foot of the ellipsoid normal through
+// the Moon's apparent position (see coord.SubPoint), taken to first order as
+// SubsolarPoint's is.
+//
+// Until #579 it was the point whose normal was merely parallel to the
+// Moon's geocentric direction, which treats the Moon as infinitely far. At
+// 60 Earth radii it is not: the Moon there sat up to about 10″ from the
+// zenith, 0.3 km from the point returned now, and 4.3″ in latitude from
+// Skyfield's subpoint_of on 2026-03-20.
 func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()

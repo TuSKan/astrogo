@@ -80,6 +80,60 @@ func TestSubPointIsOverhead(t *testing.T) {
 	t.Logf("worst zenith distance at the sub-point: %.3f arcsec", worst)
 }
 
+// TestSubPointPutsANearBodyAtTheZenith holds SubPoint to its definition for
+// a body whose distance matters (#579): the Moon at 60 Earth radii and a
+// satellite at 420 km, observed from the point returned, airless, through
+// the transform core.
+//
+// The normal at a point does not pass through Earth's centre, so the point
+// whose normal is merely parallel to the body's direction, which SubPoint
+// returned until #579, sees a near body off the zenith by up to R⊕·11.5′ over
+// the distance: 11″ for the Moon at these declinations, and over 10′ for the
+// satellite. The floor is diurnal aberration, 0.32″ at the equator, as in
+// TestSubPointIsOverhead.
+func TestSubPointPutsANearBodyAtTheZenith(t *testing.T) {
+	t.Parallel()
+
+	const (
+		tolArcsec = 0.5
+		moonAU    = 384400.0 / 149597870.7
+		issAU     = (6378.137 + 420) / 149597870.7
+	)
+
+	tm := time.FromJD(2461318.0, time.UTC)
+
+	for _, c := range []struct {
+		name     string
+		distance float64
+	}{
+		{"Moon", moonAU},
+		{"satellite at 420 km", issAU},
+	} {
+		// Declinations near ±45°, where geodetic and geocentric latitude
+		// differ most.
+		for _, dir := range []vector.Vec3{
+			vector.V3(0.5, 0.5, 0.7071),
+			vector.V3(-0.6, 0.4, -0.6928),
+			vector.V3(0.2, -0.95, 0.24),
+		} {
+			pos := dir.MulScalar(c.distance / dir.Norm())
+
+			geo, err := coord.SubPoint(pos, tm)
+			if err != nil {
+				t.Fatalf("%s: SubPoint: %v", c.name, err)
+			}
+
+			ctx := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+
+			if zd := 90*3600 - ctx.GeocentricToObserved(pos).Alt().Degrees()*3600; zd > tolArcsec {
+				t.Errorf("%s in direction %v: seen from the sub-point (lat %.6f°, lon %.6f°) it is "+
+					"%.3f arcsec from the zenith, want under %.1f",
+					c.name, dir, geo.Lat().Degrees(), geo.Lon().Degrees(), zd, tolArcsec)
+			}
+		}
+	}
+}
+
 // TestSubPoint_ZeroVector confirms the degenerate zero-length input is
 // rejected rather than silently returning (0,0).
 func TestSubPoint_ZeroVector(t *testing.T) {
