@@ -287,7 +287,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		epochs[i] = epochStart.Add(unit.Days(float64(i) * 45))
 	}
 
-	atmNoRef := atmosphere.StandardRefraction
+	atmNoRef := atmosphere.StandardRefraction()
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
 	// The contract, and why it is no longer the number this test last

@@ -30,7 +30,7 @@ import (
 // case, and it passed. Stepping finely across the whole domain is what makes
 // the guard independent of guessing where the next one will be.
 func TestRefractionIsNeverNegative(t *testing.T) {
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	models := []struct {
 		name string
@@ -82,7 +82,7 @@ func TestRefractionIsNeverNegative(t *testing.T) {
 // correct — the distinction is carried by the exact field below rather than
 // papered over with one loose tolerance.
 func TestRefractionVanishesAtTheZenith(t *testing.T) {
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	for _, model := range []struct {
 		name string
@@ -133,7 +133,7 @@ func TestRefractionVanishesAtTheZenith(t *testing.T) {
 // crossing. Both fits quote about 0.1 arcmin (6 arcsec) of accuracy, so the
 // discarded amount has to be far under that to be free.
 func TestZenithClampCostsLessThanTheModelsOwnAccuracy(t *testing.T) {
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	// The quoted accuracy of the empirical fits, in arcseconds.
 	const quotedAccuracy = 0.1 * 60.0
@@ -179,7 +179,7 @@ func TestZenithClampCostsLessThanTheModelsOwnAccuracy(t *testing.T) {
 // TestZenithClampLeavesTheUsefulRangeUntouched checks the fix is local: every
 // altitude a real observation cares about must return what it did before.
 func TestZenithClampLeavesTheUsefulRangeUntouched(t *testing.T) {
-	env := StandardRefraction
+	env := StandardRefraction()
 
 	// Values recorded on main before the clamp, in arcseconds.
 	for _, tc := range []struct {

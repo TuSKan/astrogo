@@ -84,7 +84,16 @@ func (u Unit) String() string {
 
 // ── Built-in Units ─────────────────────────────────────────────────────────────
 
-// SI and astronomical measurement units — immutable physical constants.
+// SI and astronomical measurement units.
+//
+// They are vars because a Unit is a struct, which Go cannot declare const,
+// and nothing stops an importer assigning to one: unit.Meter.ScaleFactor =
+// 0.3048 would change every length in the process. Treat them as read-only.
+// They stay vars rather than accessors because they appear in composite
+// literals and arithmetic all through the module, where unit.Meter() would
+// read worse for no gain in a value nothing in astrogo assigns. docsguard's
+// inventory of exported vars lists this family and why it is one (#537);
+// this comment used to call them immutable, which they are not.
 var (
 	// Meter is the SI base unit of length.
 	Meter = Unit{Dimension: dim.Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}

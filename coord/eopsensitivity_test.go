@@ -89,7 +89,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	// A fixed catalogue direction rather than a body: no ephemeris, no light
@@ -164,7 +164,7 @@ func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
@@ -292,7 +292,7 @@ func TestObserverVectorRotatesWithUT1(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
@@ -379,7 +379,7 @@ func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)

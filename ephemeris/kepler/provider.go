@@ -164,7 +164,13 @@ func (p *Provider) Close() error { return nil }
 // SOFA has no analytical Pluto, and without one a satellite registered about
 // Pluto — Charon — cannot be placed at all, since the provider composes a
 // satellite through its parent.
-var PlutoElements = func() Elements {
+//
+// It returns a copy, not a var, so that no importer can change Pluto's orbit
+// for every other one in the process (#537).
+func PlutoElements() Elements { return plutoElements }
+
+// plutoElements is the value PlutoElements returns, built once.
+var plutoElements = func() Elements {
 	el, err := NewElements(time.J2000(), unit.AU(39.48211675), 0.24882730,
 		angle.Deg(17.14001206), angle.Deg(110.30393684),
 		angle.Deg(113.76497945), angle.Deg(14.86012204))
@@ -264,7 +270,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 		// difference between a Charon orbit that can be placed and one that
 		// cannot be, and it is what ephemeris.Default() already offered a
 		// layer up.
-		pos, vel, perr := PlutoElements.StateAt(t)
+		pos, vel, perr := PlutoElements().StateAt(t)
 		if perr != nil {
 			return core.State{}, fmt.Errorf("kepler: pluto: %w", perr)
 		}

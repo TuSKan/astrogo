@@ -40,7 +40,7 @@ func TestAtTimeAcrossALeapSecond(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-30))
 
 	before := time.Date(2016, time.December, 31, 23, 30, 0, 0, time.LocationUTC)

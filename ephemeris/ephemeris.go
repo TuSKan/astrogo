@@ -340,7 +340,7 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // visible at the call site instead of resting on a lower layer's behavior.
 func Default() Provider {
 	p := kepler.New(kepler.WithBase(&sofaProvider{}))
-	if err := p.Register(Pluto, kepler.PlutoElements); err != nil {
+	if err := p.Register(Pluto, kepler.PlutoElements()); err != nil {
 		panic(fmt.Sprintf("ephemeris: failed to register built-in Pluto elements: %v", err))
 	}
 

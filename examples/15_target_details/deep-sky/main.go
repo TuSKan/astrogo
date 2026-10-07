@@ -32,7 +32,7 @@ func main() {
 	}
 
 	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD)
 

@@ -60,7 +60,7 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 		yp:   angle.Arcsec(ypArcsec).Radians(),
 	})
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	epoch := diurnalEpoch
@@ -161,7 +161,7 @@ func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 		yp:   angle.Arcsec(0.4021).Radians(),
 	})
 
-	atm := atmosphere.StandardRefraction
+	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
 	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)

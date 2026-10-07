@@ -26,7 +26,7 @@ func main() {
 
 	now := time.NowUTC()
 
-	ctx := coord.NewContext(now, loc, atmosphere.StandardRefraction)
+	ctx := coord.NewContext(now, loc, atmosphere.StandardRefraction())
 
 	altaz, err := ctx.ICRSToAltAz(icrs)
 	if err != nil {

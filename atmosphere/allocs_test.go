@@ -35,7 +35,7 @@ func TestRefractionAndAirmassDoNotAllocate(t *testing.T) {
 	var (
 		rigorous    = RefractionRigorous{}
 		approximate = RefractionApproximate{}
-		env         = StandardRefraction
+		env         = StandardRefraction()
 		alt         = angle.Deg(30)
 		horizon     = angle.Deg(0.5)
 	)
