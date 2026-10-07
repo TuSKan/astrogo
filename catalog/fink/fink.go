@@ -645,7 +645,11 @@ func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord,
 				v := chunk.GetOneForMarshal(row)
 				switch iv := v.(type) {
 				case string:
-					n, err := strconv.ParseInt(strings.TrimSpace(iv), 10, 64)
+					// 32 bits: an asteroid number, a fit flag or an
+					// observation count fits with room to spare, and the
+					// bound is what makes the int conversions of fit, status
+					// and n_obs below safe on a 32-bit platform.
+					n, err := strconv.ParseInt(strings.TrimSpace(iv), 10, 32)
 					if err != nil {
 						return 0
 					}
