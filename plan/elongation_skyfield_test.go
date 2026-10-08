@@ -28,9 +28,7 @@ import (
 // 1e-4 degrees for the elongation itself.
 func TestGreatestElongationsAgreeWithSkyfield(t *testing.T) {
 	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("DE440s provider: %v", err)
-	}
+	requireKernel(t, "DE440s provider", err)
 
 	t.Cleanup(func() { _ = prov.Close() })
 
