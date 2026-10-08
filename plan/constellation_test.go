@@ -2,6 +2,7 @@ package plan
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -51,6 +52,43 @@ func TestNewConstellation_NameAndAbbreviationResolveIdentically(t *testing.T) {
 func TestNewConstellation_UnknownName(t *testing.T) {
 	if _, err := NewConstellation("Not A Real Constellation"); !errors.Is(err, constellation.ErrUnknownAbbreviation) {
 		t.Errorf("NewConstellation(unknown) error = %v, want ErrUnknownAbbreviation", err)
+	}
+}
+
+// TestNewConstellationNamesTheConstellationAskedFor holds all 88, by name,
+// by abbreviation and without spaces or case, to the constellation asked
+// for (#640). Eridanus's point lies in Fornax and Serpens's in Ophiuchus,
+// and those two had been named for the constellation their point fell in.
+func TestNewConstellationNamesTheConstellationAskedFor(t *testing.T) {
+	for _, c := range constellation.List() {
+		for _, query := range []string{c.Name, c.Abbreviation, strings.ToUpper(strings.ReplaceAll(c.Name, " ", ""))} {
+			got, err := NewConstellation(query)
+			if err != nil {
+				t.Errorf("NewConstellation(%q): %v", query, err)
+
+				continue
+			}
+
+			if got.Name() != c.Name || got.Abbreviation() != c.Abbreviation {
+				t.Errorf("NewConstellation(%q) = %s (%s), want %s (%s)", query, got.Name(), got.Abbreviation(), c.Name, c.Abbreviation)
+			}
+		}
+	}
+}
+
+// TestNewConstellationRefusesSerpenssHalves: constellation.Centroid also
+// answers to its catalog's keys for Serpens's two halves, which name no
+// constellation, so NewConstellation refuses them as it does any unknown
+// name.
+func TestNewConstellationRefusesSerpenssHalves(t *testing.T) {
+	for _, key := range []string{"SER1", "ser2"} {
+		if _, err := constellation.Centroid(key); err != nil {
+			t.Fatalf("Centroid(%q): %v, the premise of this test", key, err)
+		}
+
+		if _, err := NewConstellation(key); !errors.Is(err, constellation.ErrUnknownAbbreviation) {
+			t.Errorf("NewConstellation(%q) error = %v, want ErrUnknownAbbreviation", key, err)
+		}
 	}
 }
 

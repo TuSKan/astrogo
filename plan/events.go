@@ -1454,7 +1454,6 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 	return geom, refr, nil
 }
 
-// wrap180 is an angle in degrees brought into (−180°, 180°].
 // raOfDateDifference returns pos1's right ascension minus pos2's, in degrees
 // wrapped to (−180°, 180°], both measured on the true equator of date — the
 // right ascension an almanac means by a conjunction in right ascension.
@@ -1484,6 +1483,7 @@ func raOfDateDifference(pos1, pos2 coord.ICRS, t time.Time) float64 {
 	return wrap180(ra(pos1) - ra(pos2))
 }
 
+// wrap180 is an angle in degrees brought into (−180°, 180°].
 func wrap180(deg float64) float64 {
 	for deg > 180 {
 		deg -= 360

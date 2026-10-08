@@ -563,8 +563,9 @@ bitten on an exact grid line — see also the HEALPix 45° face boundary.
 **Goal.** Spectral moonlight scattered into the line of sight.
 
 **Chain.** Solar spectral irradiance → Sun–Moon geometry → ROLO reflectance → lunar
-spectral irradiance at Earth → Moon–target geometry → Rayleigh and aerosol scattering →
-atmospheric attenuation → multiple-scattering correction → observer radiance.
+spectral irradiance at Earth → ozone absorption along the Moon's beam → Moon–target
+geometry → Rayleigh and aerosol scattering → atmospheric attenuation → multiple-scattering
+correction → observer radiance.
 
 **ROLO disk-equivalent albedo, model 311g.** Kieffer & Stone (2005) Eq. 10:
 
@@ -722,10 +723,27 @@ a column via Beer–Lambert, with the Dobson Unit derived from the SI-exact Bolt
 constant and the STP definition rather than hardcoded (`TestDobsonUnitDerivation`
 reproduces 2.687×10¹⁶ molecules·cm⁻²).
 
-It ships **no tabulated cross-section data**. O₃ (Chappuis), O₂ (A and B bands) and H₂O
-are the species that matter over 330–1000 nm, but their cross sections are datasets with
-their own provenance — Serdyuchenko et al. (2014) for ozone, HITRAN for O₂ and H₂O — and
-inventing numbers for them is exactly what the design forbids. See §16.
+O₃ (Chappuis), O₂ (A and B bands) and H₂O are the species that matter over 330–1000 nm,
+and their cross sections are datasets with their own provenance — Serdyuchenko et al.
+(2014) for ozone, HITRAN for O₂ and H₂O — so inventing numbers for them is exactly what
+the design forbids. See §16.
+
+Ozone's is the one shipped, and only as `atmosphere`'s 10 nm average of the Serdyuchenko
+file at 223 K, from 320 to 1000 nm. `TestExtinctionOzoneIsTheDatasetBinned` recomputes every
+value from that file. The Chappuis band is a continuum some 200 nm wide, so 10 nm resolves
+it. Every component that crosses the ozone layer applies it, as
+`exp(−τ_O3 · X_O3)` with `τ_O3` from `Atmosphere.OzoneOpticalDepth` (the scene's own column)
+and `X_O3` from `atmosphere.OzoneAirmass`, a thin shell 20 km up (#632). Where that path
+runs depends on where the light meets the layer:
+
+- Light from beyond the atmosphere crosses it along the line of sight: starlight, the
+  zodiacal and diffuse galactic light, the extragalactic background, and airglow, emitted
+  near 90 km.
+- Moonlight crosses it along the Moon's beam, before scattering below it.
+- Artificial skyglow never meets it.
+
+At Paranal with 258 DU this dims a dark sky's V by 0.022 mag at the zenith and 0.083 mag at
+10° altitude.
 
 One caveat recorded in the code: Beer–Lambert with a band-averaged cross section is valid
 for the ozone Chappuis continuum and **wrong** for the narrow O₂ A band, where a 1 nm grid
@@ -744,7 +762,8 @@ first:
     L_obs(lambda) = L_0(lambda) * T(lambda, z)
 
 `L_0` is an extra-atmospheric map, `T` the line-of-sight transmission at that wavelength
-and airmass, built from `atmosphere.RayleighOpticalDepth` and the scene's aerosol.
+and airmass, built from `atmosphere.RayleighOpticalDepth`, the scene's aerosol, and its
+ozone column through `atmosphere.OzoneAirmass` (see §11.5's molecular absorption).
 
 **Primary references.** Masana, E., Carrasco, J.M., Bará, S. & Ribas, S.J. (2021), MNRAS
 501, 5443 (GAMBONS); Riello, M. et al. (2021), A&A 649, A3 and the Gaia DR3 photometric
@@ -1502,7 +1521,7 @@ allocations.
 | Phase | Content | State |
 | :--- | :--- | :--- |
 | 0 | Architecture and spectral foundation | **Done** |
-| 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. No cross-section dataset is shipped, and deliberately: ozone's Chappuis-band cross section is strongly temperature-dependent, so a reference and a temperature are the caller's scientific choice |
+| 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. Ozone's cross section ships only as `atmosphere`'s 10 nm average of the 223 K file that `dataset/crosssection` fetches (§11.5, §16), and every component that crosses the ozone layer applies it (#632) |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.6 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
