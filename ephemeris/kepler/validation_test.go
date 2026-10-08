@@ -127,14 +127,6 @@ func horizonsGet(params url.Values) (string, error) {
 	return strings.TrimSpace(s[soe+6 : eoe]), nil
 }
 
-// fetchHelioElements queries Horizons for designation's real published
-// heliocentric osculating elements (EPHEM_TYPE=ELEMENTS, CENTER='@10')
-// at atStr, and the exact TDB Julian date they were reported for.
-// Verified live against Horizons' real ELEMENTS CSV column layout
-// (JDTDB, Calendar Date, EC, QR, IN, OM, W, Tp, N, MA, TA, A, AD, PR;
-// km-seconds units by default, since OUT_UNITS is not set) — not
-// guessed — and cross-checked against 433 Eros's well-known real
-// elements (a~1.458 AU, e~0.223, i~10.83 deg) before being trusted.
 // horizonsEpoch renders an instant for a Horizons query that declares
 // TIME_TYPE='TDB', as a Julian Date rather than a calendar string.
 //
@@ -159,6 +151,14 @@ func horizonsEpoch(at time.Time) string {
 	return fmt.Sprintf("'JD%.9f'", at.JD())
 }
 
+// fetchHelioElements queries Horizons for designation's real published
+// heliocentric osculating elements (EPHEM_TYPE=ELEMENTS, CENTER='@10')
+// at the instant at, and the exact TDB Julian date they were reported for.
+// Verified live against Horizons' real ELEMENTS CSV column layout
+// (JDTDB, Calendar Date, EC, QR, IN, OM, W, Tp, N, MA, TA, A, AD, PR;
+// km-seconds units by default, since OUT_UNITS is not set) — not
+// guessed — and cross-checked against 433 Eros's well-known real
+// elements (a~1.458 AU, e~0.223, i~10.83 deg) before being trusted.
 func fetchHelioElements(designation string, at time.Time) (epochJD float64, el kepler.Elements, err error) {
 	params := url.Values{}
 	params.Add("format", "text")

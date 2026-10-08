@@ -89,12 +89,11 @@ func (s *Atmosphere) Extinction(lambda unit.WavelengthNM) (float64, error) {
 //
 //   - X_R is [Airmass], Pickering's (2002) airmass of the molecular
 //     atmosphere.
-//   - X_O3 is the airmass of a thin shell 20 km up, the ozone layer:
-//     (1 - (sin z / (1 + 20/6378))^2)^(-1/2), which Pickering (DIO 12 ‡1,
-//     footnote 39) adopts from Schaefer (1998). Near the horizon it is a
-//     third of X_R, 12.66 against 38.75 at 0°, so charging ozone X_R
-//     over-dimmed a target there: by 0.63 mag at 0°, 0.34 at 1° and 0.19
-//     at 2° on VisibleTonight's default air (#625).
+//   - X_O3 is [OzoneAirmass], the airmass of a thin shell 20 km up, the
+//     ozone layer. Near the horizon it is a third of X_R, 12.66 against
+//     38.75 at 0°, so charging ozone X_R over-dimmed a target there: by
+//     0.63 mag at 0°, 0.34 at 1° and 0.19 at 2° on VisibleTonight's
+//     default air (#625).
 //   - X_aer is X_R as well. That is the right airmass for aerosol with the
 //     molecular scale height, 8 km, which OPAC gives its continental and
 //     urban types. A thinner layer, maritime (1 km) or desert (2 km), has a
@@ -116,17 +115,59 @@ func (s *Atmosphere) ExtinctionToward(lambda unit.WavelengthNM, alt angle.Angle)
 		return 0, err
 	}
 
-	return magnitudesPerOpticalDepth * ((rayleigh+aerosol)*x + ozone*ozoneAirmass(alt)), nil
+	xO3, err := OzoneAirmass(alt)
+	if err != nil {
+		return 0, err
+	}
+
+	return magnitudesPerOpticalDepth * ((rayleigh+aerosol)*x + ozone*xO3), nil
 }
 
-// ozoneAirmass returns the airmass of a thin absorbing shell 20 km above an
-// Earth of radius 6378 km, seen from apparent altitude alt at or above the
-// horizon: Schaefer's (1998) formula as Pickering (DIO 12 ‡1, footnote 39)
-// gives it.
-func ozoneAirmass(alt angle.Angle) float64 {
+// OzoneAirmass returns the airmass of a thin absorbing shell 20 km above an
+// Earth of radius 6378 km, the ozone layer, seen from apparent altitude alt:
+// Schaefer's (1998) formula as Pickering (DIO 12 ‡1, footnote 39) gives it,
+//
+//	X_O3 = (1 - (sin z / (1 + 20/6378))^2)^(-1/2)
+//
+// with z the zenith distance. Ozone lies above nearly all the air that
+// scatters, so light crossing it travels a path set by the layer's height
+// rather than by the molecular atmosphere's: 12.66 airmasses at the horizon
+// against [Airmass]'s 38.75. High in the sky the two agree.
+//
+// Below the horizon the error wraps [ErrBelowHorizon], as Airmass's does.
+func OzoneAirmass(alt angle.Angle) (float64, error) {
+	if alt.Degrees() < 0 {
+		return 0, ErrBelowHorizon
+	}
+
 	s := math.Cos(alt.Radians()) / (1 + 20.0/6378)
 
-	return 1 / math.Sqrt(1-s*s)
+	return 1 / math.Sqrt(1-s*s), nil
+}
+
+// OzoneOpticalDepth returns the vertical optical depth of this air's ozone
+// column, [Atmosphere.Ozone], at wavelength lambda: the column times the
+// Serdyuchenko et al. (2014) cross section at 223 K averaged over 10 nm, the
+// ozone term of [Atmosphere.Extinction].
+//
+// Ozone only absorbs, and it lies in a layer some 20 km up, so light that
+// crosses it is dimmed by exp(-tau * X) with X from [OzoneAirmass].
+//
+// The wavelength must lie from 320 to 1000 nm, where the cross section is
+// tabulated; outside it the error wraps [ErrExtinctionWavelength]. A zero
+// column, which is an Atmosphere's default, is zero optical depth at any
+// wavelength, since nothing absorbs whatever the cross section there.
+func (s *Atmosphere) OzoneOpticalDepth(lambda unit.WavelengthNM) (unit.OpticalDepth, error) {
+	if s.ozone == 0 {
+		return 0, nil
+	}
+
+	nm := float64(lambda)
+	if !(nm >= extinctionMinNM && nm <= extinctionMaxNM) {
+		return 0, fmt.Errorf("%w: got %g nm", ErrExtinctionWavelength, nm)
+	}
+
+	return unit.OpticalDepth(ozoneCrossSectionAt(nm) * float64(s.ozone) * dobsonUnitMoleculesPerCM2), nil
 }
 
 // opticalDepths returns this air's Rayleigh, ozone and aerosol optical
@@ -142,10 +183,14 @@ func (s *Atmosphere) opticalDepths(lambda unit.WavelengthNM) (rayleigh, ozone, a
 		return 0, 0, 0, err
 	}
 
-	ozone = ozoneCrossSectionAt(nm) * float64(s.ozone) * dobsonUnitMoleculesPerCM2
+	tauO3, err := s.OzoneOpticalDepth(lambda)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
 	aerosol = float64(s.aerosol.TauAt(lambda))
 
-	return float64(tauR), ozone, aerosol, nil
+	return float64(tauR), float64(tauO3), aerosol, nil
 }
 
 // ozoneCrossSectionAt interpolates [ozoneCrossSection] linearly at nm, which

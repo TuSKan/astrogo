@@ -33,19 +33,10 @@ func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrig
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	atm, err := atmosphere.NewBuilder().
-		Surface(743, 284).
-		Aerosol(0.02, 550, 1.3, 0.95, 0.65).
-		AerosolScaleHeight(1500).
-		Build()
-	if err != nil {
-		t.Fatalf("atmosphere Build: %v", err)
-	}
-
 	scene := &skybrightness.Scene{
 		Observer:   loc,
 		Time:       when,
-		Atmosphere: atm,
+		Atmosphere: fullSkyAir(t, 0),
 		Ephemeris:  eph.Default(),
 	}
 
@@ -124,6 +115,24 @@ func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrig
 	}
 
 	return model, scene, grid
+}
+
+// fullSkyAir is assembleSky's air over Paranal, with an ozone column of
+// ozoneDU Dobson units.
+func fullSkyAir(t *testing.T, ozoneDU float64) *atmosphere.Atmosphere {
+	t.Helper()
+
+	atm, err := atmosphere.NewBuilder().
+		Surface(743, 284).
+		Aerosol(0.02, 550, 1.3, 0.95, 0.65).
+		AerosolScaleHeight(1500).
+		Ozone(ozoneDU).
+		Build()
+	if err != nil {
+		t.Fatalf("atmosphere Build: %v", err)
+	}
+
+	return atm
 }
 
 // vMagPerArcsec projects a spectrum's 554 nm radiance to mag/arcsec^2 against
