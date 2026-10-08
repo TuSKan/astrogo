@@ -120,7 +120,6 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			var xmlPayload struct {
 				ResolvedCoordinate []struct {
 					CanonicalName string   `xml:"canonicalName"`
-					Resolver      string   `xml:"resolver"`
 					RA            *float64 `xml:"ra"`
 					Dec           *float64 `xml:"dec"`
 				} `xml:"resolvedCoordinate"`
@@ -133,7 +132,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 			targets = make([]resolve.Target, 0, len(xmlPayload.ResolvedCoordinate))
 			for _, match := range xmlPayload.ResolvedCoordinate {
-				targets = append(targets, newMASTTarget(match.CanonicalName, match.Resolver, match.RA, match.Dec))
+				targets = append(targets, newMASTTarget(match.CanonicalName, match.RA, match.Dec))
 			}
 		} else {
 			var jsonPayload struct {
@@ -141,7 +140,6 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 				Msg                string `json:"msg"`
 				ResolvedCoordinate []struct {
 					CanonicalName string   `json:"canonicalName"`
-					Resolver      string   `json:"resolver"`
 					RA            *float64 `json:"ra"`
 					Decl          *float64 `json:"decl"`
 				} `json:"resolvedCoordinate"`
@@ -159,7 +157,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 
 			targets = make([]resolve.Target, 0, len(jsonPayload.ResolvedCoordinate))
 			for _, match := range jsonPayload.ResolvedCoordinate {
-				targets = append(targets, newMASTTarget(match.CanonicalName, match.Resolver, match.RA, match.Decl))
+				targets = append(targets, newMASTTarget(match.CanonicalName, match.RA, match.Decl))
 			}
 		}
 
@@ -187,24 +185,24 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 //
 // Catalog is always "mast" (consistent with every other provider setting
 // Catalog to its own name), never the relayed sub-resolver name (NED,
-// Simbad, VizieR) MAST's Name.Lookup service internally used to answer —
-// that information isn't discarded, it's preserved as an alias instead, so
+// Simbad, VizieR) MAST's Name.Lookup service internally used to answer, so
 // Catalog keeps one consistent meaning ("which provider produced this row")
 // across the whole package.
+//
+// The sub-resolver's name is not kept as an alias either, as it once was. An
+// alias is a name of the object, and catalog.Resolver and xmatch match on
+// aliases: with "SIMBAD" on every MAST result, xmatch paired M31 with M33 and
+// with Vega (#612).
 //
 // Epoch defaults to time.J2000() as a best-effort assumption: the API doesn't
 // report which sub-resolver's native epoch actually answered, but
 // SIMBAD/NED name-lookup responses are conventionally J2000.
-func newMASTTarget(canonicalName, resolver string, ra, dec *float64) resolve.Target {
+func newMASTTarget(canonicalName string, ra, dec *float64) resolve.Target {
 	t := resolve.Target{
 		ID:      canonicalName,
 		Name:    canonicalName,
 		Catalog: "mast",
 		Epoch:   time.J2000(),
-	}
-
-	if resolver != "" {
-		t.Aliases = []string{resolver}
 	}
 
 	if ra != nil && dec != nil {
