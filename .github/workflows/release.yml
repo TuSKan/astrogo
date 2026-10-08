@@ -1,0 +1,54 @@
+name: Release
+
+# A GitHub Release for every version tag, its notes that version's CHANGELOG.md
+# section as the release PR assembled it (docs/RELEASING.md).
+#
+# Until this existed the tags had no releases at all, and the repository's only
+# GitHub Release was a data file, starmap-v2, which the Releases page therefore
+# showed as "Latest". A version release is marked Latest; a data release is
+# created by hand with --latest=false.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          # See the Setup Go step in ci.yml's lint-and-test job for why this is
+          # a minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.27'
+          cache: true
+
+      # Fails, and so creates no release, when CHANGELOG.md has no section for
+      # the tag or the section is empty: a tag pushed without its release PR.
+      - name: Extract the release notes
+        run: >-
+          go test ./internal/changelog/ -count=1 -run '^TestReleaseNotesFile$'
+          -release-notes "${GITHUB_REF_NAME#v}"
+          -notes-out "$RUNNER_TEMP/notes.md"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          --title "$GITHUB_REF_NAME"
+          --notes-file "$RUNNER_TEMP/notes.md"
+          --verify-tag
+          --latest

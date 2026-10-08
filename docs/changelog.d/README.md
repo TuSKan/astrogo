@@ -40,13 +40,16 @@ not the record.
 
 ## Releasing
 
+When to release, which version, and the release pull request are in
+[RELEASING.md](../RELEASING.md). The assembly step is:
+
 ```bash
-go test ./internal/changelog/ -run TestAssembleRelease -update -release-version 0.17.0
+go test ./internal/changelog/ -run TestAssembleRelease -update -release-version X.Y.Z
 ```
 
 That folds every entry here into a new `CHANGELOG.md` section, in the order
-above, extends the link-reference chain, and deletes the consumed files. Review
-the result before tagging.
+above, extends the link-reference chain, and deletes the consumed files. The
+release pull request is where the result is reviewed.
 
 The `-update` gate follows this repository's existing convention for generated
 artefacts — the Horizons corpus and the accuracy table work the same way — so
