@@ -470,11 +470,6 @@ func (uf *unionFind) union(a, b int) {
 
 // ── Alias-graph cross-match (primary signal) ─────────────────────────────
 
-type matchKey struct {
-	kind  byte // 'i' for ID, 'a' for alias — both funnel into the same union pass
-	value string
-}
-
 // unionByAlias generalizes bigsky's "join on shared Tycho/Hipparcos ID" to
 // Go's Aliases []string: every candidate's own ID and every alias it
 // carries are indexed together, and any two candidates sharing a bucket
@@ -483,20 +478,24 @@ type matchKey struct {
 // different provider's Aliases, which is what makes this work in
 // practice for e.g. a SIMBAD hit and a Gaia ConeSearch hit of the same
 // star.
+//
+// IDs and aliases share one index, so one provider's ID meets another's alias.
+// They used to be keyed apart, an ID only ever meeting other IDs, which made
+// the cross-identifier match this doc describes impossible (#613).
 func unionByAlias(candidates []candidate, uf *unionFind) {
-	idx := make(map[matchKey][]int)
+	idx := make(map[string][]int)
 
-	add := func(k matchKey, i int) { idx[k] = append(idx[k], i) }
+	add := func(name string, i int) {
+		if key := resolve.Normalize(name); key != "" {
+			idx[key] = append(idx[key], i)
+		}
+	}
 
 	for i, c := range candidates {
-		if c.target.ID != "" {
-			add(matchKey{'i', resolve.Normalize(c.target.ID)}, i)
-		}
+		add(c.target.ID, i)
 
 		for _, a := range c.target.Aliases {
-			if a != "" {
-				add(matchKey{'a', resolve.Normalize(a)}, i)
-			}
+			add(a, i)
 		}
 	}
 
