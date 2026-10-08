@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -33,7 +34,10 @@ func TestImportingThisPackageRegistersTheBackend(t *testing.T) {
 func TestBackendReportsTheKernelFailureNotAMissingImport(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
-	// Nothing can be fetched, so whatever comes back is a kernel failure.
+	// Nothing is cached and nothing can be fetched, so whatever comes back
+	// is a kernel failure. The cache is this test's own: offline, a cached
+	// kernel is served (#633), and the shared cache usually holds DE440s.
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.SetOffline(true)
 
 	_, err := core.KernelProvider(context.Background(), core.KernelRequest{
@@ -59,6 +63,7 @@ func TestBackendReportsTheKernelFailureNotAMissingImport(t *testing.T) {
 // pins is that the option translation runs at all rather than being skipped.
 func TestBackendCarriesTheTimeInterval(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.SetOffline(true)
 
 	_, err := core.KernelProvider(context.Background(), core.KernelRequest{
