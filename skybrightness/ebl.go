@@ -132,6 +132,11 @@ func (e *ExtragalacticBackground) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: extragalactic: airmass: %w", err)
 	}
 
+	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: extragalactic: ozone airmass: %w", err)
+	}
+
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 	height := scene.Observer.Height()
@@ -163,7 +168,12 @@ func (e *ExtragalacticBackground) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
 		}
 
-		dst[i] += value * float64(atmosphere.Transmission(slant))
+		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
+		}
+
+		dst[i] += value * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
 	return flags, nil
