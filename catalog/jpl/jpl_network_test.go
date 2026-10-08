@@ -116,3 +116,36 @@ func TestJPLNetworkResolveExact(t *testing.T) {
 		t.Errorf("expected a non-empty SPKID, got: %+v", got[0])
 	}
 }
+
+// TestJPLNetworkResolvesCommonNames resolves names Horizons answers with an
+// ambiguous table, a spacecraft header with two parentheticals, and a
+// four-column small-body index. Before #616 these came back as Larissa, the
+// Earth-Moon barycenter, the ID "spacecraft" and nothing.
+func TestJPLNetworkResolvesCommonNames(t *testing.T) {
+	requireHorizons(t)
+
+	tests := []struct {
+		query, wantID, wantName string
+	}{
+		{"ISS", "-125544", "International Space Station (spacec"},
+		{"Moon", "301", "Moon"},
+		{"Voyager 1", "-31", "Voyager 1 (spacecraft)"},
+		{"Halley", "2688", "Halley"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			got, err := New().Resolve(ctx, tt.query)
+			if err != nil {
+				testutil.SkipOnUpstreamFailure(t, err)
+				t.Fatalf("Resolve(%q): %v", tt.query, err)
+			}
+
+			testutil.AssertEqual(t, "ID", got.ID, tt.wantID)
+			testutil.AssertEqual(t, "Name", got.Name, tt.wantName)
+		})
+	}
+}

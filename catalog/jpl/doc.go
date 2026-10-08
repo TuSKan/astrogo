@@ -8,15 +8,21 @@
 // shapes, verified against live Horizons traffic:
 //
 //   - An ambiguous major-body match (planets, satellites, spacecraft,
-//     barycenters) — a fixed-width table, yielding one [resolve.Target] per
-//     row.
+//     barycenters) — a fixed-width table whose columns are read from its
+//     separator line, yielding one [resolve.Target] per row.
 //   - An ambiguous small-body match (comets/asteroids) — JPL/DASTCOM's
 //     "Small-body Index Search Results" index table, a structurally
-//     different table from the major-body one above, yielding one
-//     [resolve.Target] per row.
+//     different table from the major-body one above whose columns are found
+//     by their headers, yielding one [resolve.Target] per row with its
+//     DASTCOM record number as ID.
 //   - An unambiguous single match (major or small body) — Horizons' stable
 //     "Target body name: <name> (<id-or-designation>)" identifying header
-//     line, yielding exactly one [resolve.Target].
+//     line, yielding exactly one [resolve.Target]. The identifier is the
+//     last parenthetical, or the record number for a comet whose line has
+//     none.
+//
+// [Provider.ResolveObject] yields a table in Horizons' order, which is not
+// best match first; [Provider.Search] and [Provider.Resolve] rank it.
 //
 // A response matching none of these shapes but carrying non-blank result
 // text returns [ErrNotImplemented] rather than a guessed/fabricated Target.

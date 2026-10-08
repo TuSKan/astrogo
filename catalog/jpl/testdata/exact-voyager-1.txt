@@ -1,0 +1,94 @@
+*******************************************************************************
+ Revised: Aug 19, 2022   Voyager 1 Spacecraft (interplanetary) / (Sun)     -31
+                        http://www.jpl.nasa.gov/missions/voyager-1/
+
+ BACKGROUND
+   See the web-page above for information on the Voyager Mission
+
+ TIMELINE
+   1977-Sep-06  Launch from Kennedy Space Center @ 12:56 UTC
+   1979-Mar-05  Jupiter closest-approach, Io imaging
+   1980-Nov-12  Saturn encounter, Titan
+   1990-Jan-01  Interstellar mission begins
+   1990-Feb-14  Final Voyager image return
+   1992-Apr-24  Final two-way tracking measurements
+   1998-Feb-17  Exceeds Pioneer 10 distance (most distant man-made object)
+   2004-Dec-15  Crosses solar system "bow shock" boundary
+   2012-Aug-25  Passes heliopause and termination shock boundary
+
+ SPACECRAFT TRAJECTORY:
+   This trajectory is composed of two merged sections:
+
+     #1) 1977-Sep-5 to 1981-Jan-1:
+          A patched conic mission-design type trajectory in which the conics 
+          were constructed to approximately match specific events, such as
+          satellite encounters, providing a rough accuracy. 
+
+     #2) 1981-Jan-1 to 2100-Jan-1 
+          Refit of tracking data spanning 1981-1992 (end of two-way coherent 
+          transponder data). Done in 2022 by R. Jacobson (former Voyager
+          navigation) using DE440 to generate a new solution and prediction. 
+
+   The reconstruction done in 2022 estimated:
+      - Epoch state vector
+      - Constant and stochastic non-gravitational accelerations 
+         (to account for the activity of three-axis attitude control system)
+      - Thermal radiation from RTG power sources
+      - Mismodelling of solar pressure  
+      - 96 impulsive maneuvers through Feb 1992
+
+   Note there has been no new tracking data possible since 1992. This is a
+   different issue from on-board telemetry, which continued beyond that date. 
+
+   The 2022 update refit the existing old tracking data using modern approaches
+   and standards to allow consistent extrapolation to 2100.
+
+   Formal predicted geocentric pointing uncertainty on 2030-Jan-1:
+     RA +/- 1.701 arcseconds, DEC +/- 1.535 arcseconds
+
+   This uncertainty is consistent with the new solution's difference with 
+   the A54206 prediction made in 1990. 
+ 
+   Tracking data used in 2022 solution:
+     Points Type       First point            Last point       residual rms
+       2366   F2   01-JAN-1981 05:14:00  15-APR-1989 08:09:00  0.133 mm/s
+       2084   F3   07-JAN-1981 12:15:00  24-APR-1992 14:04:00  0.153 mm/s
+       5191  PRA   01-JAN-1981 03:52:18  20-JAN-1989 14:13:59  228 m
+         67  SRA   04-MAR-1989 10:58:56  13-OCT-1991 04:49:30  227 m
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Wed Oct  7 20:17:07 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: Voyager 1 (spacecraft) (-31)    {source: Voyager_1_ST+refit2022_m}
+Center body name: Earth (399)                     {source: Voyager_1_ST+refit2022_m}
+Center-site name: GEOCENTRIC
+*******************************************************************************
+Start time      : A.D. 2022-Jan-01 10:00:00.0000 UT      
+Stop  time      : A.D. 2022-Jan-02 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : undefined
+Target radii    : undefined                                                    
+Center geodetic : 0.0, 0.0, -6378.137             {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : ITRF93                          {East-longitude positive}
+Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+Target primary  : Earth
+Vis. interferer : MOON (R_eq= 1737.400) km        {source: Voyager_1_ST+refit20
+Rel. light bend : Sun                             {source: Voyager_1_ST+refit20
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Atmos refraction: NO (AIRLESS)
+RA format       : HMS
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261007.p270103                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-07. PREDICTS-> 2027-JAN-02
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+ Date__(UT)__HR:MN     R.A._____(ICRF)_____DEC  R.A.__(a-apparent)__DEC  dRA*cosD d(DEC)/dt  Azi____(a-app)___Elev  dAZ*cosE d(ELV)/dt  X_(sat-primary)_Y SatPANG  L_Ap_Sid_Time  a-mass mag_ex    APmag   S-brt      Illu%  Def_illu   ang-sep/v  Ang-diam  ObsSub-LON ObsSub-LAT  SunSub-LON SunSub-LAT  SN.ang   SN.dist    NP.ang   NP.dist  hEcl-Lon hEcl-Lat                r        rdot             delta      deldot  1-way_down_LT       VmagSn      VmagOb     S-O-T /r     S-T-O   T-O-M/MN_Illu%     O-P-T    PsAng   PsAMV      PlAng  Cnst        TDB-UT     ObsEcLon    ObsEcLat  N.Pole-RA  N.Pole-DC      GlxLon     GlxLat  L_Ap_SOL_Time  399_ins_LT  RA_3sigma DEC_3sigma  SMAA_3sig SMIA_3sig    Theta Area_3sig  POS_3sigma  RNG_3sigma RNGRT_3sig   DOP_S_3sig  DOP_X_3sig  RT_delay_3sig  Tru_Anom  L_Ap_Hour_Ang       phi  PAB-LON  PAB-LAT  App_Lon_Sun  RA_(ICRF-a-apparnt)_DEC  I_dRA*cosD I_d(DEC)/dt  Sky_motion  Sky_mot_PA  RelVel-ANG  Lun_Sky_Brt  sky_SNR   UT1-UTC
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************

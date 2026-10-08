@@ -1,0 +1,72 @@
+*******************************************************************************
+JPL/HORIZONS               2688 Halley (1982 HG1)          2026-Oct-07 20:22:54
+Rec #:    2688 (+COV) Soln.date: 2026-Jun-05_06:49:27   # obs: 5886 (1950-2026)
+ 
+IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+ 
+  EPOCH=  2458459.5 ! 2018-Dec-07.00 (TDB)         Residual RMS= .23385
+   EC= .1434935027907016   QR= 2.716184714391124   TP= 2457665.765444485
+   OM= 95.23970780254312   W=  188.421443308325    IN= 3.449455167026217
+   A= 3.171236555987723    MA= 138.5276296704908   ADIST= 3.626288397584323
+   PER= 5.64743            N= .174526394           ANGMOM= .030316422
+   DAN= 3.61975            DDN= 2.71986            L= 283.6461119
+   B= -.5048854            MOID= 1.69786           TP= 2016-Oct-04.2654444850
+ 
+Asteroid physical parameters (km, seconds, rotational period in hours):
+   GM= n.a.                RAD= 10.7625            ROTPER= 16.022
+   H= 11.84                G= .150                 B-V= n.a.
+                           ALBEDO= .077            STYP= n.a.
+
+ASTEROID comments: 
+1: soln ref.= JPL#73, OCC=0
+2: source=ORB
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Wed Oct  7 20:22:54 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: 2688 Halley (1982 HG1)          {source: JPL#73}
+Center body name: Earth (399)                     {source: DE441}
+Center-site name: GEOCENTRIC
+*******************************************************************************
+Start time      : A.D. 2022-Jan-01 10:00:00.0000 UT      
+Stop  time      : A.D. 2022-Jan-02 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : undefined
+Target radii    : 10.762 km                                                    
+Center geodetic : 0.0, 0.0, -6378.137             {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : ITRF93                          {East-longitude positive}
+Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+Target primary  : Sun
+Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+Rel. light bend : Sun                             {source: DE441}
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Small-body perts: Yes                             {source: SB441-N16}
+Atmos refraction: NO (AIRLESS)
+RA format       : HMS
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261007.p270103                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-07. PREDICTS-> 2027-JAN-02
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+*******************************************************************************
+Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  EPOCH=  2458459.5 ! 2018-Dec-07.00 (TDB)         Residual RMS= .23385        
+   EC= .1434935027907016   QR= 2.716184714391124   TP= 2457665.765444485       
+   OM= 95.23970780254312   W=  188.421443308325    IN= 3.449455167026217       
+  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+   X= 1.105614658970622E+00  Y= 3.114984176186117E+00  Z= 1.258027867748427E+00
+  VX=-7.894633882427671E-03 VY= 2.929576145679863E-03 VZ= 1.766283239559785E-03
+Asteroid physical parameters (km, seconds, rotational period in hours):        
+   GM= n.a.                RAD= 10.7625            ROTPER= 16.022              
+   H= 11.84                G= .150                 B-V= n.a.                   
+                           ALBEDO= .077            STYP= n.a.                  
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+ Date__(UT)__HR:MN     R.A._____(ICRF)_____DEC  R.A.__(a-apparent)__DEC  dRA*cosD d(DEC)/dt  Azi____(a-app)___Elev  dAZ*cosE d(ELV)/dt  X_(sat-primary)_Y SatPANG  L_Ap_Sid_Time  a-mass mag_ex    APmag   S-brt      Illu%  Def_illu   ang-sep/v  Ang-diam  ObsSub-LON ObsSub-LAT  SunSub-LON SunSub-LAT  SN.ang   SN.dist    NP.ang   NP.dist  hEcl-Lon hEcl-Lat                r        rdot             delta      deldot  1-way_down_LT       VmagSn      VmagOb     S-O-T /r     S-T-O   T-O-M/MN_Illu%     O-P-T    PsAng   PsAMV      PlAng  Cnst        TDB-UT     ObsEcLon    ObsEcLat  N.Pole-RA  N.Pole-DC      GlxLon     GlxLat  L_Ap_SOL_Time  399_ins_LT  RA_3sigma DEC_3sigma  SMAA_3sig SMIA_3sig    Theta Area_3sig  POS_3sigma  RNG_3sigma RNGRT_3sig   DOP_S_3sig  DOP_X_3sig  RT_delay_3sig  Tru_Anom  L_Ap_Hour_Ang       phi  PAB-LON  PAB-LAT  App_Lon_Sun  RA_(ICRF-a-apparnt)_DEC  I_dRA*cosD I_d(DEC)/dt  Sky_motion  Sky_mot_PA  RelVel-ANG  Lun_Sky_Brt  sky_SNR   UT1-UTC
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
