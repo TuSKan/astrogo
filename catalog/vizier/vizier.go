@@ -15,6 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrUnexpectedSchema indicates the CSV response is missing a column the
@@ -114,13 +115,19 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	dec := center.Dec().Degrees()
 	rad := req.Radius.Degrees()
 
+	// A table whose rows carry their own epochs is asked for them.
+	epochCol := ""
+	if schema.EpochCol != "" {
+		epochCol = schema.EpochCol + " as epoch_jd, "
+	}
+
 	adql := fmt.Sprintf(`SELECT TOP %d
-	%s as designation, %s as ra, %s as dec,
+	%s as designation, %s as ra, %s as dec, %s
 	DISTANCE(POINT('ICRS', %s, %s), POINT('ICRS', %f, %f)) AS dist
 	FROM "%s"
 	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %f, %f, %f))
 	ORDER BY dist ASC`,
-		limit, schema.DesigCol, schema.RACol, schema.DecCol, schema.RACol, schema.DecCol, ra, dec,
+		limit, schema.DesigCol, schema.RACol, schema.DecCol, epochCol, schema.RACol, schema.DecCol, ra, dec,
 		tableName, schema.RACol, schema.DecCol, ra, dec, rad)
 
 	// The table name is part of the cache key: two different tables queried
@@ -164,7 +171,9 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 }
 
 // parseCSV extracts designation/ra/dec rows from the ADQL query's CSV
-// response, tagging every row with schema's kind and native epoch. Columns
+// response, tagging every row with schema's kind and with its epoch: the
+// row's own from the epoch_jd column where the table has one
+// ([tableSchema.EpochCol]), the table's otherwise. Columns
 // are located by header name rather than assumed position, so the parser
 // stays correct if the SELECT clause in ConeSearch is reordered.
 func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
@@ -205,6 +214,11 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 		return nil, fmt.Errorf("%w: missing %q column", ErrUnexpectedSchema, "dec")
 	}
 
+	epochIdx, hasEpochCol := col["epoch_jd"]
+	if schema.EpochCol != "" && !hasEpochCol {
+		return nil, fmt.Errorf("%w: missing %q column", ErrUnexpectedSchema, "epoch_jd")
+	}
+
 	var targets []resolve.Target
 
 	for {
@@ -229,6 +243,19 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 			return nil, fmt.Errorf("vizier: parse dec %q: %w", record[decIdx], err)
 		}
 
+		// A row's own epoch is the date its position was measured. Its time
+		// scale is immaterial here: a minute is nothing to a proper motion.
+		epoch := schema.Epoch
+
+		if schema.EpochCol != "" {
+			jd, err := strconv.ParseFloat(strings.TrimSpace(record[epochIdx]), 64)
+			if err != nil {
+				return nil, fmt.Errorf("vizier: parse epoch %q: %w", record[epochIdx], err)
+			}
+
+			epoch = time.FromJD(jd, time.UTC)
+		}
+
 		targets = append(targets, resolve.Target{
 			Catalog:     "vizier",
 			ID:          designation,
@@ -237,7 +264,7 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 			Kind:        schema.Kind,
 			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			HasCoord:    true,
-			Epoch:       schema.Epoch,
+			Epoch:       epoch,
 		})
 	}
 

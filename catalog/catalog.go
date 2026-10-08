@@ -803,8 +803,8 @@ func setProvenance(dst *Target, field, provider string) {
 }
 
 // scalarFieldRules covers fields whose precedence is independent of
-// Coord/Parallax/PmRA/PmDec (handled separately in mergeGroup, since
-// those four are astrometrically coupled and must come from the same
+// Coord/Parallax/PmRA/PmDec/Epoch (handled separately in mergeGroup, since
+// those five are astrometrically coupled and must come from the same
 // source or not at all).
 var scalarFieldRules = []fieldRule{
 	{
@@ -815,14 +815,6 @@ var scalarFieldRules = []fieldRule{
 		take: func(dst *Target, src Target, provider string) {
 			dst.VMag, dst.HasVMag = src.VMag, true
 			setProvenance(dst, "VMag", provider)
-		},
-	},
-	{
-		precedence: []string{"gaia", "simbad", "vizier", "openngc", "mast"},
-		hasField:   func(t Target) bool { return !t.Epoch.IsZero() },
-		take: func(dst *Target, src Target, provider string) {
-			dst.Epoch = src.Epoch
-			setProvenance(dst, "Epoch", provider)
 		},
 	},
 	{
@@ -871,9 +863,9 @@ var scalarFieldRules = []fieldRule{
 	{
 		// SBDB-only osculating orbital-element cluster — Epoch here is the
 		// elements' own epoch of osculation, so it's taken alongside them
-		// as one coupled unit rather than through the separate Epoch rule
-		// above (which would let a stellar-catalog epoch from another
-		// provider silently mismatch these elements).
+		// as one coupled unit rather than with the astrometric cluster's
+		// (which would let a stellar-catalog epoch from another provider
+		// silently mismatch these elements).
 		precedence: []string{"sbdb"},
 		hasField:   func(t Target) bool { return t.HasElements },
 		take: func(dst *Target, src Target, provider string) {
@@ -888,21 +880,22 @@ var scalarFieldRules = []fieldRule{
 			dst.PerihelionDistance = src.PerihelionDistance
 			dst.PerihelionTime = src.PerihelionTime
 			setProvenance(dst, "OrbitalElements", provider)
-			setProvenance(dst, "Epoch", provider) // overwrites whatever the generic Epoch rule above set — this one is authoritative for an elements-bearing Target
+			setProvenance(dst, "Epoch", provider) // overwrites the astrometric cluster's — this one is authoritative for an elements-bearing Target
 		},
 	},
 }
 
-// astrometricPrecedence orders providers for Coord/Parallax/PmRA/PmDec,
+// astrometricPrecedence orders providers for Coord/Parallax/PmRA/PmDec/Epoch,
 // treated as one coupled cluster: mixing Coord from one source with
-// proper motion from another would describe an internally-inconsistent
-// astrometric solution, so whichever provider wins Coord also supplies
-// whatever of Parallax/PmRA/PmDec it has (possibly none).
+// proper motion or an epoch from another would describe an
+// internally-inconsistent astrometric solution, so whichever provider wins
+// Coord also supplies whatever of Parallax/PmRA/PmDec/Epoch it has
+// (possibly none).
 var astrometricPrecedence = []string{"gaia", "simbad", "openngc", "mast", "vizier"}
 
 // mergeGroup coalesces g's candidates into one Target: identity/metadata
 // fields take the first group member (registration order) with a value;
-// Aliases is always a union; Coord/Parallax/PmRA/PmDec come from the
+// Aliases is always a union; Coord/Parallax/PmRA/PmDec/Epoch come from the
 // highest-precedence trustworthy-coord member; every other field follows
 // scalarFieldRules.
 func mergeGroup(g group) Target {
@@ -963,6 +956,16 @@ astrometry:
 
 			merged.Coord, merged.HasCoord = c.target.Coord, true
 			setProvenance(&merged, "Coord", provider)
+
+			// An epoch belongs to a position: it is when the position
+			// held. It had a precedence of its own, which ranked VizieR
+			// above OpenNGC and MAST where Coord ranks it below, and so
+			// could pair OpenNGC's J2000 position with a 2MASS row's 1998
+			// observation date (#628).
+			if !c.target.Epoch.IsZero() {
+				merged.Epoch = c.target.Epoch
+				setProvenance(&merged, "Epoch", provider)
+			}
 
 			if c.target.Parallax != 0 {
 				merged.Parallax = c.target.Parallax
