@@ -8,8 +8,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-
-	"github.com/TuSKan/astrogo/remote"
 )
 
 // serveByCommand points Horizons at a server answering each request with the
@@ -27,7 +25,9 @@ func serveByCommand(t *testing.T, fixtures map[string]string) (*Provider, func()
 		command := r.URL.Query().Get("COMMAND")
 
 		mu.Lock()
+
 		asked = append(asked, command)
+
 		mu.Unlock()
 
 		name, ok := fixtures[command]
@@ -43,7 +43,7 @@ func serveByCommand(t *testing.T, fixtures map[string]string) (*Provider, func()
 	}))
 	t.Cleanup(server.Close)
 
-	redirect(t, remote.JPLHorizons, server.URL)
+	redirect(t, server.URL)
 
 	return New(), func() []string {
 		mu.Lock()

@@ -113,16 +113,6 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 	return targets[:min(len(targets), searchLimit)], nil
 }
 
-// drain returns every target Horizons answers query with.
-func (p *Provider) drain(ctx context.Context, query string) ([]resolve.Target, error) {
-	targets, err := resolve.Drain(p.ResolveObject(ctx, resolve.ObjectRequest{Query: query}), 0)
-	if err != nil {
-		return nil, fmt.Errorf("searching for %q: %w", query, err)
-	}
-
-	return targets, nil
-}
-
 // namesQuery reports whether any of targets carries query as a whole word of
 // its name, ID, designation or an alias, ignoring case: "Eros" is a word of
 // "433 Eros" but not of "Kerberos", and "Iris" not of "OSIRIS-REx".
@@ -259,4 +249,14 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			}
 		}
 	}
+}
+
+// drain returns every target Horizons answers query with.
+func (p *Provider) drain(ctx context.Context, query string) ([]resolve.Target, error) {
+	targets, err := resolve.Drain(p.ResolveObject(ctx, resolve.ObjectRequest{Query: query}), 0)
+	if err != nil {
+		return nil, fmt.Errorf("searching for %q: %w", query, err)
+	}
+
+	return targets, nil
 }

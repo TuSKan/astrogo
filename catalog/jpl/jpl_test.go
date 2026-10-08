@@ -41,7 +41,7 @@ func newMockProvider(t *testing.T, jsonPayload string) *Provider {
 	}))
 	t.Cleanup(server.Close)
 
-	redirect(t, remote.JPLHorizons, server.URL)
+	redirect(t, server.URL)
 
 	return New()
 }
@@ -227,7 +227,7 @@ func TestJPLErrorResponse(t *testing.T) {
 
 	prov := New()
 
-	redirect(t, remote.JPLHorizons, server.URL)
+	redirect(t, server.URL)
 
 	req := resolve.ObjectRequest{Query: "!!!ERROR!!!"}
 	iter := prov.ResolveObject(context.Background(), req)
@@ -257,7 +257,7 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapObjectResolution, got %v", caps)
 	}
 
-	redirect(t, remote.JPLHorizons, "http://127.0.0.1:1")
+	redirect(t, "http://127.0.0.1:1")
 
 	// Fast fail search / resolve without any real network call.
 	// This hits the missing coverage lines.
@@ -267,17 +267,17 @@ func TestProviderInterface(t *testing.T) {
 	}
 }
 
-// redirect points endpoint id at a test server for the duration of one
-// test. It replaces the old http.RoundTripper injection: remote/api's
-// Client is opaque by design, and every request resolves its URL through
-// remote.URL(id) anyway, so the registry is the natural seam.
-func redirect(t *testing.T, id remote.EndpointID, url string) {
+// redirect points Horizons at a test server for the duration of one test.
+// It replaces the old http.RoundTripper injection: remote/api's Client is
+// opaque by design, and every request resolves its URL through remote.URL
+// anyway, so the registry is the natural seam.
+func redirect(t *testing.T, url string) {
 	t.Helper()
 
-	scope := remote.Capture(id)
+	scope := remote.Capture(remote.JPLHorizons)
 	t.Cleanup(scope.Restore)
 
-	if err := remote.SetURL(id, url); err != nil {
-		t.Fatalf("SetURL(%s): %v", id, err)
+	if err := remote.SetURL(remote.JPLHorizons, url); err != nil {
+		t.Fatalf("SetURL(%s): %v", remote.JPLHorizons, err)
 	}
 }
