@@ -433,7 +433,7 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 	}
 }
 
-// TestGetMoonPosition_MultiEpochCacheHits is a regression test for R25: the
+// TestGetMoonGeocentricVec_MultiEpochCacheHits is a regression test for R25: the
 // old single-entry moonSepCache thrashed to a ~0% hit rate under concurrent
 // multi-epoch access, since every lookup at a new epoch evicted whatever was
 // cached before it could ever be reused. This exercises the realistic
