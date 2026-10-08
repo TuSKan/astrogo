@@ -12,24 +12,6 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// FromCatalog converts a catalog.Target (wire format from resolvers) and an
-// optional ephemeris provider into the appropriate concrete Observable type.
-//
-// Routing logic:
-//   - Satellite TLE → *Satellite (needs a real TLE-backed provider; p == nil never matches)
-//   - Sun/Moon/planets (Planet/Moon/Star Kind with a major-body NAIF ID) → *Planet, always —
-//     falls back to eph.Default() when p is nil, so this path never needs a caller-supplied
-//     provider to produce a real, moving Observable
-//   - PlanetaryMoon (a name plan.NewPlanetaryMoon recognizes) with provider → *PlanetaryMoon
-//   - HasM1 (comet photometry) with provider → *Comet
-//   - HasH (asteroid photometry) with provider → *Asteroid
-//   - HasElements (published orbital elements) and no provider → *Comet/*Asteroid via a
-//     Kepler-propagated provider built from those elements (see eph.NewFromElements) —
-//     preferred over eph.Default() here, which has no data for an arbitrary small body.
-//     An open orbit (e >= 1) is built from its perihelion form (eph.ElementsFromPerihelion)
-//   - Star kind → *Star
-//   - Everything else → *DeepSkyObject
-//
 // starAtJ2000 returns c's position at J2000, carrying c's own proper
 // motion, parallax and radial velocity, as a [Star] takes it.
 //
@@ -50,6 +32,23 @@ func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
 	return moved, nil
 }
 
+// FromCatalog converts a catalog.Target (wire format from resolvers) and an
+// optional ephemeris provider into the appropriate concrete Observable type.
+//
+// Routing logic:
+//   - Satellite TLE → *Satellite (needs a real TLE-backed provider; p == nil never matches)
+//   - Sun/Moon/planets (Planet/Moon/Star Kind with a major-body NAIF ID) → *Planet, always —
+//     falls back to eph.Default() when p is nil, so this path never needs a caller-supplied
+//     provider to produce a real, moving Observable
+//   - PlanetaryMoon (a name plan.NewPlanetaryMoon recognizes) with provider → *PlanetaryMoon
+//   - HasM1 (comet photometry) with provider → *Comet
+//   - HasH (asteroid photometry) with provider → *Asteroid
+//   - HasElements (published orbital elements) and no provider → *Comet/*Asteroid via a
+//     Kepler-propagated provider built from those elements (see eph.NewFromElements) —
+//     preferred over eph.Default() here, which has no data for an arbitrary small body.
+//     An open orbit (e >= 1) is built from its perihelion form (eph.ElementsFromPerihelion)
+//   - Star kind → *Star
+//   - Everything else → *DeepSkyObject
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	id := parseEphID(c.ID)
 
@@ -160,7 +159,10 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 			opts = append(opts, WithProperMotion(pos.PmRA(), pos.PmDec()))
 		}
 
-		if pos.Parallax().Radians() != 0 {
+		// Gated on the catalog's own parallax: for a moving star without
+		// one, SOFA's propagation substitutes a token minimum, which is not
+		// a measurement.
+		if c.Parallax.Radians() != 0 {
 			opts = append(opts, WithParallax(pos.Parallax()))
 		}
 
