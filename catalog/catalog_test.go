@@ -455,6 +455,31 @@ func TestMergeGroup_VMagPrecedence(t *testing.T) {
 	}
 }
 
+// TestMergeGroup_EpochFollowsCoord: an epoch is when a position held, so it
+// comes from the provider whose position won. Epoch had a precedence of its
+// own, ranking VizieR above OpenNGC where Coord ranks it below, which paired
+// OpenNGC's J2000 position with a 2MASS row's 1997 observation date (#628).
+func TestMergeGroup_EpochFollowsCoord(t *testing.T) {
+	observed := time.FromJD(2450745.8589, time.UTC)
+
+	got := mergeGroup(group{candidates: []candidate{
+		{provider: "vizier", target: Target{
+			Coord: coord.NewICRS(angle.Deg(10.684737), angle.Deg(41.269035)), HasCoord: true, Epoch: observed,
+		}},
+		{provider: "openngc", target: Target{
+			Coord: coord.NewICRS(angle.Deg(10.684792), angle.Deg(41.269067)), HasCoord: true, Epoch: time.J2000(),
+		}},
+	}})
+
+	if got.Provenance["Coord"] != "openngc" {
+		t.Fatalf("Coord from %q, want openngc", got.Provenance["Coord"])
+	}
+
+	if got.Provenance["Epoch"] != "openngc" || !got.Epoch.Equal(time.J2000()) {
+		t.Errorf("Epoch = %v from %q, want OpenNGC's J2000 with OpenNGC's position", got.Epoch, got.Provenance["Epoch"])
+	}
+}
+
 // TestMergeGroup_RadialVelocityZeroSurvivesMerge regression-tests the
 // HasRadialVelocity fix: RadialVelocity == 0 is physically legitimate (a
 // star moving neither toward nor away), so the merge must not treat it the
