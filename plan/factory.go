@@ -7,8 +7,30 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/time"
 )
+
+// starAtJ2000 returns c's position at J2000, carrying c's own proper
+// motion, parallax and radial velocity, as a [Star] takes it.
+//
+// A Star has no epoch: its position goes to SOFA's catalog-place transform,
+// which reads it as the position at J2000.0 and moves it from there. A
+// catalog's position is at the catalog's own epoch, J2016.0 for Gaia DR3,
+// and was handed over as it stood until #635, so a Gaia-built star was moved
+// as though its 2016 position were its 2000 one: Barnard's star 166″ off.
+// A zero Epoch means J2000, as everywhere else.
+func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
+	pos := coord.NewICRSWithKinematics(c.Coord.RA(), c.Coord.Dec(), c.PmRA, c.PmDec, c.Parallax, c.RadialVelocity)
+
+	moved, err := coord.PropagateEpoch(pos, c.Epoch, time.J2000())
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("position at J2000: %w", err)
+	}
+
+	return moved, nil
+}
 
 // FromCatalog converts a catalog.Target (wire format from resolvers) and an
 // optional ephemeris provider into the appropriate concrete Observable type.
@@ -148,17 +170,25 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 
 	// Star
 	if c.Kind == resolve.KindStar || c.Kind == resolve.KindDoubleStar {
-		var opts []StarOption
-		if c.PmRA.Radians() != 0 || c.PmDec.Radians() != 0 {
-			opts = append(opts, WithProperMotion(c.PmRA, c.PmDec))
+		pos, err := starAtJ2000(c)
+		if err != nil {
+			return nil, fmt.Errorf("plan: %s: %w", c.Name, err)
 		}
 
+		var opts []StarOption
+		if pos.PmRA().Radians() != 0 || pos.PmDec().Radians() != 0 {
+			opts = append(opts, WithProperMotion(pos.PmRA(), pos.PmDec()))
+		}
+
+		// Gated on the catalog's own parallax: for a moving star without
+		// one, SOFA's propagation substitutes a token minimum, which is not
+		// a measurement.
 		if c.Parallax.Radians() != 0 {
-			opts = append(opts, WithParallax(c.Parallax))
+			opts = append(opts, WithParallax(pos.Parallax()))
 		}
 
 		if c.HasRadialVelocity {
-			opts = append(opts, WithRadialVelocity(c.RadialVelocity))
+			opts = append(opts, WithRadialVelocity(pos.RV()))
 		}
 
 		if c.HasVMag {
@@ -169,7 +199,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 			opts = append(opts, WithAliases(c.Aliases...))
 		}
 
-		return NewStar(c.Name, c.Coord.RA(), c.Coord.Dec(), opts...), nil
+		return NewStar(c.Name, pos.RA(), pos.Dec(), opts...), nil
 	}
 
 	// Deep-sky object (galaxy, nebula, cluster, etc.)
