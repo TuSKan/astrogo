@@ -117,6 +117,48 @@ func TestSimbadNetworkSearchBright(t *testing.T) {
 	}
 }
 
+// Objects resolved live take their kind from SIMBAD's own hierarchy (#601).
+// Each is one the old string match got wrong or flattened: Aldebaran is "LP?",
+// a long-period variable candidate, and came back KindOther; M33 ("GiG") and
+// M77 ("Sy2") are galaxies that came back KindOther; the Pleiades and M13
+// were a generic cluster.
+func TestSimbadKindsFromTheLiveHierarchy(t *testing.T) {
+	requireSimbad(t)
+
+	prov := New()
+
+	cases := []struct {
+		query string
+		want  resolve.Kind
+	}{
+		{"Aldebaran", resolve.KindStar},
+		{"M 33", resolve.KindGalaxy},
+		{"M 77", resolve.KindGalaxy},
+		{"M 45", resolve.KindOpenCluster},
+		{"M 13", resolve.KindGlobularCluster},
+		{"M 1", resolve.KindSupernovaRemnant},
+		{"M 42", resolve.KindNebula},
+		{"Sirius", resolve.KindStar},
+	}
+
+	for _, c := range cases {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		got, err := prov.Resolve(ctx, c.query)
+
+		cancel()
+		testutil.SkipOnUpstreamFailure(t, err)
+
+		if err != nil {
+			t.Errorf("Resolve(%q): %v", c.query, err)
+			continue
+		}
+
+		if got.Kind != c.want {
+			t.Errorf("Resolve(%q) = %s, kind %s; want %s", c.query, got.ID, got.Kind, c.want)
+		}
+	}
+}
+
 // A bright search with no limit returns every object brighter than the
 // bound. It used to return 100, the brightest of them down to V 2.46,
 // whatever the bound (#603). SIMBAD held 953 objects brighter than V 4.5 when

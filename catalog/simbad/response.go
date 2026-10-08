@@ -129,10 +129,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 			}
 		}
 
-		otype := resolve.KindOther
-		if tIdx, ok := colIdx["otype"]; ok {
-			otype = mapSimbadKind(row[tIdx])
-		}
+		otype := rowKind(row, colIdx)
 
 		displayName, _ := friendlyName(mainID)
 
@@ -267,10 +264,7 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 			}
 		}
 
-		otype := resolve.KindOther
-		if tIdx, ok := colIdx["otype"]; ok {
-			otype = mapSimbadKind(row[tIdx])
-		}
+		otype := rowKind(row, colIdx)
 
 		displayName, _ := friendlyName(mainID)
 
@@ -330,36 +324,83 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 	return results, nil
 }
 
-// mapSimbadKind maps common SIMBAD Object Types (OTypes) to astrogo internal kinds.
-func mapSimbadKind(o string) resolve.Kind {
-	switch o {
-	case "Star":
-		return resolve.KindStar
-	case "**":
-		return resolve.KindDoubleStar
-	case "GlC", "OpC", "Cl*":
-		return resolve.KindStarCluster // or Globular/Open specifically inside logic
-	case "PN", "HII", "Neb":
-		return resolve.KindNebula
-	case "G", "Gal", "AGN":
-		return resolve.KindGalaxy
-	case "SNR":
-		return resolve.KindSupernovaRemnant
+// rowKind classifies a row by its otype and, when the query joined it, the
+// otype's place in SIMBAD's hierarchy (otype_path).
+func rowKind(row []string, colIdx map[string]int) resolve.Kind {
+	var otype, path string
+
+	if i, ok := colIdx["otype"]; ok && i < len(row) {
+		otype = row[i]
 	}
 
-	// SIMBAD's own OTYPES nomenclature marks every single-star
-	// classification with a "*" somewhere in the code — usually a suffix
-	// (V* variable, Em* emission-line, SB* spectroscopic binary, PM*
-	// high-proper-motion, dS* delta Scuti, RG* red giant, WD* white
-	// dwarf, ...) but sometimes internal (s*b/s*r blue/red supergiant) —
-	// confirmed live against the real TAP service that ordinary bright
-	// stars (Sirius, Canopus, Vega, Rigel, ...) come back with codes like
-	// these, not the small hand-picked set this switch checked before,
-	// which silently mapped nearly every real star to KindOther. "**"
-	// (double/multiple star system) is excluded above since it has its
-	// own Kind.
-	if strings.Contains(o, "*") && o != "**" {
+	if i, ok := colIdx["otype_path"]; ok && i < len(row) {
+		path = row[i]
+	}
+
+	return simbadKind(otype, path)
+}
+
+// simbadKind classifies a SIMBAD object by its place in SIMBAD's own
+// object-type hierarchy, the path its otypedef table gives each of the 226
+// codes: "* > Ev* > LP*" for a long-period variable, "G > AGN > SyG > Sy2" for
+// a Seyfert 2 galaxy, "Cl* > OpC" for an open cluster, "ISM > SNR" for a
+// supernova remnant.
+//
+// The path rather than the code, because the code does not say. This used to
+// match strings: a few literal codes, and any code containing '*' taken for a
+// star. A candidate drops the '*' ("LP?", "EB?", "bC?"), so 109 stars brighter
+// than V 7 came back as KindOther, Aldebaran among them; every galaxy code but
+// "G" and "AGN" did too, M33 ("GiG") and M77 ("Sy2") included; associations
+// ("As*") became stars; and three of the literal cases ("Star", "Gal", "Neb")
+// are not SIMBAD codes at all (#601).
+//
+// A root that classifies only a detection (X, UV, Rad, IR, ...) or something
+// that is not an object (a lensing event, a region) is KindOther: SIMBAD has
+// not said what the source is, and neither can this. With no path, an otype
+// otypedef does not list, the code stands in for a one-level path, which still
+// places the hierarchy's roots ("*", "G", "Cl*").
+func simbadKind(otype, path string) resolve.Kind {
+	if strings.TrimSpace(path) == "" {
+		path = otype
+	}
+
+	nodes := strings.Split(path, ">")
+	root := strings.TrimSpace(nodes[0])
+	leaf := strings.TrimSpace(nodes[len(nodes)-1])
+
+	switch root {
+	case "*":
+		switch leaf {
+		case "**":
+			return resolve.KindDoubleStar
+		case "PN":
+			// SIMBAD files planetary nebulae under evolved stars; what an
+			// observer sees is the nebula.
+			return resolve.KindNebula
+		}
+
 		return resolve.KindStar
+	case "Cl*":
+		switch leaf {
+		case "OpC":
+			return resolve.KindOpenCluster
+		case "GlC":
+			return resolve.KindGlobularCluster
+		}
+
+		return resolve.KindStarCluster
+	case "As*":
+		// Associations, moving groups and streams: a star cluster, as
+		// OpenNGC's "*Ass" is (#599).
+		return resolve.KindStarCluster
+	case "G", "GrG", "ClG", "SCG", "PCG", "PaG", "IG", "PoG":
+		return resolve.KindGalaxy
+	case "ISM", "PoC":
+		if leaf == "SNR" {
+			return resolve.KindSupernovaRemnant
+		}
+
+		return resolve.KindNebula
 	}
 
 	return resolve.KindOther
