@@ -293,7 +293,12 @@ func (m *Model) AboveAtmosphere(q Query) (SkyRadiance, error) {
 }
 
 // deExtinction returns exp(+tau_eff*m) per wavelength: the reciprocal of the
-// factor the natural components applied.
+// Rayleigh and aerosol factor the natural components applied.
+//
+// Not of their ozone factor, deliberately. Ozone lies above the air that
+// scatters, so the light this field feeds into the scattering kernel has
+// crossed the ozone layer along its own direction before it scatters, and
+// leaving that factor in is what charges it (#632).
 func deExtinction(scene *Scene, dir coord.AltAz, grid unit.SpectralGrid) ([]float64, error) {
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {

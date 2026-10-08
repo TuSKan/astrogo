@@ -2,6 +2,7 @@ package plan
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
@@ -23,24 +24,30 @@ type Constellation struct {
 // abbreviation, case/space-insensitive — e.g. "Orion" or "Ori") and
 // builds a *Constellation at its boundary centroid, or returns
 // constellation.ErrUnknownAbbreviation.
+//
+// The target is named for the constellation matched, wherever its point
+// falls. Two points fall outside their constellation (see
+// constellation.Centroid): Eridanus's in Fornax, which it winds around, and
+// Serpens's in Ophiuchus, which splits it in two. Naming the target from
+// the constellation its point fell in called those two Fornax and Ophiuchus
+// (#640).
 func NewConstellation(name string) (*Constellation, error) {
 	pos, err := constellation.Centroid(name)
 	if err != nil {
 		return nil, fmt.Errorf("plan: constellation %q: %w", name, err)
 	}
 
-	full, abbr, err := constellation.Lookup(pos)
-	if err != nil {
-		// Only reachable for one of Centroid's own documented exceptions
-		// (see constellation.Centroid) where the vertex-average centroid
-		// falls outside the constellation's own boundary — fall back to
-		// the caller-supplied name/no abbreviation rather than fail
-		// outright, since the position itself is still a reasonable
-		// "point roughly this way" answer.
-		return &Constellation{name: name, pos: pos}, nil //nolint:nilerr // documented fallback, not a swallowed error
+	want := strings.ToLower(strings.ReplaceAll(name, " ", ""))
+
+	for _, c := range constellation.List() {
+		if strings.ToLower(strings.ReplaceAll(c.Name, " ", "")) == want || strings.ToLower(c.Abbreviation) == want {
+			return &Constellation{name: c.Name, abbr: c.Abbreviation, pos: pos}, nil
+		}
 	}
 
-	return &Constellation{name: full, abbr: abbr, pos: pos}, nil
+	// Centroid also answers to its catalog's keys for Serpens's two halves,
+	// "SER1" and "SER2", which name no constellation.
+	return nil, fmt.Errorf("plan: constellation %q: %w", name, constellation.ErrUnknownAbbreviation)
 }
 
 // Name returns the constellation's full IAU name.
