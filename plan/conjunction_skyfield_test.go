@@ -23,9 +23,7 @@ import (
 // Moon and Venus, 59 s for Mars and Saturn.
 func TestConjunctionsAgreeWithSkyfield(t *testing.T) {
 	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("DE440s provider: %v", err)
-	}
+	requireKernel(t, "DE440s provider", err)
 
 	t.Cleanup(func() { _ = prov.Close() })
 
@@ -82,9 +80,7 @@ func TestConjunctionsAgreeWithSkyfield(t *testing.T) {
 // bounded optimizer with a tolerance in time stopped that far from it.
 func TestAppulsesAgreeWithSkyfield(t *testing.T) {
 	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("DE440s provider: %v", err)
-	}
+	requireKernel(t, "DE440s provider", err)
 
 	t.Cleanup(func() { _ = prov.Close() })
 

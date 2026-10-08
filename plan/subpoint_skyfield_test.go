@@ -28,9 +28,7 @@ import (
 // does not: 0.05 to 0.07 s this year, which is the 0.6 to 0.8" measured.
 func TestSubpointsAgreeWithSkyfield(t *testing.T) {
 	prov, err := eph.NewProvider(kernelContext(t), eph.Planets, "de440s")
-	if err != nil {
-		t.Fatalf("DE440s provider: %v", err)
-	}
+	requireKernel(t, "DE440s provider", err)
 
 	t.Cleanup(func() { _ = prov.Close() })
 
