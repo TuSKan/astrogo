@@ -46,91 +46,17 @@ func newMockProvider(t *testing.T, jsonPayload string) *Provider {
 	return New()
 }
 
-// TestJPLResolveObject_AmbiguousMajorBody uses a real Horizons "Multiple
-// major-bodies match string" response (verified live for query "Mars",
-// trimmed to 3 of the 10 real matches) — including a body whose name
-// overflows into the designation column, the exact case that motivated
-// cosparDesignationRe over fixed-offset slicing.
-func TestJPLResolveObject_AmbiguousMajorBody(t *testing.T) {
-	result := "*******************************************************************************\n" +
-		" Multiple major-bodies match string \"MARS*\"\n\n" +
-		"  ID#      Name                               Designation  IAU/aliases/other   \n" +
-		"  -------  ---------------------------------- -----------  ------------------- \n" +
-		"        4  Mars Barycenter                                                      \n" +
-		"      499  Mars                                                                 \n" +
-		"      -74  Mars Reconnaissance Orbiter (spacec2005-029A    MRO                  \n" +
-		" \n" +
-		"   Number of matches =  3. Use ID# to make unique selection.\n" +
-		"*******************************************************************************\n"
-
-	prov := newMockProvider(t, jsonResultPayload(t, result))
-
-	var got []resolve.Target
-
-	prov.ResolveObject(context.Background(), resolve.ObjectRequest{Query: "Mars"})(func(tg resolve.Target, err error) bool {
-		testutil.AssertNoError(t, err)
-
-		got = append(got, tg)
-
-		return true
-	})
-
-	if len(got) != 3 {
-		t.Fatalf("expected 3 targets, got %d: %+v", len(got), got)
-	}
-
-	testutil.AssertEqual(t, "target[0] ID", got[0].ID, "4")
-	testutil.AssertEqual(t, "target[0] Name", got[0].Name, "Mars Barycenter")
-	testutil.AssertEqual(t, "target[1] ID", got[1].ID, "499")
-	testutil.AssertEqual(t, "target[1] Name", got[1].Name, "Mars")
-	testutil.AssertEqual(t, "target[2] Designation", got[2].Designation, "2005-029A")
-	testutil.AssertEqual(t, "target[2] Aliases[0]", got[2].Aliases[0], "MRO")
-}
-
-// TestJPLResolveObject_AmbiguousSmallBody uses a real Horizons "Small-body
-// Index Search Results" response (verified live for query "73P", trimmed
-// to 2 of the 84 real matches) — a structurally different table from the
-// major-body one, keyed on Primary Desig / Name columns instead of
-// ID# / Designation.
-func TestJPLResolveObject_AmbiguousSmallBody(t *testing.T) {
-	result := "*******************************************************************************\n" +
-		"JPL/DASTCOM            Small-body Index Search Results     2026-Jul-07 16:26:47\n\n" +
-		" Comet AND asteroid index search:\n\n    DES = 73P;\n\n Matching small-bodies: \n\n" +
-		"    Record #  Epoch-yr  >MATCH DESIG<  Primary Desig  Name  \n" +
-		"    --------  --------  -------------  -------------  -------------------------\n" +
-		"    90000733    1930    73P            73P             Schwassmann-Wachmann 3\n" +
-		"    90000740    1995    73P-A          73P-A           Schwassmann-Wachmann 3\n"
-
-	prov := newMockProvider(t, jsonResultPayload(t, result))
-
-	var got []resolve.Target
-
-	prov.ResolveObject(context.Background(), resolve.ObjectRequest{Query: "73P"})(func(tg resolve.Target, err error) bool {
-		testutil.AssertNoError(t, err)
-
-		got = append(got, tg)
-
-		return true
-	})
-
-	if len(got) != 2 {
-		t.Fatalf("expected 2 targets, got %d: %+v", len(got), got)
-	}
-
-	testutil.AssertEqual(t, "target[0] ID", got[0].ID, "90000733")
-	testutil.AssertEqual(t, "target[0] Name", got[0].Name, "Schwassmann-Wachmann 3")
-	testutil.AssertEqual(t, "target[0] Designation", got[0].Designation, "73P")
-	testutil.AssertEqual(t, "target[1] Designation", got[1].Designation, "73P-A")
-}
-
 // TestJPLResolveObject_ExactMatch uses real Horizons "Target body name:"
-// header lines (verified live) — a major body with a purely numeric ID and
-// a small body whose parenthetical is a non-numeric provisional
-// designation instead.
+// header lines (verified live), with the "Rec #" line a small body's
+// response opens with where there is one. The ID is the last
+// parenthetical, which is a NAIF/SPK ID for a major body and may be a
+// provisional designation for a small one; a comet may have none, leaving
+// the record number as its only identifier.
 func TestJPLResolveObject_ExactMatch(t *testing.T) {
 	tests := []struct {
 		name      string
 		result    string
+		fixture   string
 		wantName  string
 		wantID    string
 		wantSPKID string
@@ -150,11 +76,58 @@ func TestJPLResolveObject_ExactMatch(t *testing.T) {
 			wantID:    "1948 OA",
 			wantDesig: "1948 OA",
 		},
+		{
+			// The first parenthetical used to be taken: ID "spacecraft".
+			name:      "spacecraft",
+			fixture:   "exact-voyager-1.txt",
+			wantName:  "Voyager 1 (spacecraft)",
+			wantID:    "-31",
+			wantSPKID: "-31",
+		},
+		{
+			name:      "small body in the major-body index",
+			fixture:   "exact-bennu.txt",
+			wantName:  "101955 Bennu (1999 RQ36)",
+			wantID:    "2101955",
+			wantSPKID: "2101955",
+		},
+		{
+			name:      "asteroid with a record number",
+			fixture:   "exact-2688.txt",
+			wantName:  "2688 Halley",
+			wantID:    "1982 HG1",
+			wantDesig: "1982 HG1",
+		},
+		{
+			// This and the next used to be ErrNotImplemented.
+			name:     "comet with no parenthetical",
+			fixture:  "exact-90000030.txt",
+			wantName: "1P/Halley",
+			wantID:   "90000030",
+		},
+		{
+			name:     "numbered periodic comet with no parenthetical",
+			fixture:  "exact-p-2010-a2.txt",
+			wantName: "354P/LINEAR",
+			wantID:   "90001346",
+		},
+		{
+			name:      "named comet",
+			fixture:   "exact-c-2020-f3.txt",
+			wantName:  "NEOWISE",
+			wantID:    "C/2020 F3",
+			wantDesig: "C/2020 F3",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prov := newMockProvider(t, jsonResultPayload(t, tt.result))
+			result := tt.result
+			if tt.fixture != "" {
+				result = readFixture(t, tt.fixture)
+			}
+
+			prov := newMockProvider(t, jsonResultPayload(t, result))
 
 			var got []resolve.Target
 

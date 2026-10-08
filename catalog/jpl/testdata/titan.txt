@@ -1,0 +1,11 @@
+*******************************************************************************
+ Multiple major-bodies match string "TITAN*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+      606  Titan                                           SVI                  
+      703  Titania                                         UIII                 
+  -102770  Titan-3C RB (spacecraft)           1967-040F                         
+ 
+   Number of matches =           3 . Use ID# to make unique selection.
+*******************************************************************************
