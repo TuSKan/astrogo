@@ -118,7 +118,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	// A table whose rows carry their own epochs is asked for them.
 	epochCol := ""
 	if schema.EpochCol != "" {
-		epochCol = fmt.Sprintf("%s as epoch_jd, ", schema.EpochCol)
+		epochCol = schema.EpochCol + " as epoch_jd, "
 	}
 
 	adql := fmt.Sprintf(`SELECT TOP %d
