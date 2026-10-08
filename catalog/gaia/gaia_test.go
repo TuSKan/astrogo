@@ -61,6 +61,12 @@ func TestGaiaOfflineConeSearch(t *testing.T) {
 	testutil.AssertEqual(t, "ID", targets[0].ID, "123456789")
 	testutil.AssertEqual(t, "Kind", string(targets[0].Kind), string(resolve.KindStar))
 	testutil.AssertEqual(t, "Catalog", targets[0].Catalog, "Gaia DR3")
+
+	// Gaia DR3's positions are at J2016.0, the Julian epoch 16 years of 365.25
+	// days after J2000: JD 2457389.0. It was 2457388.5, half a day early (#611).
+	if got := targets[0].Epoch.TT().JD(); math.Abs(got-(2451545.0+16*365.25)) > 1e-9 {
+		t.Errorf("Epoch is JD %.6f (TT), want J2016.0 = 2457389.0", got)
+	}
 }
 
 // TestGaiaOfflineConeSearch_SkipsUnparseableRow is a regression test: a row

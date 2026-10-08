@@ -143,7 +143,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		}
 
 		if hasCoord {
-			t.Epoch = time.FromJD(2451545.0, time.UTC) // Default SIMBAD Epoch (J2000)
+			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
 
 			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
 				if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {
@@ -278,7 +278,7 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 		}
 
 		if hasCoord {
-			t.Epoch = time.FromJD(2451545.0, time.UTC) // Default SIMBAD Epoch (J2000)
+			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
 
 			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
 				if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {

@@ -35,7 +35,7 @@ const defaultTable = "II/246/out"
 var (
 	epoch2MASS     = time.J2000()                       // "raj2000"/"dej2000" column names state this explicitly
 	epochHipparcos = time.FromJD(2448349.0625, time.TT) // J1991.25, the Hipparcos catalog's own reference epoch
-	epochGaiaDR3   = time.FromJD(2457388.5, time.TT)    // J2016.0, Gaia DR3's reference epoch
+	epochGaiaDR3   = time.FromJD(2457389.0, time.TT)    // J2016.0 = 2451545.0 + 16 x 365.25, Gaia DR3's reference epoch (#611)
 )
 
 // tableSchemas is the registry of VizieR tables ConeSearch knows how to
