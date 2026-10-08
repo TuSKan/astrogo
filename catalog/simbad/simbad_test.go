@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/unit"
@@ -354,6 +355,12 @@ func TestParseBrightCSV(t *testing.T) {
 
 	if sirius.Kind != resolve.KindStar {
 		t.Errorf("Sirius Kind = %q, want %q", sirius.Kind, resolve.KindStar)
+	}
+
+	// SIMBAD's ICRS positions are at J2000, which is JD 2451545.0 in TT; it
+	// was built on the UTC scale, 64 s apart (#611).
+	if !sirius.Epoch.Equal(time.J2000()) {
+		t.Errorf("Sirius Epoch = %v, want J2000", sirius.Epoch)
 	}
 
 	if !sirius.HasCoord || math.Abs(sirius.Coord.RA().Degrees()-101.28715) > 1e-5 {

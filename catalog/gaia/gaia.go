@@ -90,6 +90,12 @@ func (p *Provider) Search(_ context.Context, _ string) ([]resolve.Target, error)
 	return nil, fmt.Errorf("%w: gaia resolves positions, not names", resolve.ErrUnsupported)
 }
 
+// gaiaDR3Epoch is Gaia DR3's reference epoch, J2016.0: JD 2451545.0 + 16 x
+// 365.25 = 2457389.0. It was JD 2457388.5, midnight on 2016 January 1, half a
+// day early (#611). Gaia's epoch is in TCB; TT is 20 s from it, which no
+// proper motion notices.
+var gaiaDR3Epoch = time.FromJD(2457389.0, time.TT)
+
 // ConeSearch performs a spatial cone search via the Gaia DR3 TAP service.
 //
 // It returns the req.Limit sources nearest the center, nearest first, or the
@@ -320,7 +326,7 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 		Kind:     resolve.KindStar,
 		Coord:    coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 		HasCoord: true,
-		Epoch:    time.FromJD(2457388.5, time.UTC), // Gaia DR3 epoch is J2016.0
+		Epoch:    gaiaDR3Epoch,
 		Catalog:  "Gaia DR3",
 	}
 

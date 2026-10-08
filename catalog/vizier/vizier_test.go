@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -334,6 +335,29 @@ func TestVizierConeQueryOrdersByDistance(t *testing.T) {
 	} {
 		if !strings.Contains(adql, want) {
 			t.Errorf("the cone query lacks %q:\n%s", want, adql)
+		}
+	}
+}
+
+// Each table's epoch is the Julian epoch its comment names: J2000 for 2MASS's
+// "raj2000" columns, J1991.25 for Hipparcos, J2016.0 for Gaia DR3, each that
+// many years of 365.25 days from J2000 (JD 2451545.0, TT). Gaia's was JD
+// 2457388.5, midnight on 2016 January 1 rather than J2016.0's noon (#611).
+func TestTableEpochsAreTheirJulianEpochs(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name  string
+		epoch time.Time
+		years float64
+	}{
+		{"2MASS", epoch2MASS, 0},
+		{"Hipparcos", epochHipparcos, 1991.25 - 2000},
+		{"Gaia DR3", epochGaiaDR3, 2016 - 2000},
+	} {
+		want := 2451545.0 + c.years*365.25
+		if got := c.epoch.TT().JD(); math.Abs(got-want) > 1e-9 {
+			t.Errorf("%s epoch is JD %.6f (TT), want %.6f", c.name, got, want)
 		}
 	}
 }
