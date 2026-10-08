@@ -878,7 +878,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	}
 
 	if obj.Name() != "Moon" {
-		vo.SkyNote = moonNote(planetProvider, peakTime, pos)
+		vo.SkyNote = moonNote(planetProvider, obj, peakTime, astroCtx)
 	}
 
 	return vo, true, nil
@@ -927,27 +927,28 @@ func rawMagnitude(obj Observable, t time.Time) (mag float64, ok bool, err error)
 }
 
 // moonNote returns a Moon-proximity advisory when the Moon is a
-// significant fraction illuminated and angularly close to pos, empty
-// otherwise. This is a heuristic capturing the single dominant real-world
-// "will moonlight wash this out" factor, not the full light-pollution-
-// aware skybrightness model (see VisibleObject.SkyNote's doc comment).
-func moonNote(provider eph.Provider, t time.Time, pos coord.ICRS) string {
+// significant fraction illuminated and angularly close to obj as the site
+// sees them both (see topocentricPosition), empty otherwise. This is a
+// heuristic capturing the single dominant real-world "will moonlight wash
+// this out" factor, not the full light-pollution-aware skybrightness model
+// (see VisibleObject.SkyNote's doc comment).
+func moonNote(provider eph.Provider, obj Observable, t time.Time, ctx *coord.Context) string {
 	fraction, _, err := MoonIllumination(t, provider)
 	if err != nil || fraction < 0.5 {
 		return ""
 	}
 
-	moonVec, err := eph.Position(provider, eph.Moon, t)
+	pos, err := topocentricPosition(obj, t, ctx)
 	if err != nil {
 		return ""
 	}
 
-	moonICRS, err := eph.ToICRS(moonVec)
+	moonPos, err := topocentricPosition(NewMoon(provider), t, ctx)
 	if err != nil {
 		return ""
 	}
 
-	sep := coord.Separation(pos, moonICRS)
+	sep := coord.Separation(pos, moonPos)
 	if sep.Degrees() > 30 {
 		return ""
 	}
