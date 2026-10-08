@@ -131,6 +131,12 @@ func TestJPLNetworkResolvesCommonNames(t *testing.T) {
 		{"Moon", "301", "Moon"},
 		{"Voyager 1", "-31", "Voyager 1 (spacecraft)"},
 		{"Halley", "2688", "Halley"},
+		// Asteroids whose names occur inside a major body's: Horizons
+		// answered Kerberos, Thebe and OSIRIS-REx until Search asked the
+		// small bodies again (#618).
+		{"Eros", "A898 PA", "433 Eros"},
+		{"Hebe", "A847 NA", "6 Hebe"},
+		{"Iris", "A847 PA", "7 Iris"},
 	}
 
 	for _, tt := range tests {

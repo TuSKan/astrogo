@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
@@ -78,15 +80,85 @@ const searchLimit = 10
 // [resolve.Score] over each target's name, ID, designation and aliases,
 // keeping Horizons' order between equal scores, and only then applies the
 // cap: Horizons answers "ACE" with 255 bodies, and lists ACE itself 53rd.
+//
+// Horizons also searches its major bodies first and looks no further once
+// anything there matches, so an asteroid whose name occurs inside a major
+// body's never surfaced: "Eros" came back as Pluto's moon Kerberos and
+// "Hebe" as Jupiter's Thebe, each as an unambiguous single match. When no
+// target carries the query as a whole word, Search asks again with a
+// trailing semicolon, Horizons' own syntax for small bodies only, and keeps
+// that answer when it has one (#618). A query that does name a major body,
+// "Juno" for the spacecraft, is answered as it was.
 func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
-	targets, err := resolve.Drain(p.ResolveObject(ctx, resolve.ObjectRequest{Query: query}), 0)
+	targets, err := p.drain(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("searching for %q: %w", query, err)
+		return nil, err
+	}
+
+	trimmed := strings.TrimSpace(query)
+
+	if len(targets) > 0 && !strings.HasSuffix(trimmed, ";") && !namesQuery(trimmed, targets) {
+		small, err := p.drain(ctx, trimmed+";")
+		if err != nil {
+			return nil, err
+		}
+
+		if len(small) > 0 {
+			targets = small
+		}
 	}
 
 	targets = rankByMatch(query, targets)
 
 	return targets[:min(len(targets), searchLimit)], nil
+}
+
+// namesQuery reports whether any of targets carries query as a whole word of
+// its name, ID, designation or an alias, ignoring case: "Eros" is a word of
+// "433 Eros" but not of "Kerberos", and "Iris" not of "OSIRIS-REx".
+func namesQuery(query string, targets []resolve.Target) bool {
+	for _, t := range targets {
+		for _, s := range append([]string{t.Name, t.ID, t.Designation}, t.Aliases...) {
+			if containsWord(s, query) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// containsWord reports whether word occurs in s, ignoring case, with no
+// letter or digit immediately on either side of it.
+func containsWord(s, word string) bool {
+	s, word = strings.ToLower(s), strings.ToLower(word)
+	if word == "" {
+		return false
+	}
+
+	for from := 0; ; {
+		i := strings.Index(s[from:], word)
+		if i < 0 {
+			return false
+		}
+
+		start, end := from+i, from+i+len(word)
+
+		before, _ := utf8.DecodeLastRuneInString(s[:start])
+		after, _ := utf8.DecodeRuneInString(s[end:])
+
+		if !isWordRune(before) && !isWordRune(after) {
+			return true
+		}
+
+		from = start + 1
+	}
+}
+
+// isWordRune reports whether r is a letter or a digit. utf8.RuneError, which
+// the decoders return at either end of the string, is neither.
+func isWordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // rankByMatch returns targets ordered best match for query first, by the
@@ -177,4 +249,14 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			}
 		}
 	}
+}
+
+// drain returns every target Horizons answers query with.
+func (p *Provider) drain(ctx context.Context, query string) ([]resolve.Target, error) {
+	targets, err := resolve.Drain(p.ResolveObject(ctx, resolve.ObjectRequest{Query: query}), 0)
+	if err != nil {
+		return nil, fmt.Errorf("searching for %q: %w", query, err)
+	}
+
+	return targets, nil
 }
