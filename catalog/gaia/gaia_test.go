@@ -144,10 +144,6 @@ func TestProviderInterface(t *testing.T) {
 	}
 }
 
-// redirect points endpoint id at a test server for the duration of one
-// test. It replaces the old http.RoundTripper injection: remote/api's
-// Client is opaque by design, and every request resolves its URL through
-// remote.URL(id) anyway, so the registry is the natural seam.
 // newForTest builds a provider against the default archive.
 //
 // The tests redirect [DefaultEndpoint] to a local server, so what they
@@ -166,6 +162,10 @@ func newForTest(t *testing.T) *Provider {
 	return p
 }
 
+// redirect points [DefaultEndpoint] at a test server for the duration of
+// one test. It replaces the old http.RoundTripper injection: remote/api's
+// Client is opaque by design, and every request resolves its URL through
+// remote.URL(id) anyway, so the registry is the natural seam.
 func redirect(t *testing.T, url string) {
 	t.Helper()
 

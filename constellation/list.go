@@ -63,10 +63,12 @@ func normalize(s string) string {
 //
 // This is NOT a rigorously defined "center": no single agreed definition
 // exists for an irregular polygon's centroid on a sphere (a vertex average
-// is not area-weighted), and for Serpens specifically it mixes vertices
-// from two disjoint regions (Serpens Caput and Cauda) into one point that
-// may not usefully represent either. Good enough for "point roughly this
-// way," not for anything requiring precision.
+// is not area-weighted). For two constellations the point lies outside the
+// constellation itself. Serpens's mixes vertices from its two disjoint
+// regions (Serpens Caput and Cauda) into one point between them, in
+// Ophiuchus, that represents neither. Eridanus winds around Fornax, and
+// its point lies in Fornax. Good enough for "point roughly this way," not
+// for anything requiring precision.
 func Centroid(name string) (coord.ICRS, error) {
 	want := normalize(name)
 

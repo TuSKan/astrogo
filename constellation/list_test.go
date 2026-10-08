@@ -40,39 +40,41 @@ func TestList_CountAndNoDuplicates(t *testing.T) {
 	}
 }
 
-// knownCentroidExceptions lists constellations where a plain vertex-average
-// centroid is documented (Centroid's own doc comment) to land outside the
-// constellation's own boundary — not a bug, a real property of the shapes
-// involved, confirmed by running the round-trip check below and inspecting
-// each failure:
+// knownCentroidExceptions maps each constellation whose vertex-average
+// centroid lands outside its own boundary, as Centroid's doc comment says,
+// to the constellation it lands in instead. A real property of the shapes
+// involved, not a bug:
 //   - Eridanus: an extremely long, tightly winding constellation near the
 //     south celestial pole; its vertex average falls into neighboring
 //     Fornax.
 //   - Serpens: split into two disjoint regions (Caput/Cauda) by
 //     Ophiuchus; averaging vertices from both lands the point in the
 //     middle — inside Ophiuchus.
-//   - Ursa Minor: wraps tightly around the north celestial pole, where
-//     the notion of "average RA" is close to degenerate; the resulting
-//     point falls just short of Lookup's own +88° polar-cap fallback.
-var knownCentroidExceptions = map[string]bool{
-	"Eridanus":   true,
-	"Serpens":    true,
-	"Ursa Minor": true,
+//
+// Ursa Minor was listed too, for a polar-cap fallback in Lookup that no
+// longer exists, and went on being skipped after its centroid round-tripped
+// (#640). TestCentroid_RoundTripsThroughLookup now checks each exception
+// as well, so one that stops being one fails.
+var knownCentroidExceptions = map[string]string{
+	"Eridanus": "For",
+	"Serpens":  "Oph",
 }
 
 // TestCentroid_RoundTripsThroughLookup is the core correctness check for
 // Centroid: for every constellation not in knownCentroidExceptions,
-// Lookup(Centroid(name)) must resolve back to that same constellation.
+// Lookup(Centroid(name)) must resolve back to that same constellation, and
+// for each that is, to the constellation the exception names.
 // This is a genuine cross-check, not a tautology — Centroid averages
 // boundary vertices and precesses B1875→J2000, while Lookup does
 // point-in-polygon testing after precessing J2000→B1875 (the reverse
 // rotation); if Centroid's precession direction were wrong, this would
-// fail for nearly every entry (84 of 88 pass), not just the three
+// fail for nearly every entry (86 of 88 round-trip), not just the two
 // documented shape-driven exceptions above.
 func TestCentroid_RoundTripsThroughLookup(t *testing.T) {
 	for _, c := range constellation.List() {
-		if knownCentroidExceptions[c.Name] {
-			continue
+		want := c.Abbreviation
+		if lands, ok := knownCentroidExceptions[c.Name]; ok {
+			want = lands
 		}
 
 		t.Run(c.Name, func(t *testing.T) {
@@ -86,8 +88,8 @@ func TestCentroid_RoundTripsThroughLookup(t *testing.T) {
 				t.Fatalf("Lookup(Centroid(%q)): %v", c.Name, err)
 			}
 
-			if abbr != c.Abbreviation {
-				t.Errorf("Lookup(Centroid(%q)) = %q, want %q", c.Name, abbr, c.Abbreviation)
+			if abbr != want {
+				t.Errorf("Lookup(Centroid(%q)) = %q, want %q", c.Name, abbr, want)
 			}
 		})
 	}

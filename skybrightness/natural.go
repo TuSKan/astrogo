@@ -305,6 +305,11 @@ func (d *DiffuseGalacticLight) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: diffuse galactic: airmass: %w", err)
 	}
 
+	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: diffuse galactic: ozone airmass: %w", err)
+	}
+
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 	height := scene.Observer.Height()
@@ -329,7 +334,12 @@ func (d *DiffuseGalacticLight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: %s: %w", "diffuse galactic", slantErr)
 		}
 
-		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant))
+		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
+		}
+
+		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
 	return flags, nil
@@ -509,6 +519,11 @@ func (z *ZodiacalLight) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: zodiacal: airmass: %w", err)
 	}
 
+	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: zodiacal: ozone airmass: %w", err)
+	}
+
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 	height := scene.Observer.Height()
@@ -533,7 +548,12 @@ func (z *ZodiacalLight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: %s: %w", "zodiacal", slantErr)
 		}
 
-		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
+		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: zodiacal: %w", err)
+		}
+
+		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
 	return flags, nil
@@ -682,6 +702,11 @@ func (a *Airglow) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: airglow: airmass: %w", err)
 	}
 
+	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: airglow: ozone airmass: %w", err)
+	}
+
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 	height := scene.Observer.Height()
@@ -706,7 +731,12 @@ func (a *Airglow) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: %s: %w", "airglow", slantErr)
 		}
 
-		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant))
+		ozone, oErr := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
+		if oErr != nil {
+			return 0, fmt.Errorf("skybrightness: airglow: %w", oErr)
+		}
+
+		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
 	return flags, nil
@@ -942,6 +972,11 @@ func (s *IntegratedStarlight) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: starlight: airmass: %w", err)
 	}
 
+	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness: starlight: ozone airmass: %w", err)
+	}
+
 	flags := Flag(0)
 	if dir.Alt().Degrees() < 30 {
 		flags |= ExtrapolatedModel
@@ -975,7 +1010,12 @@ func (s *IntegratedStarlight) AddRadiance(
 			return 0, fmt.Errorf("skybrightness: %s: %w", "starlight", slantErr)
 		}
 
-		dst[i] += value * s.shape[i] * float64(atmosphere.Transmission(slant))
+		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: starlight: %w", err)
+		}
+
+		dst[i] += value * s.shape[i] * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
 	return flags, nil

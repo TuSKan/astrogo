@@ -35,7 +35,6 @@ const (
 	gambonsZenithNoAirglow   = 21.74
 )
 
-// gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
 // enableStarMapDownload grants consent for the published star map.
 //
 // The budget comes from the registry rather than from a literal here. Consent
@@ -55,6 +54,7 @@ func enableStarMapDownload(tb testing.TB) {
 	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
 }
 
+// gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
 func gambonsEpoch() time.GoTime {
 	return time.GoDate(2026, 8, 20, 23, 16, 0, 0, time.LocationUTC)
 }
