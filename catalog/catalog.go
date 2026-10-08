@@ -838,11 +838,20 @@ var scalarFieldRules = []fieldRule{
 		},
 	},
 	{
-		// SBDB-only physical-parameter cluster (H/G/M1/K1/M2/K2/PC/G1/G2/
-		// Diameter/Albedo) — no other provider populates any of these
-		// today.
-		precedence: []string{"sbdb"},
-		hasField:   func(t Target) bool { return t.HasH || t.HasM1 || t.HasG1G2 || t.HasDiameter || t.HasAlbedo },
+		// Physical-parameter cluster (H/G/M1/K1/M2/K2/PC/G1/G2/spin/
+		// oblateness/Diameter/Albedo), taken whole from one provider. SBDB
+		// and FINK both populate it, and a provider's H, phase parameters
+		// and spin are one fit that does not survive being mixed with
+		// another's. SBDB ranks first: its H is the V-band absolute
+		// magnitude plan predicts in, where FINK's sHG1G2 is fitted to
+		// ZTF's r band. FINK's is then what an asteroid SBDB does not know
+		// is predicted from. This used to name SBDB alone, and had no rule
+		// for spin or oblateness, so every one of FINK's parameters was
+		// dropped, even from a result FINK alone found (#648).
+		precedence: []string{"sbdb", "fink"},
+		hasField: func(t Target) bool {
+			return t.HasH || t.HasM1 || t.HasG1G2 || t.HasSpin || t.HasOblateness || t.HasDiameter || t.HasAlbedo
+		},
 		take: func(dst *Target, src Target, provider string) {
 			dst.H, dst.HasH = src.H, src.HasH
 			dst.G = src.G
@@ -852,6 +861,8 @@ var scalarFieldRules = []fieldRule{
 			dst.K2 = src.K2
 			dst.PC = src.PC
 			dst.G1, dst.G2, dst.HasG1G2 = src.G1, src.G2, src.HasG1G2
+			dst.SpinRA, dst.SpinDec, dst.HasSpin = src.SpinRA, src.SpinDec, src.HasSpin
+			dst.Oblateness, dst.HasOblateness = src.Oblateness, src.HasOblateness
 			dst.Diameter, dst.HasDiameter = src.Diameter, src.HasDiameter
 			dst.Albedo, dst.HasAlbedo = src.Albedo, src.HasAlbedo
 			setProvenance(dst, "PhysicalParams", provider)
