@@ -107,6 +107,10 @@ func TestNeedsSmallBodyEphemeris(t *testing.T) {
 // path even when elements are present.
 func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
+
+	// The cache is this test's own and empty: offline, a cached kernel is
+	// served (#633), and the shared cache can hold Ceres's from another test.
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.SetOffline(true)
 
 	tgt := resolve.Target{
