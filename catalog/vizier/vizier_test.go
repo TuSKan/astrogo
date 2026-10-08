@@ -302,3 +302,38 @@ func redirect(t *testing.T, url string) {
 		t.Fatalf("SetURL(%s): %v", id, err)
 	}
 }
+
+// The cone query orders by distance from the center, so a capped result is
+// the nearest sources rather than whichever the service reaches first (#605).
+// Its live counterpart is TestVizierConeSearchReturnsTheNearestSources.
+func TestVizierConeQueryOrdersByDistance(t *testing.T) {
+	var adql string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		adql = r.PostFormValue("QUERY")
+
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = fmt.Fprint(w, "designation,ra,dec\n1,83.8221,-5.3911\n")
+	}))
+	defer server.Close()
+
+	redirect(t, server.URL)
+
+	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), Radius: angle.Deg(5), Limit: 5}
+	New().ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	for _, want := range []string{
+		"DISTANCE(POINT('ICRS', RAICRS, DEICRS), POINT('ICRS', 83.822100, -5.391100)) AS dist",
+		"ORDER BY dist ASC",
+		"TOP 5\n",
+	} {
+		if !strings.Contains(adql, want) {
+			t.Errorf("the cone query lacks %q:\n%s", want, adql)
+		}
+	}
+}
