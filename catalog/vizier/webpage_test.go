@@ -48,9 +48,9 @@ func TestAWebPageIsReportedAsDowntime(t *testing.T) {
 func TestRealCSVStillParses(t *testing.T) {
 	t.Parallel()
 
-	const rows = "designation,ra,dec\n" +
-		"2MASS J00424433+4116074,10.684708,41.268750\n" +
-		"2MASS J01335090+3039357,23.462042,30.660222\n"
+	const rows = "designation,ra,dec,epoch_jd\n" +
+		`"00424433+4116085 ",10.684737,41.269035,2450745.8589` + "\n" +
+		`"01335089+3039365 ",23.462063,30.66016,2450787.6246` + "\n"
 
 	out, err := parseCSV(strings.NewReader(rows), tableSchemas[defaultTable])
 	if err != nil {

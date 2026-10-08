@@ -19,11 +19,17 @@ type tableSchema struct {
 	DesigCol string
 	// Kind is the resolve.Kind assigned to every row from this table.
 	Kind resolve.Kind
-	// Epoch is this table's native reference epoch for RA/Dec — the three
-	// tables registered below genuinely differ (2MASS ~J2000, Hipparcos
-	// J1991.25, Gaia DR3 J2016.0), so this cannot be a single package-wide
-	// constant; every row from a table is stamped with its own.
+	// Epoch is this table's reference epoch for RA/Dec — the three tables
+	// registered below genuinely differ (2MASS ~J2000, Hipparcos J1991.25,
+	// Gaia DR3 J2016.0), so this cannot be a single package-wide constant.
+	// A cone's center is moved to it before the query, and every row is
+	// stamped with it unless EpochCol names the row's own.
 	Epoch time.Time
+	// EpochCol, when set, is a column holding each row's own epoch as a
+	// Julian date, for a table whose positions were never moved to one
+	// epoch: 2MASS's are where each source was when it was observed,
+	// between 1997 and 2001. Epoch is then only the cone center's.
+	EpochCol string
 }
 
 // defaultTable is used when a ConeRequest doesn't specify Table, preserving
@@ -33,7 +39,12 @@ const defaultTable = "II/246/out"
 // Standard reference epochs for the tables below, expressed as two-part
 // Julian dates matching each survey's own documented catalog epoch.
 var (
-	epoch2MASS     = time.J2000()                       // "raj2000"/"dej2000" column names state this explicitly
+	// epoch2MASS is J2000, within the 1997-2001 span 2MASS observed over, and
+	// only where a cone is centered: each row carries its own date (EpochCol).
+	// The "raj2000"/"dej2000" column names state the J2000 equinox and frame,
+	// not an epoch, and every row used to be stamped J2000 on their strength
+	// (#628).
+	epoch2MASS     = time.J2000()
 	epochHipparcos = time.FromJD(2448349.0625, time.TT) // J1991.25, the Hipparcos catalog's own reference epoch
 	epochGaiaDR3   = time.FromJD(2457389.0, time.TT)    // J2016.0 = 2451545.0 + 16 x 365.25, Gaia DR3's reference epoch (#611)
 )
@@ -46,7 +57,7 @@ var (
 // a table here is a data change, not an API change.
 var tableSchemas = map[string]tableSchema{
 	// 2MASS Point Source Catalog — the package's original hardcoded table.
-	defaultTable: {RACol: "raj2000", DecCol: "dej2000", DesigCol: `"2MASS"`, Kind: resolve.KindStar, Epoch: epoch2MASS},
+	defaultTable: {RACol: "raj2000", DecCol: "dej2000", DesigCol: `"2MASS"`, Kind: resolve.KindStar, Epoch: epoch2MASS, EpochCol: "jd"},
 	// Hipparcos main catalog.
 	"I/239/hip_main": {RACol: "RAICRS", DecCol: "DEICRS", DesigCol: "HIP", Kind: resolve.KindStar, Epoch: epochHipparcos},
 	// Gaia DR3 (VizieR mirror of the Gaia archive).
