@@ -104,14 +104,15 @@ jobs:
         shell: bash
         run: go test -tags=integration -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/integration.log"
 
-      # 60 minutes, not 15. The GAMBONS comparisons fetch their dust one cell at
-      # a time from IRSA, paced at about 2.7 s a cell so the service is never
-      # hit in a burst: TestAgainstGAMBONSAllSky spends 6m24s on its 144 cells,
-      # and TestAgainstGAMBONSTable2, which sets its own 60-minute context, has
-      # never finished inside the 15 minutes this step gave the package. Every
-      # weekly run from 31 August to 5 October timed out there, so the
-      # validation tier reported nothing at all. The other packages finish in
-      # under three minutes, so this does not hide a slow one.
+      # 60 minutes, not 15 (#660). The GAMBONS comparisons fetch their dust one
+      # cell at a time from IRSA, paced at about 2.7 s a cell so the service is
+      # never hit in a burst, and the skybrightness package needs 22.5 minutes
+      # for it: TestAgainstGAMBONSTable2 846.7 s, TestAgainstGAMBONSAllSky
+      # 332.8 s, TestAgainstGAMBONS 150.3 s, measured on a dispatched run of
+      # this workflow. Every weekly run from 31 August to 5 October timed out
+      # inside Table2 at the 15 minutes this step gave the package, so the
+      # validation tier reported nothing at all. Every other package finishes
+      # in under four minutes, so the longer bound does not hide a slow one.
       - name: Run validation tests
         id: validation
         if: always()
