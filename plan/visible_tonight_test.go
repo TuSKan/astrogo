@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -249,14 +247,13 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 			alt, -site.HorizonDip().Degrees())
 	}
 
-	horizon, err := atmosphere.Airmass(angle.Zero())
+	horizon, err := defaultNight(t, site.Height()).ExtinctionToward(547.8, angle.Zero())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	k := extinctionV(t, defaultNight(t, site.Height()))
-	if want := magnitude.StarApparent(grazer.VMag, horizon, k); math.Abs(got.ApparentMag-want) > 1e-9 {
-		t.Errorf("ApparentMag %.4f, want %.4f: the catalog magnitude extinguished at the horizon's airmass", got.ApparentMag, want)
+	if want := grazer.VMag + horizon; math.Abs(got.ApparentMag-want) > 1e-9 {
+		t.Errorf("ApparentMag %.4f, want %.4f: the catalog magnitude extinguished at the horizon", got.ApparentMag, want)
 	}
 }
 

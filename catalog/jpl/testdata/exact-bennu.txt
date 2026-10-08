@@ -1,0 +1,88 @@
+*******************************************************************************
+ Revised: Aug 11, 2021          101955 Bennu (1999 RQ36)                2101955
+ *SPECIAL*             Soln.date: 2021-Jan-07_11:18:06   # obs: 554 (1999-2020)
+
+IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+ 
+  EPOCH=  2455562.5 ! 2011-Jan-01.00 (TDB)         Residual RMS= .23164
+   EC= .2037450762416414   QR= .8968944004459729   TP= 2455439.14194087
+   OM= 2.060866195696420   W=  66.22306084084298   IN= 6.0349437702479403
+   A= 1.1263910258948120   MA= 101.7039520024729   ADIST= 1.355887651343651
+   PER= 1.19548            N= 0.824461327          ANGMOM= .017873901
+   DAN= 0.99768            DDN= 1.17626            L= 68.16622425
+   B= 5.521044             MOID= .0032228          TP= 2010-Aug-30.6419408992
+ 
+Asteroid physical parameters (km, seconds, rotational period in hours):
+   GM= n.a.                RAD= .241               ROTPER= 4.2960610
+   H= 20.21                G= -0.031               B-V= 0.64
+                           ALBEDO= .044            STYP= B
+ 
+Asteroid non-gravitational force model (AMRAT= m^2/kg;A1,A2,A3=au/d^2;R0=au):
+   AMRAT= .00000026
+   A1= 0.                  A2= 0.                  A3= 0.
+ Yarkovsky acceleration:
+   RHO= 1191.5349121
+
+ This pre-computed trajectory of asteroid (101955) Bennu, covering 1900 to 
+ 2136 is based on ground-based optical and radar astrometry as well as 
+ pseudo-range measurements from the OSIRIS-REx mission.
+
+ The trajectory accounts for the gravity of the Sun, the planets, Pluto, the 
+ Moon and 343 small-body perturbers, relativistic effect, the Yarkovsky effect,
+ and other solar radiation perturbations. Full details are provided in 
+ Farnocchia et al. (2021): https://doi.org/10.1016/j.icarus.2021.114594
+
+ It may be used to generate ephemerides relative to the SPACECRAFT-BASED Bennu
+ solution by specifying coordinate center as "@2101955", or extended physical
+ ephemerides of Bennu such as sub-observer/solar latitude and longitude.
+
+  Trajectory name                                   Start (TDB)    Stop (TDB)
+  ----------------------------------------------    -----------   -----------
+  sb-101955-118_long                                1900-Jan-01   2135-Oct-01
+
+ Due to the non-standard dynamical models enabled by extensive high-precision
+ spacecraft data, Horizons won't generate new SPK files for Bennu. However, 
+ the final reconstructed mission SPK can be downloaded for use here: 
+
+    https://ssd.jpl.nasa.gov/ftp/xfr/sb-101955-118_long.bsp
+  
+ASTEROID comments: 
+1: soln ref.= JPL#118, PHA  OCC=0       radar(58 delay, 7 Dop.)
+2: source=ORB; See Farnocchia et al. 2021
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Wed Oct  7 20:23:24 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: 101955 Bennu (1999 RQ36) (2101955) {source: ORX_merged_DE424}
+Center body name: Earth (399)                     {source: ORX_merged_DE424}
+Center-site name: GEOCENTRIC
+*******************************************************************************
+Start time      : A.D. 2022-Jan-01 10:00:00.0000 UT      
+Stop  time      : A.D. 2022-Jan-02 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : IAU_BENNU                       {East-longitude positive}
+Target radii    : .2831, .2712, .2497 km          {Equator_a, b, pole_c}       
+Center geodetic : 0.0, 0.0, -6378.137             {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : ITRF93                          {East-longitude positive}
+Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+Target primary  : Sun
+Vis. interferer : MOON (R_eq= 1737.400) km        {source: ORX_merged_DE424}
+Rel. light bend : Sun                             {source: ORX_merged_DE424}
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Atmos refraction: NO (AIRLESS)
+RA format       : HMS
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261007.p270103                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-07. PREDICTS-> 2027-JAN-02
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+ Date__(UT)__HR:MN     R.A._____(ICRF)_____DEC  R.A.__(a-apparent)__DEC  dRA*cosD d(DEC)/dt  Azi____(a-app)___Elev  dAZ*cosE d(ELV)/dt  X_(sat-primary)_Y SatPANG  L_Ap_Sid_Time  a-mass mag_ex    APmag   S-brt      Illu%  Def_illu   ang-sep/v  Ang-diam  ObsSub-LON ObsSub-LAT  SunSub-LON SunSub-LAT  SN.ang   SN.dist    NP.ang   NP.dist  hEcl-Lon hEcl-Lat                r        rdot             delta      deldot  1-way_down_LT       VmagSn      VmagOb     S-O-T /r     S-T-O   T-O-M/MN_Illu%     O-P-T    PsAng   PsAMV      PlAng  Cnst        TDB-UT     ObsEcLon    ObsEcLat  N.Pole-RA  N.Pole-DC      GlxLon     GlxLat  L_Ap_SOL_Time  399_ins_LT  RA_3sigma DEC_3sigma  SMAA_3sig SMIA_3sig    Theta Area_3sig  POS_3sigma  RNG_3sigma RNGRT_3sig   DOP_S_3sig  DOP_X_3sig  RT_delay_3sig  Tru_Anom  L_Ap_Hour_Ang       phi  PAB-LON  PAB-LAT  App_Lon_Sun  RA_(ICRF-a-apparnt)_DEC  I_dRA*cosD I_d(DEC)/dt  Sky_motion  Sky_mot_PA  RelVel-ANG  Lun_Sky_Brt  sky_SNR   UT1-UTC
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************

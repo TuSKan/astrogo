@@ -7,6 +7,8 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,6 +17,8 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/internal/votable"
+	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -304,5 +308,56 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 		if !strings.Contains(adql, want) {
 			t.Errorf("the cone query lacks %q:\n%s", want, adql)
 		}
+	}
+}
+
+// TestGaiaConeCenterIsMovedToJ2016: a center given at J2000 with a proper
+// motion is searched where Gaia DR3 has the star, at J2016.0 (#627).
+// Barnard's star, as SIMBAD gives it, lands within 0.2" of its own Gaia
+// row, 4472832130942575872 at (269.4485025254, 4.7394200511); unmoved, the
+// search would be centered 166" away.
+func TestGaiaConeCenterIsMovedToJ2016(t *testing.T) {
+	var adql string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		adql = r.PostFormValue("QUERY")
+
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = fmt.Fprint(w, "source_id,ra,dec\n")
+	}))
+	defer server.Close()
+
+	prov := newForTest(t)
+
+	redirect(t, server.URL)
+
+	barnard := coord.NewICRSWithKinematics(angle.Deg(269.4520769586), angle.Deg(4.6933649666),
+		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11))
+
+	req := resolve.ConeRequest{Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
+	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	m := regexp.MustCompile(`CIRCLE\('ICRS', ([-0-9.]+), ([-0-9.]+),`).FindStringSubmatch(adql)
+	if m == nil {
+		t.Fatalf("no CIRCLE in the cone query:\n%s", adql)
+	}
+
+	ra, errRA := strconv.ParseFloat(m[1], 64)
+	dec, errDec := strconv.ParseFloat(m[2], 64)
+
+	if errRA != nil || errDec != nil {
+		t.Fatalf("unparseable CIRCLE center %q, %q", m[1], m[2])
+	}
+
+	center := coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
+	gaiaRow := coord.NewICRS(angle.Deg(269.4485025254), angle.Deg(4.7394200511))
+
+	if sep := coord.Separation(center, gaiaRow).Arcseconds(); sep > 0.2 {
+		t.Errorf("cone centered %.3f\" from Barnard's star's Gaia row, want under 0.2", sep)
 	}
 }

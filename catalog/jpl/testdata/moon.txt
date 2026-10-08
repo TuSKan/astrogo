@@ -1,0 +1,10 @@
+*******************************************************************************
+ Multiple major-bodies match string "MOON*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+        3  Earth-Moon Barycenter                           EMB                  
+      301  Moon                                            Luna                 
+ 
+   Number of matches =           2 . Use ID# to make unique selection.
+*******************************************************************************

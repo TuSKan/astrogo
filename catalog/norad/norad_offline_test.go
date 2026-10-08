@@ -2,6 +2,7 @@ package norad
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,21 +77,77 @@ func TestNewFetchSearchResolve(t *testing.T) {
 	}
 }
 
-func TestFetchByIDNoData(t *testing.T) {
+// serveCelesTrak points CelesTrak at a server answering every request with
+// status, content type and body.
+func serveCelesTrak(t *testing.T, status int, contentType, body string) {
+	t.Helper()
 	t.Cleanup(remote.Reset)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("[]"))
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 
 	if err := remote.SetURL(remote.CelesTrak, srv.URL); err != nil {
 		t.Fatal(err)
 	}
+}
 
-	p := New()
+// noGPData is CelesTrak's answer to a query nothing matches, checked live
+// for NAME=QZXVNONEXISTENT and CATNR=999999999: HTTP 404, text/plain. This
+// test used to serve "[]", which CelesTrak does not send for it, and accept
+// any error, which the 404 also was.
+func serveNoGPData(t *testing.T) {
+	t.Helper()
+	serveCelesTrak(t, http.StatusNotFound, "text/plain; charset=UTF-8", "No GP data found")
+}
 
-	if _, err := p.FetchByID(context.Background(), 99999); err == nil {
-		t.Error("expected an error for an empty GP result")
+func TestFetchByIDNoData(t *testing.T) {
+	serveNoGPData(t)
+
+	_, err := New().FetchByID(context.Background(), 999999999)
+	if !errors.Is(err, ErrNoData) {
+		t.Errorf("FetchByID = %v, want ErrNoData", err)
+	}
+}
+
+// TestResolveUnknownIsNotFound: CelesTrak's "no data" is an answer, so a
+// catalog.Resolver asking NORAD about a name it lacks hears "no", not a
+// failure.
+func TestResolveUnknownIsNotFound(t *testing.T) {
+	for _, q := range []string{"QZXVNONEXISTENT", "999999999"} {
+		t.Run(q, func(t *testing.T) {
+			serveNoGPData(t)
+
+			_, err := New().Resolve(context.Background(), q)
+			if !errors.Is(err, resolve.ErrNotFound) {
+				t.Errorf("Resolve(%q) = %v, want ErrNotFound", q, err)
+			}
+		})
+	}
+}
+
+// TestOtherHTTPErrorsStayFailures: only CelesTrak's own "no data" answer is
+// read as empty.
+func TestOtherHTTPErrorsStayFailures(t *testing.T) {
+	tests := []struct {
+		name, contentType, body string
+		status                  int
+	}{
+		{"another 404", "text/html", "<html>Not Found</html>", http.StatusNotFound},
+		{"server error", "text/plain", "No GP data found", http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			serveCelesTrak(t, tt.status, tt.contentType, tt.body)
+
+			_, err := New().Resolve(context.Background(), "ISS")
+			if err == nil || errors.Is(err, resolve.ErrNotFound) {
+				t.Errorf("Resolve = %v, want a failure that is not ErrNotFound", err)
+			}
+		})
 	}
 }

@@ -109,8 +109,16 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		limit = 100
 	}
 
-	ra := req.Center.RA().Degrees()
-	dec := req.Center.Dec().Degrees()
+	// Gaia's positions are at J2016.0, so a moving center is sought there.
+	center, err := coord.PropagateEpoch(req.Center, req.Epoch, gaiaDR3Epoch)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("gaia: cone center: %w", err))
+		}
+	}
+
+	ra := center.RA().Degrees()
+	dec := center.Dec().Degrees()
 	rad := req.Radius.Degrees()
 
 	// Query gaia source for ra, dec, pmra, pmdec, parallax
