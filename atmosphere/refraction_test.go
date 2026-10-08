@@ -194,6 +194,41 @@ func TestAirmass_KnownValues(t *testing.T) {
 	}
 }
 
+// TestAirmassIsPickeringsFormula holds Airmass to pvlib 0.16.1's independent
+// implementation of the same formula (#623):
+//
+//	pvlib.atmosphere.get_relative_airmass(90 - h, model='pickering2002')
+//
+// They agree to every printed digit. The formula is Pickering's, DIO 12 ‡1
+// (2002), footnote 39; TestAirmass_KnownValues only bounds it, at 35 to 42
+// on the horizon, which is all the "1e-4" VALIDATION.md claimed rested on.
+func TestAirmassIsPickeringsFormula(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct{ alt, want float64 }{
+		{0, 38.7493987557804},
+		{0.5, 31.742308559173},
+		{1, 26.6437693976408},
+		{2, 19.6426549580359},
+		{5, 10.3337055993756},
+		{10, 5.58073714868189},
+		{20, 2.90014300920293},
+		{30, 1.99315384641457},
+		{45, 1.4123696442557},
+		{60, 1.15405792057335},
+		{90, 1.00000019617134},
+	} {
+		got, err := Airmass(angle.Deg(c.alt))
+		if err != nil {
+			t.Fatalf("Airmass(%g°): %v", c.alt, err)
+		}
+
+		if rel := math.Abs(got-c.want) / c.want; rel > 1e-12 {
+			t.Errorf("Airmass(%g°) = %.15g, pvlib %.15g, relative difference %.2g", c.alt, got, c.want, rel)
+		}
+	}
+}
+
 func TestAirmass_BelowHorizon(t *testing.T) {
 	_, err := Airmass(angle.Deg(-5))
 	if !errors.Is(err, ErrBelowHorizon) {
