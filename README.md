@@ -701,7 +701,9 @@ These are wrapped internally to ensure:
 
 > [!IMPORTANT]
 > astrogo is **pre-1.0** — the public API may still change, and every release
-> is listed with its breaking changes in [CHANGELOG.md](CHANGELOG.md). For what
+> is listed with its breaking changes in [CHANGELOG.md](CHANGELOG.md). A release
+> goes out every week in which anything merged, and security fixes sooner; see
+> [`docs/RELEASING.md`](docs/RELEASING.md). For what
 > remains before a v1.0.0 API-stability commitment, see
 > [`docs/ROADMAP.md`](docs/ROADMAP.md).
 >
