@@ -558,6 +558,66 @@ func TestMergeGroup_PhysicalParamsClusterIncludesDiameterAndAlbedo(t *testing.T)
 	}
 }
 
+// finkPhotometry is a FINK sHG1G2 fit as catalog/fink fills one: H, G1, G2,
+// the spin axis and the oblateness.
+func finkPhotometry() Target {
+	return Target{
+		H: 10.62, HasH: true,
+		G1: 0.29, G2: 0.33, HasG1G2: true,
+		SpinRA: 11.4, SpinDec: 17.2, HasSpin: true,
+		Oblateness: 0.71, HasOblateness: true,
+	}
+}
+
+// TestMergeGroup_FinkOnlyKeepsItsWholeFit: a result only FINK found keeps
+// every parameter of FINK's fit. The cluster rule named SBDB alone and none
+// carried spin or oblateness, so every one of them was dropped (#648), and
+// plan.FromCatalog then had no H to build an asteroid's magnitude from.
+func TestMergeGroup_FinkOnlyKeepsItsWholeFit(t *testing.T) {
+	want := finkPhotometry()
+
+	got := mergeGroup(group{candidates: []candidate{{provider: "fink", target: want}}})
+
+	if !got.HasH || got.H != want.H {
+		t.Errorf("H = %v (has=%v), want %v", got.H, got.HasH, want.H)
+	}
+
+	if !got.HasG1G2 || got.G1 != want.G1 || got.G2 != want.G2 {
+		t.Errorf("G1, G2 = %v, %v (has=%v), want %v, %v", got.G1, got.G2, got.HasG1G2, want.G1, want.G2)
+	}
+
+	if !got.HasSpin || got.SpinRA != want.SpinRA || got.SpinDec != want.SpinDec {
+		t.Errorf("spin = %v, %v (has=%v), want %v, %v", got.SpinRA, got.SpinDec, got.HasSpin, want.SpinRA, want.SpinDec)
+	}
+
+	if !got.HasOblateness || got.Oblateness != want.Oblateness {
+		t.Errorf("oblateness = %v (has=%v), want %v", got.Oblateness, got.HasOblateness, want.Oblateness)
+	}
+
+	if got.Provenance["PhysicalParams"] != "fink" {
+		t.Errorf("PhysicalParams provenance = %q, want fink", got.Provenance["PhysicalParams"])
+	}
+}
+
+// TestMergeGroup_SBDBPhotometryIsNotMixedWithFinks: where SBDB knows the
+// asteroid too, its V-band H and G win the cluster whole, and none of FINK's
+// r-band fit rides along with it — FINK's spin belongs to FINK's H.
+func TestMergeGroup_SBDBPhotometryIsNotMixedWithFinks(t *testing.T) {
+	got := mergeGroup(group{candidates: []candidate{
+		{provider: "fink", target: finkPhotometry()},
+		{provider: "sbdb", target: Target{H: 10.40, G: 0.46, HasH: true}},
+	}})
+
+	if got.H != 10.40 || got.G != 0.46 || got.Provenance["PhysicalParams"] != "sbdb" {
+		t.Errorf("H, G = %v, %v from %q, want SBDB's 10.40, 0.46", got.H, got.G, got.Provenance["PhysicalParams"])
+	}
+
+	if got.HasG1G2 || got.HasSpin || got.HasOblateness {
+		t.Errorf("FINK's fit mixed into SBDB's: HasG1G2=%v HasSpin=%v HasOblateness=%v",
+			got.HasG1G2, got.HasSpin, got.HasOblateness)
+	}
+}
+
 // ── Cross-match integration tests (via Resolver.Resolve/Search) ────────────
 
 // TestResolver_CrossMatchByAlias confirms two providers sharing the same ID

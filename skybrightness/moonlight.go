@@ -342,17 +342,20 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 		return nil, fmt.Errorf("skybrightness: moonlight: sun state: %w", err)
 	}
 
-	moonICRS, err := eph.ToICRS(moon.Pos)
+	// The Moon where the site sees it: its apparent geocentric vector, taken
+	// through diurnal parallax by GeocentricToObserved. It used to be placed
+	// from the Earth's center, as a star is, which put it up to its horizontal
+	// parallax, about 0.95 degrees, above where the site sees it: a Moon at
+	// 9.2 degrees was charged 5.50 airmasses instead of 6.02, and one just
+	// below the site's horizon lit its sky (#646).
+	apparent, err := eph.ApparentState(scene.Ephemeris, eph.Moon, at)
 	if err != nil {
-		return nil, fmt.Errorf("skybrightness: moonlight: moon direction: %w", err)
+		return nil, fmt.Errorf("skybrightness: moonlight: moon apparent state: %w", err)
 	}
 
 	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 
-	altaz, err := ctx.ICRSToAltAz(moonICRS)
-	if err != nil {
-		return nil, fmt.Errorf("skybrightness: moonlight: moon altaz: %w", err)
-	}
+	altaz := ctx.GeocentricToObserved(apparent.Pos)
 
 	geom := &moonGeometry{
 		observer:     scene.Observer,
@@ -376,13 +379,17 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 		return nil, fmt.Errorf("skybrightness: moonlight: moon ozone airmass: %w", err)
 	}
 
-	geom.phaseAngle = phaseAngleAt(moon.Pos, sun.Pos)
+	// The phase angle is the observation's, at the Moon between the Sun and
+	// the site, which differs from the Earth's center's by up to the same
+	// parallax. The Sun's selenographic longitude is measured from the mean
+	// sub-Earth point, so it stays the Earth's center's.
+	geom.phaseAngle = phaseAngleAt(moon.Pos, sun.Pos, ctx.ObsVec())
 
 	reflectance := make([]float64, len(geom.irradiance))
 
 	err = magnitude.ROLOReflectance(reflectance, magnitude.ROLOGeometry{
 		PhaseAngle:     geom.phaseAngle,
-		SolarLongitude: solarSelenographicLongitude(moon.Pos, sun.Pos, geom.phaseAngle),
+		SolarLongitude: solarSelenographicLongitude(moon.Pos, sun.Pos, phaseAngleAt(moon.Pos, sun.Pos, vector.Vec3{})),
 	})
 	if err != nil && !errors.Is(err, magnitude.ErrROLOPhaseRange) {
 		return nil, fmt.Errorf("skybrightness: moonlight: %w", err)
@@ -413,10 +420,11 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 }
 
 // phaseAngleAt returns the Sun-Moon-observer angle from geocentric position
-// vectors: the angle at the Moon between the directions to the Sun and to
-// the observer.
-func phaseAngleAt(moon, sun vector.Vec3) angle.Angle {
-	toObserver := moon.MulScalar(-1)
+// vectors, the observer's included: the angle at the Moon between the
+// directions to the Sun and to the observer. A zero observer is the Earth's
+// center.
+func phaseAngleAt(moon, sun, observer vector.Vec3) angle.Angle {
+	toObserver := observer.Sub(moon)
 	toSun := sun.Sub(moon)
 
 	denom := toObserver.Norm() * toSun.Norm()
