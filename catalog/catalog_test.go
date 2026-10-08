@@ -572,6 +572,47 @@ func TestResolver_CrossMatchByAlias(t *testing.T) {
 	}
 }
 
+// One provider's ID meets another provider's alias. MAST answers M31 with the
+// ID "M  31" and no aliases; SIMBAD lists "M 31" among its cross-identifiers.
+// Neither has a position here, so only the identifier can join them, and IDs
+// and aliases used to be indexed apart, an ID only ever meeting another ID:
+// the two came back as separate objects (#613).
+func TestResolver_CrossMatchIDAgainstAlias(t *testing.T) {
+	mast := &mockProvider{name: "mast", targets: map[string]Target{
+		"m31": {ID: "M  31", Name: "M31"},
+	}}
+	simbad := &mockProvider{name: "simbad", targets: map[string]Target{
+		"m31": {ID: "NAME Andromeda Galaxy", Name: "M31", Aliases: []string{"M 31", "NGC 224"}, VMag: 3.44, HasVMag: true},
+	}}
+
+	r := &Resolver{
+		providers: []resolve.Provider{mast, simbad},
+		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+	}
+
+	got, err := r.Search(context.Background(), "M31")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if len(got) != 1 {
+		ids := make([]string, len(got))
+		for i, g := range got {
+			ids[i] = g.ID
+		}
+
+		t.Fatalf("Search returned %d objects %q, want MAST's and SIMBAD's M31 merged into one", len(got), ids)
+	}
+
+	if !got[0].HasVMag || got[0].VMag != 3.44 {
+		t.Errorf("the merged M31 lacks SIMBAD's V magnitude: %+v", got[0])
+	}
+
+	if !containsNormalized(got[0].Aliases, "NGC 224") {
+		t.Errorf("the merged M31 lacks SIMBAD's aliases: %v", got[0].Aliases)
+	}
+}
+
 // TestResolver_CrossMatchByPosition_SameEpochMerges confirms two providers
 // with no shared alias/ID, but positions within the default 2" threshold at
 // the same epoch, merge via the positional fallback.
