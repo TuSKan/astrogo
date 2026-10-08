@@ -462,7 +462,7 @@ happens.
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizonsSPK` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
 | IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | blank-import `remote/eop`, then automatic on the first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
-| OpenNGC catalog CSVs | `remote.OpenNGC` | ~2 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
+| OpenNGC catalog CSVs | `remote.OpenNGC` | ~3.9 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 | MPC observatory-code list | `remote.MPCObsCodes` | ~150 KB | `plan.NewMPCSite(ctx, "568")` / `plan.MPCObservatories(ctx)` |
 | MPC orbital elements (MPCORB format) | `remote.MPCORB` | 0.5 MB (`PHA.txt`) – 317 MB (`MPCORB.DAT`, 94 MB gzipped) | `mpcorb.Open(ctx, "NEA.txt")` — streamed, so a caller filtering 500 objects never holds the other million and a half |
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
@@ -542,7 +542,7 @@ p, err := eph.NewProvider(ctx, eph.Planets, "de442") // now downloads (once) and
 `catalog.NewResolver`'s first use of it fetches and caches the catalog automatically:
 
 ```go
-remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
+remote.EnableDownloads(5<<20, remote.OpenNGC) // ~3.9 MB combined source CSVs
 
 resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD) // fetches OpenNGC on first use
 ```
