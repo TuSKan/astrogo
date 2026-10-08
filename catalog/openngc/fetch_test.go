@@ -14,7 +14,7 @@ import (
 
 const (
 	sampleNGCCSV = `Name;Type;RA;Dec;M;Common names;Identifiers;V-Mag;B-Mag
-NGC1976;Nb;05:35:17.3;-05:23:28;42;Orion Nebula;;4.0;5.5
+NGC1976;Cl+N;05:35:17.3;-05:23:28;42;Orion Nebula;;4.0;5.5
 `
 	sampleAddendumCSV = `Name;Type;RA;Dec;M;Common names;Identifiers;V-Mag;B-Mag
 NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
