@@ -1,0 +1,10 @@
+*******************************************************************************
+ Multiple major-bodies match string "JUNO*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+      -61  Juno (spacecraft)                  2011-040A                         
+     -610  Juno Centaur Stage (spacecraft)    2011-040B                         
+ 
+   Number of matches =           2 . Use ID# to make unique selection.
+*******************************************************************************

@@ -129,3 +129,51 @@ func TestResolverMatchesAMovingStarsGaiaRow(t *testing.T) {
 		}
 	}
 }
+
+// TestResolverMatchesAStarsTwoMASSRowAtItsOwnDate: catalog/vizier stamps a
+// 2MASS row with the night 2MASS observed it (#628), where every row used to
+// carry J2000. Barnard's star from SIMBAD, moved to that night, is 0.3″ from
+// its row and folds it into the group; moved to the J2000 the row used to
+// carry, it is 4.4″ away, outside the 2″ match, and the row stays out. The
+// merged epoch is SIMBAD's, the epoch of the position that won, not the row's.
+func TestResolverMatchesAStarsTwoMASSRowAtItsOwnDate(t *testing.T) {
+	t.Parallel()
+
+	row := func(epoch time.Time) Target {
+		return Target{
+			ID: "17574849+0441405", Name: "17574849+0441405", Catalog: "vizier", Kind: resolve.KindStar,
+			Coord: coord.NewICRS(angle.Deg(269.452044), angle.Deg(4.694597)), HasCoord: true, Epoch: epoch,
+		}
+	}
+
+	for _, c := range []struct {
+		name    string
+		epoch   time.Time
+		matches bool
+	}{
+		{"stamped with its own date", time.FromJD(2451692.9284, time.UTC), true},
+		{"stamped J2000, as every row used to be", time.J2000(), false},
+	} {
+		r := &Resolver{
+			providers: []Provider{&mockProvider{name: "simbad", targets: map[string]Target{
+				resolve.Normalize(simbadBarnard.ID): simbadBarnard,
+			}}},
+			coneSearchers: []coneProvider{{name: "vizier", cs: &mockConeSearcher{targets: []Target{row(c.epoch)}}}},
+			cfg:           resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		}
+
+		got, err := r.Resolve(context.Background(), simbadBarnard.ID)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+
+		if matched := containsNormalized(got.Aliases, "17574849+0441405"); matched != c.matches {
+			t.Errorf("%s: 2MASS row in the group = %v, want %v (aliases %v)", c.name, matched, c.matches, got.Aliases)
+		}
+
+		if got.Provenance["Epoch"] != "simbad" || !got.Epoch.Equal(time.J2000()) {
+			t.Errorf("%s: Epoch = %v from %q, want SIMBAD's J2000, the epoch of the Coord it chose",
+				c.name, got.Epoch, got.Provenance["Epoch"])
+		}
+	}
+}

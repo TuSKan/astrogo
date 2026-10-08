@@ -23,8 +23,8 @@ import (
 )
 
 func TestVizierOfflineConeSearch(t *testing.T) {
-	csvData := "designation,ra,dec\n" +
-		`"18375080-4835411 ",279.461678,-48.594772` + "\n"
+	csvData := "designation,ra,dec,epoch_jd\n" +
+		`"18375080-4835411 ",279.461678,-48.594772,2451462.5171` + "\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
@@ -217,7 +217,7 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 		if strings.Contains(adql, "I/239/hip_main") {
 			fmt.Fprint(w, "designation,ra,dec\n1,10.68470,41.26875\n") //nolint:errcheck // test server
 		} else {
-			fmt.Fprint(w, "designation,ra,dec\n2,10.68470,41.26875\n") //nolint:errcheck // test server
+			fmt.Fprint(w, "designation,ra,dec,epoch_jd\n2,10.68470,41.26875,2451545.0\n") //nolint:errcheck // test server
 		}
 	}))
 	defer server.Close()
@@ -414,5 +414,83 @@ func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
 
 	if sep > 0.5 {
 		t.Errorf("cone centered %.3f\" from Barnard's star's Hipparcos row, want under 0.5", sep)
+	}
+}
+
+// TestTwoMASSRowsCarryTheNightTheyWereObserved: a 2MASS position is where its
+// source was on the night 2MASS observed it, between 1997 and 2001, and the
+// table publishes that date per row as a Julian date. Every row used to be
+// stamped J2000 on the strength of the "raj2000"/"dej2000" column names, which
+// state the equinox and frame, not an epoch (#628). The rows below are the
+// live ones for Barnard's star and the M31 nucleus.
+func TestTwoMASSRowsCarryTheNightTheyWereObserved(t *testing.T) {
+	t.Parallel()
+
+	const rows = "designation,ra,dec,epoch_jd\n" +
+		`"17574849+0441405 ",269.452044,4.694597,2451692.9284` + "\n" +
+		`"00424433+4116085 ",10.684737,41.269035,2450745.8589` + "\n"
+
+	out, err := parseCSV(strings.NewReader(rows), tableSchemas[defaultTable])
+	if err != nil {
+		t.Fatalf("parseCSV: %v", err)
+	}
+
+	for i, jd := range []float64{2451692.9284, 2450745.8589} {
+		if got := out[i].Epoch.JD(); math.Abs(got-jd) > 1e-9 {
+			t.Errorf("row %d: epoch JD %.6f, want %.6f, the night it was observed", i, got, jd)
+		}
+	}
+
+	// A 2MASS answer without the column is a changed schema, not a J2000 row.
+	if _, err := parseCSV(strings.NewReader("designation,ra,dec\n1,10.68,41.27\n"), tableSchemas[defaultTable]); !errors.Is(err, ErrUnexpectedSchema) {
+		t.Errorf("2MASS rows without epoch_jd: error = %v, want ErrUnexpectedSchema", err)
+	}
+
+	// A table at one epoch stamps every row with it.
+	hip, err := parseCSV(strings.NewReader("designation,ra,dec\n87937,269.45402305,4.66828815\n"), tableSchemas["I/239/hip_main"])
+	if err != nil {
+		t.Fatalf("parseCSV(Hipparcos): %v", err)
+	}
+
+	if !hip[0].Epoch.Equal(epochHipparcos) {
+		t.Errorf("Hipparcos row epoch %v, want J1991.25", hip[0].Epoch)
+	}
+}
+
+// TestOnlyTwoMASSIsAskedForRowEpochs: the cone query asks for a row epoch
+// column exactly where the table has one.
+func TestOnlyTwoMASSIsAskedForRowEpochs(t *testing.T) {
+	var queries []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		queries = append(queries, r.PostFormValue("QUERY"))
+
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = fmt.Fprint(w, "designation,ra,dec,epoch_jd\n")
+	}))
+	defer server.Close()
+
+	prov := New()
+
+	redirect(t, server.URL)
+
+	for _, table := range []string{"", "I/239/hip_main", "I/355/gaiadr3"} {
+		req := resolve.ConeRequest{Table: table, Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)), Radius: angle.Arcsec(5)}
+		prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+	}
+
+	if len(queries) != 3 {
+		t.Fatalf("%d queries, want 3", len(queries))
+	}
+
+	for i, want := range []bool{true, false, false} {
+		if asked := strings.Contains(queries[i], "jd as epoch_jd"); asked != want {
+			t.Errorf("query %d asks for row epochs = %v, want %v:\n%s", i, asked, want, queries[i])
+		}
 	}
 }

@@ -1,0 +1,10 @@
+*******************************************************************************
+JPL/DASTCOM            Small-body Index Search Results     2026-Oct-08 06:43:54
+
+ Comet AND asteroid index search:
+
+   NAME = Tethy;
+
+ Matching small-bodies: 
+    No matches found.
+*******************************************************************************

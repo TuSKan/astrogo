@@ -1,0 +1,10 @@
+*******************************************************************************
+ Multiple major-bodies match string "IRIS*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+      -64  OSIRIS-REx (spacecraft)            2016-055A    OSIRIS-APX ORX APEX  
+   -64090  OSIRIS-REx SRC (spacecraft)                                          
+ 
+   Number of matches =           2 . Use ID# to make unique selection.
+*******************************************************************************
