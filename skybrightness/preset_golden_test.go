@@ -56,6 +56,11 @@ const goldenTol = 1e-12
 // integrals sample the sky below 10° of altitude, where refraction now hands
 // over to Bennett-NA instead of holding SOFA's clamp, and the zodiacal table
 // is the one smooth enough to follow the arcminutes that moved.
+//
+// #646 moved Observatory's moonlight rows by 0.7 to 1.9 per cent, and its
+// totals with them. The Moon is placed where the site sees it, which lowers
+// it into more air and on its own dims the zenith by 1.0 per cent, and its
+// phase angle is the site's, which brightens every row by about 1.7.
 func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
 	tb.Helper()
 
@@ -337,36 +342,36 @@ var observatoryGolden = []goldenRow{
 	{90, skybrightness.Extragalactic, 1.2564884178802038e-11},
 	{90, skybrightness.Zodiacal, 1.693095058467329e-09},
 	{90, skybrightness.AirglowContinuum, 2.6478108272245852e-09},
-	{90, skybrightness.Moonlight, 1.0222952902998189e-07},
+	{90, skybrightness.Moonlight, 1.0298360358137359e-07},
 	{90, skybrightness.Artificial, 8.4639173450219717e-08},
-	{90, totalSurfaceBrightness, 17.278020985809246},
+	{90, totalSurfaceBrightness, 17.273643557764409},
 
 	{60, skybrightness.Starlight, 1.0062187658169592e-09},
 	{60, skybrightness.DiffuseGalactic, 4.3464905192341308e-11},
 	{60, skybrightness.Extragalactic, 1.2560100089124851e-11},
 	{60, skybrightness.Zodiacal, 1.7404135103067849e-09},
 	{60, skybrightness.AirglowContinuum, 3.0341282189366305e-09},
-	{60, skybrightness.Moonlight, 8.8363621001293378e-08},
+	{60, skybrightness.Moonlight, 8.9869570249689853e-08},
 	{60, skybrightness.Artificial, 1.1741516319643428e-07},
-	{60, totalSurfaceBrightness, 17.172947236833163},
+	{60, totalSurfaceBrightness, 17.165172011378107},
 
 	{30, skybrightness.Starlight, 1.0022793132197267e-09},
 	{30, skybrightness.DiffuseGalactic, 4.3294735504132998e-11},
 	{30, skybrightness.Extragalactic, 1.2510925972522657e-11},
 	{30, skybrightness.Zodiacal, 1.093102427966267e-09},
 	{30, skybrightness.AirglowContinuum, 4.9242262169215958e-09},
-	{30, skybrightness.Moonlight, 7.4085189493413251e-08},
+	{30, skybrightness.Moonlight, 7.5495915764149476e-08},
 	{30, skybrightness.Artificial, 2.6030405951465619e-07},
-	{30, totalSurfaceBrightness, 16.654599131112203},
+	{30, totalSurfaceBrightness, 16.650039220073417},
 
 	{10, skybrightness.Starlight, 9.6671969658419908e-10},
 	{10, skybrightness.DiffuseGalactic, 4.1758692430553132e-11},
 	{10, skybrightness.Extragalactic, 1.2067053964519993e-11},
 	{10, skybrightness.Zodiacal, 9.1717731626735636e-10},
 	{10, skybrightness.AirglowContinuum, 9.2177897305315865e-09},
-	{10, skybrightness.Moonlight, 1.2972639735517454e-07},
+	{10, skybrightness.Moonlight, 1.3215846676751951e-07},
 	{10, skybrightness.Artificial, 7.8099677446004759e-07},
-	{10, totalSurfaceBrightness, 15.580433983678223},
+	{10, totalSurfaceBrightness, 15.57754393680079},
 }
 
 // checkPresetGolden compares one preset against its own locked table.
