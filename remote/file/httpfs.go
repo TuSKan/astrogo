@@ -190,10 +190,16 @@ func (h *httpFS) probe(objURL string) (http.Header, int64, error) {
 		// chunked transfer encoding sends no Content-Length at all, so
 		// "unknown" has to be distinguishable from "empty". Fall through.
 		headHeader = resp.Header
-	} else if !errors.Is(err, errMethodNotAllowed) {
+	} else if !errors.Is(err, errMethodNotAllowed) && !errors.Is(err, fs.ErrPermission) {
 		return nil, 0, err
 	}
 
+	// A 403 on the HEAD falls through to the GET as a 405 does. A download
+	// redirected to a pre-signed object-store URL is signed for GET alone, so
+	// a HEAD that follows the redirect is refused: Dataverse's SFD dust map
+	// answers a HEAD with a 303 and then a 403, and a ranged GET with the
+	// bytes (#659). An object that really is forbidden refuses the GET too,
+	// and that error is the one returned.
 	ranged, rangeErr := h.do(ctx, http.MethodGet, objURL, "bytes=0-0")
 	if rangeErr != nil {
 		if headHeader != nil {

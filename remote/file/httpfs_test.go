@@ -221,6 +221,78 @@ func TestHTTPProbesSizeWithoutHEAD(t *testing.T) {
 // It is fs.ErrNotExist rather than an astrogo error on purpose: the same
 // errors.Is works against os, embed, zip and every backend here, so a caller
 // learns one vocabulary instead of two.
+// presignedServer redirects every request for the object to a "signed" URL
+// that, like a pre-signed object-store URL, answers only the method it was
+// signed for: GET. A HEAD that follows the redirect gets 403. With forbidden
+// set, the GET is refused as well, as for an object that really is private.
+type presignedServer struct {
+	object    objectServer
+	forbidden bool
+}
+
+func (s *presignedServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.URL.Path, "/signed/") {
+		http.Redirect(w, r, "/signed"+r.URL.Path+"?X-Amz-Signature=abc", http.StatusSeeOther)
+
+		return
+	}
+
+	if r.Method == http.MethodHead || s.forbidden {
+		w.WriteHeader(http.StatusForbidden)
+
+		return
+	}
+
+	s.object.ServeHTTP(w, r)
+}
+
+// TestHTTPStatsThroughAPresignedRedirect: Dataverse answers a request for the
+// SFD dust map with a 303 to a pre-signed S3 URL, which refuses a HEAD with 403
+// and serves a GET (#659). Stat, and so every download, has to size the object
+// from the ranged GET as it does after a 405, and Open has to read it whole.
+// A 403 on both methods is still fs.ErrPermission.
+func TestHTTPStatsThroughAPresignedRedirect(t *testing.T) {
+	t.Parallel()
+
+	open := func(s *presignedServer) fs.FS {
+		srv := httptest.NewServer(s)
+		t.Cleanup(srv.Close)
+
+		fsys, err := file.OpenFS(srv.URL + "/pub/naif/")
+		if err != nil {
+			t.Fatalf("OpenFS: %v", err)
+		}
+
+		return fsys
+	}
+
+	fsys := open(&presignedServer{object: objectServer{sendRangeSize: true}})
+
+	info, err := fs.Stat(fsys, "de440s.bsp")
+	if err != nil {
+		t.Fatalf("Stat through a pre-signed redirect: %v", err)
+	}
+
+	if info.Size() != int64(len(kernel)) {
+		t.Errorf("size %d, want %d", info.Size(), len(kernel))
+	}
+
+	got, err := fs.ReadFile(fsys, "de440s.bsp")
+	if err != nil {
+		t.Fatalf("ReadFile through a pre-signed redirect: %v", err)
+	}
+
+	if string(got) != string(kernel) {
+		t.Errorf("read %d bytes through the redirect, not the %d-byte object", len(got), len(kernel))
+	}
+
+	private := open(&presignedServer{object: objectServer{sendRangeSize: true}, forbidden: true})
+
+	if _, err := fs.Stat(private, "de440s.bsp"); !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("Stat of an object refused to every method: error = %v, want fs.ErrPermission", err)
+	}
+}
+
 func TestHTTPMissingObjectIsErrNotExist(t *testing.T) {
 	t.Parallel()
 
