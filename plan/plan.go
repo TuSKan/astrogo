@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/parallel"
+	"github.com/TuSKan/astrogo/vector"
 
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -298,14 +299,16 @@ func (sc ScoreConfig) normalize() (wAlt, wUrg, wMoon float64) {
 // sharing the same epoch) actually hit.
 const moonPosCacheSize = 32
 
-// moonPosEntry is the cached Moon position for one epoch.
+// moonPosEntry is the cached Moon position for one epoch: its apparent
+// geocentric vector, which each site turns into its own direction.
 type moonPosEntry struct {
 	t   time.Time
-	pos coord.ICRS
+	vec vector.Vec3
 }
 
-// moonSepCache caches the Moon's ICRS position per epoch to avoid redundant
-// ephemeris lookups when scoring many targets at or near the same time.
+// moonSepCache caches the Moon's geocentric vector per epoch to avoid
+// redundant ephemeris lookups when scoring many targets at or near the same
+// time.
 var moonSepCache = struct {
 	mu      sync.Mutex
 	entries map[time.Time]*list.Element // time.Time is a comparable value type
@@ -315,27 +318,29 @@ var moonSepCache = struct {
 	order:   list.New(),
 }
 
-// getMoonPosition returns the Moon's ICRS coordinates, caching per-epoch.
-func getMoonPosition(t time.Time) (coord.ICRS, error) {
+// getMoonGeocentricVec returns the Moon's apparent geocentric vector,
+// caching per-epoch. It is a vector rather than a direction because the
+// direction depends on the site (see topocentricPosition).
+func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 	moonSepCache.mu.Lock()
 
 	if el, ok := moonSepCache.entries[t]; ok {
 		moonSepCache.order.MoveToFront(el)
 
-		pos := el.Value.(moonPosEntry).pos //nolint:forcetypeassert // only this cache ever inserts list elements
+		vec := el.Value.(moonPosEntry).vec //nolint:forcetypeassert // only this cache ever inserts list elements
 
 		moonSepCache.mu.Unlock()
 
-		return pos, nil
+		return vec, nil
 	}
 
 	moonSepCache.mu.Unlock()
 
 	moon := NewMoon(eph.Default())
 
-	pos, err := moon.Position(t)
+	vec, err := moon.GeocentricVec(t)
 	if err != nil {
-		return coord.ICRS{}, err
+		return vector.Vec3{}, fmt.Errorf("plan: moon: %w", err)
 	}
 
 	moonSepCache.mu.Lock()
@@ -346,10 +351,10 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 	if el, ok := moonSepCache.entries[t]; ok {
 		moonSepCache.order.MoveToFront(el)
 
-		return el.Value.(moonPosEntry).pos, nil //nolint:forcetypeassert // only this cache ever inserts list elements
+		return el.Value.(moonPosEntry).vec, nil //nolint:forcetypeassert // only this cache ever inserts list elements
 	}
 
-	el := moonSepCache.order.PushFront(moonPosEntry{t: t, pos: pos})
+	el := moonSepCache.order.PushFront(moonPosEntry{t: t, vec: vec})
 	moonSepCache.entries[t] = el
 
 	if moonSepCache.order.Len() > moonPosCacheSize {
@@ -360,7 +365,7 @@ func getMoonPosition(t time.Time) (coord.ICRS, error) {
 		}
 	}
 
-	return pos, nil
+	return vec, nil
 }
 
 // estimateHoursUntilSet computes a lightweight estimate of how many hours
@@ -508,9 +513,16 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	moonMerit := 1.0 // default: no penalty if Moon lookup fails
 
 	if wMoon > 0 {
-		moonPos, err := getMoonPosition(t)
+		// Both as the site sees them: the Moon's parallax moves it up to
+		// 0.95° from where the Earth's center has it (#634).
+		moonVec, err := getMoonGeocentricVec(t)
 		if err == nil {
-			sep := coord.Separation(eval.Position, moonPos).Degrees()
+			pos, posErr := topocentricPosition(obj, t, ctx)
+			if posErr != nil {
+				pos = eval.Position
+			}
+
+			sep := coord.Separation(pos, topocentricDirection(moonVec, ctx)).Degrees()
 
 			threshold := sc.MoonFullPenaltyDeg
 			if threshold <= 0 {

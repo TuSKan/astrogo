@@ -1,0 +1,18 @@
+*******************************************************************************
+ Multiple major-bodies match string "MARS*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+        4  Mars Barycenter                                                      
+      499  Mars                                                                 
+       -3  Mars Orbiter Mission (spacecraft)  2013-060A    MOM Mangalyaan       
+      -41  Mars Express (spacecraft)          2003-022A    MEX                  
+      -53  Mars Odyssey (spacecraft)          2001-013A                         
+     -530  Mars Pathfinder (spacecraft)       1996-068A    MPF                  
+      -74  Mars Reconnaissance Orbiter (spacec2005-029A    MRO                  
+      -76  Mars Science Laboratory (spacecraft2011-070A    Curiosity MSL        
+     -143  ExoMars16 TGO (spacecraft)         2016-017A                         
+     -168  Mars2020 (spacecraft)              2020-052A    Ingenuity Perseveran 
+ 
+   Number of matches =          10 . Use ID# to make unique selection.
+*******************************************************************************

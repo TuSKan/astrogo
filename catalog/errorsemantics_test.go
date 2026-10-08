@@ -3,10 +3,13 @@ package catalog
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 var errOutage = errors.New("simulated service outage")
@@ -180,5 +183,36 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 
 	if _, err := total.Search(context.Background(), "M31"); !errors.Is(err, errOutage) {
 		t.Errorf("err = %v, want the underlying outage", err)
+	}
+}
+
+// TestResolveHearsNoFromSBDBAndNORAD runs the real SBDB and NORAD providers
+// against each service's real answer for a name it lacks: SBDB's HTTP 200
+// "specified object was not found" and CelesTrak's HTTP 404 "No GP data
+// found". Both used to arrive here as failures, so a Resolver with either
+// registered could not report ErrNotFound for anything (#620).
+func TestResolveHearsNoFromSBDBAndNORAD(t *testing.T) {
+	t.Cleanup(remote.Reset)
+
+	serve := func(id remote.EndpointID, status int, contentType, body string) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", contentType)
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(body))
+		}))
+		t.Cleanup(srv.Close)
+
+		if err := remote.SetURL(id, srv.URL); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	serve(remote.JPLSBDB, http.StatusOK, "application/json",
+		`{"message":"specified object was not found","code":"200","moreInfo":"https://ssd-api.jpl.nasa.gov/doc/sbdb.html"}`)
+	serve(remote.CelesTrak, http.StatusNotFound, "text/plain; charset=UTF-8", "No GP data found")
+
+	_, err := NewResolver(SBDB, NORAD).Resolve(context.Background(), "Qzxv Nonexistent 7")
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("Resolve = %v, want ErrNotFound", err)
 	}
 }

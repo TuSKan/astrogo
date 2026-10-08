@@ -1,10 +1,12 @@
 package jpl
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -48,7 +50,8 @@ func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
-// Resolve performs exact-match resolution for a query.
+// Resolve returns the target that best matches query, the first of
+// [Provider.Search]'s results.
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
 	targets, err := p.Search(ctx, query)
 	if err != nil {
@@ -62,16 +65,58 @@ func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, e
 	return targets[0], nil
 }
 
-// Search performs a fuzzy search for the query.
-func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
-	req := resolve.ObjectRequest{Query: query, Limit: 10}
+// searchLimit caps how many targets [Provider.Search] returns.
+const searchLimit = 10
 
-	targets, err := resolve.Drain(p.ResolveObject(ctx, req), 10)
+// Search returns up to searchLimit of Horizons' matches for query, best
+// match first.
+//
+// Horizons lists an ambiguous query's matches in its own order and matches
+// a name anywhere inside another: for "Moon" the Earth-Moon barycenter
+// comes before the Moon, and for "ISS" Larissa comes first and the
+// International Space Station fourth. So Search ranks the whole table by
+// [resolve.Score] over each target's name, ID, designation and aliases,
+// keeping Horizons' order between equal scores, and only then applies the
+// cap: Horizons answers "ACE" with 255 bodies, and lists ACE itself 53rd.
+func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
+	targets, err := resolve.Drain(p.ResolveObject(ctx, resolve.ObjectRequest{Query: query}), 0)
 	if err != nil {
 		return nil, fmt.Errorf("searching for %q: %w", query, err)
 	}
 
-	return targets, nil
+	targets = rankByMatch(query, targets)
+
+	return targets[:min(len(targets), searchLimit)], nil
+}
+
+// rankByMatch returns targets ordered best match for query first, by the
+// best [resolve.Score] over each target's name, ID, designation and
+// aliases. The sort is stable, so equal scores keep Horizons' order.
+func rankByMatch(query string, targets []resolve.Target) []resolve.Target {
+	type ranked struct {
+		target resolve.Target
+		score  float64
+	}
+
+	rs := make([]ranked, len(targets))
+
+	for i, t := range targets {
+		best := 0.0
+		for _, s := range append([]string{t.Name, t.ID, t.Designation}, t.Aliases...) {
+			best = max(best, resolve.Score(query, s))
+		}
+
+		rs[i] = ranked{t, best}
+	}
+
+	slices.SortStableFunc(rs, func(a, b ranked) int { return cmp.Compare(b.score, a.score) })
+
+	out := make([]resolve.Target, len(rs))
+	for i, r := range rs {
+		out[i] = r.target
+	}
+
+	return out
 }
 
 // ResolveObject performs streaming resolution via the JPL Horizons API.

@@ -13,6 +13,7 @@ package norad
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -221,5 +222,20 @@ func TestResolveISSIsTheStation(t *testing.T) {
 	if byNumber.ID != "25544" {
 		t.Errorf("Resolve(\"25544\") = %q (NORAD %s), want ISS (ZARYA)",
 			byNumber.Name, byNumber.ID)
+	}
+}
+
+// TestResolveUnknownIsNotFound_Live: CelesTrak answers a name it has no
+// data for with HTTP 404 "No GP data found", which is a "no" (#620).
+func TestResolveUnknownIsNotFound_Live(t *testing.T) {
+	requireCelestrak(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err := New().Resolve(ctx, "QZXVNONEXISTENT")
+	if !errors.Is(err, resolve.ErrNotFound) {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Resolve = %v, want ErrNotFound", err)
 	}
 }

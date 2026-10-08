@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/vector"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -192,22 +193,22 @@ func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
-// CheckCtx evaluates Moon separation using a pre-built coord.Context.
+// CheckCtx evaluates Moon separation using a pre-built coord.Context. The
+// separation is the one the site sees, from both positions as the observer
+// has them (see topocentricPosition).
 func (c MoonSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 180}, nil
 	}
 
-	pos, err := obj.Position(ctx.Time())
+	pos, err := topocentricPosition(obj, ctx.Time(), ctx)
 	if err != nil {
 		return Result{}, fmt.Errorf("constraint: moon separation position: %w", err)
 	}
 
-	moon := NewMoon(eph.Default())
-
-	moonPos, err := moon.Position(ctx.Time())
+	moonPos, err := topocentricPosition(NewMoon(eph.Default()), ctx.Time(), ctx)
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("constraint: moon separation: %w", err)
 	}
 
 	sep := coord.Separation(pos, moonPos)
@@ -342,6 +343,46 @@ func observedAltAz(obj any, t time.Time, ctx *coord.Context, pos coord.ICRS) (co
 	}
 
 	return ctx.GeocentricToObserved(vec), nil
+}
+
+// topocentricPosition returns the direction in which the site sees obj at t:
+// for a body with an ephemeris, its apparent geocentric vector less the
+// observer's; for anything else, its catalog position, which no offset on
+// the Earth can move.
+//
+// The Moon is close enough for that offset to move it by up to its
+// horizontal parallax, about 0.95°. Separations from it used to be measured
+// from the Earth's center, which put a star the observer sees 30.005° from
+// the Moon at 30.76° (#634). Unlike observedAltAz this leaves out
+// refraction, which would bend two directions near the horizon by different
+// amounts, so the result is comparable with any topocentric separation.
+func topocentricPosition(obj Observable, t time.Time, ctx *coord.Context) (coord.ICRS, error) {
+	mb, ok := obj.(MovingBody)
+	if !ok {
+		pos, err := obj.Position(t)
+		if err != nil {
+			return coord.ICRS{}, fmt.Errorf("plan: position: %w", err)
+		}
+
+		return pos, nil
+	}
+
+	vec, err := mb.GeocentricVec(t)
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("plan: geocentric vector: %w", err)
+	}
+
+	return topocentricDirection(vec, ctx), nil
+}
+
+// topocentricDirection is the direction of geocentric vector v, in AU, from
+// ctx's observer.
+func topocentricDirection(v vector.Vec3, ctx *coord.Context) coord.ICRS {
+	var pos coord.ICRS
+
+	pos.FromUnitVector(v.Sub(ctx.ObsVec()).Unit())
+
+	return pos
 }
 
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.

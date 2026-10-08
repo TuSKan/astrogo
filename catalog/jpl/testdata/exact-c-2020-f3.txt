@@ -1,0 +1,70 @@
+*******************************************************************************
+JPL/HORIZONS                 NEOWISE (C/2020 F3)           2026-Oct-07 20:23:22
+Rec #:90004599 (+COV) Soln.date: 2024-Jul-30_14:57:24   # obs: 1315 (2020-2021)
+ 
+IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+ 
+  EPOCH=  2459036.5 ! 2020-Jul-06.0000000 (TDB)    RMSW= n.a.
+   EC= .9991780262531292   QR= .2946512493809196   TP= 2459034.1788980444
+   OM= 61.01042818536988   W= 37.2786584481257     IN= 128.9375027594809
+   A= 358.4679565529321    MA= .0003370720801209784ADIST= 716.6412618564833
+   PER= 6787.09163038227   N= .000145221           ANGMOM= .013202656
+   DAN= .32816             DDN= 2.8741             L= 35.4440798
+   B= 28.1074538           MOID= .36251399         TP= 2020-Jul-03.6788980444
+ 
+Comet physical (GM= km^3/s^2; RAD= km):
+   GM= n.a.                RAD= n.a.
+   M1=  12.1     M2=  n.a.     k1=  12.25  k2= n.a.     PHCOF= n.a.
+
+COMET comments 
+1: soln ref.= JPL#31, data arc: 2020-03-27 to 2021-06-08
+2: k1=12.25;
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Wed Oct  7 20:23:23 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: NEOWISE (C/2020 F3)             {source: JPL#31}
+Center body name: Earth (399)                     {source: DE441}
+Center-site name: GEOCENTRIC
+*******************************************************************************
+Start time      : A.D. 2022-Jan-01 10:00:00.0000 UT      
+Stop  time      : A.D. 2022-Jan-02 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : undefined
+Target radii    : undefined                                                    
+Center geodetic : 0.0, 0.0, -6378.137             {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : ITRF93                          {East-longitude positive}
+Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+Target primary  : Sun
+Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+Rel. light bend : Sun                             {source: DE441}
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Small-body perts: Yes                             {source: SB441-N16}
+Atmos refraction: NO (AIRLESS)
+RA format       : HMS
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261007.p270103                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-07. PREDICTS-> 2027-JAN-02
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+*******************************************************************************
+Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  EPOCH=  2459036.5 ! 2020-Jul-06.0000000 (TDB)    RMSW= n.a.                  
+   EC= .9991780262531292   QR= .2946512493809196   TP= 2459034.1788980444      
+   OM= 61.01042818536988   W= 37.2786584481257     IN= 128.9375027594809       
+  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+   X= 2.200839683613764E-01  Y=-1.775828091488398E-02  Z= 2.084362287542256E-01
+  VX= 7.944100705820443E-04 VY=-4.365012228700479E-02 VZ= 6.503968511781093E-03
+Comet physical (GM= km^3/s^2; RAD= km):                                        
+   GM= n.a.                RAD= n.a.                                           
+   M1=  12.1     M2=  n.a.     k1=  12.25  k2= n.a.     PHCOF= n.a.            
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+ Date__(UT)__HR:MN     R.A._____(ICRF)_____DEC  R.A.__(a-apparent)__DEC  dRA*cosD d(DEC)/dt  Azi____(a-app)___Elev  dAZ*cosE d(ELV)/dt  X_(sat-primary)_Y SatPANG  L_Ap_Sid_Time  a-mass mag_ex    T-mag   N-mag      Illu%  Def_illu   ang-sep/v  Ang-diam  ObsSub-LON ObsSub-LAT  SunSub-LON SunSub-LAT  SN.ang   SN.dist    NP.ang   NP.dist  hEcl-Lon hEcl-Lat                r        rdot             delta      deldot  1-way_down_LT       VmagSn      VmagOb     S-O-T /r     S-T-O   T-O-M/MN_Illu%     O-P-T    PsAng   PsAMV      PlAng  Cnst        TDB-UT     ObsEcLon    ObsEcLat  N.Pole-RA  N.Pole-DC      GlxLon     GlxLat  L_Ap_SOL_Time  399_ins_LT  RA_3sigma DEC_3sigma  SMAA_3sig SMIA_3sig    Theta Area_3sig  POS_3sigma  RNG_3sigma RNGRT_3sig   DOP_S_3sig  DOP_X_3sig  RT_delay_3sig  Tru_Anom  L_Ap_Hour_Ang       phi  PAB-LON  PAB-LAT  App_Lon_Sun  RA_(ICRF-a-apparnt)_DEC  I_dRA*cosD I_d(DEC)/dt  Sky_motion  Sky_mot_PA  RelVel-ANG  Lun_Sky_Brt  sky_SNR   UT1-UTC
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************

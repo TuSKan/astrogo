@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -70,20 +71,81 @@ const magnitudesPerOpticalDepth = 2.5 * math.Log10E
 // [ErrExtinctionWavelength]. An Atmosphere with no surface pressure has no
 // Rayleigh term to compute, and the error wraps [ErrPressure].
 func (s *Atmosphere) Extinction(lambda unit.WavelengthNM) (float64, error) {
-	nm := float64(lambda)
-	if !(nm >= extinctionMinNM && nm <= extinctionMaxNM) {
-		return 0, fmt.Errorf("%w: got %g nm", ErrExtinctionWavelength, nm)
-	}
-
-	rayleigh, err := RayleighOpticalDepth(lambda, s.surface.Pressure)
+	rayleigh, ozone, aerosol, err := s.opticalDepths(lambda)
 	if err != nil {
 		return 0, err
 	}
 
-	ozone := ozoneCrossSectionAt(nm) * float64(s.ozone) * dobsonUnitMoleculesPerCM2
-	aerosol := float64(s.aerosol.TauAt(lambda))
+	return magnitudesPerOpticalDepth * (rayleigh + ozone + aerosol), nil
+}
 
-	return magnitudesPerOpticalDepth * (float64(rayleigh) + ozone + aerosol), nil
+// ExtinctionToward returns how many magnitudes this air dims light at
+// wavelength lambda arriving from apparent altitude alt: the three terms of
+// [Atmosphere.Extinction], each through the airmass of the layer it lies in,
+//
+//	A = 2.5 log10(e) * [tau_R * X_R + tau_O3 * X_O3 + tau_aer * X_aer]
+//
+// rather than one coefficient times one airmass.
+//
+//   - X_R is [Airmass], Pickering's (2002) airmass of the molecular
+//     atmosphere.
+//   - X_O3 is the airmass of a thin shell 20 km up, the ozone layer:
+//     (1 - (sin z / (1 + 20/6378))^2)^(-1/2), which Pickering (DIO 12 ‡1,
+//     footnote 39) adopts from Schaefer (1998). Near the horizon it is a
+//     third of X_R, 12.66 against 38.75 at 0°, so charging ozone X_R
+//     over-dimmed a target there: by 0.63 mag at 0°, 0.34 at 1° and 0.19
+//     at 2° on VisibleTonight's default air (#625).
+//   - X_aer is X_R as well. That is the right airmass for aerosol with the
+//     molecular scale height, 8 km, which OPAC gives its continental and
+//     urban types. A thinner layer, maritime (1 km) or desert (2 km), has a
+//     larger airmass near the horizon (Pickering's for 2 km is 88.8 at 0°),
+//     which this does not model, so below about 5° it under-dims through
+//     such air.
+//
+// High in the sky the three airmasses agree and this is Extinction times
+// Airmass: at 30° they differ by 0.6%. It errors where Extinction does, and
+// below the horizon, where Airmass does.
+func (s *Atmosphere) ExtinctionToward(lambda unit.WavelengthNM, alt angle.Angle) (float64, error) {
+	rayleigh, ozone, aerosol, err := s.opticalDepths(lambda)
+	if err != nil {
+		return 0, err
+	}
+
+	x, err := Airmass(alt)
+	if err != nil {
+		return 0, err
+	}
+
+	return magnitudesPerOpticalDepth * ((rayleigh+aerosol)*x + ozone*ozoneAirmass(alt)), nil
+}
+
+// ozoneAirmass returns the airmass of a thin absorbing shell 20 km above an
+// Earth of radius 6378 km, seen from apparent altitude alt at or above the
+// horizon: Schaefer's (1998) formula as Pickering (DIO 12 ‡1, footnote 39)
+// gives it.
+func ozoneAirmass(alt angle.Angle) float64 {
+	s := math.Cos(alt.Radians()) / (1 + 20.0/6378)
+
+	return 1 / math.Sqrt(1-s*s)
+}
+
+// opticalDepths returns this air's Rayleigh, ozone and aerosol optical
+// depths at lambda, which must lie in the modeled range.
+func (s *Atmosphere) opticalDepths(lambda unit.WavelengthNM) (rayleigh, ozone, aerosol float64, err error) {
+	nm := float64(lambda)
+	if !(nm >= extinctionMinNM && nm <= extinctionMaxNM) {
+		return 0, 0, 0, fmt.Errorf("%w: got %g nm", ErrExtinctionWavelength, nm)
+	}
+
+	tauR, err := RayleighOpticalDepth(lambda, s.surface.Pressure)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	ozone = ozoneCrossSectionAt(nm) * float64(s.ozone) * dobsonUnitMoleculesPerCM2
+	aerosol = float64(s.aerosol.TauAt(lambda))
+
+	return float64(tauR), ozone, aerosol, nil
 }
 
 // ozoneCrossSectionAt interpolates [ozoneCrossSection] linearly at nm, which

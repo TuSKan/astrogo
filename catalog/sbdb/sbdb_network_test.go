@@ -4,6 +4,7 @@ package sbdb
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 
@@ -388,4 +389,37 @@ func TestSearchBrightElementsAreFullPrecision(t *testing.T) {
 		t.Errorf("only %d of %d element values carry detail beyond four significant figures; "+
 			"the bulk query is rounding, so full-prec is missing or ignored", detailed, total)
 	}
+}
+
+// TestSBDBNetworkAnswersAreSentinels checks SBDB's three answers live: no
+// match is ErrNotFound, a name several objects carry is ErrAmbiguous, and a
+// designation among several matches is selected by asking again with des=
+// (#620).
+func TestSBDBNetworkAnswersAreSentinels(t *testing.T) {
+	requireSBDB(t)
+
+	resolveLive := func(q string) (resolve.Target, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		tgt, err := New().Resolve(ctx, q)
+		testutil.SkipOnUpstreamFailure(t, err)
+
+		return tgt, err
+	}
+
+	if _, err := resolveLive("Vega"); !errors.Is(err, resolve.ErrNotFound) {
+		t.Errorf("Resolve(Vega) = %v, want ErrNotFound", err)
+	}
+
+	if _, err := resolveLive("Halley"); !errors.Is(err, resolve.ErrAmbiguous) {
+		t.Errorf("Resolve(Halley) = %v, want ErrAmbiguous", err)
+	}
+
+	tgt, err := resolveLive("73P")
+	if err != nil {
+		t.Fatalf("Resolve(73P): %v", err)
+	}
+
+	testutil.AssertEqual(t, "73P SPKID", tgt.SPKID, "1000394")
 }

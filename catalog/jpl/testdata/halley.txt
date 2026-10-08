@@ -1,0 +1,45 @@
+*******************************************************************************
+JPL/DASTCOM            Small-body Index Search Results     2026-Oct-07 20:17:14
+
+ Comet AND asteroid index search:
+
+   NAME = Halley;
+
+ Matching small-bodies: 
+
+    Record #  Epoch-yr  Primary Desig  >MATCH NAME<
+    --------  --------  -------------  -------------------------
+        2688            1982 HG1        Halley
+    90000001    -239    1P              Halley
+    90000002    -163    1P              Halley
+    90000003     -86    1P              Halley
+    90000004     -11    1P              Halley
+    90000005      66    1P              Halley
+    90000006     141    1P              Halley
+    90000007     218    1P              Halley
+    90000008     295    1P              Halley
+    90000009     374    1P              Halley
+    90000010     451    1P              Halley
+    90000011     530    1P              Halley
+    90000012     607    1P              Halley
+    90000013     684    1P              Halley
+    90000014     760    1P              Halley
+    90000015     837    1P              Halley
+    90000016     912    1P              Halley
+    90000017     989    1P              Halley
+    90000018    1066    1P              Halley
+    90000019    1145    1P              Halley
+    90000020    1222    1P              Halley
+    90000021    1301    1P              Halley
+    90000022    1378    1P              Halley
+    90000023    1456    1P              Halley
+    90000024    1531    1P              Halley
+    90000025    1607    1P              Halley
+    90000026    1682    1P              Halley
+    90000027    1759    1P              Halley
+    90000028    1835    1P              Halley
+    90000029    1910    1P              Halley
+    90000030    1968    1P              Halley
+
+ (31 matches. To SELECT, enter record # (integer), followed by semi-colon.)
+*******************************************************************************

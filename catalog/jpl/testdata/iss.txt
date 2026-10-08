@@ -1,0 +1,13 @@
+*******************************************************************************
+ Multiple major-bodies match string "ISS*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+      807  Larissa                                         NVII                 
+       -3  Mars Orbiter Mission (spacecraft)  2013-060A    MOM Mangalyaan       
+      -74  Mars Reconnaissance Orbiter (spacec2005-029A    MRO                  
+  -125544  International Space Station (spacec1998-067A    ISS                  
+  2000016  Psyche (mission target)                                              
+ 
+   Number of matches =           5 . Use ID# to make unique selection.
+*******************************************************************************
