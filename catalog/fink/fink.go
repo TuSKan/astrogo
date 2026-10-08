@@ -72,6 +72,7 @@ type Provider struct {
 	byNumber map[int64]*ssoRecord
 	byName   map[string]*ssoRecord
 	version  string
+	indexed  int
 	mu       sync.RWMutex
 	loaded   bool
 }
@@ -211,7 +212,7 @@ func (p *Provider) Count() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return len(p.byNumber)
+	return p.indexed
 }
 
 // ── Single-object JSON API ───────────────────────────────────────────────────
@@ -375,6 +376,12 @@ func (p *Provider) recordToTarget(rec *ssoRecord) resolve.Target {
 		Catalog:     "fink",
 	}
 
+	// An object with no number has nothing to put in either field but its
+	// name; "0" would be an identifier shared by every such object (#596).
+	if rec.Number <= 0 {
+		t.ID, t.Designation = rec.Name, ""
+	}
+
 	// Use r-band (filter 2) as primary — closer to V than g-band.
 	if !math.IsNaN(rec.H2) {
 		t.H = rec.H2
@@ -473,7 +480,16 @@ func (p *Provider) ensureLoaded(ctx context.Context) error {
 			continue
 		}
 
-		p.byNumber[rec.Number] = rec
+		p.indexed++
+
+		// Only a real number goes in the number index. Every row the reader
+		// could not read a number from used to land on 0, one entry
+		// overwriting the next, which is how the whole table once collapsed
+		// to a single key (#596).
+		if rec.Number > 0 {
+			p.byNumber[rec.Number] = rec
+		}
+
 		if rec.Name != "" {
 			p.byName[strings.ToLower(rec.Name)] = rec
 		}
@@ -622,8 +638,23 @@ func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord,
 					return 0
 				}
 
+				// FINK chooses the column types, not this reader. In SSOFT
+				// 2025.04 sso_number is a string column and fit, status and
+				// n_obs are doubles; a reader that knew only the integer
+				// types read every asteroid's number as 0 (#596).
 				v := chunk.GetOneForMarshal(row)
 				switch iv := v.(type) {
+				case string:
+					// 32 bits: an asteroid number, a fit flag or an
+					// observation count fits with room to spare, and the
+					// bound is what makes the int conversions of fit, status
+					// and n_obs below safe on a 32-bit platform.
+					n, err := strconv.ParseInt(strings.TrimSpace(iv), 10, 32)
+					if err != nil {
+						return 0
+					}
+
+					return n
 				case int32:
 					return int64(iv)
 				case int64:

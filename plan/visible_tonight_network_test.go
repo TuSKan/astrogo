@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
+	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -174,4 +175,43 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 
 		t.Logf("found planetary moon: %s, mag=%.2f, constellation=%s", r.Target.Name, r.ApparentMag, r.Constellation)
 	}
+}
+
+// VisibleTonight considers every SIMBAD object brighter than its limit. It
+// used to see only SIMBAD's 100 brightest, down to V 2.46, whatever the limit,
+// because simbad.SearchBright took TOP 100 for a request with no limit (#603).
+// At Paranal on this night it listed 86 SIMBAD objects at limit 4.5 that way;
+// with every object it lists 632. The bound leaves room for SIMBAD's catalog
+// and the night's geometry.
+func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
+	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
+
+	site, err := plan.NewSiteEarthLocation("Paranal", -24.6272, -70.4045, 2640)
+	if err != nil {
+		t.Fatalf("NewSiteEarthLocation: %v", err)
+	}
+
+	night := time.Date(2026, 8, 1, 12, 0, 0, 0, time.LocationUTC)
+
+	results, err := plan.VisibleTonight(context.Background(), site, night, 4.5,
+		[]resolve.BrightObjectSearcher{simbad.New()}, ephemeris.Default())
+	testutil.SkipOnUpstreamFailure(t, err)
+
+	if err != nil {
+		t.Fatalf("VisibleTonight: %v", err)
+	}
+
+	var n int
+
+	for _, o := range results {
+		if o.Target.Catalog == "SIMBAD" {
+			n++
+		}
+	}
+
+	if n < 400 {
+		t.Errorf("VisibleTonight listed %d SIMBAD objects at limit 4.5; some 630 clear the sky that night", n)
+	}
+
+	t.Logf("SIMBAD objects visible at limit 4.5: %d", n)
 }
