@@ -209,18 +209,18 @@ func (p *parquetRows) Next() bool {
 	return p.at < p.rows
 }
 
-// Number reads a column as a float, whatever width the service chose for it.
-//
-// The archive types these columns as it sees fit — a count as INT64, a summed
-// flux as DOUBLE, a mean color as FLOAT — and every one of them is a number
-// this package divides or multiplies. Converting at the edge keeps that choice
-// out of the accumulation, where it would be a per-column special case.
 func (p *parquetRows) Has(column string) bool {
 	_, ok := p.columns[column]
 
 	return ok
 }
 
+// Number reads a column as a float, whatever width the service chose for it.
+//
+// The archive types these columns as it sees fit — a count as INT64, a summed
+// flux as DOUBLE, a mean color as FLOAT — and every one of them is a number
+// this package divides or multiplies. Converting at the edge keeps that choice
+// out of the accumulation, where it would be a per-column special case.
 func (p *parquetRows) Number(column string) (float64, bool) {
 	col, ok := p.columns[column]
 	if !ok || p.at < 0 || p.at >= p.rows || col.IsNull(int(p.at)) {

@@ -84,6 +84,10 @@ type moonGeometry struct {
 	airmass    float64
 	phaseAngle angle.Angle
 
+	// ozoneAirmass is the Moon's beam's path through the ozone layer, which
+	// it crosses before it scatters (see ozoneTransmission).
+	ozoneAirmass float64
+
 	// irradiance is the lunar spectral irradiance at the observer on the
 	// 32 ROLO bands, W m^-2 nm^-1.
 	irradiance []float64
@@ -238,8 +242,18 @@ func (m *ScatteredMoonlight) AddRadiance(
 		return 0, fmt.Errorf("skybrightness: moonlight: resample: %w", err)
 	}
 
+	// The Moon's beam crosses the ozone layer before it scatters, and the
+	// scattered light reaches the observer from below it, so ozone dims the
+	// beam along the Moon's own path and not the line of sight. Applied on the
+	// caller's grid rather than ROLO's bands, which run past 1000 nm where the
+	// cross section is not tabulated.
 	for i := range dst {
-		dst[i] += resampled[i]
+		ozone, err := ozoneTransmission(scene.Atmosphere, grid.At(i), geom.ozoneAirmass)
+		if err != nil {
+			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+		}
+
+		dst[i] += resampled[i] * ozone
 	}
 
 	return flags, nil
@@ -358,6 +372,11 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	geom.airmass, err = atmosphere.Airmass(altaz.Alt())
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: moon airmass: %w", err)
+	}
+
+	geom.ozoneAirmass, err = atmosphere.OzoneAirmass(altaz.Alt())
+	if err != nil {
+		return nil, fmt.Errorf("skybrightness: moonlight: moon ozone airmass: %w", err)
 	}
 
 	// The phase angle is the observation's, at the Moon between the Sun and
