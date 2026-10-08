@@ -266,13 +266,6 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 	return opts
 }
 
-// parseEphID converts a string ID to an eph.ID, returning 0 on failure.
-//
-// Bounded to 31 bits, not 32. eph.ID is unsigned and a NAIF id is signed
-// 32-bit, so anything above MaxInt32 is not an id at all — and converting one
-// wraps it to a negative value, which NAIF uses for spacecraft. Parsing it as
-// a failure keeps a garbage designation from arriving downstream as a
-// plausible different body.
 // naifMajorRangeID returns spkID as a NAIF ID when it is one of the Sun's,
 // a planet's, a system barycenter's or a planetary satellite's: 1 to 999.
 // Small bodies' SPK-IDs start at 1,000,000 and spacecraft's are negative.
@@ -319,6 +312,13 @@ func majorBodyForNAIF(naif int) (eph.ID, bool) {
 	}
 }
 
+// parseEphID converts a string ID to an eph.ID, returning 0 on failure.
+//
+// Bounded to 31 bits, not 32. eph.ID is unsigned and a NAIF id is signed
+// 32-bit, so anything above MaxInt32 is not an id at all — and converting one
+// wraps it to a negative value, which NAIF uses for spacecraft. Parsing it as
+// a failure keeps a garbage designation from arriving downstream as a
+// plausible different body.
 func parseEphID(id string) eph.ID {
 	n, err := strconv.ParseUint(id, 10, 31)
 	if err != nil {
