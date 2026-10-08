@@ -117,12 +117,12 @@ var moonSpecs = map[string]moonSpec{
 	"callisto": {name: "Callisto", kernel: "jup365", parent: eph.Jupiter, naifID: 504, h: -1.05},
 
 	"mimas":     {name: "Mimas", kernel: "sat441", parent: eph.Saturn, naifID: 601, h: 3.3},
-	"enceladus": {name: "Enceladus", kernel: "sat441", parent: eph.Saturn, naifID: 602, h: 2.2},
-	"tethys":    {name: "Tethys", kernel: "sat441", parent: eph.Saturn, naifID: 603, h: 0.7},
+	"enceladus": {name: "Enceladus", kernel: "sat441", parent: eph.Saturn, naifID: 602, h: 2.1},
+	"tethys":    {name: "Tethys", kernel: "sat441", parent: eph.Saturn, naifID: 603, h: 0.6},
 	"dione":     {name: "Dione", kernel: "sat441", parent: eph.Saturn, naifID: 604, h: 0.8},
 	"rhea":      {name: "Rhea", kernel: "sat441", parent: eph.Saturn, naifID: 605, h: 0.1},
-	"titan":     {name: "Titan", kernel: "sat441", parent: eph.Saturn, naifID: 606, h: -1.2},
-	"hyperion":  {name: "Hyperion", kernel: "sat441", parent: eph.Saturn, naifID: 607, h: 4.8},
+	"titan":     {name: "Titan", kernel: "sat441", parent: eph.Saturn, naifID: 606, h: -1.28},
+	"hyperion":  {name: "Hyperion", kernel: "sat441", parent: eph.Saturn, naifID: 607, h: 4.63},
 	"iapetus":   {name: "Iapetus", kernel: "sat441", parent: eph.Saturn, naifID: 608, h: 1.5},
 
 	"ariel":   {name: "Ariel", kernel: "ura184_part-3", parent: eph.Uranus, naifID: 701, h: 1.45},
