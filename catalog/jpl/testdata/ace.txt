@@ -1,0 +1,263 @@
+*******************************************************************************
+ Multiple major-bodies match string "ACE*"
+
+  ID#      Name                               Designation  IAU/aliases/other   
+  -------  ---------------------------------- -----------  ------------------- 
+       -2  Mariner 2 (spacecraft)             1962-041A                         
+       -3  Mars Orbiter Mission (spacecraft)  2013-060A    MOM Mangalyaan       
+       -5  Planet-C (spacecraft)              2010-020D    VCO Akatsuki         
+       -6  Pioneer 6 (spacecraft)             1965-105A                         
+       -8  Wind (spacecraft)                  1994-071A                         
+       -9  ESCAPADE-Blue (spacecraft)         2025-260A                         
+      -10  ESCAPADE-Gold (spacecraft)         2025-260B                         
+      -12  LADEE (spacecraft)                 2013-047A                         
+      -18  LCROSS Shepherd (spacecraft)       2009-031B    SSC                  
+   -18900  LCROSS Centaur Impactor (spacecraft2009-031B                         
+      -20  Pioneer 8 (spacecraft)             1967-123A                         
+      -21  SOHO (spacecraft)                  1995-065A                         
+      -23  Pioneer 10 (spacecraft)            1972-012A                         
+      -24  Pioneer 11 (spacecraft)            1973-019A                         
+      -25  Lunar Prospector (LP) (spacecraft) 1998-001A                         
+      -28  JUICE (spacecraft)                 2023-053A                         
+      -29  Stardust (bus) (spacecraft)        1999-003A    NExT                 
+   -29900  Stardust (SRC) (spacecraft)        1999-003D                         
+      -30  Deep Space 1 (spacecraft)          1998-061A    DS1 DS-1             
+      -31  Voyager 1 (spacecraft)             1977-084A                         
+      -32  Voyager 2 (spacecraft)             1977-076A                         
+      -33  NEOS (spacecraft)                               NEO Surveyor         
+      -37  Hayabusa 2 (spacecraft)            2014-076K                         
+      -39  Ouna (spacecraft)                  2007-039C                         
+      -40  Clementine (spacecraft)            1994-004A    DSPSE                
+      -41  Mars Express (spacecraft)          2003-022A    MEX                  
+      -43  IMAP (spacecraft)                                                    
+      -47  Genesis (bus) (spacecraft)         2001-034A                         
+      -48  Hubble Space Telescope (spacecraft)1990-037B    HST                  
+      -49  Lucy (spacecraft)                  2021-093A                         
+   -47900  Genesis (SRC) (spacecraft)         2001-034D                         
+      -53  Mars Odyssey (spacecraft)          2001-013A                         
+     -530  Mars Pathfinder (spacecraft)       1996-068A    MPF                  
+      -55  Ulysses (spacecraft)               1990-090B                         
+      -61  Juno (spacecraft)                  2011-040A                         
+      -62  EMM (spacecraft)                   2020-047A    Emirates Hope        
+      -64  OSIRIS-REx (spacecraft)            2016-055A    OSIRIS-APX ORX APEX  
+      -65  MarCO-A (spacecraft)               2018-042B    Wall-E               
+      -66  MarCO-B (spacecraft)               2018-042C    Eva                  
+      -70  Deep Impact IMPACTOR (spacecraft)  2005-001D                         
+      -74  Mars Reconnaissance Orbiter (spacec2005-029A    MRO                  
+      -75  OMOTENASHI (spacecraft)            2022-156D                         
+      -76  Mars Science Laboratory (spacecraft2011-070A    Curiosity MSL        
+   -74900  MRO Centaur Stage (spacecraft)     2005-029B                         
+      -77  Galileo (spacecraft)               1989-084B                         
+      -78  DSCOVR (spacecraft)                2015-007A    Triana               
+      -79  Spitzer Space Telescope (spacecraft2003-038A    SST SIRTF            
+      -82  Cassini (spacecraft)               1997-061A                         
+      -84  Phoenix (spacecraft)               2007-034A                         
+      -85  LRO (spacecraft)                   2009-031A                         
+      -86  Chandrayaan-1 (spacecraft)         2008-052A    CH1 CH-1             
+      -91  Hera (spacecraft)                  2024-180A                         
+      -92  ACE (spacecraft)                   1997-045A    Advanced Composition 
+      -93  NEAR Shoemaker (spacecraft)        1996-008A                         
+      -95  TESS (spacecraft)                  2018-038A                         
+      -96  Parker Solar Probe (spacecraft)    2018-065A    SPP PSP              
+      -98  New Horizons (spacecraft)          2006-001A    NH New_Horizons      
+     -101  EQUULEUS (spacecraft)              2022-156E                         
+     -111  ICE (spacecraft)                   1978-079A    ISEE-3               
+     -121  BepiColombo (Spacecraft)           2018-080A    MPO MMO              
+     -125  ICPS (Spacecraft)                  2022-156B                         
+     -130  Hayabusa (spacecraft)              2003-019A    Muses-C              
+     -135  DART (spacecraft)                  2021-110A                         
+     -140  Deep Impact Flyby - EPOXI (spacecra2005-001A                         
+     -143  ExoMars16 TGO (spacecraft)         2016-017A                         
+     -144  Solar Orbiter (spacecraft)         2020-010A    Solo                 
+     -150  Cassini Huygens (spacecraft)       1997-061C                         
+     -151  Chandra Observatory (spacecraft)   1999-040B                         
+     -152  Chandrayaan-2 (ORBITER) (spacecraft2019-042A    CH2 CH-2             
+     -153  Chandrayaan-2 (LANDER) (spacecraft)2019-042A    CH2 CH-2             
+     -155  Danuri (spacecraft)                2022-094A    KPLO                 
+     -158  Chandrayaan-3 (LANDER spacecraft)  2023-098A    CH-3 CH3 Vikram      
+     -159  Europa Clipper (spacecraft)        2024-182A                         
+     -163  WISE (spacecraft)                  2009-071A    NEOWISE              
+     -164  Lunar Flashlight (spacecraft)      2022-168B    LFL                  
+     -165  WMAP (spacecraft)                  2001-027A                         
+     -168  Mars2020 (spacecraft)              2020-052A    Ingenuity Perseveran 
+     -169  Chandrayaan-3P (ORBITER) (spacecraf2023-098A    CH-3P CH3P           
+     -170  James Webb Space Telescope (spacecr2021-130A    JWST                 
+     -171  Carruthers Geocorona Observatory (s2025-215C    CGO                  
+     -176  GRAIL-SS Second Stage (spacecraft) 2011-046C                         
+     -177  GRAIL-A (spacecraft)               2011-046A    Ebb                  
+     -178  Nozomi (spacecraft)                1998-041A    Planet-B             
+     -181  GRAIL-B (spacecraft)               2011-046B    Flow                 
+     -182  NEA Scout (spacecraft)             2022-156H                         
+     -189  InSight (spacecraft)               2018-042A                         
+     -192  THEMIS-B (spacecraft)              2007-004B    ARTEMIS-P1           
+     -193  THEMIS-C (spacecraft)              2007-004C    ARTEMIS-P2           
+     -198  INTEGRAL (spacecraft)              2002-048A                         
+     -202  MAVEN (spacecraft)                 2013-063A                         
+     -203  Dawn (spacecraft)                  2007-043A                         
+     -204  CONTOUR-A (SPACECRAFT FRAGMENT)    2002-034A                         
+     -205  CONTOUR-B (SPACECRAFT FRAGMENT)    2002-034A                         
+     -206  CONTOUR-C (SPACECRAFT FRAGMENT)    2002-034A                         
+     -210  LICIACube (spacecraft)             2021-110C                         
+     -211  Roman Space Telescope (spacecraft)              RST Nancy Grace      
+     -226  Rosetta (spacecraft)               2004-006A                         
+     -227  Kepler (spacecraft)                2009-011A                         
+     -231  SWFO-L1 (spacecraft)               2025-215B    SOLAR-1              
+     -234  STEREO-A (spacecraft)              2006-047A    AHEAD                
+     -235  STEREO-B (spacecraft)              2006-047B    BEHIND               
+  -234900  STEREO Third Stage (spacecraft)    2006-047C                         
+     -236  MESSENGER (spacecraft)             2004-030A                         
+     -239  MMX (spacecraft)                                                     
+     -240  SLIM (spacecraft)                  2023-137D                         
+     -242  Lunar Trailblazer (spacecraft)     2025-038C    LTB                  
+     -248  Venus Express (spacecraft)         2005-045A    VEX                  
+     -253  Opportunity (spacecraft)           2003-032A    MER-B MER-1          
+     -254  Spirit (spacecraft)                2003-027A    MER-A MER-2          
+     -255  Psyche (spacecraft)                2023-157A                         
+     -344  Galileo Probe (spacecraft)         1989-084E                         
+     -486  Herschel Space Observatory (spacecr2009-026A                         
+     -489  Planck Space Observatory (spacecraf2009-026B                         
+     -490  Lucy Centaur RB Booster (spacecraft2021-093B                         
+     -557  Spektr-R Observatory (spacecraft)  2011-037A                         
+     -610  Juno Centaur Stage (spacecraft)    2011-040B                         
+     -640  Infrared Space Observatory (spacecr1995-062A    ISO                  
+     -680  Euclid (spacecraft)                2023-092A                         
+     -760  MSL Centaur Stage (spacecraft)     2011-070B                         
+    -1023  Artemis 1 (spacecraft)             2022-156A    Orion EM-1           
+    -1024  Artemis II (spacecraft)            2026-069A    Integrity Orion EM-2 
+    -1176  CAPSTONE (spacecraft)              2022-070A                         
+   -40000  Clementine Extended (spacecraft)   1994-004A                         
+   -64090  OSIRIS-REx SRC (spacecraft)                                          
+   -70007  BioSentinel (spacecraft)           2022-156F    BIOS                 
+   -78000  Chang'e_5-T1_booster (spacecraft)  2014-065B    WE0913A              
+   -23230  ETS-6 (spacecraft)                 1994-056A    Kiku-6               
+  -399080  Apollo 8 S-IVB (spacecraft)        1968-118B                         
+  -399090  Apollo 9 S-IVB (spacecraft)        1969-018B                         
+  -399100  Apollo 10 S-IVB (spacecraft)       1969-043B                         
+  -399101  Apollo 10 LM (spacecraft)          1969-059C    Snoopy               
+  -399110  Apollo 11 S-IVB (spacecraft)       1969-059B                         
+  -399120  Apollo 12 S-IVB (spacecraft)       1969-099B                         
+  -100836  Vela-2A (spacecraft)               1964-040B                         
+  -101361  LCS-1 (spacecraft)                 1965-034C                         
+  -102770  Titan-3C RB (spacecraft)           1967-040F                         
+  -106197  IMP-7 (spacecraft)                 1972-073A                         
+  -107964  Atlas-Agena_RB (spacecraft)        1975-055B                         
+  -108366  GOES-1 (spacecraft)                1975-100A                         
+  -108820  LAGEOS-1 (spacecraft)              1976-039A                         
+  -110637  IUE (spacecraft)                   1978-012A                         
+  -111353  FLTSATCOM 2 (spacecraft)           1979-038A                         
+  -112065  SBS-1 (spacecraft)                 1980-091A                         
+  -112472  GOES-5 (spacecraft)                1981-049A                         
+  -113269  WESTAR-5 (spacecraft)              1982-058A                         
+  -113631  SATCOM-C5 (spacecraft)             1982-105A    RCA-SATCOM-5         
+  -113901  ASTRON (spacecraft)                1983-020A                         
+  -114050  GOES-6 (spacecraft)                1983-041A                         
+  -115993  AUSSAT-1 (spacecraft)              1985-076B    OPTUS-A1             
+  -116275  AUSSAT-2 (spacecraft)              1985-109C    OPTUS-A2             
+  -116292  COSMOS 1704 RB (spacecraft)        1985-110B    SL-8_RB              
+  -116609  Mir (spacecraft)                   1986-07A                          
+  -116908  AJISAI (spacecraft)                1986-061A                         
+  -119548  TDRS-3 (spacecraft)                1988-091B                         
+  -119751  Etalon-1 (spacecraft)              1989-001C                         
+  -120026  Etalon-2 (spacecraft)              1989-039C                         
+  -120452  NAVSTAR-18 (spacecraft)            1990-008A                         
+  -122087  AUSSAT-B1 (spacecraft)             1992-054A    OPTUS-B1             
+  -122195  LAGEOS-2 (spacecraft)              1992-070B                         
+  -122911  Solidaridad-1 (spacecraft)         1993-073A                         
+  -122927  Telstar-401 (spacecraft)           1993-077A                         
+  -123051  GOES-8 (spacecraft)                1994-022A                         
+  -123227  AUSSAT-B3 (spacecraft)             1994-055A    OPTUS-B3             
+  -123553  AMSC-1 (spacecraft)                1995-019A                         
+  -123581  GOES-9 (spacecraft)                1995-025A                         
+  -123754  Echostar-1 (spacecraft)            1995-073A                         
+  -123846  MSAT-1 (spacecraft)                1996-022A                         
+  -124313  Echostar-2 (spacecraft)            1996-055A                         
+  -124720  HALCA (spacecraft)                 1997-005A    Muses-B Haruka VSOP  
+  -124786  GOES-10 (spacecraft)               1997-019A                         
+  -125126  HGS-1 (spacecraft)                 1997-086A    Asisat-3 PAS-22      
+  -125544  International Space Station (spacec1998-067A    ISS                  
+  -125789  QuikSCAT (spacecraft)              1999-034A                         
+  -125989  XMM-Newton (spacecraft)            1999-066A                         
+  -125994  TERRA (spacecraft)                 1999-068A    EOS-1                
+  -126352  GOES-11 (spacecraft)               2000-022A                         
+  -126402  Echostar-6 (spacecraft)            2000-038A                         
+  -126407  NAVSTAR-48 (spacecraft)            2000-040A                         
+  -126410  CLUSTER II-FM7 (spacecraft)        2000-041A    SAMBA CL3            
+  -126464  CLUSTER II-FM8 (spacecraft)        2000-045B    TANGO CL4            
+  -126619  EO-1 (spacecraft)                  2000-075A                         
+  -126639  AMC-8 (spacecraft)                 2000-081B    GE-8                 
+  -126824  Intelsat-901 (spacecraft)          2001-024A                         
+  -126871  GOES-12 (spacecraft)               2001-031A                         
+  -127391  GRACE-1 (spacecraft)               2002-012A                         
+  -127424  Aqua (spacecraft)                  2002-022A                         
+  -127509  Meteosat-8 (spacecraft)            2002-040B                         
+  -127783  GALEX (spacecraft)                 2003-017A                         
+  -128376  Aura (spacecraft)                  2004-026A                         
+  -128378  Anik-F2 (spacecraft)               2004-027A                         
+  -128485  Swift Observatory (spacecraft)     2004-047A                         
+  -128868  Anik-F1R (spacecraft)              2005-036A                         
+  -128884  Galaxy-15 (spacecraft)             2005-041A                         
+  -128912  Meteosat-9 (spacecraft)            2005-049B                         
+  -129107  Cloudsat (spacecraft)              2006-016B                         
+  -129494  DirecTV-9S (spacecraft)            2006-043A                         
+  -129520  XM-4 (spacecraft)                  2006-049A                         
+  -132487  Thor-5 (spacecraft)                2008-006A    Thor-2R              
+  -132763  ICO_G-1 (spacecraft)               2008-016A    Echostar G1 DBSD     
+  -133105  Jason-2 (spacecraft)               2008-032A                         
+  -133207  Echostar-11 (spacecraft)           2008-035A                         
+  -134381  Kepler Booster (Third Stage) (space2009-011B                         
+  -135491  GOES-14 (spacecraft)               2009-033A                         
+  -136032  NSS-12 (spacecraft)                2009-058A                         
+  -136395  Solar Dynamics Observatory (spacecr2010-005A    SDO                  
+  -136499  Echostar-14 (spacecraft)           2010-010A                         
+  -137218  SKYTERRA-1 (spacecraft)            2010-061A                         
+  -137820  Tiangong-1 (spacecraft)            2011-053A                         
+  -138250  BEIDOU-M3 (spacecraft)             2012-018A                         
+  -138358  NuSTAR (spacecraft)                2012-031A    SMEX-11              
+  -138551  Echostar-17 (spacecraft)           2012-035A                         
+  -138552  Meteosat-10 (spacecraft)           2012-035B                         
+  -138833  NAVSTAR-67 (spacecraft)            2012-053A                         
+  -139089  NEOSsat (spacecraft)               2013-009D                         
+  -139166  NAVSTAR-68 (spacecraft)            2013-023A                         
+  -139459  Chang'e_3_booster (spacecraft)     2013-070B                         
+  -139479  Gaia (spacecraft)                  2013-074A                         
+  -140059  OCO-2 (spacecraft)                 2014-035A                         
+  -140267  Himawari-8 (spacecraft)            2014-060A                         
+  -140376  SMAP (spacecraft)                  2015-003A                         
+  -140482  MMS-1 (spacecraft)                 2015-011A                         
+  -140483  MMS-2 (spacecraft)                 2015-011B                         
+  -140484  MMS-3 (spacecraft)                 2015-011C                         
+  -140485  MMS-4 (spacecraft)                 2015-011D                         
+  -140663  DirecTV-15 (spacecraft)            2015-026A                         
+  -140732  Meteosat-11 (spacecraft)           2015-034A                         
+  -140947  MEXSAT-2 Centaur RB (spacecraft)   2015-056B    MORELOS-3            
+  -141043  LISA Pathfinder (spacecraft)       2015-070A    LPF                  
+  -141240  Jason-3 (spacecraft)               2016-002A                         
+  -141748  Intelsat-33E (spacecraft)          2016-053A                         
+  -141836  Himawari-9 (spacecraft)            2016-064A                         
+  -141866  GOES-16 (spacecraft)               2016-071A                         
+  -143205  SpaceX Roadster (spacecraft)       2018-017A    Tesla Starman        
+  -143226  GOES-17 (spacecraft)               2018-022A                         
+  -143241  GSAT-6A (spacecraft)               2018-027A                         
+  -143846  Chang'e_4_booster (spacecraft)     2018-103B                         
+  -148274  Chinese Space Station (CSS) (spacec2021-035A    Tiangong             
+  -148841  Yangwang-1 (spacecraft)            2021-050B                         
+  -149498  DART Falcon 9 Booster (spacecraft) 2021-110B                         
+  -151850  GOES-18 (spacecraft)               2022-021A                         
+  -159588  ACS3 (spacecraft)                  2024-077B                         
+  -160133  GOES-19 (spacecraft)               2024-119A                         
+  -163182  SPHEREx (spacecraft)               2025-047E                         
+  -165053  NISAR (spacecraft)                 2025-163A                         
+  -168540  SWC-1 (spacecraft)                 2026-069C                         
+     -463  SMILE (spacecraft)                 2026-109A                         
+  -169792  LINK (spacecraft)                  2026-152A                         
+  -999742  LISA Pathfinder Propulsion Module (             PRM                  
+-10001001  Odin (spacecraft)                  2025-038D                         
+  9901489  2018_AV2 (spacecraft)                                                
+  9901490  9O0DC57 (spacecraft)                                                 
+  9901885  9U01FF6 (spacecraft)                                                 
+ -9901491  Tianwen-1 (spacecraft)             2020-049A                         
+ -9901492  Luna-25 STAGE (spacecraft)                                           
+ -9901495  EscaPADE STAGE (spacecraft)        2025-260C                         
+ 
+   Number of matches =         255 . Use ID# to make unique selection.
+*******************************************************************************

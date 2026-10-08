@@ -364,6 +364,84 @@ func TestGetFileRespectsOfflineAndDisable(t *testing.T) {
 	}
 }
 
+// seedCache writes content at id's cache key for name, as an air-gapped
+// deployment copies a file in by hand: no recorded source ETag beside it.
+func seedCache(t *testing.T, id EndpointID, name, content string) {
+	t.Helper()
+
+	fsys, prefix, err := CacheDir(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := WriteFile(context.Background(), fsys, prefix+name, strings.NewReader(content)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestGetFileServesThePreSeededCacheOffline is the README's air-gapped
+// recipe at the layer it rests on: pre-seed the cache, go offline, and every
+// object already there is served. Until #633 offline mode refused them all
+// before the cache was looked at.
+func TestGetFileServesThePreSeededCacheOffline(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		id   EndpointID
+		file string
+	}{
+		{"immutable", NAIFSPK, "planets/de442.bsp"},
+		// A Mutable object cannot be revalidated without its source; offline
+		// is the caller saying there is none to ask.
+		{"mutable", IERSFinals2000A, "finals2000A.all"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cleanRemoteState(t)
+
+			if ep, _ := Lookup(c.id); ep.Mutable != (c.name == "mutable") {
+				t.Fatalf("%s is not %s", c.id, c.name)
+			}
+
+			seedCache(t, c.id, c.file, "pre-seeded "+c.name)
+			SetOffline(true)
+
+			fsys, key, err := GetFile(context.Background(), c.id, c.file)
+			if err != nil {
+				t.Fatalf("GetFile offline with %s cached: %v", c.file, err)
+			}
+
+			got, err := fs.ReadFile(fsys, key)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(got) != "pre-seeded "+c.name {
+				t.Errorf("served %q, want the pre-seeded object", got)
+			}
+		})
+	}
+}
+
+// TestGetFileOfflineStillRefusesAMissOrADisabledEndpoint: offline mode lets
+// the cache through, not the network, and not an endpoint the caller
+// disabled.
+func TestGetFileOfflineStillRefusesAMissOrADisabledEndpoint(t *testing.T) {
+	cleanRemoteState(t)
+
+	EnableDownloads(0, NAIFSPK)
+	seedCache(t, NAIFSPK, "planets/de442.bsp", "pre-seeded")
+	SetOffline(true)
+
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de440.bsp"); !errors.Is(err, ErrOffline) {
+		t.Errorf("an uncached object offline: %v, want ErrOffline", err)
+	}
+
+	Disable(NAIFSPK)
+
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); err == nil {
+		t.Error("a disabled endpoint served its cached object")
+	}
+}
+
 func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 	cleanRemoteState(t)
 

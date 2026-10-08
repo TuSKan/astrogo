@@ -106,11 +106,15 @@ func (c *Client) SetURL(id EndpointID, url string) error {
 }
 
 // SetOffline toggles global offline mode. While offline, every endpoint
-// access — API call or download — fails with ErrOffline.
+// access — API call or download — fails with ErrOffline. An object already in
+// the cache is not an access: [GetFile] still serves it, which is what lets a
+// pre-seeded, air-gapped deployment run offline.
 func SetOffline(off bool) { Default().SetOffline(off) }
 
 // SetOffline toggles offline mode for this client. While offline, every
-// endpoint access through it — API call or download — fails with ErrOffline.
+// endpoint access through it — API call or download — fails with ErrOffline,
+// and an object already in its cache is still served; see the package-level
+// [SetOffline].
 func (c *Client) SetOffline(off bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

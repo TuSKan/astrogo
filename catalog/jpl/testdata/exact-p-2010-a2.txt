@@ -1,0 +1,80 @@
+*******************************************************************************
+JPL/HORIZONS                     354P/LINEAR               2026-Oct-07 20:30:24
+Rec #:90001346 (+COV) Soln.date: 2024-Apr-16_15:09:05    # obs: 250 (2010-2017)
+ 
+IAU76/J2000 helio. ecliptic osc. elements (au, days, deg., period=Julian yrs):
+ 
+  EPOCH=  2456701.5 ! 2014-Feb-13.0000000 (TDB)    RMSW= n.a.
+   EC= .1249714999731071   QR= 2.003548908241142   TP= 2456434.4627191592
+   OM= 320.235371746456    W= 132.7324370479407    IN= 5.256073878911332
+   A= 2.289695602119892    MA= 75.96426602557803   ADIST= 2.575842295998641
+   PER= 3.46477332575987   N= .284470639           ANGMOM= .025825704
+   DAN= 2.46279            DDN= 2.07774            L= 93.0881625
+   B= 3.8582494            MOID= 1.02449           TP= 2013-May-21.9627191592
+ 
+Comet physical (GM= km^3/s^2; RAD= km):
+   GM= n.a.                RAD= n.a.
+   M1=  15.6     M2=  n.a.     k1=  10.    k2= n.a.     PHCOF= n.a.
+Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au):
+   AMRAT=  0.                                      DT=  0.
+   A1= 0.                  A2= -1.92630469799E-9   A3= 0.
+ Non-standard or simulated/proxy model:
+   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808
+
+COMET comments 
+1: soln ref.= JPL#28, data arc: 2010-01-06 to 2017-01-28
+2: k1=10.;
+*******************************************************************************
+
+
+*******************************************************************************
+Ephemeris / API_USER Wed Oct  7 20:30:24 2026 Pasadena, USA      / Horizons    
+*******************************************************************************
+Target body name: 354P/LINEAR                     {source: JPL#28}
+Center body name: Earth (399)                     {source: DE441}
+Center-site name: GEOCENTRIC
+*******************************************************************************
+Start time      : A.D. 2022-Jan-01 10:00:00.0000 UT      
+Stop  time      : A.D. 2022-Jan-02 00:00:00.0000 UT      
+Step-size       : 60 minutes
+*******************************************************************************
+Target pole/equ : undefined
+Target radii    : undefined                                                    
+Center geodetic : 0.0, 0.0, -6378.137             {E-lon(deg),Lat(deg),Alt(km)}
+Center cylindric: 0.0, 0.0, 0.0                   {E-lon(deg),Dxy(km),Dz(km)}
+Center pole/equ : ITRF93                          {East-longitude positive}
+Center radii    : 6378.137, 6378.137, 6356.752 km {Equator_a, b, pole_c}       
+Target primary  : Sun
+Vis. interferer : MOON (R_eq= 1737.400) km        {source: DE441}
+Rel. light bend : Sun                             {source: DE441}
+Rel. lght bnd GM: 1.3271E+11 km^3/s^2                                          
+Small-body perts: Yes                             {source: SB441-N16}
+Atmos refraction: NO (AIRLESS)
+RA format       : HMS
+Time format     : CAL 
+Calendar mode   : Mixed Julian/Gregorian
+EOP file        : eop.261007.p270103                                           
+EOP coverage    : DATA-BASED 1962-JAN-20 TO 2026-OCT-07. PREDICTS-> 2027-JAN-02
+Units conversion: 1 au= 149597870.700 km, c= 299792.458 km/s, 1 day= 86400.0 s 
+Table cut-offs 1: Elevation (-90.0deg=NO ),Airmass (>38.000=NO), Daylight (NO )
+Table cut-offs 2: Solar elongation (  0.0,180.0=NO ),Local Hour Angle( 0.0=NO )
+Table cut-offs 3: RA/DEC angular rate (     0.0=NO )                           
+*******************************************************************************
+Initial IAU76/J2000 heliocentric ecliptic osculating elements (au, days, deg.):
+  EPOCH=  2456701.5 ! 2014-Feb-13.0000000 (TDB)    RMSW= n.a.                  
+   EC= .1249714999731071   QR= 2.003548908241142   TP= 2456434.4627191592      
+   OM= 320.235371746456    W= 132.7324370479407    IN= 5.256073878911332       
+  Equivalent ICRF heliocentric cartesian coordinates (au, au/d):
+   X=-2.247483169387746E+00  Y=-5.567332211741050E-02  Z=-1.776631136613018E-01
+  VX=-7.610211803010009E-04 VY=-1.019539506115923E-02 VZ=-5.354156742311557E-03
+Comet physical (GM= km^3/s^2; RAD= km):                                        
+   GM= n.a.                RAD= n.a.                                           
+   M1=  15.6     M2=  n.a.     k1=  10.    k2= n.a.     PHCOF= n.a.            
+Comet non-gravitational force model (AMRAT=m^2/kg;A1-A3=au/d^2;DT=days;R0=au): 
+   AMRAT=  0.                                      DT=  0.                     
+   A1= 0.                  A2= -1.92630469799E-9   A3= 0.                      
+ Non-standard or simulated/proxy model:                                        
+   ALN=  .1112620426   NK=  4.6142   NM=  2.15     NN=  5.093    R0=  2.808    
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************
+ Date__(UT)__HR:MN     R.A._____(ICRF)_____DEC  R.A.__(a-apparent)__DEC  dRA*cosD d(DEC)/dt  Azi____(a-app)___Elev  dAZ*cosE d(ELV)/dt  X_(sat-primary)_Y SatPANG  L_Ap_Sid_Time  a-mass mag_ex    T-mag   N-mag      Illu%  Def_illu   ang-sep/v  Ang-diam  ObsSub-LON ObsSub-LAT  SunSub-LON SunSub-LAT  SN.ang   SN.dist    NP.ang   NP.dist  hEcl-Lon hEcl-Lat                r        rdot             delta      deldot  1-way_down_LT       VmagSn      VmagOb     S-O-T /r     S-T-O   T-O-M/MN_Illu%     O-P-T    PsAng   PsAMV      PlAng  Cnst        TDB-UT     ObsEcLon    ObsEcLat  N.Pole-RA  N.Pole-DC      GlxLon     GlxLat  L_Ap_SOL_Time  399_ins_LT  RA_3sigma DEC_3sigma  SMAA_3sig SMIA_3sig    Theta Area_3sig  POS_3sigma  RNG_3sigma RNGRT_3sig   DOP_S_3sig  DOP_X_3sig  RT_delay_3sig  Tru_Anom  L_Ap_Hour_Ang       phi  PAB-LON  PAB-LAT  App_Lon_Sun  RA_(ICRF-a-apparnt)_DEC  I_dRA*cosD I_d(DEC)/dt  Sky_motion  Sky_mot_PA  RelVel-ANG  Lun_Sky_Brt  sky_SNR   UT1-UTC
+********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************

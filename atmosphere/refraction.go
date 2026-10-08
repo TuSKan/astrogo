@@ -229,9 +229,17 @@ func ZenithDistance(alt angle.Angle) angle.Angle {
 	return angle.Deg(90).Sub(alt)
 }
 
-// Airmass returns the relative airmass for a given apparent altitude using the
-// Pickering (2002) formula. This interpolative model resolves horizon stability properly,
-// overcoming the earlier Kasten & Young approach limitations down to visual zero.
+// Airmass returns the relative airmass at an apparent altitude, by Pickering's
+// formula for the molecular (Rayleigh) atmosphere:
+//
+//	X = 1 / sin(h + 244/(165 + 47·h^1.1)),  h the apparent altitude in degrees
+//
+// from Pickering, DIO 12 ‡1 (2002), footnote 39. It is his least-squares fit
+// to an onion-skin integration of Garfinkel's (1967) theory at 550 nm, which
+// it fits about ten times better than Schaefer's (1998) formulae, most of all
+// near the horizon, where it gives 38.75. The same footnote gives aerosol and
+// ozone their own airmasses, which differ from this one at low altitude:
+// aerosol, in a thinner layer, has the larger airmass near the horizon.
 func Airmass(alt angle.Angle) (float64, error) {
 	if alt.Degrees() < 0 {
 		return 0, ErrBelowHorizon

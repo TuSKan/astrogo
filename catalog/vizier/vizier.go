@@ -100,9 +100,18 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		limit = 100
 	}
 
+	// The table's positions are at its own epoch, so a moving center is
+	// sought there.
+	center, err := coord.PropagateEpoch(req.Center, req.Epoch, schema.Epoch)
+	if err != nil {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("vizier: cone center: %w", err))
+		}
+	}
+
 	// CIRCLE receives coordinates in DEGREES for ADQL natively.
-	ra := req.Center.RA().Degrees()
-	dec := req.Center.Dec().Degrees()
+	ra := center.RA().Degrees()
+	dec := center.Dec().Degrees()
 	rad := req.Radius.Degrees()
 
 	adql := fmt.Sprintf(`SELECT TOP %d

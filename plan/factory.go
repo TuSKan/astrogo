@@ -7,8 +7,30 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/time"
 )
+
+// starAtJ2000 returns c's position at J2000, carrying c's own proper
+// motion, parallax and radial velocity, as a [Star] takes it.
+//
+// A Star has no epoch: its position goes to SOFA's catalog-place transform,
+// which reads it as the position at J2000.0 and moves it from there. A
+// catalog's position is at the catalog's own epoch, J2016.0 for Gaia DR3,
+// and was handed over as it stood until #635, so a Gaia-built star was moved
+// as though its 2016 position were its 2000 one: Barnard's star 166″ off.
+// A zero Epoch means J2000, as everywhere else.
+func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
+	pos := coord.NewICRSWithKinematics(c.Coord.RA(), c.Coord.Dec(), c.PmRA, c.PmDec, c.Parallax, c.RadialVelocity)
+
+	moved, err := coord.PropagateEpoch(pos, c.Epoch, time.J2000())
+	if err != nil {
+		return coord.ICRS{}, fmt.Errorf("position at J2000: %w", err)
+	}
+
+	return moved, nil
+}
 
 // FromCatalog converts a catalog.Target (wire format from resolvers) and an
 // optional ephemeris provider into the appropriate concrete Observable type.
@@ -28,6 +50,27 @@ import (
 //   - Star kind → *Star
 //   - Everything else → *DeepSkyObject
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
+	// ── A NAIF major body, as catalog/jpl reports one ──
+	//
+	// Its SPK-ID is a NAIF ID, which astrogo numbers differently, so it is
+	// translated rather than read as an eph.ID: read as one, the JPL Sun
+	// (NAIF 10) was astrogo's body 10, the Moon (#636).
+	if naif, ok := naifMajorRangeID(c.SPKID); ok {
+		if body, ok := majorBodyForNAIF(naif); ok {
+			return NewPlanet(c.Name, body, p), nil
+		}
+
+		if p != nil {
+			if m, err := NewPlanetaryMoon(c.Name, p); err == nil {
+				return m, nil
+			}
+		}
+
+		if !c.HasCoord {
+			return nil, fmt.Errorf("%w: %s is NAIF body %d, which astrogo has no ephemeris for", ErrNoCoordinates, c.Name, naif)
+		}
+	}
+
 	id := parseEphID(c.ID)
 
 	// ── Satellite ──
@@ -127,17 +170,25 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 
 	// Star
 	if c.Kind == resolve.KindStar || c.Kind == resolve.KindDoubleStar {
-		var opts []StarOption
-		if c.PmRA.Radians() != 0 || c.PmDec.Radians() != 0 {
-			opts = append(opts, WithProperMotion(c.PmRA, c.PmDec))
+		pos, err := starAtJ2000(c)
+		if err != nil {
+			return nil, fmt.Errorf("plan: %s: %w", c.Name, err)
 		}
 
+		var opts []StarOption
+		if pos.PmRA().Radians() != 0 || pos.PmDec().Radians() != 0 {
+			opts = append(opts, WithProperMotion(pos.PmRA(), pos.PmDec()))
+		}
+
+		// Gated on the catalog's own parallax: for a moving star without
+		// one, SOFA's propagation substitutes a token minimum, which is not
+		// a measurement.
 		if c.Parallax.Radians() != 0 {
-			opts = append(opts, WithParallax(c.Parallax))
+			opts = append(opts, WithParallax(pos.Parallax()))
 		}
 
 		if c.HasRadialVelocity {
-			opts = append(opts, WithRadialVelocity(c.RadialVelocity))
+			opts = append(opts, WithRadialVelocity(pos.RV()))
 		}
 
 		if c.HasVMag {
@@ -148,7 +199,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 			opts = append(opts, WithAliases(c.Aliases...))
 		}
 
-		return NewStar(c.Name, c.Coord.RA(), c.Coord.Dec(), opts...), nil
+		return NewStar(c.Name, pos.RA(), pos.Dec(), opts...), nil
 	}
 
 	// Deep-sky object (galaxy, nebula, cluster, etc.)
@@ -243,6 +294,52 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 	}
 
 	return opts
+}
+
+// naifMajorRangeID returns spkID as a NAIF ID when it is one of the Sun's,
+// a planet's, a system barycenter's or a planetary satellite's: 1 to 999.
+// Small bodies' SPK-IDs start at 1,000,000 and spacecraft's are negative.
+func naifMajorRangeID(spkID string) (int, bool) {
+	n, err := strconv.Atoi(spkID)
+	if err != nil || n < 1 || n > 999 {
+		return 0, false
+	}
+
+	return n, true
+}
+
+// majorBodyForNAIF returns the astrogo body a NAIF ID names. A planet's
+// body center and its system barycenter both name the planet: astrogo's
+// Mars through Neptune are the barycenters, a few hundredths of an
+// arcsecond from the planets (see eph.ID). The Earth-Moon barycenter (3)
+// names no astrogo body.
+func majorBodyForNAIF(naif int) (eph.ID, bool) {
+	switch naif {
+	case 10:
+		return eph.Sun, true
+	case 301:
+		return eph.Moon, true
+	case 1, 199:
+		return eph.Mercury, true
+	case 2, 299:
+		return eph.Venus, true
+	case 399:
+		return eph.Earth, true
+	case 4, 499:
+		return eph.Mars, true
+	case 5, 599:
+		return eph.Jupiter, true
+	case 6, 699:
+		return eph.Saturn, true
+	case 7, 799:
+		return eph.Uranus, true
+	case 8, 899:
+		return eph.Neptune, true
+	case 9, 999:
+		return eph.Pluto, true
+	default:
+		return 0, false
+	}
 }
 
 // parseEphID converts a string ID to an eph.ID, returning 0 on failure.

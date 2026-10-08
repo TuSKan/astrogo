@@ -154,3 +154,28 @@ func seedEpoch(t *testing.T) (epoch time.Time) {
 
 	return time.FromJD(2460000.5, time.UTC)
 }
+
+// TestPreSeededKernelLoadsOffline is the README's air-gapped recipe end to
+// end: with the kernel and the LSK in the cache, NewProvider works with
+// remote.SetOffline(true) and no network. Until #633 offline mode refused
+// both before the cache was looked at.
+func TestPreSeededKernelLoadsOffline(t *testing.T) {
+	seed := mustPlanetProvider(t)
+	if err := seed.Close(); err != nil {
+		t.Fatalf("close seed provider: %v", err)
+	}
+
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetOffline(true)
+
+	p, err := jpl.NewProvider(t.Context(), core.Planets, testKernel)
+	if err != nil {
+		t.Fatalf("NewProvider offline with %s cached: %v", testKernel, err)
+	}
+
+	t.Cleanup(func() { _ = p.Close() })
+
+	if got := p.LoadedKernels(); len(got) != 1 {
+		t.Errorf("loaded %d kernels offline, want 1", len(got))
+	}
+}

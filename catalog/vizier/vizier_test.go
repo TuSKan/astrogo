@@ -7,6 +7,8 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -359,5 +362,57 @@ func TestTableEpochsAreTheirJulianEpochs(t *testing.T) {
 		if got := c.epoch.TT().JD(); math.Abs(got-want) > 1e-9 {
 			t.Errorf("%s epoch is JD %.6f (TT), want %.6f", c.name, got, want)
 		}
+	}
+}
+
+// TestVizierConeCenterIsMovedToTheTablesEpoch: a center given at J2000 with
+// a proper motion is searched where the table has the star (#627).
+// Barnard's star, as SIMBAD gives it, is moved back to Hipparcos's J1991.25
+// and lands 0.35" from its own row there, HIP 87937 at (269.45402305,
+// 4.66828815), where unmoved it would be 91" away.
+func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
+	var adql string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		adql = r.PostFormValue("QUERY")
+
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = fmt.Fprint(w, "designation,ra,dec\n")
+	}))
+	defer server.Close()
+
+	prov := New()
+
+	redirect(t, server.URL)
+
+	barnard := coord.NewICRSWithKinematics(angle.Deg(269.4520769586), angle.Deg(4.6933649666),
+		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11))
+
+	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
+	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	m := regexp.MustCompile(`CIRCLE\('ICRS', ([-0-9.]+), ([-0-9.]+),`).FindStringSubmatch(adql)
+	if m == nil {
+		t.Fatalf("no CIRCLE in the cone query:\n%s", adql)
+	}
+
+	ra, errRA := strconv.ParseFloat(m[1], 64)
+	dec, errDec := strconv.ParseFloat(m[2], 64)
+
+	if errRA != nil || errDec != nil {
+		t.Fatalf("unparseable CIRCLE center %q, %q", m[1], m[2])
+	}
+
+	sep := coord.Separation(coord.NewICRS(angle.Deg(ra), angle.Deg(dec)),
+		coord.NewICRS(angle.Deg(269.45402305), angle.Deg(4.66828815))).Arcseconds()
+	t.Logf("cone centered %.3f\" from HIP 87937 at J1991.25", sep)
+
+	if sep > 0.5 {
+		t.Errorf("cone centered %.3f\" from Barnard's star's Hipparcos row, want under 0.5", sep)
 	}
 }
