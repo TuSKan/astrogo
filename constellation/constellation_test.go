@@ -84,9 +84,8 @@ func TestLookup_SerpensSplitRegions(t *testing.T) {
 
 // TestLookup_PoleRegions covers the two pole edge cases: Octans genuinely
 // encloses the south celestial pole in the source catalog, while Ursa
-// Minor's boundary tops out at Dec +88° — the small remaining north-polar
-// cap has no explicit boundary and falls back to Ursa Minor by convention
-// (see Lookup's doc comment).
+// Minor's boundary tops out at Dec +88° and winds once around the north
+// pole, so the cap above it is Ursa Minor's interior (see containsPoint).
 func TestLookup_PoleRegions(t *testing.T) {
 	tests := []struct {
 		name          string
