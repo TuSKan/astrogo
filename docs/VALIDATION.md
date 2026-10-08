@@ -89,7 +89,7 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 
 ## Status Table
 
-> **Five rows below cite `gofa` as their reference, and that is weaker evidence than a tick
+> **Three rows below cite `gofa` as their reference, and that is weaker evidence than a tick
 > suggests.** astrogo reaches every IAU reduction *through* gofa, via `internal/gofaext`, so
 > comparing astrogo against gofa compares the library with its own dependency. Such a row
 > establishes that astrogo drives the routine correctly — argument order, units, time scale,
@@ -97,8 +97,10 @@ Every figure above is a **measured** value over the corpus named in its suite, n
 > catch a fault the two share. Astropy would not fix this: it reaches the same algorithms
 > through ERFA, which is SOFA-derived in turn.
 >
-> The rows this applies to are ICRS ↔ Galactic, ICRS ↔ Ecliptic, ICRS ↔ AltAz, astronomical
-> time scales, and local sidereal time. The generated table above states the same thing per
+> The rows this applies to are ICRS ↔ AltAz, astronomical time scales, and local sidereal
+> time. ICRS ↔ Galactic and ICRS ↔ Ecliptic were on this list until #672, and are now held to
+> the constants that define the two frames, which no implementation can share an error with.
+> The generated table above states the same thing per
 > row and mechanically, in its Independence column, which is why that column exists.
 >
 > Genuinely independent references in this table are JPL Horizons, USNO, the NASA eclipse
@@ -130,8 +132,8 @@ measured distribution, follow the Evidence link to the generated table.
 | Angle formatting/parsing | ✅ validated | `angle/angle_test.go` | round-trip tests | string + tolerance | sexagesimal (HMS/DMS) formatting |
 | Vector spherical/cartesian | ✅ validated | `vector/vector_test.go` | analytical | 1e-12 | pole cases tested |
 | Geodetic ↔ ECEF | ✅ validated | `coord/geodesy_test.go` | round trip through the closed-form forward conversion | 1e-6 m / 1e-10 rad | ECEF → geodetic is SOFA's `iauGc2gde` (Fukushima 2006). Held from −10 km to the Moon's distance at every latitude: worst **1.8e-7 m** of height and **2.6e-11 rad** of latitude. The one-step Bowring (1976) method it replaced lost 1.5 mm at the ISS and 31 cm at geostationary orbit (#526); the round trip was then tested only within a kilometer of the surface, where Bowring is exact. Polar axis and invalid ellipsoids covered. |
-| ICRS ↔ Galactic | ✅ validated | `coord/transform_roundtrip_test.go` | `gofa` | 1e-12 | poles, GC, round-trip verified |
-| ICRS ↔ Ecliptic | ✅ validated | `coord/transform_roundtrip_test.go` | `gofa` (IAU 2006) | 2e-5 deg | poles, Aries, round-trip verified |
+| ICRS ↔ Galactic | ✅ validated | `coord/transform_roundtrip_test.go` | The Hipparcos Catalogue's three defining angles (ESA SP-1200, 1997) | 1e-9 deg | The north galactic pole, the ascending node and the celestial pole's galactic longitude, each exact by definition, so the bound is float64's; a round trip over the whole sphere to 1e-9 deg. Until #672 this row gave 1e-12 against `gofa`, and the anchors were written to three decimals and held to 0.01°, 36″ |
+| ICRS ↔ Ecliptic | ✅ validated | `coord/transform_roundtrip_test.go` | IAU 2006 obliquity at J2000, 84381.406″ | 0.05″ | The four cardinal points and the pole at J2000 TT, within the ICRS frame bias; a round trip at three epochs to 1e-9 deg. Until #672 this row gave 2e-5 deg against `gofa`, the anchors were held to 0.01°, and the transform read the caller's time scale as TT |
 | ICRS ↔ AltAz | ✅ validated | `coord.topocentric.separation`, `coord.topocentric.crosstrack`, `coord.topocentric.elevation` | `gofa` + invariants | 1e-7 deg | edge cases + round-trip verified |
 | Coord FromUnitVector | ✅ validated | `coord/coord_test.go` | round-trip | 1e-10 deg | ICRS, Galactic, Ecliptic tested |
 | Constellation lookup | ✅ validated | `constellation/roman_test.go` | Roman (1987)'s boundary table, as astropy 8.0.1 ships it, on positions precessed to B1875.0 | exact, outside 2″ of a boundary | 200,000 random positions: **199,999 agree**, and the one exception lies 0.7″ from a boundary, where precession models decide. The test holds the 64 of them within about 22″ of a boundary. astropy's own `get_constellation` is not a usable reference: it precesses through a GCRS frame, so 18–22″ of annual aberration comes along, and it disagrees with Roman's method at 73 of the 200,000. Had no external check until #570 |

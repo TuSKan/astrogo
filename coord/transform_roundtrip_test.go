@@ -93,26 +93,50 @@ func TestICRSEclipticRoundTrip(t *testing.T) {
 	}
 }
 
-// The known anchors, so the transform is pinned to the sky and not only to
+// The defining anchors, so the transform is pinned to the sky and not only to
 // itself. A pair of mutually inverse transforms can both be wrong.
+//
+// The galactic system is defined by three angles in the Hipparcos Catalogue
+// (ESA SP-1200, 1997), given to five decimals and, in SOFA's words, "regarded
+// as exact": the north galactic pole at ICRS (P, Q) = (192.85948, 27.12825)
+// degrees, and the galactic longitude R = 32.93192 degrees of the ascending
+// node of the galactic equator on the ICRS equator, which lies at right
+// ascension P + 90 degrees. Being definitions, they hold to the arithmetic,
+// and the bound is float64's: 1e-9 degrees, 3.6 microarcseconds. Until #672
+// these were written to three decimals and held to 0.01 degrees, which a
+// rotation wrong by half an arcminute passes.
 func TestGalacticAnchors(t *testing.T) {
 	t.Parallel()
 
-	// The galactic center and the north galactic pole, ICRS J2000.
+	const (
+		poleRA  = 192.85948
+		poleDec = 27.12825
+		node    = 32.93192
+		tolDeg  = 1e-9
+	)
+
+	// The pole's longitude is undefined, so its latitude alone is checked.
+	pole := coord.ICRSToGalactic(coord.NewICRS(angle.Deg(poleRA), angle.Deg(poleDec)))
+	if d := 90 - pole.B().Degrees(); d > tolDeg {
+		t.Errorf("the north galactic pole, ICRS (%.5f, %+.5f), came out at b = %.12f, %.3g degrees short of 90",
+			poleRA, poleDec, pole.B().Degrees(), d)
+	}
+
 	for _, c := range []struct {
 		name         string
 		ra, dec      float64
 		wantL, wantB float64
-		toleranceDeg float64
 	}{
-		{"galactic center", 266.405, -28.936, 0, 0, 0.01},
-		{"north galactic pole", 192.859, 27.128, 0, 90, 0.01},
+		// On the galactic equator and on the ICRS equator at once.
+		{"ascending node", poleRA + 90, 0, node, 0},
+		// The ICRS pole, which by the same rotation sits at the node's
+		// longitude plus 90 degrees and at the galactic pole's declination.
+		{"north celestial pole", 0, 90, node + 90, poleDec},
 	} {
 		gal := coord.ICRSToGalactic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)))
 
-		// At the pole the longitude is undefined, so compare as directions.
-		if sep := separation(gal.L(), gal.B(), angle.Deg(c.wantL), angle.Deg(c.wantB)); sep > c.toleranceDeg {
-			t.Errorf("%s: ICRS (%.3f, %+.3f) gave galactic (%.3f, %+.3f), %.4f degrees from (%.1f, %+.1f)",
+		if sep := separation(gal.L(), gal.B(), angle.Deg(c.wantL), angle.Deg(c.wantB)); sep > tolDeg {
+			t.Errorf("%s: ICRS (%.5f, %+.5f) gave galactic (%.9f, %+.9f), %.3g degrees from (%.5f, %+.5f)",
 				c.name, c.ra, c.dec, gal.L().Degrees(), gal.B().Degrees(),
 				sep, c.wantL, c.wantB)
 		}
@@ -131,14 +155,25 @@ func TestGalacticAnchors(t *testing.T) {
 // tests would have noticed if it had not: every argument is a float64 in
 // radians, so a longitude and a right ascension are indistinguishable to the
 // compiler, and the round trip above passes under a consistent swap.
+//
+// At J2000.0 TT the ecliptic of date is the IAU 2006 mean ecliptic, inclined
+// to the mean equator by epsilon_0 = 84381.406 arcseconds exactly (Capitaine
+// et al. 2003, adopted by IAU 2006 Resolution B1). ICRS is not quite that
+// equator and equinox: the frame bias between them, SOFA's iauBi00, is
+// -0.0418 arcseconds in longitude, -0.0068 in obliquity and -0.0146 in the
+// equinox, and that, not the obliquity, is what separates the anchors from
+// their nominal places. The bound is 0.05 arcseconds, above every one of
+// them. Until #672 the obliquity was written as 23.4393 and the anchors held
+// to 0.01 degrees, 36 arcseconds.
 func TestEclipticAnchors(t *testing.T) {
 	t.Parallel()
 
-	// J2000, where the equinox and solstice points are at their defining
-	// positions and the obliquity is 23.4393 degrees.
-	at := time.FromGo(time.GoDate(2000, 1, 1, 12, 0, 0, 0, time.LocationUTC))
+	at := time.J2000()
 
-	const obliquity = 23.4393
+	const (
+		obliquity = 84381.406 / 3600
+		tolDeg    = 0.05 / 3600
+	)
 
 	for _, c := range []struct {
 		name             string
@@ -154,9 +189,9 @@ func TestEclipticAnchors(t *testing.T) {
 	} {
 		ecl := coord.ICRSToEcliptic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)), at)
 
-		if sep := separation(ecl.Lon(), ecl.Lat(), angle.Deg(c.wantLon), angle.Deg(c.wantLat)); sep > 0.01 {
-			t.Errorf("%s: ICRS (%.1f, %+.4f) gave ecliptic (%.4f, %+.4f), %.4f degrees from (%.1f, %+.1f)",
-				c.name, c.ra, c.dec, ecl.Lon().Degrees(), ecl.Lat().Degrees(), sep, c.wantLon, c.wantLat)
+		if sep := separation(ecl.Lon(), ecl.Lat(), angle.Deg(c.wantLon), angle.Deg(c.wantLat)); sep > tolDeg {
+			t.Errorf("%s: ICRS (%.1f, %+.7f) gave ecliptic (%.7f, %+.7f), %.4f arcseconds from (%.1f, %+.1f)",
+				c.name, c.ra, c.dec, ecl.Lon().Degrees(), ecl.Lat().Degrees(), sep*3600, c.wantLon, c.wantLat)
 		}
 	}
 
@@ -165,9 +200,9 @@ func TestEclipticAnchors(t *testing.T) {
 	// are compared as directions.
 	pole := coord.EclipticToICRS(coord.NewEcliptic(angle.Deg(0), angle.Deg(90)), at)
 
-	if sep := separation(pole.RA(), pole.Dec(), angle.Deg(270), angle.Deg(90-obliquity)); sep > 0.01 {
-		t.Errorf("the north ecliptic pole came back at ICRS (%.4f, %+.4f), %.4f degrees from (270, %+.4f)",
-			pole.RA().Degrees(), pole.Dec().Degrees(), sep, 90-obliquity)
+	if sep := separation(pole.RA(), pole.Dec(), angle.Deg(270), angle.Deg(90-obliquity)); sep > tolDeg {
+		t.Errorf("the north ecliptic pole came back at ICRS (%.7f, %+.7f), %.4f arcseconds from (270, %+.7f)",
+			pole.RA().Degrees(), pole.Dec().Degrees(), sep*3600, 90-obliquity)
 	}
 
 	// And the direction of the tilt, which is the part a swap would invert: a
@@ -183,6 +218,35 @@ func TestEclipticAnchors(t *testing.T) {
 	if south.Lat().Degrees() <= 0 {
 		t.Errorf("ICRS (270, 0) is %+.4f degrees from the ecliptic; it lies north of it",
 			south.Lat().Degrees())
+	}
+}
+
+// The ecliptic of date is defined on TT, so one instant must give one ecliptic
+// whatever scale it is held in. Until #672 both transforms read the caller's
+// Julian Date as TT, and a UTC instant was taken 69 seconds early, moving the
+// result by about 3e-8 degrees.
+func TestEclipticTakesTheInstantNotItsScale(t *testing.T) {
+	t.Parallel()
+
+	utc := time.Date(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC)
+	tt := utc.TT()
+
+	icrs := coord.NewICRS(angle.Deg(123.4), angle.Deg(-45.6))
+
+	a := coord.ICRSToEcliptic(icrs, utc)
+	b := coord.ICRSToEcliptic(icrs, tt)
+
+	if sep := separation(a.Lon(), a.Lat(), b.Lon(), b.Lat()); sep > 1e-12 {
+		t.Errorf("ICRSToEcliptic: the same instant as UTC and as TT differs by %.3g degrees", sep)
+	}
+
+	ecl := coord.NewEcliptic(angle.Deg(210.5), angle.Deg(12.3))
+
+	c := coord.EclipticToICRS(ecl, utc)
+	d := coord.EclipticToICRS(ecl, tt)
+
+	if sep := separation(c.RA(), c.Dec(), d.RA(), d.Dec()); sep > 1e-12 {
+		t.Errorf("EclipticToICRS: the same instant as UTC and as TT differs by %.3g degrees", sep)
 	}
 }
 
