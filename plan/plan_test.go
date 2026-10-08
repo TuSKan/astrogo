@@ -439,7 +439,7 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 // cached before it could ever be reused. This exercises the realistic
 // pattern (many targets/goroutines revisiting a small set of shared epochs)
 // and asserts the ephemeris is only computed once per distinct epoch.
-func TestGetMoonPosition_MultiEpochCacheHits(t *testing.T) {
+func TestGetMoonGeocentricVec_MultiEpochCacheHits(t *testing.T) {
 	epochs := make([]time.Time, 5)
 	for i := range epochs {
 		epochs[i] = time.FromJD(2460000.5+float64(i), time.UTC)
@@ -452,8 +452,8 @@ func TestGetMoonPosition_MultiEpochCacheHits(t *testing.T) {
 	for range 20 {
 		wg.Go(func() {
 			for _, e := range epochs {
-				if _, err := getMoonPosition(e); err != nil {
-					t.Errorf("getMoonPosition(%v): %v", e, err)
+				if _, err := getMoonGeocentricVec(e); err != nil {
+					t.Errorf("getMoonGeocentricVec(%v): %v", e, err)
 				}
 			}
 		})
@@ -639,7 +639,9 @@ func TestScorerMeritTerms(t *testing.T) {
 		// the fallback its threshold would be zero: sep/0 is +Inf, min(+Inf, 1)
 		// is 1, and every target would score a perfect Moon merit — the Moon
 		// itself included.
-		moon, err := getMoonPosition(tm)
+		// The Moon as the site sees it, which is what the merit measures from.
+		moon, err := topocentricPosition(NewMoon(eph.Default()), tm,
+			coord.NewContext(tm, site.Location(), site.Refraction()))
 		testutil.AssertNoError(t, err)
 
 		// 15° away along the meridian is half the default 30° threshold, so
