@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -447,7 +448,8 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 }
 
 // Fetch queries the CelestTrak GP API and returns parsed element sets.
-// It uses the JSON format for compact, natively-typed responses.
+// It uses the JSON format for compact, natively-typed responses. A query
+// CelesTrak has no data for returns no element sets and a nil error.
 func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]GP, error) {
 	cacheKey := fmt.Sprintf("norad:%s:%s", query, value)
 
@@ -460,6 +462,10 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 
 	var gps []GP
 	if err := p.client.GetJSON(ctx, remote.CelesTrak, "", params, &gps); err != nil {
+		if isNoGPData(err) {
+			return nil, nil
+		}
+
 		return nil, fmt.Errorf("norad: fetch failed: %w", err)
 	}
 
@@ -472,6 +478,16 @@ func (p *Provider) Fetch(ctx context.Context, query QueryType, value string) ([]
 	_ = p.cache.Set(cacheKey, targets)
 
 	return gps, nil
+}
+
+// isNoGPData reports whether err is CelesTrak's answer to a query nothing
+// matches: HTTP 404 with the plain-text body "No GP data found", checked
+// live for an unknown NAME and an unknown CATNR. It is an empty result, not
+// a failure; any other 404 still is one.
+func isNoGPData(err error) bool {
+	httpErr, ok := errors.AsType[*remote.HTTPError](err)
+
+	return ok && httpErr.StatusCode == http.StatusNotFound && strings.TrimSpace(httpErr.Body) == "No GP data found"
 }
 
 // FetchByID fetches GP data for a single NORAD catalog number.

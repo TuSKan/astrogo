@@ -45,7 +45,11 @@ func (p *Provider) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapMagnitudeBrowse}
 }
 
-// Resolve performs exact-match resolution for a query.
+// Resolve returns the object SBDB identifies by query. A query that matches
+// nothing is [resolve.ErrNotFound]. One that several objects match is
+// [resolve.ErrAmbiguous], unless exactly one of them has query as its
+// primary designation, as "73P" is the parent of 73P-A and the other
+// fragments; that one is returned.
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
 	targets, err := p.Search(ctx, query)
 	if err != nil {
@@ -80,59 +84,10 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		return seq
 	}
 
-	params := url.Values{}
-	// Switch to using Lookup API explicitly targeted via sstr
-	params.Set("sstr", req.Query)
-	// Request physical parameters to get H, G, M1, k1 for magnitude computation.
-	params.Set("phys-par", "true")
-	// Without this SBDB rounds every orbital element to three significant
-	// figures — Eros comes back with a = 1.46 and e = 0.223, not 1.458243716
-	// and 0.2228779628. That is not a display detail: propagating the rounded
-	// elements two-body puts Eros 690,000 km from its own kernel *at the epoch
-	// of osculation*, where osculating elements are exact by construction and
-	// the error should be nil. See TestSBDBElementsAreFullPrecision.
-	params.Set("full-prec", "true")
-
 	return func(yield func(resolve.Target, error) bool) {
-		var payload struct {
-			Object *struct {
-				SpkID      string `json:"spkid"`
-				FullName   string `json:"fullname"`
-				Des        string `json:"des"`
-				Kind       string `json:"kind"`
-				OrbitClass struct {
-					Code string `json:"code"`
-				} `json:"orbit_class"`
-			} `json:"object"`
-			Message string `json:"message"`
-			PhysPar []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"phys_par"`
-			Orbit struct {
-				Epoch    string `json:"epoch"` // JD, TDB — confirmed live against the same convention as the elements' own "tp" (time of perihelion passage), which SBDB explicitly labels units:"TDB"
-				Elements []struct {
-					Name  string `json:"name"`
-					Value string `json:"value"`
-				} `json:"elements"`
-			} `json:"orbit"`
-		}
-
-		if err := p.client.GetJSON(ctx, remote.JPLSBDB, "", params, &payload); err != nil {
+		payload, err := p.identify(ctx, req.Query)
+		if err != nil {
 			yield(resolve.Target{}, err)
-			return
-		}
-
-		if payload.Message != "" {
-			// This means either multiple matches or error
-			// The JSON payload includes generic text if multiple
-			// We skip multiple matching to keep it exact resolution for lookup API
-			yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, payload.Message))
-			return
-		}
-
-		if payload.Object == nil {
-			yield(resolve.Target{}, nil) // empty
 			return
 		}
 
@@ -281,6 +236,78 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 			return
 		}
 	}
+}
+
+// lookupPayload is an SBDB API answer. Its documentation lists three for a
+// valid query: the object's data; a list of the objects a non-unique query
+// matches, under HTTP 300; and, under HTTP 200, a message with no object
+// when nothing matches.
+type lookupPayload struct {
+	Object *struct {
+		SpkID      string `json:"spkid"`
+		FullName   string `json:"fullname"`
+		Des        string `json:"des"`
+		Kind       string `json:"kind"`
+		OrbitClass struct {
+			Code string `json:"code"`
+		} `json:"orbit_class"`
+	} `json:"object"`
+	Message string        `json:"message"`
+	List    []lookupMatch `json:"list"`
+	PhysPar []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	} `json:"phys_par"`
+	Orbit struct {
+		Epoch    string `json:"epoch"` // JD, TDB — confirmed live against the same convention as the elements' own "tp" (time of perihelion passage), which SBDB explicitly labels units:"TDB"
+		Elements []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"elements"`
+	} `json:"orbit"`
+}
+
+// lookupMatch is one entry of the list SBDB answers a non-unique query with.
+type lookupMatch struct {
+	PDes string `json:"pdes"`
+	Name string `json:"name"`
+}
+
+// exactDesignation returns the primary designation of the one entry in
+// list whose designation is query itself.
+func exactDesignation(query string, list []lookupMatch) (string, bool) {
+	var found []string
+
+	for _, m := range list {
+		if resolve.Normalize(m.PDes) == resolve.Normalize(query) {
+			found = append(found, m.PDes)
+		}
+	}
+
+	if len(found) != 1 {
+		return "", false
+	}
+
+	return found[0], true
+}
+
+// ambiguous reports that query matched every object in list, naming the
+// first few.
+func ambiguous(query string, list []lookupMatch) error {
+	const named = 5
+
+	names := make([]string, 0, min(len(list), named))
+	for _, m := range list[:min(len(list), named)] {
+		names = append(names, m.Name)
+	}
+
+	more := ""
+	if len(list) > named {
+		more = fmt.Sprintf(" and %d more", len(list)-named)
+	}
+
+	return fmt.Errorf("%w: %q in sbdb matches %d objects: %s%s",
+		resolve.ErrAmbiguous, query, len(list), strings.Join(names, "; "), more)
 }
 
 // brightnessMargin is a cushion added to a requested magnitude bound
@@ -462,6 +489,71 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 // classifyKind, now decoded once alongside the rest. "q" and "tp" are the
 // comet form of the same orbit, which is the only form an open orbit has.
 const elementFields = ",e,a,i,om,w,ma,q,tp,epoch"
+
+// identify asks SBDB which object query names and returns its answer, which
+// then always has an object.
+//
+// SBDB answers a query several objects match with their list, and
+// documents asking again by des= to select one of them. That is done only
+// when one entry's primary designation is the query itself, as "73P" is the
+// parent of 73P-A, 73P-B and the rest; otherwise the answer is
+// [resolve.ErrAmbiguous]. A message with no object is SBDB's documented
+// answer when nothing matches ("specified object was not found"), since its
+// errors arrive as HTTP error statuses instead.
+func (p *Provider) identify(ctx context.Context, query string) (lookupPayload, error) {
+	payload, err := p.lookup(ctx, "sstr", query)
+	if err != nil {
+		return lookupPayload{}, err
+	}
+
+	if len(payload.List) > 0 {
+		pdes, ok := exactDesignation(query, payload.List)
+		if !ok {
+			return lookupPayload{}, ambiguous(query, payload.List)
+		}
+
+		if payload, err = p.lookup(ctx, "des", pdes); err != nil {
+			return lookupPayload{}, err
+		}
+
+		if len(payload.List) > 0 {
+			return lookupPayload{}, ambiguous(pdes, payload.List)
+		}
+	}
+
+	if payload.Object != nil {
+		return payload, nil
+	}
+
+	if payload.Message != "" {
+		return lookupPayload{}, fmt.Errorf("%w: %q in sbdb: %s", resolve.ErrNotFound, query, payload.Message)
+	}
+
+	return lookupPayload{}, fmt.Errorf("%w: answer for %q has no object, list or message", ErrAPIError, query)
+}
+
+// lookup asks SBDB for the object key=value names, key being "sstr" (a
+// search string) or "des" (a primary designation).
+func (p *Provider) lookup(ctx context.Context, key, value string) (lookupPayload, error) {
+	params := url.Values{}
+	params.Set(key, value)
+	// Request physical parameters to get H, G, M1, k1 for magnitude computation.
+	params.Set("phys-par", "true")
+	// Without this SBDB rounds every orbital element to three significant
+	// figures — Eros comes back with a = 1.46 and e = 0.223, not 1.458243716
+	// and 0.2228779628. That is not a display detail: propagating the rounded
+	// elements two-body puts Eros 690,000 km from its own kernel *at the epoch
+	// of osculation*, where osculating elements are exact by construction and
+	// the error should be nil. See TestSBDBElementsAreFullPrecision.
+	params.Set("full-prec", "true")
+
+	var payload lookupPayload
+	if err := p.client.GetJSON(ctx, remote.JPLSBDB, "", params, &payload); err != nil {
+		return lookupPayload{}, fmt.Errorf("sbdb: %w", err)
+	}
+
+	return payload, nil
+}
 
 // queryBright issues one sb-kind-scoped bulk query against
 // remote.JPLSBDBQuery, filtering by magField < maxVal, sorted magField
