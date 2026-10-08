@@ -228,23 +228,56 @@ func TestGPToTarget(t *testing.T) {
 	}
 }
 
+// formatTLEExp rounds half up from the value's decimal digits, as the
+// published TLE does. It used to scale the float by repeated multiplication, so
+// a sixth digit of exactly 5 rounded whichever way the binary value fell:
+// 3.10545e-7, published as 31055-6, came out 31054-6 (#609). This test used to
+// log its output and assert nothing.
 func TestFormatTLEExp(t *testing.T) {
-	tests := []struct {
-		want  string
+	t.Parallel()
+
+	for _, tt := range []struct {
 		input float64
+		want  string
 	}{
-		{" 00000-0", 0},
-		{" 19194-3", 0.00019193879},
-	}
-
-	for _, tt := range tests {
-		got := formatTLEExp(tt.input)
-		// Just check it produces reasonable output.
-		if len(got) == 0 {
-			t.Errorf("formatTLEExp(%f) returned empty string", tt.input)
+		{0, " 00000+0"},
+		{0.00019193879, " 19194-3"},
+		{-0.00019193879, "-19194-3"},
+		{3.10545e-7, " 31055-6"},    // a tie the float used to round down
+		{-1.81175e-5, "-18118-4"},   // a tie, rounded half up
+		{0.00033927814, " 33928-3"}, // ordinary rounding
+		{1.2104e-5, " 12104-4"},     // exact
+		{9.999996e-5, " 10000-3"},   // rounding carries into the exponent
+		{8.5268073e-5, " 85268-4"},  // the ISS
+		{-6.469899e-6, "-64699-5"},
+	} {
+		if got := formatTLEExp(tt.input); got != tt.want {
+			t.Errorf("formatTLEExp(%v) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
 
-		t.Logf("formatTLEExp(%e) = %q", tt.input, got)
+// eccentricityField truncates the decimal digits, as the published field does
+// (0.00014417 is 0001441), and does so exactly: 0.0005799 times 1e7 is
+// 5798.999999... in binary, which int() made 0005798 (#609).
+func TestEccentricityField(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		input float64
+		want  string
+	}{
+		{0, "0000000"},
+		{0.0005799, "0005799"},
+		{0.0001378, "0001378"},
+		{0.00014417, "0001441"},
+		{0.00068101, "0006810"},
+		{0.9999999, "9999999"},
+		{1e-9, "0000000"},
+	} {
+		if got := eccentricityField(tt.input); got != tt.want {
+			t.Errorf("eccentricityField(%v) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }
 

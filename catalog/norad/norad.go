@@ -95,9 +95,9 @@ func (gp GP) ToTLE() (line1, line2 string) {
 	line1 += strconv.Itoa(checksumTLE(line1))
 
 	// Line 2
-	line2 = fmt.Sprintf("2 %05d %8.4f %8.4f %07d %8.4f %8.4f %11.8f%5d",
+	line2 = fmt.Sprintf("2 %05d %8.4f %8.4f %s %8.4f %8.4f %11.8f%5d",
 		catID, gp.Inclination, gp.RAOfAscNode,
-		int(gp.Eccentricity*1e7), gp.ArgOfPericenter,
+		eccentricityField(gp.Eccentricity), gp.ArgOfPericenter,
 		gp.MeanAnomaly, gp.MeanMotion, gp.RevAtEpoch)
 	line2 = padToLength(line2, 68)
 	line2 += strconv.Itoa(checksumTLE(line2))
@@ -155,15 +155,47 @@ func formatNdot(val float64) string {
 	return fmt.Sprintf("-.%08d", int(-val*1e8+0.5))
 }
 
-// formatTLEExp formats a float in TLE exponential notation.
+// The TLE's numeric fields are written from the decimal digits a GP value was
+// published in, not by scaling the float.
+//
+// CelesTrak publishes each element set both as GP JSON and as a TLE, and over
+// 11,357 satellites the TLE's digits are the JSON's: eccentricity truncated to
+// seven, B* and the second derivative rounded half up to a five-digit
+// mantissa. Scaling the float first loses that. 0.0005799 times 1e7 is
+// 5798.999999..., which truncated to 0005798 in 72 of them, and a B* whose
+// sixth digit was exactly 5 rounded whichever way its binary value happened to
+// fall, in 610 (#609). strconv's shortest representation of a float is the
+// decimal it was parsed from, so the digits are taken from that.
+
+// eccentricityField writes e as the seven digits after its decimal point,
+// truncated, as the published field is: 0.00014417 is "0001441". An
+// eccentricity outside [0, 1) is no orbit a TLE can carry, and is written as it
+// always was, so that the validator rejects the line rather than this
+// inventing a value for it.
+func eccentricityField(e float64) string {
+	if !(e >= 0 && e < 1) {
+		return fmt.Sprintf("%07d", int(e*1e7))
+	}
+
+	_, frac, _ := strings.Cut(strconv.FormatFloat(e, 'f', -1, 64), ".")
+
+	return (frac + "0000000")[:7]
+}
+
+// formatTLEExp formats a float in TLE exponential notation: a sign, a
+// five-digit mantissa with an implied leading decimal point, and a signed
+// one-digit exponent, rounded half up from the value's decimal digits.
 // Examples:
 //
-//	0         → " 00000-0"
-//	0.00019194 → " 19194-3"
+//	0           → " 00000+0"
+//	0.00019194  → " 19194-3"
 //	-0.00019194 → "-19194-3"
+//	3.10545e-7  → " 31055-6"
+//
+// Zero is written "+0", as CelesTrak's published TLEs write it.
 func formatTLEExp(val float64) string {
 	if val == 0 {
-		return " 00000-0"
+		return " 00000+0"
 	}
 
 	sign := " "
@@ -172,19 +204,22 @@ func formatTLEExp(val float64) string {
 		val = -val
 	}
 
-	exp := 0
+	// "7.72485e-06": digits "772485", and the value is 0.772485 x 10^-5.
+	mant, expText, _ := strings.Cut(strconv.FormatFloat(val, 'e', -1, 64), "e")
+	digits := strings.Replace(mant, ".", "", 1) + "000000"
 
-	for val >= 1.0 {
-		val /= 10.0
+	exp, _ := strconv.Atoi(expText)
+	exp++
+
+	mantissa, _ := strconv.Atoi(digits[:5])
+	if digits[5] >= '5' {
+		mantissa++
+	}
+
+	if mantissa == 100000 {
+		mantissa = 10000
 		exp++
 	}
-
-	for val < 0.1 && val > 0 {
-		val *= 10.0
-		exp--
-	}
-
-	mantissa := int(val*100000 + 0.5)
 
 	return fmt.Sprintf("%s%05d%+d", sign, mantissa, exp)
 }
