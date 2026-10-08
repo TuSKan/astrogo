@@ -3,6 +3,7 @@ package remote
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -58,6 +59,9 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 // Mutable one is revalidated against the source's current ETag first. A
 // miss downloads, which requires consent (ErrDownloadDenied otherwise) and
 // is serialized against other processes doing the same.
+//
+// In offline mode ([SetOffline]) a cached entry is served without contacting
+// the source, Mutable or not, and only a miss fails, with ErrOffline.
 func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
 	return Default().GetFile(ctx, id, name, opts...)
 }
@@ -72,11 +76,20 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	// URL is the offline/Disable gate. It runs first so a blocked endpoint
-	// fails before any cache directory is resolved or lock taken, and so
-	// the source below is never opened for a URL the caller may not reach.
-	if _, err := c.URL(id); err != nil {
-		return nil, "", err
+	// URL is the offline/Disable gate. A disabled endpoint fails here,
+	// before any cache directory is resolved or lock taken, and the source
+	// below is never opened for a URL the caller may not reach.
+	//
+	// Offline mode alone waits for the cache to be looked at. It forbids
+	// contacting the source, not reading what is already here: the
+	// air-gapped deployment the README documents pre-seeds the cache and
+	// then goes offline, and until #633 every pre-seeded kernel was refused
+	// with ErrOffline.
+	_, gateErr := c.URL(id)
+
+	offline := errors.Is(gateErr, ErrOffline) && ep.Enabled
+	if gateErr != nil && !offline {
+		return nil, "", gateErr
 	}
 
 	if !ep.Kind.cacheable() {
@@ -107,10 +120,17 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// An immutable endpoint's cache hit is answered before the source is
 	// ever resolved, so a fully-cached kernel stays readable even when its
 	// source is unreachable — no network, no credentials, no driver.
-	if !ep.Mutable {
+	// Offline, a Mutable endpoint's cached object is served too: it cannot
+	// be revalidated without the source, and offline mode is the caller
+	// saying there is none to ask.
+	if !ep.Mutable || offline {
 		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
 			return cacheFS, cacheKey, nil
 		}
+	}
+
+	if offline {
+		return nil, "", gateErr
 	}
 
 	srcFS, err := OpenFS(ctx, ep.URL)
