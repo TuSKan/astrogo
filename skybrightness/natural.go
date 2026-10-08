@@ -763,9 +763,9 @@ func (a *Airglow) Provenance() Provenance {
 		KnownApproximations: []string{
 			"A single thin emitting layer, where the real emissions arise between " +
 				"about 90 km and 300 km depending on species.",
-			"Extinction along the slant path is applied, but not the light " +
-				"scattered back into it, so the horizon is still somewhat too faint " +
-				"rather than, as before, much too bright.",
+			"Extinction along the slant path is applied at the effective depth " +
+				"kappa * tau, which stands in for the light scattered back into it " +
+				"rather than computing that light.",
 			"The zenith spectrum is not predicted; airglow varies by up to 100 per " +
 				"cent night to night and with the solar cycle.",
 		},
