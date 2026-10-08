@@ -193,3 +193,56 @@ func TestVizierNetworkConeSearch_RegisteredTable(t *testing.T) {
 		t.Error("expected at least one Hipparcos star within 2 degrees of Andromeda's core")
 	}
 }
+
+// A cone holding more sources than the limit returns the nearest of them,
+// nearest first. Before #605 the query had no ORDER BY: TOP 5 of a 5° cone
+// around the Trapezium came back from 2° to 4.4° out, missing the Trapezium
+// itself. Hipparcos holds the θ¹ and θ² Orionis stars a few arcminutes from
+// the center.
+func TestVizierConeSearchReturnsTheNearestSources(t *testing.T) {
+	requireVizier(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	center := coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911))
+	radius := angle.Deg(5)
+
+	var (
+		seps    []float64
+		lastErr error
+	)
+
+	New().ConeSearch(ctx, resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Limit: 5})(
+		func(tar resolve.Target, err error) bool {
+			if err != nil {
+				lastErr = err
+				return false
+			}
+
+			seps = append(seps, coord.Separation(center, tar.Coord).Degrees())
+
+			return true
+		})
+
+	if lastErr != nil {
+		failOrSkipOnOutage(ctx, t, lastErr)
+	}
+
+	if len(seps) != 5 {
+		t.Fatalf("got %d sources, want 5", len(seps))
+	}
+
+	for i := 1; i < len(seps); i++ {
+		if seps[i] < seps[i-1]-1e-9 {
+			t.Errorf("source %d is %.4f° from the center, nearer than source %d at %.4f°", i, seps[i], i-1, seps[i-1])
+		}
+	}
+
+	if far := seps[len(seps)-1]; far > 0.5 {
+		t.Errorf("the farthest of the 5 nearest Hipparcos stars is %.3f° out, in a 5° cone; "+
+			"that is a subset of the cone, not its nearest stars", far)
+	}
+
+	t.Logf("distances from the center: %.4f°", seps)
+}

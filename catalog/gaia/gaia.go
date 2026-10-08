@@ -91,6 +91,12 @@ func (p *Provider) Search(_ context.Context, _ string) ([]resolve.Target, error)
 }
 
 // ConeSearch performs a spatial cone search via the Gaia DR3 TAP service.
+//
+// It returns the req.Limit sources nearest the center, nearest first, or the
+// 100 nearest when req.Limit is not set. Without the ordering a TAP service
+// returns the first rows it reaches, so a cone holding more sources than the
+// limit came back as an arbitrary subset of it, as likely from the edge as
+// from the center (#605).
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	limit := req.Limit
 	if limit <= 0 {
@@ -102,7 +108,9 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	rad := req.Radius.Degrees()
 
 	// Query gaia source for ra, dec, pmra, pmdec, parallax
-	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f))`, limit, ra, dec, rad)
+	// Ordered by an alias rather than by the DISTANCE expression itself, which
+	// ADQL 2.0 does not allow in ORDER BY.
+	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %f, %f)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, rad)
 
 	// The archive is part of the key. Two providers over one cache would
 	// otherwise serve each other's answers, and the whole point of holding
