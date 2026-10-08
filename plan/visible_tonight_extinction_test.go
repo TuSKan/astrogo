@@ -40,10 +40,10 @@ func extinctionV(t *testing.T, air *atmosphere.Atmosphere) float64 {
 	return k
 }
 
-// appliedExtinction recovers the coefficient VisibleTonight dimmed obj by,
-// from its reported ApparentMag, its catalog magnitude and the airmass at its
-// peak.
-func appliedExtinction(t *testing.T, obj plan.VisibleObject) float64 {
+// dimming returns how many magnitudes VisibleTonight dimmed obj by, and how
+// many air dims V arriving from obj's peak, or from the horizon for a peak
+// below it.
+func dimming(t *testing.T, obj plan.VisibleObject, air *atmosphere.Atmosphere) (got, want float64) {
 	t.Helper()
 
 	peak := obj.PeakAltitude
@@ -51,12 +51,12 @@ func appliedExtinction(t *testing.T, obj plan.VisibleObject) float64 {
 		peak = angle.Zero()
 	}
 
-	airmass, err := atmosphere.Airmass(peak)
+	want, err := air.ExtinctionToward(547.8, peak)
 	if err != nil {
-		t.Fatalf("Airmass: %v", err)
+		t.Fatalf("ExtinctionToward: %v", err)
 	}
 
-	return (obj.ApparentMag - obj.Target.VMag) / airmass
+	return obj.ApparentMag - obj.Target.VMag, want
 }
 
 // siriusTonight runs VisibleTonight for Sirius alone and returns it.
@@ -94,29 +94,30 @@ func TestVisibleTonightDimsThroughTheSitesAir(t *testing.T) {
 	cases := []struct {
 		name string
 		opts []plan.VisibleTonightOption
-		want float64
+		air  *atmosphere.Atmosphere
 	}{
-		{"default", nil, extinctionV(t, defaultNight(t, site.Height()))},
-		{"named air", []plan.VisibleTonightOption{plan.WithAtmosphere(hazy)}, extinctionV(t, hazy)},
-		{"nil air", []plan.VisibleTonightOption{plan.WithAtmosphere(nil)}, extinctionV(t, defaultNight(t, site.Height()))},
+		{"default", nil, defaultNight(t, site.Height())},
+		{"named air", []plan.VisibleTonightOption{plan.WithAtmosphere(hazy)}, hazy},
+		{"nil air", []plan.VisibleTonightOption{plan.WithAtmosphere(nil)}, defaultNight(t, site.Height())},
 	}
 
 	for _, c := range cases {
-		got := appliedExtinction(t, siriusTonight(t, site, c.opts...))
-		if math.Abs(got-c.want) > 1e-9 {
-			t.Errorf("%s: Sirius was dimmed by %.6f mag per airmass, want the air's %.6f at V", c.name, got, c.want)
+		got, want := dimming(t, siriusTonight(t, site, c.opts...), c.air)
+		if math.Abs(got-want) > 1e-9 {
+			t.Errorf("%s: Sirius was dimmed by %.6f mag, want the air's %.6f toward its peak at V", c.name, got, want)
 		}
 
-		t.Logf("%-9s k(V) = %.4f", c.name, got)
+		t.Logf("%-9s dimmed by %.4f mag, k(V) = %.4f", c.name, got, extinctionV(t, c.air))
 	}
 }
 
 // The default is a clean night at the site's own height, so it falls with the
 // air above the site, and at Paranal it is the air Patat et al. (2011)
 // measured: their aerosol and ozone, with the standard atmosphere's pressure
-// in place of their barometer's. Through the whole pipeline it reproduces the
-// extinction they measured around 550 nm, 0.131 and 0.129 mag per airmass at
-// 547.5 and 552.5 nm, within the 0.01 they state for their curve.
+// in place of their barometer's. Its coefficient reproduces the extinction
+// they measured around 550 nm, 0.131 and 0.129 mag per airmass at 547.5 and
+// 552.5 nm, within the 0.01 they state for their curve, and VisibleTonight
+// dims Sirius through that air at each site.
 //
 // The figures WithAtmosphere quotes, 0.162 at sea level and 0.132 at Paranal,
 // are held here to the three decimals it prints them to.
@@ -133,8 +134,15 @@ func TestVisibleTonightDefaultAirFollowsTheSite(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	kSea := appliedExtinction(t, siriusTonight(t, seaLevel))
-	kParanal := appliedExtinction(t, siriusTonight(t, paranal))
+	for _, site := range []*plan.Site{seaLevel, paranal} {
+		got, want := dimming(t, siriusTonight(t, site), defaultNight(t, site.Height()))
+		if math.Abs(got-want) > 1e-9 {
+			t.Errorf("%s: Sirius was dimmed by %.6f mag, want the default air's %.6f", site.Name(), got, want)
+		}
+	}
+
+	kSea := extinctionV(t, defaultNight(t, seaLevel.Height()))
+	kParanal := extinctionV(t, defaultNight(t, paranal.Height()))
 
 	if math.Abs(kSea-0.162) > 0.0005 {
 		t.Errorf("at sea level the default dims V by %.4f mag per airmass; WithAtmosphere says 0.162", kSea)

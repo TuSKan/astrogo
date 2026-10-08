@@ -15,7 +15,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/parallel"
 	"github.com/TuSKan/astrogo/logging"
-	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -96,10 +95,6 @@ type visibleTonightConfig struct {
 	includeMoons          bool
 	forceSmallBodyKernels bool
 	air                   *atmosphere.Atmosphere
-
-	// extinctionV is air's extinction coefficient at V, in magnitudes per
-	// airmass, filled in once by VisibleTonight.
-	extinctionV float64
 }
 
 // The air VisibleTonight assumes when the caller names none, and the
@@ -157,8 +152,8 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // WithAtmosphere names tonight's air, the air every object's light is dimmed
 // by before magLimit applies to it: its surface pressure, its ozone column and
 // its aerosol. ApparentMag is the catalog V magnitude plus this air's
-// [atmosphere.Atmosphere.Extinction] at 547.8 nm, V's pivot wavelength, times
-// the airmass.
+// [atmosphere.Atmosphere.ExtinctionToward] the object's peak at 547.8 nm, V's
+// pivot wavelength: each of the air's terms through its own airmass.
 //
 // Without it, VisibleTonight assumes a clean night at the site's height: the
 // standard atmosphere's pressure there, 258 DU of ozone, and Paranal's median
@@ -321,12 +316,13 @@ func VisibleTonight(
 		}
 	}
 
-	extinctionV, err := air.Extinction(vPivotNM)
-	if err != nil {
+	// Checked once here so an air that cannot dim V fails the call rather
+	// than every target in it.
+	if _, err := air.Extinction(vPivotNM); err != nil {
 		return nil, fmt.Errorf("plan: visible tonight: extinction: %w", err)
 	}
 
-	cfg.extinctionV = extinctionV
+	cfg.air = air
 
 	// AstronomicalDawnDusk finds the first dawn and first dusk independently
 	// within [start, end) — not "tonight's dusk paired with the dawn that
@@ -855,7 +851,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	// elevated site lies below 0°, so a window's peak can too: a target that
 	// clears the horizon a mountain observer sees without clearing the
 	// astronomical one. Airmass is not defined below 0°, and it refusing used
-	// to fail the whole call (#551). The horizon's airmass is used instead,
+	// to fail the whole call (#551). The horizon's extinction is used instead,
 	// which is a lower bound on the extinction there, and the magnitude limit
 	// decides as for any other target.
 	peakAlt := aa.Alt()
@@ -863,12 +859,16 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		peakAlt = angle.Zero()
 	}
 
-	airmass, err := atmosphere.Airmass(peakAlt)
+	// Each part of the air through its own airmass: ozone, in a thin shell
+	// 20 km up, has a third of the molecular airmass at the horizon, and
+	// charging it the molecular one dimmed a target there 0.63 mag too much
+	// (#625).
+	extinction, err := cfg.air.ExtinctionToward(vPivotNM, peakAlt)
 	if err != nil {
-		return skipped("airmass", err)
+		return skipped("extinction", err)
 	}
 
-	vo.ApparentMag = magnitude.StarApparent(rawMag, airmass, cfg.extinctionV)
+	vo.ApparentMag = rawMag + extinction
 	if vo.ApparentMag >= magLimit {
 		return VisibleObject{}, false, nil
 	}
