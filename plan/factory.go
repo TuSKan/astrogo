@@ -28,6 +28,27 @@ import (
 //   - Star kind → *Star
 //   - Everything else → *DeepSkyObject
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
+	// ── A NAIF major body, as catalog/jpl reports one ──
+	//
+	// Its SPK-ID is a NAIF ID, which astrogo numbers differently, so it is
+	// translated rather than read as an eph.ID: read as one, the JPL Sun
+	// (NAIF 10) was astrogo's body 10, the Moon (#636).
+	if naif, ok := naifMajorRangeID(c.SPKID); ok {
+		if body, ok := majorBodyForNAIF(naif); ok {
+			return NewPlanet(c.Name, body, p), nil
+		}
+
+		if p != nil {
+			if m, err := NewPlanetaryMoon(c.Name, p); err == nil {
+				return m, nil
+			}
+		}
+
+		if !c.HasCoord {
+			return nil, fmt.Errorf("%w: %s is NAIF body %d, which astrogo has no ephemeris for", ErrNoCoordinates, c.Name, naif)
+		}
+	}
+
 	id := parseEphID(c.ID)
 
 	// ── Satellite ──
@@ -252,6 +273,52 @@ func asteroidOptsFrom(c catalog.Target) []AsteroidOption {
 // wraps it to a negative value, which NAIF uses for spacecraft. Parsing it as
 // a failure keeps a garbage designation from arriving downstream as a
 // plausible different body.
+// naifMajorRangeID returns spkID as a NAIF ID when it is one of the Sun's,
+// a planet's, a system barycenter's or a planetary satellite's: 1 to 999.
+// Small bodies' SPK-IDs start at 1,000,000 and spacecraft's are negative.
+func naifMajorRangeID(spkID string) (int, bool) {
+	n, err := strconv.Atoi(spkID)
+	if err != nil || n < 1 || n > 999 {
+		return 0, false
+	}
+
+	return n, true
+}
+
+// majorBodyForNAIF returns the astrogo body a NAIF ID names. A planet's
+// body center and its system barycenter both name the planet: astrogo's
+// Mars through Neptune are the barycenters, a few hundredths of an
+// arcsecond from the planets (see eph.ID). The Earth-Moon barycenter (3)
+// names no astrogo body.
+func majorBodyForNAIF(naif int) (eph.ID, bool) {
+	switch naif {
+	case 10:
+		return eph.Sun, true
+	case 301:
+		return eph.Moon, true
+	case 1, 199:
+		return eph.Mercury, true
+	case 2, 299:
+		return eph.Venus, true
+	case 399:
+		return eph.Earth, true
+	case 4, 499:
+		return eph.Mars, true
+	case 5, 599:
+		return eph.Jupiter, true
+	case 6, 699:
+		return eph.Saturn, true
+	case 7, 799:
+		return eph.Uranus, true
+	case 8, 899:
+		return eph.Neptune, true
+	case 9, 999:
+		return eph.Pluto, true
+	default:
+		return 0, false
+	}
+}
+
 func parseEphID(id string) eph.ID {
 	n, err := strconv.ParseUint(id, 10, 31)
 	if err != nil {
