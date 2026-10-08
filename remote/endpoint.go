@@ -586,12 +586,16 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Timeout:     120 * time.Second,
 		},
 		OpenNGC: {
-			ID:              OpenNGC,
-			URL:             "https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/",
-			Kind:            KindFile,
-			Subsystem:       "openngc",
-			Description:     "OpenNGC catalog source CSVs (NGC.csv, addendum.csv), pinned to a fixed commit",
-			ApproxSize:      2_000_000,
+			ID:          OpenNGC,
+			URL:         "https://raw.githubusercontent.com/mattiaverga/OpenNGC/36cb178a0f69dba8bfc03a99c10512831edf1c6b/database_files/",
+			Kind:        KindFile,
+			Subsystem:   "openngc",
+			Description: "OpenNGC catalog source CSVs (NGC.csv, addendum.csv), pinned to a fixed commit",
+			// The larger file, NGC.csv, is 3,876,288 bytes at the pinned
+			// commit. This read 2,000,000, and consent is checked against the
+			// size the source reports, so a grant of ApproxSize was refused
+			// (#659; TestListedFilesFitTheirApproxSize).
+			ApproxSize:      4_000_000,
 			Enabled:         true,
 			DownloadTimeout: 2 * time.Minute,
 			Mutable:         true,
@@ -697,8 +701,12 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem: "skybrightness/dataset/dust",
 			Description: "Schlegel, Finkbeiner & Davis (1998) 100 micron all-sky maps, " +
 				"4096 squared per galactic hemisphere in MJy/sr",
-			Files:           []string{"2902710", "2902711"},
-			ApproxSize:      64 << 20, // each; two hemispheres
+			Files: []string{"2902710", "2902711"},
+			// Each hemisphere is 67,115,520 bytes: a 4096-square float32
+			// image, 64 MiB, and 6,656 bytes of FITS header and padding.
+			// This read 64 << 20, which is under the file, so the size check
+			// after the request refused every grant of ApproxSize (#659).
+			ApproxSize:      67_115_520,
 			Enabled:         true,
 			Downloadable:    true,
 			Mutable:         false, // a 1999 archival product with a DOI
