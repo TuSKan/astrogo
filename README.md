@@ -191,7 +191,8 @@ tables you can check against published references.
 - **Scale-aware time system** (JD-based, full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph)
   - Fairhead & Bretagnon (1990) TDB correction, its leading 37 terms (≤0.79 µs over 1900–2100, ≤3 µs over −1000 to 3000)
   - Cross-scale comparisons auto-unify via TT (2 ns same-scale fast path)
-  - `UT1()` returns `(Time, error)`: an error when a loaded IERS bulletin does not reach the epoch; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
+  - `UT1()` returns `(Time, error)`: an error when a loaded IERS bulletin starts after the epoch; past its end, ΔT held at its last measured value; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
+  - One ΔT = TT − UT1 for every conversion, `time.DeltaT`: Espenak & Meeus (2006) before 1960, the IERS bulletin's measured value where it covers, and that value held past its end, with `time.DeltaTUncertainty` growing from there
 
 ### Coordinate systems
 - ICRS
