@@ -726,12 +726,12 @@ func eclipseDate(ref nasaEclipseRef) time.Time {
 // Until #398 it asserted nothing: a difference over 10 s was logged as a
 // warning, and the test passed whatever time.DeltaT returned. The bound now
 // comes from the two things that separate the sides when the model agrees.
-// The catalog prints ΔT in whole seconds, 1 s at most. And ΔT is evaluated on
-// the eclipse's date, which Time.DecimalYear reads as the middle of its month
-// until #697: up to half a month early or late, 0.4 s in the first century,
-// where ΔT falls fastest, near 10 s a year. From 1960 the zero-DUT1 fallback
-// adds up to 0.9 s. Measured over 1213 rows: 0.9 s at worst before 1960, and
-// 1.2 s in 1901–2000, where it was 0.9 s against the model.
+// The catalog prints ΔT in whole seconds, 1 s at most, and from 1960 the
+// zero-DUT1 fallback adds up to 0.9 s. ΔT is evaluated on the eclipse's date;
+// until #697 Time.DecimalYear read that as the middle of its month, up to
+// 0.4 s off in the first century, where ΔT falls fastest. Measured over 1213
+// rows: 0.6 s at worst before 1960, where it was 0.9 s at the month's middle,
+// and 1.2 s in 1901–2000, where it was 0.9 s against the model.
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	const deltaTTolerance = 1.5 // seconds
 
