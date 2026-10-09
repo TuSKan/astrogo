@@ -179,7 +179,7 @@ func logEOPUnavailable(mjd float64, cause error) {
 	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
 		"mjd", mjd,
 		"cause", causeText,
-		"topocentric_error", "~1 arcsec",
+		"topocentric_error", "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
 		"ut1_error", "~0.9 s until leap seconds end in 2035, unbounded after",
 		"remedy", `import _ "github.com/TuSKan/astrogo/remote/eop", then `+
 			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, "+

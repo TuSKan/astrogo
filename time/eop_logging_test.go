@@ -57,7 +57,10 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 		"mjd=58849",
 		// Which step failed, so a caller can tell the remedies apart (#518).
 		`cause="time: no EOP bulletin loaded"`,
-		"topocentric_error=",
+		// The rotation the stated UT1 error amounts to, 0.9 s at 15.04″/s,
+		// not the "~1 arcsec" this said until #689, which is what it costs
+		// only in a year when |DUT1| happens to be small.
+		`topocentric_error="up to 13.5 arcsec`,
 		"remedy=",
 		// The remedy has to name the import: without remote/eop no loader is
 		// registered, and EnableDownloads alone consents to a fetch nothing
