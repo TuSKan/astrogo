@@ -119,6 +119,13 @@ jobs:
         shell: bash
         run: go test -tags=validation -v -count=1 -timeout=60m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/validation.log"
 
+      - name: Keep the IRSA dust cache
+        if: always()
+        shell: bash
+        run: |
+          f="$HOME/.cache/astrogo/skybrightness/dataset/dust/i100.txt"
+          if [ -f "$f" ]; then cp "$f" "$ASTROGO_METROLOGY_OUT/irsa-dust-i100.txt"; wc -l "$f"; fi
+
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
