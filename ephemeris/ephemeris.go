@@ -615,7 +615,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 
-	switch id {
+	switch id { //nolint:exhaustive // the default rejects every body SOFA has no theory for, Pluto among them
 	case Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
@@ -665,7 +665,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 
 		var np int
 
-		switch id {
+		switch id { //nolint:exhaustive // the enclosing case admits only these eight planets
 		case Mercury:
 			np = 1
 		case Venus:
