@@ -20,7 +20,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun ≤0.5 min (civil twilight included), Moon ≤0.6 min |
 | Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | **≤0.7″** in altitude and azimuth against USNO's airless, geocentric values, at five places and dates; held to 2″. An offline fixture, so it runs without the integration tag |
 | Moon Phases | `TestUSNO_MoonPhases` | ✅ PASS | **≤1 minute** |
-| Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **2–4 minutes** |
+| Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **≤0.74 min** over 20 events, 2020–2035; held to 1 min |
 | Perihelion/Aphelion | `TestUSNO_Apsides` | ✅ PASS | **≤1 minute** |
 | Lunar/Solar Eclipses | `TestUSNO_Eclipses` | ✅ PASS | date-exact vs NASA |
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
@@ -180,14 +180,35 @@ Algorithm: Chandrupatla root-finding on Moon–Sun ecliptic elongation crossing
 
 ---
 
-## Earth's Seasons — 2026
+## Earth's Seasons — 2020–2035
+
+Twenty equinoxes and solstices across the 18.6-year nutation cycle, measured
+live on 2026-10-09. USNO gives whole minutes, so half a minute of any Δ is
+its rounding. The table here used to show 2026 at 2 to 4 minutes, from before
+#414 added the missing nutation in longitude.
 
 | Event | USNO | astrogo | Δ |
 |---|---|---|---|
-| Vernal Equinox | 2026-03-20 14:46 | 2026-03-20 14:48 | **2 min** |
-| Summer Solstice | 2026-06-21 08:24 | 2026-06-21 08:27 | 4 min |
-| Autumnal Equinox | 2026-09-23 00:05 | 2026-09-23 00:08 | 4 min |
-| Winter Solstice | 2026-12-21 20:50 | 2026-12-21 20:53 | 4 min |
+| Vernal Equinox | 2020-03-20 03:50 | 2020-03-20 03:49:37 | -0.38 min |
+| Summer Solstice | 2020-06-20 21:44 | 2020-06-20 21:43:40 | -0.32 min |
+| Autumnal Equinox | 2020-09-22 13:31 | 2020-09-22 13:30:39 | -0.35 min |
+| Winter Solstice | 2020-12-21 10:02 | 2020-12-21 10:02:20 | +0.34 min |
+| Vernal Equinox | 2024-03-20 03:06 | 2024-03-20 03:06:24 | +0.40 min |
+| Summer Solstice | 2024-06-20 20:51 | 2024-06-20 20:50:59 | -0.00 min |
+| Autumnal Equinox | 2024-09-22 12:44 | 2024-09-22 12:43:39 | -0.34 min |
+| Winter Solstice | 2024-12-21 09:20 | 2024-12-21 09:20:34 | +0.57 min |
+| Vernal Equinox | 2027-03-20 20:25 | 2027-03-20 20:24:41 | -0.31 min |
+| Summer Solstice | 2027-06-21 14:11 | 2027-06-21 14:10:50 | -0.17 min |
+| Autumnal Equinox | 2027-09-23 06:02 | 2027-09-23 06:01:43 | -0.28 min |
+| Winter Solstice | 2027-12-22 02:42 | 2027-12-22 02:42:09 | +0.16 min |
+| Vernal Equinox | 2031-03-20 19:41 | 2031-03-20 19:40:58 | -0.02 min |
+| Summer Solstice | 2031-06-21 13:17 | 2031-06-21 13:17:08 | +0.14 min |
+| Autumnal Equinox | 2031-09-23 05:15 | 2031-09-23 05:15:18 | +0.30 min |
+| Winter Solstice | 2031-12-22 01:55 | 2031-12-22 01:55:33 | +0.56 min |
+| Vernal Equinox | 2035-03-20 19:02 | 2035-03-20 19:02:44 | +0.74 min |
+| Summer Solstice | 2035-06-21 12:33 | 2035-06-21 12:33:08 | +0.14 min |
+| Autumnal Equinox | 2035-09-23 04:39 | 2035-09-23 04:38:56 | -0.05 min |
+| Winter Solstice | 2035-12-22 01:31 | 2035-12-22 01:30:53 | -0.11 min |
 
 Algorithm: Chandrupatla root-finding on the Sun's apparent ecliptic longitude
 crossing 0° (VE), 90° (SS), 180° (AE), 270° (WS). Implemented in `plan.Seasons()`.
