@@ -304,12 +304,12 @@ func contentLength(resp *http.Response) int64 {
 // contentRangeTotal extracts the total from "bytes 0-0/1234". It reports false
 // for the unknown total "*".
 func contentRangeTotal(v string) (int64, bool) {
-	i := strings.LastIndex(v, "/")
-	if i < 0 {
+	_, after, found := strings.CutLast(v, "/")
+	if !found {
 		return 0, false
 	}
 
-	total := strings.TrimSpace(v[i+1:])
+	total := strings.TrimSpace(after)
 	if total == "" || total == "*" {
 		return 0, false
 	}

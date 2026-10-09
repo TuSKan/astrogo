@@ -42,7 +42,7 @@ func newOppositionProvider(targetID eph.ID) *testEphProvider {
 var errUnknownTestBody = errors.New("testEphProvider: unknown body id")
 
 func (p *testEphProvider) State(id eph.ID, _ time.Time) (eph.State, error) {
-	switch id {
+	switch id { //nolint:exhaustive // a stub serving the Sun and one target; the default rejects the rest
 	case eph.Sun:
 		return eph.State{Pos: p.sunPos}, nil
 	case p.targetID:
