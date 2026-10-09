@@ -13,8 +13,14 @@ import (
 )
 
 // fakeBulletin is a bulletin covering [first, last] MJD, with DUT1 drifting
-// 0.5 ms a day and polar motion that is not zero, so a held value and a zero
-// one cannot be confused. It reports its coverage, as the real one does.
+// 0.5 ms a day from 0.3 s and polar motion that is not zero, so a held value
+// and a zero one cannot be confused. It reports its coverage, as the real one
+// does.
+//
+// The drift starts at 0.3 s, not 0.2: over 400 days that left DUT1 on the
+// last day at 0.2 − 0.0005·400, exactly 0 on amd64 and 7e-18 on arm64, where
+// FMA fuses the product, and a test comparing the held DUT1 exactly failed on
+// macOS alone.
 type fakeBulletin struct{ first, last float64 }
 
 func (b fakeBulletin) EOP(mjd float64) (iers.EOP, error) {
@@ -22,7 +28,7 @@ func (b fakeBulletin) EOP(mjd float64) (iers.EOP, error) {
 		return iers.EOP{}, fmt.Errorf("%w: MJD %.1f", iers.ErrOutOfRange, mjd)
 	}
 
-	return iers.EOP{DUT1: 0.2 - 0.0005*(mjd-b.first), XP: 1e-6, YP: 2e-6}, nil
+	return iers.EOP{DUT1: 0.3 - 0.0005*(mjd-b.first), XP: 1e-6, YP: 2e-6}, nil
 }
 
 func (b fakeBulletin) Coverage() (mjdMin, mjdMax float64) { return b.first, b.last }
@@ -96,7 +102,7 @@ func TestDeltaTIsHeldPastTheBulletin(t *testing.T) {
 	last, _ := bulletin2023.EOP(bulletin2023.last)
 	past := atMJD(70000)
 
-	if eop := past.EOP(); eop.DUT1 != last.DUT1 || eop.XP != 0 || eop.YP != 0 {
+	if eop := past.EOP(); math.Abs(eop.DUT1-last.DUT1) > 1e-12 || eop.XP != 0 || eop.YP != 0 {
 		t.Errorf("EOP past the bulletin = %+v, want DUT1 held at %g s and zero polar motion", eop, last.DUT1)
 	}
 
@@ -105,9 +111,8 @@ func TestDeltaTIsHeldPastTheBulletin(t *testing.T) {
 		t.Fatalf("UT1 past the bulletin: %v, want the held value", err)
 	}
 
-	want := past.UT1Using(last.DUT1)
-	if !ut1.Equal(want) {
-		t.Errorf("UT1 past the bulletin = %v, want %v", ut1, want)
+	if d := ut1.Sub(past.UT1Using(last.DUT1)).Seconds(); math.Abs(d) > 1e-6 {
+		t.Errorf("UT1 past the bulletin is %g s from the held DUT1's", d)
 	}
 
 	if _, err := atMJD(59000).UT1(); !errors.Is(err, iers.ErrOutOfRange) {
@@ -173,4 +178,18 @@ func TestDeltaTUncertaintyGrowsFromTheBulletinsEnd(t *testing.T) {
 	if s := time.DeltaTUncertainty(time.Date(1750, time.June, 15, 0, 0, 0, 0, time.LocationUTC)); s != 2 {
 		t.Errorf("1750: σ = %g s, want the historical model's 2 s", s)
 	}
+}
+
+// TestDeltaTUncertaintyWithNoBulletinStartsAt2005: with no bulletin, which
+// is what ZeroModel declares, the measured record is taken to end in 2005,
+// the end of the observations the model was fitted to, as it used to for
+// every caller.
+func TestDeltaTUncertaintyWithNoBulletinStartsAt2005(t *testing.T) {
+	withBulletin(t, time.ZeroModel{})
+
+	at := time.Date(2027, time.July, 1, 0, 0, 0, 0, time.LocationUTC)
+	n := at.DecimalYear() - 2005
+	want := 365.25 * n * math.Sqrt(n*0.058/3*(1+n/2500)) / 1000
+
+	testutil.AssertNear(t, "σ in 2027 with no bulletin", time.DeltaTUncertainty(at), want, 1e-9)
 }

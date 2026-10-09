@@ -84,7 +84,10 @@ func TestDeltaTUncertainty_KnownValues(t *testing.T) {
 		{"0 CE: historical", 0, 200, 300},
 		{"1000 CE: medieval", 1000, 50, 60},
 		{"1500 CE: pre-telescopic", 1500, 15, 25},
+		{"1650 CE: early telescopic", 1650, 5, 5},
 		{"1700 CE: early telescopic", 1700, 1.5, 5.5},
+		{"1830 CE", 1830, 1, 1},
+		{"1880 CE", 1880, 0.5, 0.5},
 		{"1950 CE: before the observed record", 1950, 0.2, 0.2},
 	}
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/logging"
+	"github.com/TuSKan/astrogo/time/internal/iers"
 )
 
 // TestDeltaTHeldIsItsOwnNotice: past the bulletin's end DUT1 is held, not
@@ -47,5 +48,47 @@ func TestDeltaTHeldIsItsOwnNotice(t *testing.T) {
 
 	if n := strings.Count(out, "level=WARN"); n != 2 {
 		t.Errorf("%d warnings written, want the two, one of each:\n%s", n, out)
+	}
+}
+
+// tinyEndBulletin covers MJD 60000–60400 with a DUT1 that ends at 7e-18 s,
+// what an FMA-fused 0.2 − 0.0005·400 gives on arm64, and an EOP that fails
+// for its own last day when failLast is set.
+type tinyEndBulletin struct{ failLast bool }
+
+func (b tinyEndBulletin) EOP(mjd float64) (EOP, error) {
+	if mjd < 60000 || mjd > 60400 || (b.failLast && mjd == 60400) {
+		return EOP{}, iers.ErrOutOfRange
+	}
+
+	return EOP{DUT1: 7e-18}, nil
+}
+
+func (tinyEndBulletin) Coverage() (mjdMin, mjdMax float64) { return 60000, 60400 }
+
+// TestHeldDUT1IsTheBulletinsOwn: with no leap second between, the held DUT1
+// is the bulletin's last value exactly. It used to be end.DUT1 + ΔAT − ΔAT,
+// which rounds a DUT1 this small away against 37 s; that failed on macOS
+// alone, where FMA left the test bulletin's last DUT1 at 7e-18 rather than 0.
+// And a bulletin that cannot answer for its own last day holds nothing: the
+// lookup's out-of-range error stands.
+func TestHeldDUT1IsTheBulletinsOwn(t *testing.T) {
+	// Not parallel: the EOP model is process-wide.
+	RegisterModel(tinyEndBulletin{})
+	t.Cleanup(ResetEOP)
+
+	eop, report, ok := heldPastBulletin(65000)
+	if !ok || eop.DUT1 != 7e-18 {
+		t.Errorf("held DUT1 = %g s (ok %v), want the bulletin's last 7e-18 s exactly", eop.DUT1, ok)
+	}
+
+	if msg := report.Error(); !strings.Contains(msg, "ΔT held at") || !strings.Contains(msg, "MJD 60400.0") {
+		t.Errorf("the held report reads %q, want the held ΔT and the bulletin's last day", msg)
+	}
+
+	RegisterModel(tinyEndBulletin{failLast: true})
+
+	if _, _, ok := heldPastBulletin(65000); ok {
+		t.Error("a bulletin that cannot answer for its last day was held anyway")
 	}
 }

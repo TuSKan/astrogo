@@ -293,9 +293,13 @@ func heldPastBulletin(mjd float64) (eop EOP, report deltaTHeldError, ok bool) {
 		return EOP{}, deltaTHeldError{}, false
 	}
 
+	// The leap seconds between are summed first: end.DUT1 + ΔAT − ΔAT rounds
+	// a DUT1 near zero away against 37 s, and on arm64, where FMA leaves the
+	// bulletin's last DUT1 at 7e-18 rather than 0, that broke the hold by
+	// exactly that much.
 	atEnd := deltaATAtMJD(last)
 
-	return EOP{DUT1: end.DUT1 + deltaATAtMJD(mjd) - atEnd}, deltaTHeldError{
+	return EOP{DUT1: end.DUT1 + (deltaATAtMJD(mjd) - atEnd)}, deltaTHeldError{
 		lastMJD: last,
 		deltaT:  atEnd + 32.184 - end.DUT1,
 		sigma:   huberSigma((mjd - last) / 365.25),
