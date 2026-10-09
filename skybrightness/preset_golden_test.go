@@ -61,6 +61,11 @@ const goldenTol = 1e-12
 // totals with them. The Moon is placed where the site sees it, which lowers
 // it into more air and on its own dims the zenith by 1.0 per cent, and its
 // phase angle is the site's, which brightens every row by about 1.7.
+//
+// #672 moved every zodiacal row by 2 to 3 parts in 10^12. The Sun's ecliptic
+// longitude, which zodiacal light is a function of, now comes from the
+// instant read as TT, where it used to read this fixed UTC instant's Julian
+// Date as TT, 69 seconds early.
 func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
 	tb.Helper()
 
@@ -181,28 +186,28 @@ var gambonsWebGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.7273884516322964e-10},
 	{90, skybrightness.DiffuseGalactic, 4.2018697243834238e-11},
 	{90, skybrightness.Extragalactic, 1.214218783318975e-11},
-	{90, skybrightness.Zodiacal, 1.6509952047144716e-09},
+	{90, skybrightness.Zodiacal, 1.6509952047111827e-09},
 	{90, skybrightness.AirglowContinuum, 2.4318471129080736e-09},
 	{90, totalSurfaceBrightness, 21.220885782283112},
 
 	{60, skybrightness.Starlight, 9.6860563353807089e-10},
 	{60, skybrightness.DiffuseGalactic, 4.1840157886856984e-11},
 	{60, skybrightness.Extragalactic, 1.2090595124461664e-11},
-	{60, skybrightness.Zodiacal, 1.6943376742125551e-09},
+	{60, skybrightness.Zodiacal, 1.6943376742177076e-09},
 	{60, skybrightness.AirglowContinuum, 2.7837481071333883e-09},
 	{60, totalSurfaceBrightness, 21.140951350937684},
 
 	{30, skybrightness.Starlight, 9.4639993687408995e-10},
 	{30, skybrightness.DiffuseGalactic, 4.0880954448183097e-11},
 	{30, skybrightness.Extragalactic, 1.1813413082023905e-11},
-	{30, skybrightness.Zodiacal, 1.0024868355047375e-09},
+	{30, skybrightness.Zodiacal, 1.002486835507156e-09},
 	{30, skybrightness.AirglowContinuum, 4.5529489963254674e-09},
 	{30, totalSurfaceBrightness, 20.951150333439127},
 
 	{10, skybrightness.Starlight, 8.5705815421231311e-10},
 	{10, skybrightness.DiffuseGalactic, 3.7021721997915625e-11},
 	{10, skybrightness.Extragalactic, 1.0698206557862453e-11},
-	{10, skybrightness.Zodiacal, 7.1600351600147072e-10},
+	{10, skybrightness.Zodiacal, 7.160035160035241e-10},
 	{10, skybrightness.AirglowContinuum, 9.0478164742275109e-09},
 	{10, totalSurfaceBrightness, 20.424569484844998},
 }
@@ -219,28 +224,28 @@ var gambonsFullGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.9185382323796635e-10},
 	{90, skybrightness.DiffuseGalactic, 4.2844393144166162e-11},
 	{90, skybrightness.Extragalactic, 1.238079005964017e-11},
-	{90, skybrightness.Zodiacal, 1.6718188028253846e-09},
+	{90, skybrightness.Zodiacal, 1.6718188028221454e-09},
 	{90, skybrightness.AirglowContinuum, 2.5788686481672761e-09},
 	{90, totalSurfaceBrightness, 21.181521040173887},
 
 	{60, skybrightness.Starlight, 9.8960429863641313e-10},
 	{60, skybrightness.DiffuseGalactic, 4.2747222054880267e-11},
 	{60, skybrightness.Extragalactic, 1.2352710426156573e-11},
-	{60, skybrightness.Zodiacal, 1.7161670056261378e-09},
+	{60, skybrightness.Zodiacal, 1.7161670056311337e-09},
 	{60, skybrightness.AirglowContinuum, 2.9516262945475295e-09},
 	{60, totalSurfaceBrightness, 21.099856733594549},
 
 	{30, skybrightness.Starlight, 9.7624049428941108e-10},
 	{30, skybrightness.DiffuseGalactic, 4.2169955451747658e-11},
 	{30, skybrightness.Extragalactic, 1.2185897079127065e-11},
-	{30, skybrightness.Zodiacal, 1.0578449423765218e-09},
+	{30, skybrightness.Zodiacal, 1.0578449423788532e-09},
 	{30, skybrightness.AirglowContinuum, 4.7739343029753323e-09},
 	{30, totalSurfaceBrightness, 20.901618917197496},
 
 	{10, skybrightness.Starlight, 9.1001151633863401e-10},
 	{10, skybrightness.DiffuseGalactic, 3.9309110131218376e-11},
 	{10, skybrightness.Extragalactic, 1.135919555047209e-11},
-	{10, skybrightness.Zodiacal, 8.4304185880121422e-10},
+	{10, skybrightness.Zodiacal, 8.4304185880302129e-10},
 	{10, skybrightness.AirglowContinuum, 8.8603798273970605e-09},
 	{10, totalSurfaceBrightness, 20.426835296328466},
 }
@@ -304,28 +309,28 @@ var naturalSkyGolden = []goldenRow{
 	{90, skybrightness.Starlight, 9.5938823606035686e-10},
 	{90, skybrightness.DiffuseGalactic, 4.144200062613079e-11},
 	{90, skybrightness.Extragalactic, 1.1975539195458651e-11},
-	{90, skybrightness.Zodiacal, 1.6283356885262783e-09},
+	{90, skybrightness.Zodiacal, 1.6283356885230345e-09},
 	{90, skybrightness.AirglowContinuum, 2.3984705901508912e-09},
 	{90, totalSurfaceBrightness, 21.236234785161233},
 
 	{60, skybrightness.Starlight, 9.5328000968613116e-10},
 	{60, skybrightness.DiffuseGalactic, 4.1178147983675336e-11},
 	{60, skybrightness.Extragalactic, 1.1899293415481554e-11},
-	{60, skybrightness.Zodiacal, 1.6675292591321038e-09},
+	{60, skybrightness.Zodiacal, 1.6675292591371749e-09},
 	{60, skybrightness.AirglowContinuum, 2.7397026515720373e-09},
 	{60, totalSurfaceBrightness, 21.158664262279494},
 
 	{30, skybrightness.Starlight, 9.2068709110288861e-10},
 	{30, skybrightness.DiffuseGalactic, 3.9770255222887726e-11},
 	{30, skybrightness.Extragalactic, 1.1492453140275742e-11},
-	{30, skybrightness.Zodiacal, 9.7525015850945756e-10},
+	{30, skybrightness.Zodiacal, 9.7525015851181048e-10},
 	{30, skybrightness.AirglowContinuum, 4.4292494156457222e-09},
 	{30, totalSurfaceBrightness, 20.981731628651211},
 
 	{10, skybrightness.Starlight, 7.9344245891200624e-10},
 	{10, skybrightness.DiffuseGalactic, 3.4273760760353396e-11},
 	{10, skybrightness.Extragalactic, 9.9041252632620779e-12},
-	{10, skybrightness.Zodiacal, 6.6285769236741384e-10},
+	{10, skybrightness.Zodiacal, 6.628576923693147e-10},
 	{10, skybrightness.AirglowContinuum, 8.3762364500148613e-09},
 	{10, totalSurfaceBrightness, 20.509814327919116},
 }
@@ -340,7 +345,7 @@ var observatoryGolden = []goldenRow{
 	{90, skybrightness.Starlight, 1.0066020303432268e-09},
 	{90, skybrightness.DiffuseGalactic, 4.3481460793234216e-11},
 	{90, skybrightness.Extragalactic, 1.2564884178802038e-11},
-	{90, skybrightness.Zodiacal, 1.693095058467329e-09},
+	{90, skybrightness.Zodiacal, 1.6930950584640768e-09},
 	{90, skybrightness.AirglowContinuum, 2.6478108272245852e-09},
 	{90, skybrightness.Moonlight, 1.0298360358137359e-07},
 	{90, skybrightness.Artificial, 8.4639173450219717e-08},
@@ -349,7 +354,7 @@ var observatoryGolden = []goldenRow{
 	{60, skybrightness.Starlight, 1.0062187658169592e-09},
 	{60, skybrightness.DiffuseGalactic, 4.3464905192341308e-11},
 	{60, skybrightness.Extragalactic, 1.2560100089124851e-11},
-	{60, skybrightness.Zodiacal, 1.7404135103067849e-09},
+	{60, skybrightness.Zodiacal, 1.7404135103117827e-09},
 	{60, skybrightness.AirglowContinuum, 3.0341282189366305e-09},
 	{60, skybrightness.Moonlight, 8.9869570249689853e-08},
 	{60, skybrightness.Artificial, 1.1741516319643428e-07},
@@ -358,7 +363,7 @@ var observatoryGolden = []goldenRow{
 	{30, skybrightness.Starlight, 1.0022793132197267e-09},
 	{30, skybrightness.DiffuseGalactic, 4.3294735504132998e-11},
 	{30, skybrightness.Extragalactic, 1.2510925972522657e-11},
-	{30, skybrightness.Zodiacal, 1.093102427966267e-09},
+	{30, skybrightness.Zodiacal, 1.0931024279686121e-09},
 	{30, skybrightness.AirglowContinuum, 4.9242262169215958e-09},
 	{30, skybrightness.Moonlight, 7.5495915764149476e-08},
 	{30, skybrightness.Artificial, 2.6030405951465619e-07},
@@ -367,7 +372,7 @@ var observatoryGolden = []goldenRow{
 	{10, skybrightness.Starlight, 9.6671969658419908e-10},
 	{10, skybrightness.DiffuseGalactic, 4.1758692430553132e-11},
 	{10, skybrightness.Extragalactic, 1.2067053964519993e-11},
-	{10, skybrightness.Zodiacal, 9.1717731626735636e-10},
+	{10, skybrightness.Zodiacal, 9.1717731626917864e-10},
 	{10, skybrightness.AirglowContinuum, 9.2177897305315865e-09},
 	{10, skybrightness.Moonlight, 1.3215846676751951e-07},
 	{10, skybrightness.Artificial, 7.8099677446004759e-07},

@@ -16,14 +16,14 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// These tests need the s3:// scheme, which is being rebuilt on the AWS SDK
-// after gocloud.dev was removed and is not registered yet — see PR 5 of the
-// plan in docs/storage.md. Until it lands they skip rather than fail, which is
-// the same thing they do for an unreachable endpoint, and the skip names the
-// reason so nobody reads it as a passing test.
+// These tests need the s3:// scheme, which went with gocloud.dev and has no
+// backend now: PR 5 of the plan in docs/storage.md, which would have rebuilt
+// it, was dropped, and §10 there records what the work is. Until somebody does
+// it they skip rather than fail, which is the same thing they do for an
+// unreachable endpoint, and the skip names the reason so nobody reads it as a
+// passing test.
 //
-// The blank import of remote/file/s3 that used to sit above is what restores
-// them; it goes back when that package does.
+// A blank import of an s3:// backend package is what restores them.
 func requireS3(tb testing.TB) {
 	tb.Helper()
 
@@ -31,8 +31,8 @@ func requireS3(tb testing.TB) {
 		return
 	}
 
-	tb.Skip("the s3:// backend is not registered: it is being rebuilt on the AWS SDK " +
-		"after gocloud.dev's removal (docs/storage.md, PR 5)")
+	tb.Skip("the s3:// backend is not registered: astrogo has none since gocloud.dev's " +
+		"removal, and its rebuild was dropped (docs/storage.md, §10)")
 }
 
 // A date the archive is known to hold, used by every test here so they share

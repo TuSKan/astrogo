@@ -1,8 +1,8 @@
 {
   "manifest": {
     "schema_version": 1,
-    "generated": "2026-09-23T01:05:36Z",
-    "astrogo_commit": "7bd2e0e7b4416bef2872e57541c99222fdd96398",
+    "generated": "2026-10-09T09:08:50Z",
+    "astrogo_commit": "c4026782701b69a9885b66471a87638b026b9ad0",
     "reference": "JPL Horizons (https://ssd.jpl.nasa.gov/api/horizons.api)",
     "reference_query": "EPHEM_TYPE=OBSERVER CENTER='coord@399' QUANTITIES='1,2,4,20' CAL_FORMAT=JD; EPHEM_TYPE=VECTORS CENTER='@399' OUT_UNITS=AU-D REF_PLANE=FRAME VEC_TABLE=2 TIME_TYPE=UT",
     "refraction": "AIRLESS — no APPARENT parameter is sent, so Horizons applies its default and states it in the response header",
@@ -12,28 +12,28 @@
         "lon_deg": 0,
         "lat_deg": 51.47720000000001,
         "height_m": 45,
-        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+        "provenance": "plan.NewKnownSite; published coordinates cross-checked against the IAU MPC observatory code list"
       },
       {
         "name": "Paranal",
         "lon_deg": -70.40417,
         "lat_deg": -24.62722,
         "height_m": 2635,
-        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+        "provenance": "plan.NewKnownSite; published coordinates cross-checked against the IAU MPC observatory code list"
       },
       {
         "name": "Mauna Kea",
         "lon_deg": -155.47441,
         "lat_deg": 19.8263,
         "height_m": 4145,
-        "provenance": "plan.KnownSites; published coordinates cross-checked against the IAU MPC observatory code list"
+        "provenance": "plan.NewKnownSite; published coordinates cross-checked against the IAU MPC observatory code list"
       },
       {
         "name": "Polar (synthetic, 78N)",
         "lon_deg": 0,
         "lat_deg": 78,
         "height_m": 0,
-        "provenance": "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.KnownSites has nothing above 52 degrees"
+        "provenance": "synthetic; hour-angle-to-azimuth projection is most extreme near the pole, and plan.NewKnownSite has nothing above 52 degrees"
       },
       {
         "name": "Equator (synthetic, 0N 0E)",
@@ -73,7 +73,7 @@
         "app_dec_deg": 8.575194444444444,
         "azimuth_deg": 81.15254,
         "elevation_deg": -14.196616,
-        "range_au": 4.60569864178413
+        "range_au": 4.60569864178412
       }
     },
     {
@@ -99,7 +99,7 @@
         "app_dec_deg": 8.594222222222223,
         "azimuth_deg": 81.168638,
         "elevation_deg": -13.256459,
-        "range_au": 4.62118501888187
+        "range_au": 4.62118501888188
       }
     },
     {
@@ -125,7 +125,7 @@
         "app_dec_deg": 8.614472222222222,
         "azimuth_deg": 81.180878,
         "elevation_deg": -12.319417,
-        "range_au": 4.63674186351213
+        "range_au": 4.63674186351215
       }
     },
     {
@@ -255,7 +255,7 @@
         "app_dec_deg": -20.012194444444443,
         "azimuth_deg": 228.513455,
         "elevation_deg": -58.895381,
-        "range_au": 5.99403787242307
+        "range_au": 5.99403787242306
       }
     },
     {
@@ -463,7 +463,7 @@
         "app_dec_deg": 15.155027777777779,
         "azimuth_deg": 74.40103,
         "elevation_deg": 13.537625,
-        "range_au": 4.67586081999668
+        "range_au": 4.67586081999669
       }
     },
     {
@@ -643,9 +643,9 @@
         "astro_dec_deg": 8.615666666666666,
         "app_ra_deg": 23.906041666666667,
         "app_dec_deg": 8.613999999999999,
-        "azimuth_deg": 76.049347,
+        "azimuth_deg": 76.049346,
         "elevation_deg": 5.862797,
-        "range_au": 4.63672844060295
+        "range_au": 4.63672844060296
       }
     },
     {
@@ -670,7 +670,7 @@
         "app_ra_deg": 199.81812499999998,
         "app_dec_deg": -6.9863333333333335,
         "azimuth_deg": 80.721203,
-        "elevation_deg": -9.101894,
+        "elevation_deg": -9.101893,
         "range_au": 5.57851433277716
       }
     },
@@ -697,7 +697,7 @@
         "app_dec_deg": -7.023861111111111,
         "azimuth_deg": 81.596433,
         "elevation_deg": -8.95739,
-        "range_au": 5.56267423850932
+        "range_au": 5.56267423850931
       }
     },
     {
@@ -827,7 +827,7 @@
         "app_dec_deg": -13.95575,
         "azimuth_deg": 188.442942,
         "elevation_deg": -2.08874,
-        "range_au": 4.02460497075668
+        "range_au": 4.02460497075667
       }
     },
     {
@@ -879,7 +879,7 @@
         "app_dec_deg": -2.190555555555555,
         "azimuth_deg": 37.256527,
         "elevation_deg": -11.810556,
-        "range_au": 5.71541441409014
+        "range_au": 5.71541441409013
       }
     },
     {
@@ -905,7 +905,7 @@
         "app_dec_deg": 1.6002222222222222,
         "azimuth_deg": 143.850569,
         "elevation_deg": 11.351479,
-        "range_au": 4.11068671911371
+        "range_au": 4.11068671911372
       }
     },
     {
@@ -1139,7 +1139,7 @@
         "app_dec_deg": -13.182666666666666,
         "azimuth_deg": 106.987824,
         "elevation_deg": 38.687754,
-        "range_au": 1.84966121290099
+        "range_au": 1.84966121290101
       }
     },
     {
@@ -1165,7 +1165,7 @@
         "app_dec_deg": -12.901388888888889,
         "azimuth_deg": 106.6899,
         "elevation_deg": 38.973405,
-        "range_au": 1.8550849026874
+        "range_au": 1.85508490268742
       }
     },
     {
@@ -1217,7 +1217,7 @@
         "app_dec_deg": -9.109833333333333,
         "azimuth_deg": 259.598147,
         "elevation_deg": -28.727698,
-        "range_au": 1.63388035333256
+        "range_au": 1.63388035333257
       }
     },
     {
@@ -1243,7 +1243,7 @@
         "app_dec_deg": -8.809777777777779,
         "azimuth_deg": 259.911278,
         "elevation_deg": -29.037124,
-        "range_au": 1.64055098709418
+        "range_au": 1.64055098709419
       }
     },
     {
@@ -1451,7 +1451,7 @@
         "app_dec_deg": 24.797555555555558,
         "azimuth_deg": 321.99543,
         "elevation_deg": 57.840601,
-        "range_au": 0.58817873150049
+        "range_au": 0.5881787315005
       }
     },
     {
@@ -1633,7 +1633,7 @@
         "app_dec_deg": -13.463027777777777,
         "azimuth_deg": 131.243122,
         "elevation_deg": -5.656984,
-        "range_au": 1.84427073969354
+        "range_au": 1.84427073969355
       }
     },
     {
@@ -1659,7 +1659,7 @@
         "app_dec_deg": -13.183777777777777,
         "azimuth_deg": 131.431653,
         "elevation_deg": -5.343553,
-        "range_au": 1.84969178119347
+        "range_au": 1.84969178119349
       }
     },
     {
@@ -1685,7 +1685,7 @@
         "app_dec_deg": -12.9025,
         "azimuth_deg": 131.621807,
         "elevation_deg": -5.02797,
-        "range_au": 1.8551154032545
+        "range_au": 1.85511540325451
       }
     },
     {
@@ -1971,7 +1971,7 @@
         "app_dec_deg": 24.792583333333337,
         "azimuth_deg": 203.861291,
         "elevation_deg": 35.887201,
-        "range_au": 0.58818986899152
+        "range_au": 0.58818986899151
       }
     },
     {
@@ -2153,7 +2153,7 @@
         "app_dec_deg": 12.616694444444445,
         "azimuth_deg": 75.602786,
         "elevation_deg": -28.540559,
-        "range_au": 8.63850610687509
+        "range_au": 8.63850610687508
       }
     },
     {
@@ -2179,7 +2179,7 @@
         "app_dec_deg": 12.614722222222222,
         "azimuth_deg": 75.73788,
         "elevation_deg": -27.564694,
-        "range_au": 8.65281648864131
+        "range_au": 8.65281648864132
       }
     },
     {
@@ -2204,8 +2204,8 @@
         "app_ra_deg": 38.74558333333333,
         "app_dec_deg": 12.613333333333333,
         "azimuth_deg": 75.865529,
-        "elevation_deg": -26.589893,
-        "range_au": 8.6672788442358
+        "elevation_deg": -26.589894,
+        "range_au": 8.66727884423582
       }
     },
     {
@@ -2647,7 +2647,7 @@
         "app_dec_deg": -8.453722222222222,
         "azimuth_deg": 261.516424,
         "elevation_deg": -4.790919,
-        "range_au": 9.69287162012608
+        "range_au": 9.69287162012607
       }
     },
     {
@@ -2673,7 +2673,7 @@
         "app_dec_deg": 12.616444444444443,
         "azimuth_deg": 58.927162,
         "elevation_deg": 6.564186,
-        "range_au": 8.6384809099819
+        "range_au": 8.63848090998189
       }
     },
     {
@@ -2959,7 +2959,7 @@
         "app_dec_deg": -14.477972222222222,
         "azimuth_deg": 70.699187,
         "elevation_deg": -18.790253,
-        "range_au": 10.1633304155536
+        "range_au": 10.1633304155535
       }
     },
     {
@@ -2985,7 +2985,7 @@
         "app_dec_deg": -15.673194444444444,
         "azimuth_deg": 187.934657,
         "elevation_deg": -3.791424,
-        "range_au": 8.86922788139265
+        "range_au": 8.86922788139266
       }
     },
     {
@@ -3219,7 +3219,7 @@
         "app_dec_deg": 8.593833333333334,
         "azimuth_deg": 74.183406,
         "elevation_deg": -1.48469,
-        "range_au": 4.62117638311511
+        "range_au": 4.62117638311512
       }
     },
     {
@@ -3245,7 +3245,7 @@
         "app_dec_deg": 8.614083333333333,
         "azimuth_deg": 74.915722,
         "elevation_deg": -0.89976,
-        "range_au": 4.63673347169664
+        "range_au": 4.63673347169665
       }
     },
     {
@@ -3297,7 +3297,7 @@
         "app_dec_deg": -7.023777777777778,
         "azimuth_deg": 86.507042,
         "elevation_deg": -11.758226,
-        "range_au": 5.5626762922373
+        "range_au": 5.56267629223729
       }
     },
     {
@@ -3323,7 +3323,7 @@
         "app_dec_deg": -7.060333333333333,
         "azimuth_deg": 87.231796,
         "elevation_deg": -11.234088,
-        "range_au": 5.54678619379648
+        "range_au": 5.54678619379647
       }
     },
     {
@@ -3349,7 +3349,7 @@
         "app_dec_deg": -7.095916666666667,
         "azimuth_deg": 87.95278,
         "elevation_deg": -10.709991,
-        "range_au": 5.53085049797566
+        "range_au": 5.53085049797565
       }
     },
     {
@@ -3375,7 +3375,7 @@
         "app_dec_deg": 8.575055555555556,
         "azimuth_deg": 281.581464,
         "elevation_deg": -6.523524,
-        "range_au": 4.60569305094516
+        "range_au": 4.60569305094517
       }
     },
     {
@@ -3401,7 +3401,7 @@
         "app_dec_deg": 8.594083333333334,
         "azimuth_deg": 281.944053,
         "elevation_deg": -7.392202,
-        "range_au": 4.62118074986608
+        "range_au": 4.62118074986607
       }
     },
     {
@@ -3427,7 +3427,7 @@
         "app_dec_deg": 8.614333333333333,
         "azimuth_deg": 282.310193,
         "elevation_deg": -8.256273,
-        "range_au": 4.63673891203011
+        "range_au": 4.63673891203009
       }
     },
     {
@@ -3583,7 +3583,7 @@
         "app_dec_deg": 8.594416666666667,
         "azimuth_deg": 158.734462,
         "elevation_deg": -72.91484,
-        "range_au": 4.6212160199013
+        "range_au": 4.62121601990131
       }
     },
     {
@@ -3661,7 +3661,7 @@
         "app_dec_deg": -7.0232222222222225,
         "azimuth_deg": 162.444334,
         "elevation_deg": -57.016935,
-        "range_au": 5.5627034265367
+        "range_au": 5.56270342653671
       }
     },
     {
@@ -3739,7 +3739,7 @@
         "app_dec_deg": -13.46286111111111,
         "azimuth_deg": 130.14074,
         "elevation_deg": 11.815265,
-        "range_au": 1.84425778920465
+        "range_au": 1.84425778920466
       }
     },
     {
@@ -3765,7 +3765,7 @@
         "app_dec_deg": -13.183583333333333,
         "azimuth_deg": 130.211137,
         "elevation_deg": 12.174036,
-        "range_au": 1.84967880166877
+        "range_au": 1.84967880166879
       }
     },
     {
@@ -3791,7 +3791,7 @@
         "app_dec_deg": -12.902333333333333,
         "azimuth_deg": 130.282731,
         "elevation_deg": 12.535376,
-        "range_au": 1.85510239489468
+        "range_au": 1.8551023948947
       }
     },
     {
@@ -3869,7 +3869,7 @@
         "app_dec_deg": -8.810972222222222,
         "azimuth_deg": 288.279198,
         "elevation_deg": -24.96965,
-        "range_au": 1.64054829356965
+        "range_au": 1.64054829356966
       }
     },
     {
@@ -3973,7 +3973,7 @@
         "app_dec_deg": -12.901416666666668,
         "azimuth_deg": 282.049876,
         "elevation_deg": -64.8004,
-        "range_au": 1.85515031430174
+        "range_au": 1.85515031430173
       }
     },
     {
@@ -4103,7 +4103,7 @@
         "app_dec_deg": -13.461055555555555,
         "azimuth_deg": 116.590084,
         "elevation_deg": -20.758026,
-        "range_au": 1.84428174612433
+        "range_au": 1.84428174612432
       }
     },
     {
@@ -4129,7 +4129,7 @@
         "app_dec_deg": -13.181805555555554,
         "azimuth_deg": 116.202335,
         "elevation_deg": -20.713856,
-        "range_au": 1.84970298789902
+        "range_au": 1.84970298789903
       }
     },
     {
@@ -4155,7 +4155,7 @@
         "app_dec_deg": -12.900527777777778,
         "azimuth_deg": 115.811987,
         "elevation_deg": -20.668006,
-        "range_au": 1.85512681075842
+        "range_au": 1.85512681075844
       }
     },
     {
@@ -4233,7 +4233,7 @@
         "app_dec_deg": -8.809416666666667,
         "azimuth_deg": 279.951042,
         "elevation_deg": 40.769086,
-        "range_au": 1.64050244062052
+        "range_au": 1.64050244062053
       }
     },
     {
@@ -4337,7 +4337,7 @@
         "app_dec_deg": 12.613138888888889,
         "azimuth_deg": 60.722169,
         "elevation_deg": -6.19625,
-        "range_au": 8.66726442173841
+        "range_au": 8.66726442173842
       }
     },
     {
@@ -4389,7 +4389,7 @@
         "app_dec_deg": -21.866194444444446,
         "azimuth_deg": 34.044488,
         "elevation_deg": -56.824846,
-        "range_au": 10.9755402795644
+        "range_au": 10.9755402795643
       }
     },
     {
@@ -4467,7 +4467,7 @@
         "app_dec_deg": 12.616666666666667,
         "azimuth_deg": 280.364263,
         "elevation_deg": 8.668472,
-        "range_au": 8.63847932910661
+        "range_au": 8.63847932910662
       }
     },
     {
@@ -4493,7 +4493,7 @@
         "app_dec_deg": 12.614694444444444,
         "azimuth_deg": 280.67913,
         "elevation_deg": 7.736048,
-        "range_au": 8.65279103907132
+        "range_au": 8.65279103907131
       }
     },
     {
@@ -4519,7 +4519,7 @@
         "app_dec_deg": 12.613305555555556,
         "azimuth_deg": 280.996217,
         "elevation_deg": 6.806408,
-        "range_au": 8.66725472733911
+        "range_au": 8.66725472733909
       }
     },
     {
@@ -4700,7 +4700,7 @@
         "app_ra_deg": 38.74525,
         "app_dec_deg": 12.613444444444443,
         "azimuth_deg": 212.614594,
-        "elevation_deg": -75.950872,
+        "elevation_deg": -75.950871,
         "range_au": 8.66730113778257
       }
     },
@@ -4779,7 +4779,7 @@
         "app_dec_deg": -21.873722222222224,
         "azimuth_deg": 230.613786,
         "elevation_deg": -22.583761,
-        "range_au": 10.9700715014253
+        "range_au": 10.9700715014254
       }
     },
     {
@@ -4961,7 +4961,7 @@
         "app_dec_deg": 1.6003333333333334,
         "azimuth_deg": 137.011539,
         "elevation_deg": 31.98121,
-        "range_au": 4.11067250746021
+        "range_au": 4.11067250746022
       }
     },
     {
@@ -5091,7 +5091,7 @@
         "app_dec_deg": 17.098444444444443,
         "azimuth_deg": 335.272047,
         "elevation_deg": -18.140271,
-        "range_au": 5.89937333472722
+        "range_au": 5.89937333472723
       }
     },
     {
@@ -5117,7 +5117,7 @@
         "app_dec_deg": 22.055472222222225,
         "azimuth_deg": 58.468768,
         "elevation_deg": 3.698525,
-        "range_au": 5.39447568572375
+        "range_au": 5.39447568572376
       }
     },
     {
@@ -5377,7 +5377,7 @@
         "app_dec_deg": 15.154777777777777,
         "azimuth_deg": 300.804776,
         "elevation_deg": -28.512249,
-        "range_au": 4.67589119958976
+        "range_au": 4.67589119958975
       }
     },
     {
@@ -5507,7 +5507,7 @@
         "app_dec_deg": -20.012194444444443,
         "azimuth_deg": 253.418462,
         "elevation_deg": 12.296999,
-        "range_au": 5.99399231618187
+        "range_au": 5.99399231618186
       }
     },
     {
@@ -5559,7 +5559,7 @@
         "app_dec_deg": -13.95497222222222,
         "azimuth_deg": 91.846668,
         "elevation_deg": 31.239282,
-        "range_au": 4.02458136976566
+        "range_au": 4.02458136976567
       }
     },
     {
@@ -5637,7 +5637,7 @@
         "app_dec_deg": 1.601027777777778,
         "azimuth_deg": 95.209253,
         "elevation_deg": -14.974151,
-        "range_au": 4.11070614955372
+        "range_au": 4.11070614955373
       }
     },
     {
@@ -5767,7 +5767,7 @@
         "app_dec_deg": 17.099,
         "azimuth_deg": 287.589217,
         "elevation_deg": -2.699446,
-        "range_au": 5.89936194126087
+        "range_au": 5.89936194126086
       }
     },
     {
@@ -6001,7 +6001,7 @@
         "app_dec_deg": 24.794,
         "azimuth_deg": 219.24807,
         "elevation_deg": 58.80081,
-        "range_au": 0.58817837492817
+        "range_au": 0.58817837492816
       }
     },
     {
@@ -6183,7 +6183,7 @@
         "app_dec_deg": 11.343944444444444,
         "azimuth_deg": 82.586473,
         "elevation_deg": 13.403682,
-        "range_au": 0.89855833069112
+        "range_au": 0.89855833069113
       }
     },
     {
@@ -6286,7 +6286,7 @@
         "app_ra_deg": 340.4279583333333,
         "app_dec_deg": -9.862972222222222,
         "azimuth_deg": 256.568919,
-        "elevation_deg": 7.668732,
+        "elevation_deg": 7.668733,
         "range_au": 1.65763434555443
       }
     },
@@ -6313,7 +6313,7 @@
         "app_dec_deg": 19.18191666666667,
         "azimuth_deg": 298.111455,
         "elevation_deg": -16.513579,
-        "range_au": 1.00440631624893
+        "range_au": 1.00440631624892
       }
     },
     {
@@ -6339,7 +6339,7 @@
         "app_dec_deg": 24.793472222222224,
         "azimuth_deg": 46.817143,
         "elevation_deg": -27.026074,
-        "range_au": 0.58823425532221
+        "range_au": 0.5882342553222
       }
     },
     {
@@ -6417,7 +6417,7 @@
         "app_dec_deg": -23.132055555555556,
         "azimuth_deg": 220.029698,
         "elevation_deg": 35.220599,
-        "range_au": 2.46630349550294
+        "range_au": 2.46630349550295
       }
     },
     {
@@ -6521,7 +6521,7 @@
         "app_dec_deg": 11.346361111111111,
         "azimuth_deg": 351.07162,
         "elevation_deg": 53.644591,
-        "range_au": 0.8985338112749
+        "range_au": 0.89853381127489
       }
     },
     {
@@ -6625,7 +6625,7 @@
         "app_dec_deg": -9.861611111111111,
         "azimuth_deg": 207.51031,
         "elevation_deg": -51.790163,
-        "range_au": 1.65767361245024
+        "range_au": 1.65767361245025
       }
     },
     {
@@ -6729,7 +6729,7 @@
         "app_dec_deg": 2.8638333333333335,
         "azimuth_deg": 276.2249,
         "elevation_deg": 6.607616,
-        "range_au": 2.44784671101168
+        "range_au": 2.44784671101167
       }
     },
     {
@@ -6781,7 +6781,7 @@
         "app_dec_deg": -5.941333333333334,
         "azimuth_deg": 233.814182,
         "elevation_deg": -43.410707,
-        "range_au": 2.0370481931811
+        "range_au": 2.03704819318109
       }
     },
     {
@@ -6833,7 +6833,7 @@
         "app_dec_deg": 21.66911111111111,
         "azimuth_deg": 79.822426,
         "elevation_deg": -34.691278,
-        "range_au": 0.74506136505703
+        "range_au": 0.74506136505704
       }
     },
     {
@@ -6989,7 +6989,7 @@
         "app_dec_deg": -15.673166666666667,
         "azimuth_deg": 188.571773,
         "elevation_deg": 22.466683,
-        "range_au": 8.86920874192819
+        "range_au": 8.8692087419282
       }
     },
     {
@@ -7353,7 +7353,7 @@
         "app_dec_deg": -15.52688888888889,
         "azimuth_deg": 138.801347,
         "elevation_deg": 44.456708,
-        "range_au": 10.4219614523358
+        "range_au": 10.4219614523359
       }
     },
     {
@@ -7743,7 +7743,7 @@
         "app_dec_deg": -11.520194444444446,
         "azimuth_deg": 96.660048,
         "elevation_deg": 13.487668,
-        "range_au": 8.77385138001489
+        "range_au": 8.7738513800149
       }
     },
     {
@@ -7795,7 +7795,7 @@
         "app_dec_deg": -7.433222222222223,
         "azimuth_deg": 230.030932,
         "elevation_deg": -44.098225,
-        "range_au": 10.449583899515
+        "range_au": 10.4495838995149
       }
     },
     {

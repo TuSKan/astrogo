@@ -18,19 +18,19 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | USNO Service | Test | Status | Accuracy |
 |---|---|---|---|
 | Complete Sun and Moon Data for One Day | `TestUSNO_SunMoonOneDay` | ✅ PASS | Sun ≤0.5 min (civil twilight included), Moon ≤0.6 min |
-| Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | 0.002° (sub-arcsecond) |
+| Celestial Navigation | `TestUSNO_CelNav` | ✅ PASS | **≤0.7″** in altitude and azimuth against USNO's airless, geocentric values, at five places and dates; held to 2″. An offline fixture, so it runs without the integration tag |
 | Moon Phases | `TestUSNO_MoonPhases` | ✅ PASS | **≤1 minute** |
 | Earth's Seasons | `TestUSNO_Seasons` | ✅ PASS | **2–4 minutes** |
 | Perihelion/Aphelion | `TestUSNO_Apsides` | ✅ PASS | **≤1 minute** |
 | Lunar/Solar Eclipses | `TestUSNO_Eclipses` | ✅ PASS | date-exact vs NASA |
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
-| Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | sanity validated |
+| Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | **≤0.05 ms** at six epochs 1990–2049, USNO's own rounding; held to 0.2 ms. An offline fixture, so it runs without the integration tag |
 | **Edge Cases** | | | |
 | Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | circumpolar agreement |
 | High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | 0m vs USNO ≤0.5 min |
 | Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun ≤1 min, ~12h day |
 | Polar Moon | `TestUSNO_PolarMoon` | ✅ PASS | circumpolar agreement |
-| CelNav at Extreme Locations | `TestUSNO_CelNav_EdgeCases` | ✅ PASS | Alt <1.5° |
+| CelNav at Extreme Locations | `TestUSNO_CelNav` | ✅ PASS | the same fixture: near both poles, on the equator, at Everest |
 | Altitude Shift (Sea Level vs Summit) | `TestUSNO_AltitudeShift` | ✅ PASS | monotonic shift verified |
 
 **41/41 tests passing.**
@@ -196,13 +196,20 @@ crossing 0° (VE), 90° (SS), 180° (AE), 270° (WS). Implemented in `plan.Seaso
 
 ## Celestial Navigation — AltAz
 
-**Date:** 2026-04-06 **Time:** 21:00:00 UTC **Location:** São Paulo
+USNO's `hc` and `zn` are the navigator's computed altitude and azimuth: airless and geocentric, with refraction and parallax listed as separate corrections in the same response. astrogo is asked the same question: an airless `coord.Context`, a star through `ICRSToAltAz`, the Sun through `GeocentricVec` and `GeocentricToObserved` with its parallax returned to the geocenter, and the instant as UT1.
 
-| Object | Property | USNO | astrogo | Δ |
-|---|---|---|---|---|
-| **Sun** | Altitude | -0.6574° | -0.0781° | 0.58° (near horizon) |
-| **Sun** | Azimuth | 277.0287° | 277.0285° | **0.0002°** |
-| **Sirius** | Altitude | 82.9188° | 82.9210° | **0.002°** |
+| Place | Date (UT1) | Object | Δ altitude | Δ azimuth, across |
+|---|---|---|---:|---:|
+| São Paulo | 2026-04-06 21:00 | Sun | −0.296″ | −0.286″ |
+| São Paulo | 2026-04-06 21:00 | Sirius | +0.104″ | +0.668″ |
+| 89.99° N | 2026-06-21 12:00 | Sun | +0.028″ | +0.398″ |
+| 89.99° S | 2026-12-21 00:00 | Sun | +0.024″ | −0.446″ |
+| 89.99° S | 2026-12-21 00:00 | Sirius | −0.239″ | −0.074″ |
+| Equator, 0° | 2026-03-20 12:00 | Sun | +0.056″ | +0.168″ |
+| Everest | 2026-06-21 06:00 | Sun | +0.078″ | +0.087″ |
+| Everest | 2026-06-21 06:00 | Sirius | −0.323″ | −0.257″ |
+
+The largest residual, Sirius's 0.67″ in azimuth at São Paulo, is USNO's own: its Greenwich hour angle runs 0.662″ from Horizons' (#256). Until #674 this table compared a refracted altitude with USNO's airless one — the 0.002° it showed for Sirius was the refraction at 83°, and the Sun's 0.58° was the refraction at the horizon — and passed the Sun's apparent place to `ICRSToAltAz`, which applied aberration a second time, 21″.
 
 ---
 
@@ -405,15 +412,9 @@ produces zero rise/set events. When timed events exist, Δ < 5 min.
 
 ### Celestial Navigation — Extreme Locations
 
-| Location | Date | Time (UTC) | Object | Property | Tolerance | Note |
-|---|---|---|---|---|---|---|
-| North Pole | 2026-06-21 | 12:00 | Sun | Altitude | 0.2° | ~23.4° above horizon |
-| South Pole | 2026-12-21 | 00:00 | Sun | Altitude | 0.2° | ~23.4° above horizon |
-| Equator | 2026-03-20 | 12:00 | Sun | Altitude | 0.2° | Near zenith (~90°) |
-| Everest | 2026-06-21 | 06:00 | Sun | Altitude | 1.5° | Altitude refraction correction |
+Part of `TestUSNO_CelNav`; the residuals are in the Celestial Navigation table above. Near both poles, on the equator at an equinox, and at Everest's coordinates, altitude and azimuth are each held to 2″.
 
-> **Note:** At latitudes >85°, azimuth is degenerate (all directions converge to
-> "south") and is excluded from tolerance checks.
+Azimuth is checked at 89.99° as everywhere else, as an angle across the sky (Δazimuth × cos altitude): 0.01° from the pole the zenith is 36″ from it, and the Sun's azimuth there is well defined. Until #674 these cases were held to 0.2° and 1.5° in altitude, and azimuth was not checked above 85°.
 
 ---
 
