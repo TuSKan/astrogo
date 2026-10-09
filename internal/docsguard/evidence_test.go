@@ -1,10 +1,12 @@
 package docsguard_test
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -20,6 +22,17 @@ var backtickName = regexp.MustCompile("`([^`]+)`")
 
 // generatedSuite matches a suite name in the generated accuracy table.
 var generatedSuite = regexp.MustCompile("^\\| `([a-z0-9._]+)` \\|")
+
+// toleranceTerm matches one bound stated in a Tolerance cell: a number and the
+// unit written straight after it, as in "3 arcsec" or "1e-10 AU/day".
+var toleranceTerm = regexp.MustCompile(`(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*([^\s;,()]+)`)
+
+// Column positions after splitting a table row on "|", which leaves an empty
+// cell before the first column.
+const (
+	statusToleranceCell   = 5 // Area, Status, Evidence, Reference, Tolerance
+	generatedContractCell = 9 // Suite, Reference, Independence, N, p50, p95, p99, Max, Contract
+)
 
 // TestStatusTableEvidenceResolves is why the Evidence column exists.
 //
@@ -89,7 +102,7 @@ func TestStatusTableEvidenceResolves(t *testing.T) {
 
 // checkEvidence resolves one citation: a dotted name must be a generated
 // suite, anything else a file that exists.
-func checkEvidence(t *testing.T, line int, cited string, suites map[string]bool) {
+func checkEvidence(t *testing.T, line int, cited string, suites map[string]string) {
 	t.Helper()
 
 	if strings.HasSuffix(cited, ".go") {
@@ -100,7 +113,7 @@ func checkEvidence(t *testing.T, line int, cited string, suites map[string]bool)
 		return
 	}
 
-	if !suites[cited] {
+	if _, ok := suites[cited]; !ok {
 		t.Errorf("%s:%d: Evidence cites suite %q, which the generated accuracy table does not contain",
 			validationDoc, line, cited)
 	}
@@ -122,8 +135,10 @@ func evidenceCitations(line string) []string {
 	return out
 }
 
-func collectGeneratedSuites(lines []string) map[string]bool {
-	suites := make(map[string]bool)
+// collectGeneratedSuites maps every suite in the generated accuracy table to
+// its contract, as that table prints it: a number and a unit, "3 arcsec".
+func collectGeneratedSuites(lines []string) map[string]string {
+	suites := make(map[string]string)
 
 	var inGenerated bool
 
@@ -144,7 +159,12 @@ func collectGeneratedSuites(lines []string) map[string]bool {
 		}
 
 		if m := generatedSuite.FindStringSubmatch(line); m != nil {
-			suites[m[1]] = true
+			var contract string
+			if cells := strings.Split(line, "|"); len(cells) > generatedContractCell {
+				contract = strings.TrimSpace(cells[generatedContractCell])
+			}
+
+			suites[m[1]] = contract
 		}
 	}
 
@@ -189,6 +209,104 @@ func citedAsEvidence(lines []string, suite string) bool {
 		}
 
 		if slices.Contains(evidenceCitations(line), suite) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// TestStatusTableToleranceIsTheCitedContract holds the Tolerance column to its
+// own definition.
+//
+// The document defines that column as the bound a test asserts, not an
+// achieved accuracy. When the Evidence column was added, rows written earlier
+// kept their old Tolerance beside the suites they now cited, and three of them
+// stated a bound nothing asserts: 0.05 mag for a GAMBONS comparison held to
+// 1 mag, 1e-7 deg for a Horizons comparison held to 3 arcsec, and 1e-12 d for
+// round trips held to 1e-6 s and 5 s (#665). The first was repeated in the
+// README as what the natural sky is validated to.
+//
+// So a row that cites a generated suite must state that suite's contract, with
+// the value and unit the generated table prints. It may state more, such as a
+// bound from a test file it also cites, but not less. A Tolerance with no
+// number in it, such as "per body, from SOFA's own table", makes no numeric
+// claim and is not checked.
+func TestStatusTableToleranceIsTheCitedContract(t *testing.T) {
+	raw, err := os.ReadFile(validationDoc)
+	if err != nil {
+		t.Fatalf("read %s: %v", validationDoc, err)
+	}
+
+	lines := strings.Split(string(raw), "\n")
+	contracts := collectGeneratedSuites(lines)
+
+	var (
+		inTable bool
+		checked int
+	)
+
+	for i, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "## Status Table"):
+			inTable = true
+		case strings.HasPrefix(line, "## Known Incomplete"):
+			inTable = false
+		}
+
+		if !inTable || !strings.HasPrefix(line, "| ") || strings.HasPrefix(line, "| Area") {
+			continue
+		}
+
+		cells := strings.Split(line, "|")
+		if len(cells) <= statusToleranceCell {
+			continue
+		}
+
+		tolerance := strings.TrimSpace(cells[statusToleranceCell])
+		if !strings.ContainsAny(tolerance, "0123456789") {
+			continue
+		}
+
+		for _, cited := range evidenceCitations(line) {
+			// A file, or a suite TestStatusTableEvidenceResolves reports.
+			contract, ok := contracts[cited]
+			if !ok {
+				continue
+			}
+
+			checked++
+
+			if !statesBound(tolerance, contract) {
+				t.Errorf("%s:%d: Tolerance %q does not state the contract of %s, which is %s",
+					validationDoc, i+1, tolerance, cited, contract)
+			}
+		}
+	}
+
+	if checked == 0 {
+		t.Fatal("no row cites a generated suite beside a numeric Tolerance; the table layout may have changed")
+	}
+
+	t.Logf("%d suite citations checked against their row's Tolerance", checked)
+}
+
+// statesBound reports whether a Tolerance cell states contract, which is a
+// number and a unit as the generated table prints it.
+func statesBound(tolerance, contract string) bool {
+	value, unit, ok := strings.Cut(contract, " ")
+	if !ok {
+		return false
+	}
+
+	want, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return false
+	}
+
+	for _, m := range toleranceTerm.FindAllStringSubmatch(tolerance, -1) {
+		got, err := strconv.ParseFloat(m[1], 64)
+		if err == nil && m[2] == unit && math.Abs(got-want) <= 1e-9*math.Abs(want) {
 			return true
 		}
 	}
