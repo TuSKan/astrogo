@@ -2,9 +2,11 @@ package time
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
+	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/time/internal/iers"
 )
@@ -129,14 +131,40 @@ func Coverage() (mjdMin, mjdMax float64, ok bool) { return iers.Coverage() }
 // Default: 5 minutes.
 func SetRetryCooldown(d Duration) { iers.SetRetryCooldown(d) }
 
-var warnEOPUnavailableOnce sync.Once
+var (
+	warnEOPUnavailableOnce sync.Once
+	warnDeltaTHeldOnce     sync.Once
+)
 
 // warnEOPUnavailable logs, once per process, that no real EOP data could
 // be found for mjd, and why: cause is the lookup's or the lazy load's error.
-// Shared by every path that degrades to zero EOP: Time.EOP, the UT1<->UTC
-// conversion, and Time.UT1 when nothing was loaded.
+// Shared by every path that degrades: Time.EOP, the UT1<->UTC conversion,
+// and Time.UT1 when nothing was loaded.
+//
+// An epoch past the bulletin's end is a different notice with a Once of its
+// own: there DUT1 is not zero but held, and with one Once between them
+// whichever case came first would silence the other for the process.
 func warnEOPUnavailable(mjd float64, cause error) {
+	if held, ok := errors.AsType[*deltaTHeldError](cause); ok {
+		warnDeltaTHeldOnce.Do(func() { logDeltaTHeld(mjd, held) })
+
+		return
+	}
+
 	warnEOPUnavailableOnce.Do(func() { logEOPUnavailable(mjd, cause) })
+}
+
+// logDeltaTHeld writes the notice for an epoch past the bulletin's end, apart
+// from its Once for the reason [logEOPUnavailable] gives.
+func logDeltaTHeld(mjd float64, held *deltaTHeldError) {
+	logging.Warn("EOP bulletin ends before this epoch, holding ΔT at its last value",
+		"mjd", mjd,
+		"bulletin_last_mjd", held.lastMJD,
+		"delta_t", fmt.Sprintf("%.3f s, TT − UT1 on the bulletin's last day", held.deltaT),
+		"delta_t_sigma", fmt.Sprintf("%.1f s here, Huber (2000) from the bulletin's end", held.sigma),
+		"polar_motion", "zero",
+		"remedy", `a newer bulletin: import _ "github.com/TuSKan/astrogo/remote/eop", then `+
+			"remote.EnableDownloads(0, remote.IERSFinals2000A)")
 }
 
 // logEOPUnavailable writes the warning, separately from the [sync.Once] that
@@ -210,6 +238,10 @@ func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
 
 	eop, err = iers.GetModel().EOP(mjd)
 	if err != nil {
+		if held, report, ok := heldPastBulletin(mjd); ok {
+			return held, &report, nil
+		}
+
 		return eop, nil, err
 	}
 
@@ -228,6 +260,68 @@ func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
 // lazy load reported no error of its own.
 var errNothingLoaded = errors.New("time: no EOP bulletin loaded")
 
+// heldPastBulletin is the EOP for an epoch past the loaded bulletin's last
+// day: DUT1 such that ΔT = ΔAT + 32.184 s − DUT1 keeps the value it has on
+// that day, and zero polar motion, with the report the notice is written
+// from. ok is false inside or before the bulletin, or for a model that does
+// not report its coverage, such as ZeroModel.
+//
+// # Why ΔT is held rather than extrapolated
+//
+// Past the bulletin nobody measures UT1, so every value is a forecast. This
+// one used to be DUT1 = 0, UT1 pinned to UTC, which freezes ΔT at the
+// leap-second count; nobody chose that, and it stops being even approximately
+// true once leap seconds end, by 2035 under CGPM Resolution 4 (2022), after
+// which UT1 − UTC grows without bound. The extrapolation on offer, Espenak &
+// Meeus (2006), was already 6.2 s high in 2026 and climbs 0.6 s a year, while
+// the bulletin shows ΔT flat since 2020 and published forecasts past 2030
+// disagree in sign. So the held value is the measured one, continuous with
+// the bulletin, and [DeltaTUncertainty] says what holding it costs (#696).
+//
+// A leap second registered past the bulletin's end moves ΔAT and DUT1
+// together, so ΔT stays held across it.
+func heldPastBulletin(mjd float64) (eop EOP, report deltaTHeldError, ok bool) {
+	_, last, covered := iers.Coverage()
+	if !covered || mjd <= last {
+		return EOP{}, deltaTHeldError{}, false
+	}
+
+	// The bulletin's own last day; a model that cannot answer for it has
+	// nothing to hold, and the lookup's out-of-range error stands.
+	end, err := iers.GetModel().EOP(last)
+	if err != nil {
+		return EOP{}, deltaTHeldError{}, false
+	}
+
+	atEnd := deltaATAtMJD(last)
+
+	return EOP{DUT1: end.DUT1 + deltaATAtMJD(mjd) - atEnd}, deltaTHeldError{
+		lastMJD: last,
+		deltaT:  atEnd + 32.184 - end.DUT1,
+		sigma:   huberSigma((mjd - last) / 365.25),
+	}, true
+}
+
+// deltaATAtMJD is TAI − UTC in seconds at a UTC Modified Julian Date.
+func deltaATAtMJD(mjd float64) float64 {
+	y, m, d, fd, _ := gofaext.JdToDate(2400000.5, mjd)
+
+	return deltaAT(y, m, d, fd)
+}
+
+// deltaTHeldError is the lookup's report for an epoch past the bulletin's
+// end. It is not a failure, which is why [lookupEOP] returns it as the
+// defaulted cause rather than as err: Time.UT1 answers there, and the warning
+// words it as the stated forecast it is.
+type deltaTHeldError struct {
+	lastMJD, deltaT, sigma float64
+}
+
+func (e *deltaTHeldError) Error() string {
+	return fmt.Sprintf("time: past the EOP bulletin's last day, MJD %.1f; ΔT held at %.3f s (σ %.1f s)",
+		e.lastMJD, e.deltaT, e.sigma)
+}
+
 // EOP returns Earth Orientation Parameters for t's epoch, first attempting
 // an automatic lazy load if the registered model doesn't cover it (see
 // [lookupEOP]/[iers.EnsureLoaded]), then degrading to a zero EOP and
@@ -240,6 +334,11 @@ var errNothingLoaded = errors.New("time: no EOP bulletin loaded")
 // program that never imported remote/eop: until #518 that one answered zeros
 // without the warning. RegisterModel(ZeroModel{}) chooses zero EOP
 // deliberately and stays silent.
+//
+// Past the end of a loaded bulletin, the answer is not zero: DUT1 is what
+// holds ΔT = TT − UT1 at its value on the bulletin's last day, with zero
+// polar motion, and the one-time notice says so with the held value and its
+// uncertainty. See [DeltaT] for why it is held (#696).
 func (t Time) EOP() EOP {
 	mjd := t.MJD()
 

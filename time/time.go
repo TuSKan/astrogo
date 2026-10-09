@@ -884,16 +884,14 @@ func (t Time) DecimalYear() float64 {
 	return float64(y) + (float64(m)-0.5+f)/12.0
 }
 
-// ApplyDeltaT converts a UTC/UT time to TT by applying the ΔT polynomial
-// (Espenak & Meeus 2006). This is the correct conversion for historical
-// dates, before UTC began accumulating whole leap seconds in 1972.
+// ApplyDeltaT reads t's label as UT1 and converts it to TT: TT = UT1 + ΔT,
+// with ΔT from [DeltaT] at t, the one value every conversion here uses. That
+// is the Espenak & Meeus (2006) model before 1960, the IERS bulletin's
+// measured value where it covers t, and the held value past its end.
 //
-// For modern dates (post-1972), the standard TT() method is preferred. For
-// historical dates (especially pre-1600), this method provides the only
-// reliable UT → TT bridge.
-//
-// The relationship is: TT = UT + ΔT, where ΔT = TT − UT1 encodes the
-// accumulated drift in Earth's rotation rate due to tidal friction.
+// ΔT = TT − UT1 encodes the accumulated drift in Earth's rotation rate due to
+// tidal friction. For a UTC label from 1960 on, [Time.TT] is the conversion:
+// it goes through the leap seconds instead of reading the label as UT1.
 //
 // The returned scale is TT, which is what the relationship above defines and
 // what all three paragraphs of this comment describe. It used to be tagged
@@ -902,7 +900,7 @@ func (t Time) DecimalYear() float64 {
 // plus, for anything that then asked for UTC, the whole TDB->TT->TAI->UTC
 // chain applied to a value that was already TT.
 func (t Time) ApplyDeltaT() Time {
-	dt := DeltaT(t.DecimalYear())
+	dt := DeltaT(t)
 
 	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 }
@@ -1162,8 +1160,10 @@ func dut1OrFallback(jd1, jd2 float64) float64 {
 
 // UTC returns a new Time converted to the Coordinated Universal Time scale.
 //
-// For UT1 input, the conversion uses IERS DUT1 data when available,
-// falling back to DUT1=0 (max error 0.9s) with a one-time log warning.
+// For UT1 input, the conversion uses IERS DUT1 data when available. Past the
+// bulletin's end it uses the DUT1 that holds ΔT at its value on the bulletin's
+// last day, and with no data at all it falls back to DUT1=0 (max error 0.9 s
+// while leap seconds last); either way with a one-time log warning.
 func (t Time) UTC() Time {
 	if t.scale == UTC {
 		return t
@@ -1207,9 +1207,9 @@ func (t Time) UTC() Time {
 		// of a second, so a TT inside that sliver has no UTC on the ΔAT side
 		// and is read through ΔT, the side it is nearer.
 		if t.jd1+t.jd2 < jd1960+(deltaAT(1960, 1, 1, 0)+32.184)/daySeconds {
-			dt := DeltaT(t.DecimalYear())
+			dt := deltaTModel(t.DecimalYear())
 			approx := fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
-			dt = DeltaT(approx.DecimalYear())
+			dt = deltaTModel(approx.DecimalYear())
 
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
 		}
@@ -1311,12 +1311,12 @@ func (t Time) TAI() Time {
 
 // TT returns a new Time converted to the Terrestrial Time scale.
 //
-// For modern dates (post-1972), the conversion applies leap seconds:
-// TT = UTC + ΔAT + 32.184s. For historical dates (pre-1972), where leap
-// seconds do not exist, the Espenak & Meeus (2006) ΔT polynomial is used
-// automatically: TT = UT + ΔT. This means .TT() and .TDB() produce correct
-// results for any epoch from -1999 to +3000 without requiring the user to
-// call ApplyDeltaT() explicitly.
+// From 1960, when UTC began, the conversion applies leap seconds:
+// TT = UTC + ΔAT + 32.184s. Before 1960 there is no UTC, and the label is read
+// as UT through the Espenak & Meeus (2006) model [DeltaT] returns there:
+// TT = UT + ΔT. This means .TT() and .TDB() produce correct results for any
+// epoch from -1999 to +3000 without requiring the user to call
+// ApplyDeltaT() explicitly.
 //
 // # Where ΔAT comes from
 //
@@ -1353,7 +1353,7 @@ func (t Time) TT() Time {
 		// own TAI−UTC does there.
 		if t.jd1+t.jd2 < jd1960 {
 			// Historical date: use ΔT polynomial (TT = UT + ΔT)
-			dt := DeltaT(t.DecimalYear())
+			dt := deltaTModel(t.DecimalYear())
 			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 		}
 		// Modern date: TT = UTC + ΔAT + 32.184s, the first step through
@@ -1513,7 +1513,12 @@ func (t Time) TCB() Time {
 // was called for [github.com/TuSKan/astrogo/remote.IERSFinals2000A]) a
 // network fetch.
 //
-// Returns an error when a loaded bulletin does not reach the epoch: unlike
+// Past the bulletin's end it answers with ΔT held at its value on the
+// bulletin's last day, the forecast every conversion uses there, and the
+// one-time notice saying so; it used to fail there, while Time.EOP and the
+// conversions answered with DUT1=0 (#696). See [DeltaT].
+//
+// Returns an error when a loaded bulletin starts after the epoch: unlike
 // [Time.EOP] and [Time.UTC]'s UT1 branch, this method propagates that
 // failure rather than degrading to DUT1=0. When nothing was loaded at all,
 // as in a program that never imported remote/eop, it degrades like them,

@@ -27,12 +27,12 @@ func TestDeltaT_KnownValues(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		dt := DeltaT(tt.year)
+		dt := deltaTModel(tt.year)
 		if dt < tt.wantMin || dt > tt.wantMax {
-			t.Errorf("DeltaT(%.0f) = %.1f, want [%.1f, %.1f] (%s)",
+			t.Errorf("deltaTModel(%.0f) = %.1f, want [%.1f, %.1f] (%s)",
 				tt.year, dt, tt.wantMin, tt.wantMax, tt.desc)
 		} else {
-			t.Logf("DeltaT(%.0f) = %.1f s (%s)", tt.year, dt, tt.desc)
+			t.Logf("deltaTModel(%.0f) = %.1f s (%s)", tt.year, dt, tt.desc)
 		}
 	}
 }
@@ -44,13 +44,13 @@ func TestDeltaT_SegmentContinuity(t *testing.T) {
 
 	for _, b := range boundaries {
 		eps := 0.001 // 0.001 year ≈ 8.76 hours
-		left := DeltaT(b - eps)
-		right := DeltaT(b + eps)
+		left := deltaTModel(b - eps)
+		right := deltaTModel(b + eps)
 		jump := math.Abs(right - left)
 
 		maxJump := 1.0 // 1 second max discontinuity
 		if jump > maxJump {
-			t.Errorf("Discontinuity at year %.0f: left=DeltaT(%.3f)=%.2f, right=DeltaT(%.3f)=%.2f, jump=%.2f",
+			t.Errorf("Discontinuity at year %.0f: left=deltaTModel(%.3f)=%.2f, right=deltaTModel(%.3f)=%.2f, jump=%.2f",
 				b, b-eps, left, b+eps, right, jump)
 		} else {
 			t.Logf("Boundary %.0f: jump = %.4f s (left=%.2f, right=%.2f)", b, jump, left, right)
@@ -61,11 +61,11 @@ func TestDeltaT_SegmentContinuity(t *testing.T) {
 func TestDeltaT_MonotonicModern(t *testing.T) {
 	// ΔT should be roughly monotonically increasing in the modern era (1900-2050)
 	// due to tidal deceleration of Earth's rotation.
-	prev := DeltaT(1900)
+	prev := deltaTModel(1900)
 	for y := 1905.0; y <= 2050; y += 5 {
-		cur := DeltaT(y)
+		cur := deltaTModel(y)
 		if cur < prev-1.0 { // allow 1s tolerance for the 1900-1920 dip
-			t.Errorf("DeltaT decreased unexpectedly: DeltaT(%.0f)=%.1f > DeltaT(%.0f)=%.1f",
+			t.Errorf("deltaTModel decreased unexpectedly: deltaTModel(%.0f)=%.1f > deltaTModel(%.0f)=%.1f",
 				y-5, prev, y, cur)
 		}
 
@@ -85,16 +85,16 @@ func TestDeltaTUncertainty_KnownValues(t *testing.T) {
 		{"1000 CE: medieval", 1000, 50, 60},
 		{"1500 CE: pre-telescopic", 1500, 15, 25},
 		{"1700 CE: early telescopic", 1700, 1.5, 5.5},
-		{"2000 CE: modern observations", 2000, 0, 0.1},
+		{"1950 CE: before the observed record", 1950, 0.2, 0.2},
 	}
 
 	for _, tt := range tests {
-		sigma := DeltaTUncertainty(tt.year)
+		sigma := deltaTUncertaintyHistorical(tt.year)
 		if sigma < tt.wantMin || sigma > tt.wantMax {
-			t.Errorf("DeltaTUncertainty(%.0f) = %.1f, want [%.1f, %.1f] (%s)",
+			t.Errorf("deltaTUncertaintyHistorical(%.0f) = %.1f, want [%.1f, %.1f] (%s)",
 				tt.year, sigma, tt.wantMin, tt.wantMax, tt.desc)
 		} else {
-			t.Logf("DeltaTUncertainty(%.0f) = %.1f s (%s)", tt.year, sigma, tt.desc)
+			t.Logf("deltaTUncertaintyHistorical(%.0f) = %.1f s (%s)", tt.year, sigma, tt.desc)
 		}
 	}
 }
@@ -121,12 +121,12 @@ func TestDeltaT_MatchesNASATable(t *testing.T) {
 	}
 
 	for _, tt := range table {
-		dt := DeltaT(tt.year)
+		dt := deltaTModel(tt.year)
 		if math.Abs(dt-tt.dt) > tt.tol {
-			t.Errorf("DeltaT(%.0f) = %.1f, want %.1f ±%.1f",
+			t.Errorf("deltaTModel(%.0f) = %.1f, want %.1f ±%.1f",
 				tt.year, dt, tt.dt, tt.tol)
 		} else {
-			t.Logf("DeltaT(%.0f) = %.1f (NASA: %.1f)", tt.year, dt, tt.dt)
+			t.Logf("deltaTModel(%.0f) = %.1f (NASA: %.1f)", tt.year, dt, tt.dt)
 		}
 	}
 }

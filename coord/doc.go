@@ -120,6 +120,9 @@
 // Both [Context] and [Reducer] query the global IERS EOP model for DUT1 and
 // polar motion (XP/YP). If IERS data is unavailable, a one-time log warning
 // is emitted and zero corrections are applied (UT1 ≈ UTC, ~0.9 s worst case).
+// Past the end of a loaded bulletin, DUT1 instead holds ΔT at its value on
+// the bulletin's last day, the forecast every time conversion uses; see
+// [time.DeltaT].
 //
 // # Concurrency
 //

@@ -373,7 +373,7 @@ func TestPre1972EpochsIgnoreTheRegistryEntirely(t *testing.T) {
 	// ΔT is about −2.8 s, while the smallest ΔAT-based answer the registry
 	// could produce is 10 + 32.184 s — so the two are not near each other and
 	// this cannot pass by coincidence.
-	if want := time.DeltaT(when.DecimalYear()); math.Abs(before-want) > 1e-9 {
+	if want := time.DeltaT(when); math.Abs(before-want) > 1e-9 {
 		t.Errorf("TT−UTC at 1900 = %g s, want ΔT = %g s", before, want)
 	}
 }

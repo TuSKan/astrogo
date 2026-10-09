@@ -705,17 +705,33 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 	t.Logf("══════════════════════════════════════════════════════════")
 }
 
-// TestNASA_DeltaT_CrossValidation verifies that astrogo's time.DeltaT polynomial
+// eclipseDate is the calendar date of a catalog eclipse at 0h, in the
+// calendar the catalog prints it in: Julian before 1582 October 15.
+func eclipseDate(ref nasaEclipseRef) time.Time {
+	if ref.Year < 1582 || (ref.Year == 1582 && (ref.Month < 10 || (ref.Month == 10 && ref.Day < 15))) {
+		return time.DateJulianCal(ref.Year, ref.Month, ref.Day, 0, 0, 0)
+	}
+
+	return time.Date(ref.Year, time.Month(ref.Month), ref.Day, 0, 0, 0, 0, time.LocationUTC)
+}
+
+// TestNASA_DeltaT_CrossValidation verifies that astrogo's time.DeltaT
 // matches NASA's tabulated ΔT values from the Five Millennium Eclipse Catalog.
-// Both sources use the Espenak & Meeus (2006) model, so they should agree closely.
+// Before 1960 both are the Espenak & Meeus (2006) model, so they should agree
+// closely. From 1960 time.DeltaT is the measured TT − UT1 the conversions use
+// (#696), and this test binary loads no IERS bulletin, so it is the zero-DUT1
+// fallback, ΔAT + 32.184 s: within the 0.9 s leap seconds keep UT1 − UTC
+// inside, as the catalog's observed values are.
 //
 // Until #398 it asserted nothing: a difference over 10 s was logged as a
 // warning, and the test passed whatever time.DeltaT returned. The bound now
 // comes from the two things that separate the sides when the model agrees.
-// The catalog prints ΔT in whole seconds, 1 s at most. And this test evaluates
-// ΔT at mid-month rather than on the eclipse's date, up to half a month early
-// or late, which is 0.4 s in the first century, where ΔT falls fastest, near
-// 10 s a year. Measured over 1213 rows: 0.9 s at worst.
+// The catalog prints ΔT in whole seconds, 1 s at most. And ΔT is evaluated on
+// the eclipse's date, which Time.DecimalYear reads as the middle of its month
+// until #697: up to half a month early or late, 0.4 s in the first century,
+// where ΔT falls fastest, near 10 s a year. From 1960 the zero-DUT1 fallback
+// adds up to 0.9 s. Measured over 1213 rows: 0.9 s at worst before 1960, and
+// 1.2 s in 1901–2000, where it was 0.9 s against the model.
 func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 	const deltaTTolerance = 1.5 // seconds
 
@@ -760,8 +776,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 			// for eclipses around 1902, when ΔT crossed zero — and a field
 			// that does not parse was already reported by the parser.
 			for _, ref := range refs {
-				decYear := float64(ref.Year) + (float64(ref.Month)-0.5)/12.0
-				computed := time.DeltaT(decYear)
+				computed := time.DeltaT(eclipseDate(ref))
 				delta := math.Abs(computed - ref.DeltaT)
 
 				count++

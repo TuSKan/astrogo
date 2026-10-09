@@ -2,7 +2,47 @@ package time
 
 import "math"
 
-// DeltaT returns ΔT = TT − UT1 in seconds for a given decimal year.
+// DeltaT returns ΔT = TT − UT1 at t, in seconds: the one value of it every
+// conversion in this package uses.
+//
+// It has three regimes, by where t falls:
+//
+//   - Before 1960, before UTC existed: the Espenak & Meeus (2006) model, read
+//     at t's decimal year. [Time.TT] reads a UTC label from before 1960 as UT
+//     through the same function.
+//   - From 1960, where the IERS bulletin covers t: the measured value,
+//     ΔAT + 32.184 s − DUT1, exactly the difference [Time.TT] and [Time.UT1]
+//     put between the labels of one instant.
+//   - Past the bulletin's end: ΔT held at its value on the bulletin's last
+//     day. See [Time.EOP] for why it is held rather than extrapolated, and
+//     [DeltaTUncertainty] for what holding it costs.
+//
+// With no bulletin loaded, the second and third regimes read DUT1 as zero, as
+// the conversions do, and the one-time EOP warning says so.
+//
+// It used to be the model at every epoch, while the conversions used the
+// bulletin, and the two disagreed for one instant: by 6.2 s in 2026, where
+// the model, fitted before the Earth's rotation sped up, still rises at
+// 0.6 s a year and the measured ΔT has been flat since 2020; and by 134 s in
+// 2100, where the conversions held DUT1 at zero (#696).
+//
+// From 1960 the value comes from the EOP lookup, so it can trigger the same
+// lazy load [Time.EOP] does.
+func DeltaT(t Time) float64 {
+	u := t.UTC()
+	if u.jd1+u.jd2 < jd1960 {
+		return deltaTModel(u.DecimalYear())
+	}
+
+	tt1, tt2 := u.TT().JDParts()
+	ut1 := u.UT1Using(dut1OrFallback(u.jd1, u.jd2))
+
+	return ((tt1 - ut1.jd1) + (tt2 - ut1.jd2)) * daySeconds
+}
+
+// deltaTModel is ΔT = TT − UT1 in seconds for a decimal year, by the Espenak &
+// Meeus (2006) model: what [DeltaT] returns before 1960, and the reading of a
+// pre-1960 UTC label as UT in [Time.TT] and [Time.UTC].
 //
 // This implements the Espenak & Meeus (2006) polynomial expressions from the
 // "Five Millennium Canon of Solar Eclipses" (NASA/TP-2006-214141), valid for
@@ -16,13 +56,8 @@ import "math"
 //
 //	c = −0.000012932 × (y − 1955)²
 //
-// ΔT is the difference between Terrestrial Time (the uniform time scale used
-// by planetary ephemerides) and Universal Time (based on Earth's rotation).
-// For historical dates before 1972, this is the primary mechanism to convert
-// between civil time (UT) and ephemeris time (TT/TDB). For modern dates,
-// the relationship is: ΔT = ΔAT + 32.184s − DUT1, where ΔAT is the
-// leap-second count carried by time (see the pinned record in
-// leapsecond_golden_test.go) and DUT1 comes from IERS EOP data.
+// Its segments after 1960 are kept, and still tested, as the model; nothing
+// reads them for an epoch. From 1960 [DeltaT] is the measured value.
 //
 // References:
 //   - https://eclipse.gsfc.nasa.gov/LEcat5/deltatpoly.html
@@ -31,7 +66,7 @@ import "math"
 //     Vol. 35, pp 327–336.
 //   - Chapront, Chapront-Touzé, and Francou (2002). Lunar laser ranging value
 //     for Moon's secular acceleration: n-dot = −25.858 arcsec/cy².
-func DeltaT(year float64) float64 {
+func deltaTModel(year float64) float64 {
 	y := year
 
 	var dt float64
@@ -119,43 +154,77 @@ func DeltaT(year float64) float64 {
 	return dt
 }
 
-// DeltaTUncertainty returns the estimated standard error σ of ΔT in seconds
-// for a given year.
+// DeltaTUncertainty returns the estimated standard error σ of [DeltaT] at t,
+// in seconds.
 //
-// The uncertainty arises from fluctuations in Earth's rotation rate that
-// are not captured by the smooth polynomial model. Three regimes are used:
+// Before 1955 it is the historical model's, from the fluctuations in the
+// Earth's rotation that the smooth polynomial does not capture:
 //
 // For −1000 to +1200 CE: Morrison & Stephenson (2004) parabolic model:
 //
 //	σ = 0.8 × t² seconds, where t = (year − 1820) / 100
 //
-// For 1300 to 1600 CE: decade fluctuations give σ ≈ 20 seconds.
+// For 1300 to 1600 CE: decade fluctuations give σ ≈ 20 seconds. For the
+// telescopic era, uncertainties decrease from ~5 s to 0.2 s by 1955. Before
+// −500 CE: the Huber (2000) random walk below, from −500.
 //
-// For years outside the observed epoch (before −500 CE or after 2005 CE):
-// Huber (2000) Brownian motion model with drift:
+// From 1955 to the end of the measured record ΔT is observed, and σ is zero.
+// The record ends on the IERS bulletin's last day. Past it [DeltaT] holds the
+// last measured value, and σ is the Huber (2000) Brownian-motion model of
+// the Earth's rotation, from the record's end:
 //
 //	σ = 365.25 × N × √(N×Q/3 × (1 + N/M)) / 1000
-//	where N = |year − calibrationYear|, M = 2500, Q = 0.058 ms²/yr
+//	where N = years past the end, M = 2500, Q = 0.058 ms²/yr
 //
-// For the telescopic era (1600–present), uncertainties decrease from ~5s
-// to effectively zero for modern observations.
+// With no bulletin loaded, the record is taken to end in 2005, the end of the
+// observations the model was fitted to, which is where this used to start
+// every caller's random walk (#696).
 //
 // References:
 //   - https://eclipse.gsfc.nasa.gov/LEcat5/uncertainty.html
 //   - Morrison, L. and Stephenson, F. R. (2004).
 //   - Huber, P. J. (2000). "Modeling the Length of Day and Extrapolating
 //     the Rotation of the Earth".
-func DeltaTUncertainty(year float64) float64 {
+func DeltaTUncertainty(t Time) float64 {
+	year := t.UTC().DecimalYear()
+	if year < 1955 {
+		return deltaTUncertaintyHistorical(year)
+	}
+
+	// The lookup is what loads a bulletin, if one is to be loaded; Coverage
+	// only reports the model already registered.
+	mjd := t.MJD()
+	_, _, _ = lookupEOP(mjd)
+
+	if _, last, ok := Coverage(); ok {
+		return huberSigma((mjd - last) / 365.25)
+	}
+
+	return huberSigma(year - 2005)
+}
+
+// huberSigma is the Huber (2000) random walk's σ of ΔT, in seconds, n years
+// from the last observation; zero at or before it.
+func huberSigma(n float64) float64 {
 	const (
 		M = 2500.0 // observed ΔT measurement span (years)
 		Q = 0.058  // intrinsic LOD variability (ms²/yr)
 	)
 
+	if n <= 0 {
+		return 0
+	}
+
+	return 365.25 * n * math.Sqrt(n*Q/3.0*(1.0+n/M)) / 1000.0
+}
+
+// deltaTUncertaintyHistorical is [DeltaTUncertainty] before 1955, by decimal
+// year.
+func deltaTUncertaintyHistorical(year float64) float64 {
 	switch {
 	case year < -500:
 		// Huber Brownian motion model, calibration year = -500
-		N := math.Abs(year - (-500))
-		return 365.25 * N * math.Sqrt(N*Q/3.0*(1.0+N/M)) / 1000.0
+		return huberSigma(-500 - year)
 
 	case year < 1200:
 		// Morrison & Stephenson parabolic model
@@ -178,16 +247,7 @@ func DeltaTUncertainty(year float64) float64 {
 	case year < 1900:
 		return 0.5
 
-	case year < 1955:
-		return 0.2
-
-	case year <= 2005:
-		// Direct observations — effectively zero uncertainty
-		return 0.0
-
 	default:
-		// Huber Brownian motion model, calibration year = 2005
-		N := math.Abs(year - 2005)
-		return 365.25 * N * math.Sqrt(N*Q/3.0*(1.0+N/M)) / 1000.0
+		return 0.2
 	}
 }
