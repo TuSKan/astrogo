@@ -24,7 +24,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Perihelion/Aphelion | `TestUSNO_Apsides` | ✅ PASS | **≤1 minute** |
 | Lunar/Solar Eclipses | `TestUSNO_Eclipses` | ✅ PASS | date-exact vs NASA |
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
-| Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | sanity validated |
+| Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | **≤0.05 ms** at six epochs 1990–2049, USNO's own rounding; held to 0.2 ms. An offline fixture, so it runs without the integration tag |
 | **Edge Cases** | | | |
 | Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | circumpolar agreement |
 | High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | 0m vs USNO ≤0.5 min |
