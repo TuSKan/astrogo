@@ -2,4 +2,4 @@
 type: Fixed
 pr: 684
 ---
-**Four `VALIDATION.md` rows gave the measured worst case as their tolerance**, four to five times tighter than their tests assert: Sun rise and set 0.6 min against 2, Moon rise and set 0.6 against 3, Moon phases 6.0 against 30, and ΔT 0.9 s against 1.5. Each now states the asserted bound, with the measurement in its notes.
+**Rise, set and transit are now held to 1 minute of USNO**, for the Sun and the Moon at every site from the poles to Everest: USNO's half-minute rounding plus half a minute. Rise and set were held to 2 minutes for the Sun and 3 for the Moon, 5 near the poles, loose enough that the Moon rising on its center instead of its upper limb passed; the worst measured is 0.65 min. A USNO event astrogo misses, or one it reports that USNO does not list, now fails. Four `VALIDATION.md` rows that gave a measurement as their tolerance now state the asserted bound.

@@ -323,9 +323,9 @@ func checkUSNOCivilTwilight(t *testing.T, phen string, h, m int, ev *plan.Event,
 		phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
 
 	// USNO rounds to the nearest minute, so 0.5 min is rounding alone, and
-	// that is the most measured over the nine site-days here. Rise and set
-	// get 2 min for refraction and horizon dip; twilight is a geometric
-	// −6° with neither, so 1 min is rounding plus half a minute of margin.
+	// that is the most measured over the nine site-days here. Twilight is a
+	// geometric −6°, so 1 min is rounding plus half a minute of margin: the
+	// same bound rise and set are held to, see usnoTolerance.
 	// Measured, a −5.5° threshold moves these eighteen events by 1.8 to
 	// 5.3 min, so half a degree of error cannot pass.
 	const tol = 1.0
@@ -394,7 +394,6 @@ func newEph(t *testing.T) eph.Provider {
 
 // ── Test: Complete Sun and Moon Data for One Day ──────────────────────────────
 
-//nolint:dupl,gocognit // the Sun and Moon blocks read different USNO response fields and are kept parallel so each stays readable against its own source; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_SunMoonOneDay(t *testing.T) {
 	requireUSNO(t)
 
@@ -468,121 +467,22 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 						continue
 					}
 
-					usnoMin := minutesFromMidnight(h, m)
-
-					var matchKind plan.EventKind
-
 					switch sp.Phen {
-					case "Rise":
-						matchKind = plan.EventRise
-					case "Set":
-						matchKind = plan.EventSet
-					case "Upper Transit":
-						matchKind = plan.EventTransit
 					case "Begin Civil Twilight":
 						checkUSNOCivilTwilight(t, sp.Phen, h, m, civilDawn, tz)
-
-						continue
 					case "End Civil Twilight":
 						checkUSNOCivilTwilight(t, sp.Phen, h, m, civilDusk, tz)
-
-						continue
-					default:
-						continue
-					}
-
-					found := false
-
-					for _, ev := range sunEvents {
-						if ev.Kind != matchKind {
-							continue
-						}
-
-						astroMin := eventMinutesIn(ev.Time, tz)
-						delta := deltaMinutes(usnoMin, astroMin)
-						t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
-							sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-						// Rise/Set: 2 min tolerance (topocentric + horizon dip)
-						// Transit: 1 min tolerance (no refraction dependence)
-						tol := 2.0
-						if matchKind == plan.EventTransit {
-							tol = 1.0
-						}
-
-						if delta > tol {
-							t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", sp.Phen, delta, tol)
-						}
-
-						found = true
-
-						break
-					}
-
-					if !found {
-						t.Logf("Sun %s at %02d:%02d: no matching astrogo event found", sp.Phen, h, m)
 					}
 				}
 
-				// Compare Moon events
+				compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, tz)
+
 				moonEvents, err := plan.MoonEvents(start, end, site, prov)
 				if err != nil {
 					t.Fatalf("MoonEvents failed: %v", err)
 				}
 
-				for _, mp := range resp.Properties.Data.MoonData {
-					h, m, ok := parseUSNOTime(mp.Time)
-					if !ok {
-						continue
-					}
-
-					usnoMin := minutesFromMidnight(h, m)
-
-					var matchKind plan.EventKind
-
-					switch mp.Phen {
-					case "Rise":
-						matchKind = plan.EventRise
-					case "Set":
-						matchKind = plan.EventSet
-					case "Upper Transit":
-						matchKind = plan.EventTransit
-					default:
-						continue
-					}
-
-					found := false
-
-					for _, ev := range moonEvents {
-						if ev.Kind != matchKind {
-							continue
-						}
-
-						astroMin := eventMinutesIn(ev.Time, tz)
-						delta := deltaMinutes(usnoMin, astroMin)
-						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
-							mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-						// Moon: 3 min rise/set tolerance (topocentric parallax + refraction)
-						// Transit: 1 min tolerance
-						tol := 3.0
-						if matchKind == plan.EventTransit {
-							tol = 1.0
-						}
-
-						if delta > tol {
-							t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance", mp.Phen, delta, tol)
-						}
-
-						found = true
-
-						break
-					}
-
-					if !found {
-						t.Logf("Moon %s at %02d:%02d: no matching astrogo event found", mp.Phen, h, m)
-					}
-				}
+				compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, site.MoonRiseSetThreshold(), start, tz)
 			})
 		}
 	}
@@ -948,36 +848,33 @@ var edgeCaseLocations = []testLocation{
 
 // ── Test: Polar Sun — Midnight Sun / Polar Night ─────────────────────────────
 // At the poles, the Sun can remain continuously above or below the horizon.
-// USNO returns "null" for the time field when a body doesn't rise or set.
-// This test validates:
-// 1. USNO agrees the Sun is circumpolar / below horizon for the date.
-// 2. astrogo's SunEvents returns no rise/set events for polar night/midnight sun.
-// 3. When events DO exist near the polar boundary, they agree within tolerance.
+// In every response these tests receive, USNO leaves out an event that does
+// not happen rather than listing it as null, so compareUSNOEvents's counts
+// carry the check: no sunrise listed means astrogo must find none, and an
+// upper transit is listed only in the midnight sun.
 
-//nolint:gocognit // the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_PolarSun(t *testing.T) {
 	requireUSNO(t)
 
 	eph := newEph(t)
 
 	cases := []struct {
-		name   string
-		loc    testLocation
-		date   string
-		expect string // "midnightsun", "polarnight", or "normal"
+		name string
+		loc  testLocation
+		date string
 	}{
 		// North Pole — summer (midnight sun)
-		{"NorthPole/MidnightSun", edgeCaseLocations[0], "2026-06-21", "midnightsun"},
+		{"NorthPole/MidnightSun", edgeCaseLocations[0], "2026-06-21"},
 		// North Pole — winter (polar night)
-		{"NorthPole/PolarNight", edgeCaseLocations[0], "2026-12-21", "polarnight"},
+		{"NorthPole/PolarNight", edgeCaseLocations[0], "2026-12-21"},
 		// South Pole — winter (polar night for south = June)
-		{"SouthPole/PolarNight", edgeCaseLocations[1], "2026-06-21", "polarnight"},
+		{"SouthPole/PolarNight", edgeCaseLocations[1], "2026-06-21"},
 		// South Pole — summer (midnight sun for south = December)
-		{"SouthPole/MidnightSun", edgeCaseLocations[1], "2026-12-21", "midnightsun"},
+		{"SouthPole/MidnightSun", edgeCaseLocations[1], "2026-12-21"},
 		// Tromsø — summer (midnight sun)
-		{"Tromsø/MidnightSun", edgeCaseLocations[4], "2026-06-21", "midnightsun"},
+		{"Tromsø/MidnightSun", edgeCaseLocations[4], "2026-06-21"},
 		// Tromsø — spring equinox (normal rise/set)
-		{"Tromsø/Equinox", edgeCaseLocations[4], "2026-03-20", "normal"},
+		{"Tromsø/Equinox", edgeCaseLocations[4], "2026-03-20"},
 	}
 
 	for _, tc := range cases {
@@ -997,37 +894,6 @@ func TestUSNO_PolarSun(t *testing.T) {
 			if err := json.Unmarshal(body, &resp); err != nil {
 				t.Fatalf("Failed to parse USNO response: %v", err)
 			}
-
-			// Catalog USNO Sun phenomena — count rise/set vs null entries
-			var (
-				hasRise, hasSet, hasTransit bool
-				riseNull, setNull           bool
-			)
-
-			for _, sp := range resp.Properties.Data.SunData {
-				_, _, ok := parseUSNOTime(sp.Time)
-				switch sp.Phen {
-				case "Rise":
-					if ok {
-						hasRise = true
-					} else {
-						riseNull = true
-					}
-				case "Set":
-					if ok {
-						hasSet = true
-					} else {
-						setNull = true
-					}
-				case "Upper Transit":
-					if ok {
-						hasTransit = true
-					}
-				}
-			}
-
-			t.Logf("USNO Sun: rise=%v(null=%v) set=%v(null=%v) transit=%v",
-				hasRise, riseNull, hasSet, setNull, hasTransit)
 
 			// Set up astrogo — use UTC to match USNO query timezone
 			var y, mo, d int
@@ -1055,78 +921,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
 
-			// Count astrogo events
-			var astroRise, astroSet, astroTransit int
-
-			for _, ev := range sunEvents {
-				//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
-				switch ev.Kind {
-				case plan.EventRise:
-					astroRise++
-				case plan.EventSet:
-					astroSet++
-				case plan.EventTransit:
-					astroTransit++
-				}
-			}
-
-			t.Logf("astrogo Sun events: %d rise, %d set, %d transit", astroRise, astroSet, astroTransit)
-
-			switch tc.expect {
-			case "midnightsun":
-				// USNO should show no rise/set times (null)
-				// astrogo should produce zero rise/set events
-				if hasRise {
-					t.Logf("USNO reports Sun rise during midnight sun — checking astrogo agrees")
-				}
-
-				if hasSet {
-					t.Logf("USNO reports Sun set during midnight sun — checking astrogo agrees")
-				}
-
-				if !hasRise && !hasSet {
-					// Circumpolar: astrogo should have no rise/set either
-					if astroRise != 0 {
-						t.Errorf("Expected 0 Sun rises (midnight sun), got %d", astroRise)
-					}
-
-					if astroSet != 0 {
-						t.Errorf("Expected 0 Sun sets (midnight sun), got %d", astroSet)
-					}
-
-					t.Logf("✓ Both USNO and astrogo agree: Sun does not rise/set (midnight sun)")
-				}
-
-			case "polarnight":
-				// USNO should show no rise/set times (null)
-				// astrogo should produce zero rise/set events
-				if !hasRise && !hasSet {
-					if astroRise != 0 {
-						t.Errorf("Expected 0 Sun rises (polar night), got %d", astroRise)
-					}
-
-					if astroSet != 0 {
-						t.Errorf("Expected 0 Sun sets (polar night), got %d", astroSet)
-					}
-
-					t.Logf("✓ Both USNO and astrogo agree: Sun does not rise/set (polar night)")
-				}
-
-			case "normal":
-				// Both USNO and astrogo should find rise/set events
-				if hasRise && astroRise == 0 {
-					t.Errorf("USNO reports sunrise but astrogo found none")
-				}
-
-				if hasSet && astroSet == 0 {
-					t.Errorf("USNO reports sunset but astrogo found none")
-				}
-
-				// Compare times if both have events
-				if hasRise && astroRise > 0 {
-					compareSunMoonEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, time.LocationUTC, 5.0)
-				}
-			}
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, time.LocationUTC)
 		})
 	}
 }
@@ -1139,12 +934,11 @@ func TestUSNO_PolarSun(t *testing.T) {
 // IMPORTANT: The USNO rstt/oneday API ignores the height parameter for rise/set
 // times (verified empirically: height=0 and height=8849 return identical results).
 // Therefore this test:
-//  1. Compares USNO (sea-level) against astrogo at sea-level (height=0) — must match ≤2 min.
+//  1. Compares USNO (sea-level) against astrogo at sea-level (height=0), within usnoTolerance.
 //  2. Compares astrogo at 8849m vs astrogo at 0m — validates altitude correction is physical
 //     (sunrise earlier, sunset later, shift ≈ 10–15 min at Everest latitude).
-//  3. Transit times (height-independent) are compared against USNO — must match ≤2 min.
+//  3. Transit times (height-independent) are compared against USNO, within usnoTolerance.
 
-//nolint:gocognit // the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_HighAltitude(t *testing.T) {
 	requireUSNO(t)
 
@@ -1211,96 +1005,11 @@ func TestUSNO_HighAltitude(t *testing.T) {
 				t.Fatalf("MoonEvents (8849m) failed: %v", err)
 			}
 
-			// ── Part 1: Sea-level astrogo vs USNO (must match ≤2 minutes) ──
+			// ── Part 1: Sea-level astrogo vs USNO, within usnoTolerance ──
 			t.Log("── Sea-level comparison (astrogo 0m vs USNO) ──")
 
-			for _, sp := range resp.Properties.Data.SunData {
-				h, m, ok := parseUSNOTime(sp.Time)
-				if !ok {
-					continue
-				}
-
-				usnoMin := minutesFromMidnight(h, m)
-
-				var matchKind plan.EventKind
-
-				switch sp.Phen {
-				case "Rise":
-					matchKind = plan.EventRise
-				case "Set":
-					matchKind = plan.EventSet
-				case "Upper Transit":
-					matchKind = plan.EventTransit
-				default:
-					continue
-				}
-
-				for _, ev := range sunEvents0 {
-					if ev.Kind != matchKind {
-						continue
-					}
-
-					astroMin := eventMinutesIn(ev.Time, tz)
-					delta := deltaMinutes(usnoMin, astroMin)
-					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
-						sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-					tol := 2.0
-					if matchKind == plan.EventTransit {
-						tol = 1.0
-					}
-
-					if delta > tol {
-						t.Errorf("Sun %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", sp.Phen, delta, tol)
-					}
-
-					break
-				}
-			}
-
-			for _, mp := range resp.Properties.Data.MoonData {
-				h, m, ok := parseUSNOTime(mp.Time)
-				if !ok {
-					continue
-				}
-
-				usnoMin := minutesFromMidnight(h, m)
-
-				var matchKind plan.EventKind
-
-				switch mp.Phen {
-				case "Rise":
-					matchKind = plan.EventRise
-				case "Set":
-					matchKind = plan.EventSet
-				case "Upper Transit":
-					matchKind = plan.EventTransit
-				default:
-					continue
-				}
-
-				for _, ev := range moonEvents0 {
-					if ev.Kind != matchKind {
-						continue
-					}
-
-					astroMin := eventMinutesIn(ev.Time, tz)
-					delta := deltaMinutes(usnoMin, astroMin)
-					t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo(0m)=%s  Δ=%.1f min",
-						mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-					tol := 3.0
-					if matchKind == plan.EventTransit {
-						tol = 1.0
-					}
-
-					if delta > tol {
-						t.Errorf("Moon %s (0m vs USNO): Δ=%.1f min exceeds %.0f min", mp.Phen, delta, tol)
-					}
-
-					break
-				}
-			}
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents0, site0.SunRiseSetThreshold(), start, tz)
+			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents0, site0.MoonRiseSetThreshold(), start, tz)
 
 			// ── Part 2: Altitude correction (astrogo 8849m vs 0m) ──
 			t.Log("── Altitude correction (8849m vs 0m) ──")
@@ -1416,58 +1125,7 @@ func TestUSNO_Equator(t *testing.T) {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
 
-			for _, sp := range resp.Properties.Data.SunData {
-				h, m, ok := parseUSNOTime(sp.Time)
-				if !ok {
-					continue
-				}
-
-				usnoMin := minutesFromMidnight(h, m)
-
-				var matchKind plan.EventKind
-
-				switch sp.Phen {
-				case "Rise":
-					matchKind = plan.EventRise
-				case "Set":
-					matchKind = plan.EventSet
-				case "Upper Transit":
-					matchKind = plan.EventTransit
-				default:
-					continue
-				}
-
-				found := false
-
-				for _, ev := range sunEvents {
-					if ev.Kind != matchKind {
-						continue
-					}
-
-					astroMin := eventMinutesIn(ev.Time, time.LocationUTC)
-					delta := deltaMinutes(usnoMin, astroMin)
-					t.Logf("Sun %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
-						sp.Phen, h, m, ev.Time.In(time.LocationUTC).Format("15:04:05"), delta)
-
-					// Equator: standard tolerances
-					tol := 2.0
-					if matchKind == plan.EventTransit {
-						tol = 1.0
-					}
-
-					if delta > tol {
-						t.Errorf("Sun %s: Δ=%.1f min exceeds %.0f min tolerance", sp.Phen, delta, tol)
-					}
-
-					found = true
-
-					break
-				}
-
-				if !found {
-					t.Logf("Sun %s at %02d:%02d: no matching astrogo event", sp.Phen, h, m)
-				}
-			}
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, time.LocationUTC)
 
 			// At the equator, day length should always be ~12h (± 10 minutes)
 			var (
@@ -1506,7 +1164,6 @@ func TestUSNO_Equator(t *testing.T) {
 // The Moon at polar latitudes can also be circumpolar or below horizon for
 // extended periods. This tests the Moon event solver at extreme latitudes.
 
-//nolint:dupl,gocognit // the Sun and Moon blocks read different USNO response fields and are kept parallel so each stays readable against its own source; the branching is the reference comparison itself; splitting it separates a fixture from the assertions that read it
 func TestUSNO_PolarMoon(t *testing.T) {
 	requireUSNO(t)
 
@@ -1545,37 +1202,6 @@ func TestUSNO_PolarMoon(t *testing.T) {
 				t.Fatalf("Failed to parse USNO response: %v", err)
 			}
 
-			// Count USNO Moon events
-			var (
-				usnoMoonRise, usnoMoonSet, usnoMoonTransit int
-				usnoMoonRiseNull, usnoMoonSetNull          bool
-			)
-
-			for _, mp := range resp.Properties.Data.MoonData {
-				_, _, ok := parseUSNOTime(mp.Time)
-				switch mp.Phen {
-				case "Rise":
-					if ok {
-						usnoMoonRise++
-					} else {
-						usnoMoonRiseNull = true
-					}
-				case "Set":
-					if ok {
-						usnoMoonSet++
-					} else {
-						usnoMoonSetNull = true
-					}
-				case "Upper Transit":
-					if ok {
-						usnoMoonTransit++
-					}
-				}
-			}
-
-			t.Logf("USNO Moon: rise=%d(null=%v) set=%d(null=%v) transit=%d",
-				usnoMoonRise, usnoMoonRiseNull, usnoMoonSet, usnoMoonSetNull, usnoMoonTransit)
-
 			// Set up astrogo
 			var y, mo, d int
 			if _, err := fmt.Sscanf(tc.date, "%d-%d-%d", &y, &mo, &d); err != nil {
@@ -1611,87 +1237,12 @@ func TestUSNO_PolarMoon(t *testing.T) {
 				t.Fatalf("MoonEvents failed: %v", err)
 			}
 
-			var astroRise, astroSet, astroTransit int
-
-			for _, ev := range moonEvents {
-				//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
-				switch ev.Kind {
-				case plan.EventRise:
-					astroRise++
-				case plan.EventSet:
-					astroSet++
-				case plan.EventTransit:
-					astroTransit++
-				}
-			}
-
-			t.Logf("astrogo Moon events: %d rise, %d set, %d transit", astroRise, astroSet, astroTransit)
-
-			// If USNO says Moon never rises (null), astrogo shouldn't find rises either
-			if usnoMoonRise == 0 && usnoMoonRiseNull && astroRise > 0 {
-				t.Errorf("USNO says Moon never rises but astrogo found %d rise events", astroRise)
-			}
-			// If USNO says Moon never sets (null), astrogo shouldn't find sets either
-			if usnoMoonSet == 0 && usnoMoonSetNull && astroSet > 0 {
-				t.Errorf("USNO says Moon never sets but astrogo found %d set events", astroSet)
-			}
-
-			// If USNO has timed events, compare them
-			if usnoMoonRise > 0 || usnoMoonSet > 0 {
-				for _, mp := range resp.Properties.Data.MoonData {
-					h, m, ok := parseUSNOTime(mp.Time)
-					if !ok {
-						continue
-					}
-
-					usnoMin := minutesFromMidnight(h, m)
-
-					var matchKind plan.EventKind
-
-					switch mp.Phen {
-					case "Rise":
-						matchKind = plan.EventRise
-					case "Set":
-						matchKind = plan.EventSet
-					case "Upper Transit":
-						matchKind = plan.EventTransit
-					default:
-						continue
-					}
-
-					found := false
-
-					for _, ev := range moonEvents {
-						if ev.Kind != matchKind {
-							continue
-						}
-
-						astroMin := eventMinutesIn(ev.Time, tz)
-						delta := deltaMinutes(usnoMin, astroMin)
-						t.Logf("Moon %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
-							mp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-						// Polar locations: wider tolerance (5 minutes) due to
-						// grazing horizon geometry amplifying refraction errors
-						tol := 5.0
-						if matchKind == plan.EventTransit {
-							tol = 2.0
-						}
-
-						if delta > tol {
-							t.Errorf("Moon %s: Δ=%.1f min exceeds %.0f min tolerance", mp.Phen, delta, tol)
-						}
-
-						found = true
-
-						break
-					}
-
-					if !found {
-						t.Logf("Moon %s at %02d:%02d: no matching astrogo event", mp.Phen, h, m)
-					}
-				}
-			}
+			// In every response these tests receive, USNO leaves out an event that
+			// does not happen rather than listing it as null, so a Moon that never
+			// rises is a day with no "Rise" entry.
+			// The test used to look for the null, so an astrogo moonrise on such a
+			// day could not fail it. compareUSNOEvents holds the counts both ways.
+			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, site.MoonRiseSetThreshold(), start, tz)
 		})
 	}
 }
@@ -1775,47 +1326,116 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 	}
 }
 
-// ── Helper: compareSunMoonEvents ─────────────────────────────────────────────
+// ── Helper: compareUSNOEvents ────────────────────────────────────────────────
 
-func compareSunMoonEvents(t *testing.T, body string, usnoPhenomena []usnoPhenomenon, astroEvents []plan.Event, tz *time.Location, tol float64) {
+// usnoTolerance is how far, in minutes, an astrogo rise, set or upper transit
+// may sit from USNO's: for the Sun and the Moon alike, at every site here.
+//
+// USNO publishes whole minutes, rounded, so half a minute of any residual is
+// USNO's rounding. The other half is for what the two models do differently,
+// chiefly the Moon's semi-diameter, which astrogo holds at its mean (#693):
+// up to 28 s at 60°N. Measured on 2026-10-09 over every comparison in this
+// file, Tromsø at 69.6°N included: 0.6 min at worst.
+//
+// It used to be 2 minutes for the Sun and 3 for the Moon, and 5 at the polar
+// sites. Neither caught a body rising on its center instead of its upper
+// limb: with each semi-diameter removed, the Sun's worst residual was 2.1 min
+// and the Moon's 2.3, and the Moon's test still passed (#684).
+const usnoTolerance = 1.0
+
+// usnoEventKinds maps the USNO phenomena compareUSNOEvents holds astrogo to.
+var usnoEventKinds = map[string]plan.EventKind{
+	"Rise":          plan.EventRise,
+	"Set":           plan.EventSet,
+	"Upper Transit": plan.EventTransit,
+}
+
+// compareUSNOEvents holds every rise, set and upper transit USNO lists for
+// one day to astrogo's, within usnoTolerance. day is that day's local
+// midnight in tz, the zone USNO was asked for; astro is astrogo's events over
+// the same day; horizon is the body's rise/set altitude.
+//
+// Each USNO event is paired with the astrogo event of its kind nearest to it,
+// not the first of its kind, which is another event whenever astrogo reports
+// one USNO does not. Both directions are held: a USNO event with no astrogo
+// event of its kind is an error, since the site, day and convention are the
+// same, and so is an astrogo event USNO does not list.
+//
+// USNO lists an upper transit only while the body is up: none at the North
+// Pole in the polar night, one in the midnight sun. astrogo reports every
+// culmination, as [plan.EventTransit] says, so the transits held here are the
+// ones above horizon.
+func compareUSNOEvents(
+	t *testing.T, body string, usno []usnoPhenomenon, astro []plan.Event, horizon angle.Angle, day time.Time, tz *time.Location,
+) {
 	t.Helper()
 
-	for _, sp := range usnoPhenomena {
-		h, m, ok := parseUSNOTime(sp.Time)
+	var listable []plan.Event
+
+	for _, ev := range astro {
+		if ev.Kind != plan.EventTransit || ev.GeometricAltitude > horizon {
+			listable = append(listable, ev)
+		}
+	}
+
+	astro = listable
+	local := day.GoTime().In(tz)
+	listed := map[plan.EventKind]int{}
+
+	for _, p := range usno {
+		kind, ok := usnoEventKinds[p.Phen]
 		if !ok {
 			continue
 		}
 
-		usnoMin := minutesFromMidnight(h, m)
-
-		var matchKind plan.EventKind
-
-		switch sp.Phen {
-		case "Rise":
-			matchKind = plan.EventRise
-		case "Set":
-			matchKind = plan.EventSet
-		case "Upper Transit":
-			matchKind = plan.EventTransit
-		default:
+		h, m, ok := parseUSNOTime(p.Time)
+		if !ok {
 			continue
 		}
 
-		for _, ev := range astroEvents {
-			if ev.Kind != matchKind {
+		listed[kind]++
+
+		at := time.Date(local.Year(), local.Month(), local.Day(), h, m, 0, 0, tz).GoTime()
+
+		var nearest *plan.Event
+
+		best := math.Inf(1)
+
+		for i := range astro {
+			if astro[i].Kind != kind {
 				continue
 			}
 
-			astroMin := eventMinutesIn(ev.Time, tz)
-			delta := deltaMinutes(usnoMin, astroMin)
-			t.Logf("%s %-12s  USNO=%02d:%02d  astrogo=%s  Δ=%.1f min",
-				body, sp.Phen, h, m, ev.Time.In(tz).Format("15:04:05"), delta)
-
-			if delta > tol {
-				t.Errorf("%s %s: Δ=%.1f min exceeds %.0f min tolerance", body, sp.Phen, delta, tol)
+			if d := astro[i].Time.GoTime().Sub(at).Abs().Minutes(); d < best {
+				best, nearest = d, &astro[i]
 			}
+		}
 
-			break
+		if nearest == nil {
+			t.Errorf("%s %s: USNO lists %02d:%02d, astrogo found none", body, p.Phen, h, m)
+
+			continue
+		}
+
+		t.Logf("%s %-13s  USNO=%02d:%02d  astrogo=%s  Δ=%.2f min",
+			body, p.Phen, h, m, nearest.Time.In(tz).Format("15:04:05"), best)
+
+		if best > usnoTolerance {
+			t.Errorf("%s %s: Δ=%.2f min exceeds %.0f min", body, p.Phen, best, usnoTolerance)
+		}
+	}
+
+	for phen, kind := range usnoEventKinds {
+		found := 0
+
+		for _, ev := range astro {
+			if ev.Kind == kind {
+				found++
+			}
+		}
+
+		if found != listed[kind] {
+			t.Errorf("%s %s: astrogo found %d, USNO lists %d", body, phen, found, listed[kind])
 		}
 	}
 }
