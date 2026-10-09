@@ -309,7 +309,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	// evalCtx backs observe, declared here so a single cache persists across
 	// every sample and bisection iteration within this solveVisibility call.
-	evalCtx := newContextCache(spec.Observer.Location(), geomAtm)
+	evalCtx := movingContext(spec.Observer.Location(), geomAtm)
 
 	// observe is the target's geometric observed position.
 	observe := func(t time.Time) (coord.AltAz, error) {

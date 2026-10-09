@@ -51,7 +51,7 @@ func (s *SwapOptimizedStrategy) Schedule(
 	blocks []*Block,
 	transition TransitionModel,
 ) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition, newContextCache(planner.Site.Location(), planner.Site.Refraction()))
+	return s.schedule(planner, window, blocks, transition, movingContext(planner.Site.Location(), planner.Site.Refraction()))
 }
 
 // schedule is Schedule with the Context for each instant of the swap and
@@ -136,7 +136,6 @@ func (s *SwapOptimizedStrategy) swapPass(
 ) (bool, error) {
 	improved := false
 	n := len(sched.Blocks)
-	contexts := &contextSource{at: ctxAt}
 
 	// Pre-compute merged constraints per block to avoid re-allocating on every candidate.
 	mergedC := make(map[string][]Constraint, n)
@@ -162,7 +161,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 			prevEnd = sched.Blocks[i-1].Window.End
 		}
 
-		setupJ, err := transitionOverhead(transition, prev, bj.Block, prevEnd, bi.Window.Start, planner.Site, contexts)
+		setupJ, err := transitionOverhead(transition, prev, bj.Block, prevEnd, bi.Window.Start, planner.Site, ctxAt)
 		if err != nil {
 			return false, fmt.Errorf("plan: swap: %w", err)
 		}
@@ -184,7 +183,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 			continue
 		}
 
-		overhead, err := transitionOverhead(transition, bj.Block, bi.Block, newJEnd, newJEnd, planner.Site, contexts)
+		overhead, err := transitionOverhead(transition, bj.Block, bi.Block, newJEnd, newJEnd, planner.Site, ctxAt)
 		if err != nil {
 			return false, fmt.Errorf("plan: swap: %w", err)
 		}
@@ -206,7 +205,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		if i+2 < n {
 			next := sched.Blocks[i+2]
 
-			setupNext, err = transitionOverhead(transition, bi.Block, next.Block, newIEnd, next.Window.Start, planner.Site, contexts)
+			setupNext, err = transitionOverhead(transition, bi.Block, next.Block, newIEnd, next.Window.Start, planner.Site, ctxAt)
 			if err != nil {
 				return false, fmt.Errorf("plan: swap: %w", err)
 			}
@@ -288,7 +287,6 @@ func (s *SwapOptimizedStrategy) insertPass(
 
 	improved := false
 	remaining := make([]UnscheduledBlock, 0, len(sched.Unscheduled))
-	contexts := &contextSource{at: ctxAt}
 
 	// Sort unscheduled by priority (highest first) for best gap allocation.
 	sortedUnsched := make([]UnscheduledBlock, len(sched.Unscheduled))
@@ -317,7 +315,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 			}
 
 			overhead, err := transitionOverhead(transition, gap.prevBlock, ub.Block,
-				gap.window.Start, gap.window.Start, planner.Site, contexts)
+				gap.window.Start, gap.window.Start, planner.Site, ctxAt)
 			if err != nil {
 				return false, fmt.Errorf("plan: insert: %w", err)
 			}
@@ -338,7 +336,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 			if gap.next >= 0 {
 				next := sched.Blocks[gap.next]
 
-				setupNext, err = transitionOverhead(transition, ub.Block, next.Block, endTime, next.Window.Start, planner.Site, contexts)
+				setupNext, err = transitionOverhead(transition, ub.Block, next.Block, endTime, next.Window.Start, planner.Site, ctxAt)
 				if err != nil {
 					return false, fmt.Errorf("plan: insert: %w", err)
 				}
@@ -441,26 +439,24 @@ type gapInfo struct {
 
 // transitionOverhead is the model's overhead from one block to the next: zero
 // with no model, and an error naming the transition when the model has no
-// answer.
+// answer, or the strategy cannot observe one of the two targets for it.
 func transitionOverhead(
 	transition TransitionModel,
 	from, to *Block,
 	fromTime, toTime time.Time,
 	site *Site,
-	contexts *contextSource,
+	ctxAt func(time.Time) *coord.Context,
 ) (time.Duration, error) {
 	if transition == nil {
 		return 0, nil
 	}
 
-	oh, err := transition.Overhead(TransitionContext{
-		FromBlock: from,
-		ToBlock:   to,
-		FromTime:  fromTime,
-		ToTime:    toTime,
-		Site:      site,
-		contexts:  contexts,
-	})
+	tr, err := newTransition(from, to, fromTime, toTime, site, ctxAt)
+	if err != nil {
+		return 0, overheadError(from, to, err)
+	}
+
+	oh, err := transition.Overhead(tr)
 	if err != nil {
 		return 0, overheadError(from, to, err)
 	}

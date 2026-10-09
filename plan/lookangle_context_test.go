@@ -15,18 +15,19 @@ import (
 // one used, rather than three fields copied out of it and a fresh Context built
 // behind the caller's back.
 //
-// # Why a derived Context is the fixture
+// # Why a moved Context is the fixture
 //
-// A Context built by Context.AtTime holds precession-nutation and aberration
-// from its *base* epoch, deliberately, because recomputing them is the 145 us
-// this exists to avoid. So it differs slightly from what NewContext would
-// produce at the same instant — measured here at 0.0005 arcsec after an hour
-// and 0.03 arcsec after twelve.
+// A Context moved by Context.SetTime within the hour holds precession-nutation
+// and aberration from its epoch, deliberately, because recomputing them is the
+// full SOFA evaluation it exists to avoid. So it differs slightly from what
+// NewContext would produce at the same instant — measured here at 0.0005
+// arcsec after an hour. Past the hour SetTime rebuilds, and its answer is
+// NewContext's, so the probes stay inside it.
 //
 // That difference is the probe. The old implementation called
 // coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Refraction()), which rebuilt a
 // Context from scratch and so returned the *direct* answer no matter which
-// Context it was handed. Handing it a derived one and demanding the derived
+// Context it was handed. Handing it a moved one and demanding the moved
 // answer is what tells the two implementations apart.
 //
 // The assertion is exact equality rather than a tolerance, because there is
@@ -44,9 +45,10 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 
 	base := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
 
-	for _, dt := range []unit.Duration{unit.Hours(1), unit.Hours(6), unit.Hours(12)} {
+	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
 		at := base.Add(dt)
-		derived := coord.NewContext(base, site, defaultAtm).AtTime(at)
+		derived := coord.NewContext(base, site, defaultAtm)
+		derived.SetTime(at)
 
 		st, err := sat.State(0, at)
 		if err != nil {
@@ -54,6 +56,14 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		}
 
 		want := derived.GeocentricToObserved(st.Pos)
+
+		// The probe works only while the moved answer differs from a fresh
+		// one; a SetTime that rebuilt inside the hour would leave it unable to
+		// fail.
+		fresh := coord.NewContext(at, site, defaultAtm).GeocentricToObserved(st.Pos)
+		if fresh.Alt() == want.Alt() && fresh.Az() == want.Az() {
+			t.Fatalf("dt=%v: the moved Context answers exactly as a fresh one, so this probe cannot tell them apart", dt)
+		}
 
 		got, err := LookAngle(sat, 0, derived)
 		if err != nil {

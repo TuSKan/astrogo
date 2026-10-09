@@ -56,7 +56,7 @@ func BenchmarkLookAngle(b *testing.B) {
 // the root-finding refinement on each crossing.
 //
 // It used to be two Apco13 solves per sample, then one (#111/#165), and is now
-// six for the whole window — one per hour of ctxRefresh. Measured on an
+// six for the whole window — one for each hour SetTime rebuilds. Measured on an
 // i9-11980HK: 201 ms before the Context cache, 96 ms after. What is left is
 // SGP4 propagation, which is the work this function exists to do.
 func BenchmarkSatellitePasses_6h(b *testing.B) {

@@ -203,9 +203,9 @@ func BenchmarkTransitEstimate(b *testing.B) {
 // reported in https://github.com/TuSKan/astrogo/issues/10): for each of 14
 // days, compute sun rise/set/transit, the three twilight bands, and moon
 // rise/set — the standard "14-night forecast" that made coord.NewContext
-// ~65% of total CPU before Context.AtTime (see coord/context.go) let
-// solveVisibility amortize one full NewContext per ~hour of solve window
-// instead of rebuilding one per sample and per bisection iteration.
+// ~65% of total CPU before solveVisibility amortized one full NewContext per
+// ~hour of solve window instead of rebuilding one per sample and per
+// bisection iteration, now with coord.Context.SetTime (see coord/context.go).
 func BenchmarkFortnightEvents(b *testing.B) {
 	g, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0) // Barcelona
 	if err != nil {

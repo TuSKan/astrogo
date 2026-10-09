@@ -34,7 +34,7 @@ func itrsContext(t *testing.T) *coord.Context {
 // cached factors is *bit-identical* to calling SOFA's one-shot routine.
 //
 // The Context keeps precession-nutation and polar motion separately so that
-// AtTime can rebuild the matrix from a fresh Earth rotation angle alone, which
+// SetTime can rebuild the matrix from a fresh Earth rotation angle alone, which
 // is what makes a time step cheap. That is an optimisation of C2t06a, and an
 // optimisation of a reference routine is only safe while it still agrees with
 // it — so the comparison is exact equality rather than a tolerance. A
@@ -127,7 +127,8 @@ func TestITRSTurnsAtTheSiderealRate(t *testing.T) {
 	t.Parallel()
 
 	ctx := itrsContext(t)
-	later := ctx.AtTime(ctx.Time().Add(unit.Days(1.0 / 24)))
+	later := *ctx
+	later.SetTime(ctx.Time().Add(unit.Days(1.0 / 24)))
 
 	star := coord.NewICRS(angle.Deg(101.2871), angle.Deg(-16.7161)).ToUnitVector()
 
