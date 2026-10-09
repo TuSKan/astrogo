@@ -62,6 +62,7 @@ Supplement convention:
 | Component | Value |
 |---|---|
 | Solar semi-diameter | 16' (0.2667°) |
+| Lunar semi-diameter | the Moon's at that instant, 14.7'–16.8' (#693) |
 | Standard atmospheric refraction | 34' (0.5667°) |
 | Total at sea level | **−50' (−0.8333°)** |
 | Horizon dip from elevation _h_ | 1.76'√_h_ |

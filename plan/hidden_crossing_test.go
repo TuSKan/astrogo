@@ -69,12 +69,34 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 		time.Date(2026, 6, 11, 23, 55, 18, 0, time.LocationUTC),
 	}, unit.Seconds(12)})
 
-	// Alta: the Moon sets for twelve minutes, 0.006° below the threshold.
+	// Alta: the Moon's center dips 0.006° below the fixed mean-semi-diameter
+	// threshold for twelve minutes, which is what Skyfield was given. The
+	// solver's ability to find such a dip between samples is the subject, so
+	// it gets that threshold. The almanac's moonrise does not happen that
+	// night: near perigee the semi-diameter is 16.33′, and the upper limb
+	// stays at least 0.009° above the horizon. MoonriseMoonset used to report
+	// the twelve minutes as a set and a rise (#693).
 	start = time.Date(2026, 6, 17, 22, 0, 0, 0, time.LocationUTC)
+	alta := site("Alta", 69.9689, 23.2716)
 
-	mrise, mset, err := MoonriseMoonset(start, start.Add(unit.Days(1)), site("Alta", 69.9689, 23.2716), prov)
+	if r, s, err := MoonriseMoonset(start, start.Add(unit.Days(1)), alta, prov); err != nil || r != nil || s != nil {
+		t.Errorf("Alta: MoonriseMoonset gives %v and %v (%v), want neither: the upper limb stays up", r, s, err)
+	}
+
+	centerEvents, err := moonCenterEvents(start, start.Add(unit.Days(1)), alta, prov)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	var mrise, mset *Event
+
+	for i := range centerEvents {
+		switch e := &centerEvents[i]; {
+		case e.Kind == EventRise && mrise == nil:
+			mrise = e
+		case e.Kind == EventSet && mset == nil:
+			mset = e
+		}
 	}
 
 	cases = append(cases, pair{"Alta moonset and moonrise", mset, mrise, [2]time.Time{
