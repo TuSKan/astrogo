@@ -47,7 +47,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | **Sun Rise/Set** | 0.2 min | 0.5 min | 1 min |
 | **Sun Civil Twilight** | 0.3 min | 0.5 min | 1 min |
 | **Moon Transit** | 0.2 min | 0.5 min | 1 min |
-| **Moon Rise/Set** | 0.3 min | 0.6 min | 1 min |
+| **Moon Rise/Set** | 0.3 min | 0.55 min | 1 min |
 
 Every rise, set and upper transit is held to 1 minute: USNO's half-minute
 rounding plus half a minute. Until #678 rise and set were held to 2 minutes
