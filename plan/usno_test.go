@@ -890,41 +890,9 @@ func TestUSNO_JulianDate(t *testing.T) {
 	}
 }
 
-// ── Test: Sidereal Time ──────────────────────────────────────────────────────
-
-func TestUSNO_SiderealTime(t *testing.T) {
-	// Validate GMST/GAST against known values.
-	// USNO Sidereal Time API may not be REST-accessible; use reference values.
-	// At J2000.0 epoch (2000-01-01 12:00:00 TT), GMST ≈ 18h 41m 50.55s
-	// At 2026-04-06 21:00:00 UT, validate against our computation.
-	tz, _ := time.LoadLocation("America/Sao_Paulo")
-	geodetic, _ := coord.NewGeodetic(angle.Deg(-46.6525), angle.Deg(-23.600833), 786)
-	site, _ := plan.NewSite("São Paulo", geodetic, plan.WithTimeZone(tz))
-
-	testTimes := []struct {
-		name string
-		tm   time.Time
-	}{
-		{"2026-04-06 18:00 -03", time.Date(2026, 4, 6, 18, 0, 0, 0, tz)},
-		{"2026-06-21 00:00 UTC", time.Date(2026, 6, 21, 0, 0, 0, 0, time.LocationUTC)},
-		{"2026-12-21 12:00 UTC", time.Date(2026, 12, 21, 12, 0, 0, 0, time.LocationUTC)},
-	}
-
-	for _, tc := range testTimes {
-		t.Run(tc.name, func(t *testing.T) {
-			lst, err := site.LocalSiderealTime(tc.tm)
-			if err != nil {
-				t.Fatalf("LocalSiderealTime failed: %v", err)
-			}
-
-			t.Logf("LST at %s: %s (%.6f°)", tc.name, lst.HMSString(3), lst.Degrees())
-			// Sanity: LST must be in [0, 360)
-			if lst.Degrees() < 0 || lst.Degrees() >= 360 {
-				t.Errorf("LST out of range: %.6f°", lst.Degrees())
-			}
-		})
-	}
-}
+// Sidereal time is TestUSNO_SiderealTime in usno_sidereal_test.go: an offline
+// fixture of USNO's own values, so it runs in every build rather than only
+// under this file's integration tag.
 
 // ── Test: Perihelion/Aphelion ────────────────────────────────────────────────
 

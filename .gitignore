@@ -49,6 +49,11 @@ data/
 !assets/
 !assets/**
 
+# The validation run's cache seed (#660): IRSA's own answers, kept so the weekly
+# run does not ask for them again. Tracked even though it is a .txt.
+!.github/validation-cache/
+!.github/validation-cache/**
+
 !**/testdata/
 !**/testdata/**
 
