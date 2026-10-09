@@ -56,39 +56,79 @@ type Schedule struct {
 	Unscheduled []UnscheduledBlock
 }
 
-// TransitionContext contains the information needed to evaluate transition overhead.
-type TransitionContext struct {
-	FromBlock *Block // Can be nil if this is the first block
+// Transition is what a [TransitionModel] prices: the move from one
+// observation to the next.
+//
+// It was TransitionContext, which was not a coord.Context. It carried a
+// hidden pointer to the strategy's Context cache, so that a model could reach
+// a Context through its ContextAt method without building one per call
+// (#485). What a model needs is where the two targets are, so the strategy
+// now puts that in FromAltAz and ToAltAz, observed through the Context it
+// evaluates constraints with, and a model needs no Context at all (#675).
+type Transition struct {
+	FromBlock *Block // nil if ToBlock is the first block
 	ToBlock   *Block
-	FromTime  time.Time // Time when the previous observation ended
-	ToTime    time.Time // Time when the next observation begins (approximate, often FromTime)
+	FromTime  time.Time // when the previous observation ended
+	ToTime    time.Time // when the next observation begins (approximate, often FromTime)
 	Site      *Site
 
-	// contexts is the Context cache of the strategy that built this
-	// TransitionContext, nil outside the built-in ones. A pointer rather
-	// than the func itself, so that TransitionContext stays comparable.
-	contexts *contextSource
+	// FromAltAz is FromBlock's target observed from Site at FromTime, where
+	// the telescope points as the move begins; zero when FromBlock is nil.
+	// ToAltAz is ToBlock's target at ToTime, where it has to point.
+	FromAltAz, ToAltAz coord.AltAz
 }
 
-// contextSource is a strategy's Context cache, as a TransitionContext carries
-// it.
-type contextSource struct {
-	at func(time.Time) *coord.Context
-}
-
-// ContextAt is the coord.Context for an instant at Site.
+// NewTransition is the Transition from one block to the next, as a strategy
+// hands it to a [TransitionModel]: each target observed from site at its own
+// instant. It builds a coord.Context for the pair, as Overhead used to for
+// every call; the built-in strategies observe both through the Context they
+// evaluate constraints with instead.
 //
-// Inside the built-in strategies it comes from the cache they evaluate
-// constraints through, so a model turning targets into alt/az pays an AtTime
-// rather than a full SOFA rebuild (~93 µs), and sees the same Earth as the
-// constraints did. A TransitionContext built anywhere else gets a new
-// coord.NewContext per call, as Overhead always built (#485).
-func (ctx TransitionContext) ContextAt(t time.Time) *coord.Context {
-	if ctx.contexts != nil {
-		return ctx.contexts.at(t)
+// An error means a target could not be observed, and names which end.
+func NewTransition(from, to *Block, fromTime, toTime time.Time, site *Site) (Transition, error) {
+	return newTransition(from, to, fromTime, toTime, site, movingContext(site.Location(), site.Refraction()))
+}
+
+// newTransition is NewTransition with the Context for each instant supplied
+// by ctxAt. ctxAt moves one Context, so each position is taken before the
+// next instant is asked for.
+func newTransition(
+	from, to *Block, fromTime, toTime time.Time, site *Site, ctxAt func(time.Time) *coord.Context,
+) (Transition, error) {
+	tr := Transition{FromBlock: from, ToBlock: to, FromTime: fromTime, ToTime: toTime, Site: site}
+
+	if from != nil {
+		aa, err := observedTargetAt(from.Target, fromTime, ctxAt)
+		if err != nil {
+			return Transition{}, fmt.Errorf("schedule: from %w", err)
+		}
+
+		tr.FromAltAz = aa
 	}
 
-	return coord.NewContext(t, ctx.Site.Location(), ctx.Site.Refraction())
+	aa, err := observedTargetAt(to.Target, toTime, ctxAt)
+	if err != nil {
+		return Transition{}, fmt.Errorf("schedule: to %w", err)
+	}
+
+	tr.ToAltAz = aa
+
+	return tr, nil
+}
+
+// observedTargetAt is target's observed alt/az at t, through ctxAt's Context.
+func observedTargetAt(target Observable, t time.Time, ctxAt func(time.Time) *coord.Context) (coord.AltAz, error) {
+	pos, err := target.Position(t)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("position: %w", err)
+	}
+
+	aa, err := observedAltAz(target, t, ctxAt(t), pos)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("AltAz: %w", err)
+	}
+
+	return aa, nil
 }
 
 // TransitionModel evaluates the overhead of moving between two observations.
@@ -98,7 +138,7 @@ func (ctx TransitionContext) ContextAt(t time.Time) *coord.Context {
 // the overhead cannot be known; a transition that is merely expensive is a
 // long duration.
 type TransitionModel interface {
-	Overhead(ctx TransitionContext) (time.Duration, error)
+	Overhead(tr Transition) (time.Duration, error)
 }
 
 // BasicTransitionModel provides a fundamental slew and configuration penalty model.
@@ -115,9 +155,9 @@ type BasicTransitionModel struct {
 }
 
 // Overhead calculates the transition time using separation in Alt/Az at the given times.
-func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, error) {
+func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
 	// Initial pointing initialization
-	if ctx.FromBlock == nil {
+	if tr.FromBlock == nil {
 		setup := m.BaseSetup
 		if setup <= 0 {
 			setup = 1 * time.Minute
@@ -129,48 +169,19 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 	var total time.Duration
 
 	// Configuration overhead
-	if ctx.FromBlock.Config.Filter != ctx.ToBlock.Config.Filter && ctx.FromBlock.Config.Filter != "" && ctx.ToBlock.Config.Filter != "" {
+	if tr.FromBlock.Config.Filter != tr.ToBlock.Config.Filter && tr.FromBlock.Config.Filter != "" && tr.ToBlock.Config.Filter != "" {
 		total += m.FilterChangePenalty
 	}
 
 	// Slew Time
 	if m.SlewRate > 0 {
-		posFrom, err := ctx.FromBlock.Target.Position(ctx.FromTime)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: from position: %w", err)
-		}
-
-		posTo, err := ctx.ToBlock.Target.Position(ctx.ToTime)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: to position: %w", err)
-		}
-
-		// Same epoch is the common case (ToTime is documented as
-		// "approximate, often FromTime"), and then one Context serves both.
-		fromCtx := ctx.ContextAt(ctx.FromTime)
-
-		toCtx := fromCtx
-		if !ctx.FromTime.Equal(ctx.ToTime) {
-			toCtx = ctx.ContextAt(ctx.ToTime)
-		}
-
-		altAzFrom, err := observedAltAz(ctx.FromBlock.Target, ctx.FromTime, fromCtx, posFrom)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: from AltAz: %w", err)
-		}
-
-		altAzTo, err := observedAltAz(ctx.ToBlock.Target, ctx.ToTime, toCtx, posTo)
-		if err != nil {
-			return 0, fmt.Errorf("schedule: to AltAz: %w", err)
-		}
-
 		// Calculate separation on Alt and Az independently.
 		// Assuming simultaneous slew on two independent axes, slew time is
 		// determined by the axis that takes the longest.
-		dAlt := math.Abs(altAzFrom.Alt().Degrees() - altAzTo.Alt().Degrees())
+		dAlt := math.Abs(tr.FromAltAz.Alt().Degrees() - tr.ToAltAz.Alt().Degrees())
 
-		azFrom := altAzFrom.Az().Degrees()
-		azTo := altAzTo.Az().Degrees()
+		azFrom := tr.FromAltAz.Az().Degrees()
+		azTo := tr.ToAltAz.Az().Degrees()
 
 		dAz := math.Abs(azFrom - azTo)
 		if dAz > 180.0 {
@@ -196,9 +207,9 @@ func (m *BasicTransitionModel) Overhead(ctx TransitionContext) (time.Duration, e
 // this interface directly.
 //
 // Performance note: the built-in strategies evaluate constraints through one
-// coord.Context per hour of window, deriving each step's with
-// coord.Context.AtTime rather than building a new one (~91 µs). A custom
-// Strategy evaluating many instants can do the same with AtTime.
+// coord.Context, moved to each step with coord.Context.SetTime rather than
+// building a new one (~91 µs). A custom Strategy evaluating many instants can
+// do the same.
 type Strategy interface {
 	// Schedule produces a Schedule from the provided Blocks within the given Window.
 	// The implementation should use Planner for constraint evaluation and TransitionModel
@@ -262,7 +273,7 @@ func overheadError(from, to *Block, err error) error {
 // over a time range.
 //
 // The Context at each step comes from ctxAt, which a strategy builds once per
-// Schedule with newContextCache, and is shared across the constraints that
+// Schedule with movingContext, and is shared across the constraints that
 // implement ConstraintCtx. It was a full coord.NewContext per step, per
 // candidate placement: 99.5% of a greedy schedule's time (#481).
 //
@@ -270,7 +281,7 @@ func overheadError(from, to *Block, err error) error {
 // midpoint, for scoreBlockPlacement to score the block at the midpoint with.
 // That Context was turned to the step's Earth rotation, not the midpoint's,
 // and they differ whenever the block is not an even number of steps long; the
-// score now takes ctxAt(mid) itself, which the cache makes cheap.
+// score now takes ctxAt(mid) itself, which the moving Context makes cheap.
 //
 // # A constraint that fails to evaluate is an error, not a "no"
 //
@@ -347,7 +358,7 @@ type GreedyStrategy struct {
 
 // Schedule implements Strategy for GreedyStrategy.
 func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Block, transition TransitionModel) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition, newContextCache(planner.Site.Location(), planner.Site.Refraction()))
+	return s.schedule(planner, window, blocks, transition, movingContext(planner.Site.Location(), planner.Site.Refraction()))
 }
 
 // schedule is Schedule with the Context for each instant supplied by ctxAt,
@@ -363,8 +374,6 @@ func (s *GreedyStrategy) schedule(
 	if step <= 0 {
 		step = defaultStep
 	}
-
-	contexts := &contextSource{at: ctxAt}
 
 	sched := &Schedule{
 		Site:   planner.Site,
@@ -407,27 +416,18 @@ func (s *GreedyStrategy) schedule(
 				continue
 			}
 
-			// Calculate transition overhead
-			ctx := TransitionContext{
-				FromBlock: lastBlock,
-				ToBlock:   b,
-				FromTime:  currentTime,
-				ToTime:    currentTime, // Initial approximation
-				Site:      planner.Site,
-				contexts:  contexts,
-			}
-
-			overhead, err := transition.Overhead(ctx)
+			// Calculate transition overhead, with the destination time
+			// approximated by the current time first.
+			overhead, err := transitionOverhead(transition, lastBlock, b, currentTime, currentTime, planner.Site, ctxAt)
 			if err != nil {
-				return nil, fmt.Errorf("plan: greedy: %w", overheadError(lastBlock, b, err))
+				return nil, fmt.Errorf("plan: greedy: %w", err)
 			}
 
 			// Refine Transition Overhead with better approximation of destination time
-			ctx.ToTime = currentTime.Add(time.FromGoDuration(overhead))
-
-			overhead, err = transition.Overhead(ctx)
+			overhead, err = transitionOverhead(transition, lastBlock, b,
+				currentTime, currentTime.Add(time.FromGoDuration(overhead)), planner.Site, ctxAt)
 			if err != nil {
-				return nil, fmt.Errorf("plan: greedy: %w", overheadError(lastBlock, b, err))
+				return nil, fmt.Errorf("plan: greedy: %w", err)
 			}
 
 			startTime := currentTime.Add(time.FromGoDuration(overhead))

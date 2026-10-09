@@ -38,18 +38,19 @@ func (ctx *Context) ReduceBatch(in []vector.Vec3, out []AltAz) {
 // segment, avoiding contention. For small batches (< 2× GOMAXPROCS), this
 // falls back to the serial ReduceBatch.
 //
-// The Context is safe to share across goroutines (all fields are read-only
-// after construction).
+// Every worker reads ctx itself: the conversion only reads a Context, so
+// ctx must not be moved with [Context.SetTime] while the batch runs.
 func (ctx *Context) ReduceBatchParallel(in []vector.Vec3, out []AltAz) {
 	if len(out) != len(in) {
 		panic("coord: ReduceBatchParallel: len(out) must equal len(in)")
 	}
 
-	// Each worker gets its own Context copy to avoid shared mutable ASTROM
-	// state (SOFA's iauAtioq may cache refraction coefficients) —
-	// newWorker runs once per goroutine, not once per element.
-	parallel.MapChunked(len(in), 0, ctx.Clone, func(local *Context, i int) {
-		out[i] = local.GeocentricToObserved(in[i])
+	// The workers share ctx. They used to clone it each, on the claim that
+	// SOFA's iauAtioq caches refraction coefficients in the astrometry; it
+	// does not, and neither do Atciq, Atoiq or Aticq: only Aper writes it
+	// (#675).
+	parallel.MapChunked(len(in), 0, func() *Context { return ctx }, func(c *Context, i int) {
+		out[i] = c.GeocentricToObserved(in[i])
 	})
 }
 
@@ -88,9 +89,9 @@ func (ctx *Context) ICRSBatchToAltAzParallel(in []ICRS, out []AltAz) {
 		panic("coord: ICRSBatchToAltAzParallel: len(out) must equal len(in)")
 	}
 
-	// Each worker gets its own Context copy — see ReduceBatchParallel.
-	parallel.MapChunked(len(in), 0, ctx.Clone, func(local *Context, i int) {
-		altaz := local.AstrometricToObserved(in[i].Astrometric())
+	// The workers share ctx — see ReduceBatchParallel.
+	parallel.MapChunked(len(in), 0, func() *Context { return ctx }, func(c *Context, i int) {
+		altaz := c.AstrometricToObserved(in[i].Astrometric())
 		altaz.SetDist(in[i].Dist())
 		out[i] = altaz
 	})

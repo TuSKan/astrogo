@@ -35,20 +35,18 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 
 	// FromTime/ToTime intentionally share one value here — this is the
-	// common case per TransitionContext.ToTime's doc comment ("approximate,
-	// often FromTime") and exercises the shared-Context path in Overhead.
+	// common case per Transition.ToTime's doc comment ("approximate, often
+	// FromTime").
 	now := fixedEpoch()
+	ctxAt := movingContext(site.Location(), site.Refraction())
 
-	ctx := TransitionContext{
-		FromBlock: nil,
-		ToBlock:   block1,
-		FromTime:  now,
-		ToTime:    now,
-		Site:      site,
+	tr, err := newTransition(nil, block1, now, now, site, ctxAt)
+	if err != nil {
+		t.Fatalf("newTransition: %v", err)
 	}
 
 	// 1. Initial Setup
-	overhead, err := tm.Overhead(ctx)
+	overhead, err := tm.Overhead(tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,13 +56,15 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 
 	// 2. Filter change + slew
-	ctx.FromBlock = block1
-	ctx.ToBlock = block2
+	tr, err = newTransition(block1, block2, now, now, site, ctxAt)
+	if err != nil {
+		t.Fatalf("newTransition: %v", err)
+	}
 
 	// They are placed on the equator, and site is at lat 0. Over 90 deg RA, the great circle
 	// or Az difference will be non-zero. Slew should take around 45 seconds (90 deg / 2 deg/s).
 	// With 30s filter change, total is ~75s.
-	overhead, err = tm.Overhead(ctx)
+	overhead, err = tm.Overhead(tr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,11 +74,11 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 }
 
-// TestBasicTransitionModel_SameEpoch is a regression test: Overhead used to
-// build two separate coord.Context values for FromTime and ToTime even when
-// they were the same instant (the documented common case), redundantly
-// repeating the ~91µs SOFA transform. This confirms the shared-Context path
-// (FromTime.Equal(ToTime)) produces the same result as the general path.
+// TestBasicTransitionModel_SameEpoch holds the slew priced at one instant,
+// the documented common case, to the slew with ToTime five minutes later: the
+// two must agree closely, and neither may error or zero out the slew. It began
+// as a regression test for Overhead building two Contexts for one instant;
+// the strategy now observes both ends, through one moving Context.
 func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	if err != nil {
@@ -98,16 +98,16 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 	now := fixedEpoch()
 	later := now.Add(unit.Minutes(5))
 
-	sameEpoch := TransitionContext{
-		FromBlock: block1, ToBlock: block2,
-		FromTime: now, ToTime: now,
-		Site: site,
+	ctxAt := movingContext(site.Location(), site.Refraction())
+
+	sameEpoch, err := newTransition(block1, block2, now, now, site, ctxAt)
+	if err != nil {
+		t.Fatalf("newTransition (same epoch): %v", err)
 	}
 
-	diffEpoch := TransitionContext{
-		FromBlock: block1, ToBlock: block2,
-		FromTime: now, ToTime: later,
-		Site: site,
+	diffEpoch, err := newTransition(block1, block2, now, later, site, ctxAt)
+	if err != nil {
+		t.Fatalf("newTransition (different epoch): %v", err)
 	}
 
 	sameOverhead, err := tm.Overhead(sameEpoch)

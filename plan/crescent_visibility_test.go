@@ -132,7 +132,7 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 	}
 }
 
-// The best time's Context comes from sunset's through AtTime, which the coord
+// The best time's Context is sunset's, moved with SetTime, which the coord
 // contract holds to ≲0.1″ an hour. This evening's best time is 25 minutes
 // after sunset; the criteria read tenths of a degree.
 func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
@@ -148,7 +148,9 @@ func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 
 	sunsetCtx := coord.NewContext(r.Sunset, site.Location(), atmosphere.Refraction{})
 
-	cached, err := crescentGeometryAt(sunsetCtx.AtTime(r.BestTime), prov)
+	sunsetCtx.SetTime(r.BestTime)
+
+	cached, err := crescentGeometryAt(sunsetCtx, prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
@@ -171,7 +173,7 @@ func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 		dAz := math.Abs(c.got.Az().Degrees()-c.want.Az().Degrees()) * 3600
 
 		if dAlt > 0.1 || dAz > 0.1 {
-			t.Errorf("%s through AtTime is %.3f″ in altitude, %.3f″ in azimuth from a fresh Context", c.name, dAlt, dAz)
+			t.Errorf("%s through SetTime is %.3f″ in altitude, %.3f″ in azimuth from a fresh Context", c.name, dAlt, dAz)
 		}
 	}
 }

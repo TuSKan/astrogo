@@ -198,12 +198,12 @@ func windowsOf(intervals []Interval) []Window {
 // the full-Context one.
 //
 // Measured over samplingCases, the largest shift is 3.1 ms, on a star at the
-// high-latitude site; the Moon and Sun move by microseconds, since what AtTime
+// high-latitude site; the Moon and Sun move by microseconds, since what SetTime
 // holds fixed that matters most here is the direction of annual aberration,
 // which their geocentric vectors do not pass through. The bound is the 0.01 s
-// of rise/set bias AtTime's own doc comment promises, three times the
-// measurement. It is also a test of ctxRefresh: stretched to a day, the same
-// cases shift by up to 32 ms and fail.
+// of rise/set bias SetTime's own doc comment promises, three times the
+// measurement. It is also a test of SetTime's rebuild hour: stretched to a
+// day, the same cases shift by up to 32 ms and fail.
 const maxBoundaryShift = 0.01
 
 func compareIntervals(t *testing.T, name string, got, want []Window) {

@@ -277,7 +277,7 @@ func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time
 // That is not only a saving. A sweep that found a sign change between two
 // samples has already decided there is a root between them, and a second
 // evaluation of the same instant need not agree with the first: the event
-// solvers evaluate through a context cache whose base depends on what was
+// solvers evaluate through a moving Context whose epoch depends on what was
 // evaluated before, and its answers differ by a few times 1e-7°. A sample that
 // close to the threshold could change sign on re-evaluation, and the whole
 // search then failed with ErrBracketingViolated where the sweep had found an

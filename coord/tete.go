@@ -73,12 +73,10 @@ func (c TETE) String() string {
 //
 // # Across a time step
 //
-// [Context.AtTime] does not recompute the equation of the origins, for the
-// same reason it does not recompute precession-nutation: EO drifts at about
-// 0.006 arcseconds an hour, which is the term already at the bottom of that
-// method's documented error budget. A Context stepped far enough for
-// precession to matter has the same problem here and the same remedy — build
-// a fresh [NewContext].
+// [Context.SetTime] holds the equation of the origins with precession-nutation:
+// EO drifts at about 0.006 arcseconds an hour, which is the term already at
+// the bottom of that method's documented error budget, and both are built
+// again once the Context is an hour from its epoch.
 func (ctx *Context) CIRSToTETE(c CIRS) TETE {
 	return TETE{
 		ra:  c.RA().Sub(angle.Rad(ctx.eo)).Wrap360(),

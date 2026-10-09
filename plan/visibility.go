@@ -117,7 +117,7 @@ func VisibleIntervals(
 	step time.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
-	return visibleIntervals(obj, newContextCache(site.Location(), site.Refraction()), start, end, step, minAlt)
+	return visibleIntervals(obj, movingContext(site.Location(), site.Refraction()), start, end, step, minAlt)
 }
 
 // nextSample returns the sample after t on a scan ending at end, in steps of
@@ -146,8 +146,9 @@ func nextSample(t, end time.Time, step unit.Duration) (next time.Time, more bool
 //
 // That used to be a full coord.NewContext per sample and per refinement
 // iteration, which was 98% of the function's time; VisibleIntervals passes a
-// newContextCache, whose bound is ctxRefresh's (#480). The parameter is what
-// lets a test run this same algorithm on full Contexts as its reference.
+// movingContext, whose bound is coord.Context.SetTime's (#480). The parameter
+// is what lets a test run this same algorithm on full Contexts as its
+// reference.
 func visibleIntervals(
 	obj coord.Object,
 	ctxAt func(time.Time) *coord.Context,
@@ -226,13 +227,13 @@ func visibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
-	return transitEstimate(obj, site, newContextCache(site.Location(), site.Refraction()), start, end)
+	return transitEstimate(obj, site, movingContext(site.Location(), site.Refraction()), start, end)
 }
 
 // transitEstimate is TransitEstimate with the Context for each scan sample and
 // solver iteration supplied by ctxAt, for the reason visibleIntervals gives.
 // The altitude it returns is still read through a full Context at the refined
-// instant, so the reported culmination carries no AtTime approximation.
+// instant, so the reported culmination carries no SetTime approximation.
 func transitEstimate(
 	obj coord.Object,
 	site *Site,
@@ -388,7 +389,7 @@ func Find(
 	start, end time.Time,
 	step time.Duration,
 ) ([]Interval, error) {
-	return find(obj, site, newContextCache(site.Location(), site.Refraction()), constraints, start, end, step)
+	return find(obj, site, movingContext(site.Location(), site.Refraction()), constraints, start, end, step)
 }
 
 // find is Find with the Context for each instant supplied by ctxAt, for the
