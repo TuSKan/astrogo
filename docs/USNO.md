@@ -26,10 +26,10 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Julian Date Converter | `TestUSNO_JulianDate` | ✅ PASS | exact |
 | Sidereal Time | `TestUSNO_SiderealTime` | ✅ PASS | **≤0.05 ms** at six epochs 1990–2049, USNO's own rounding; held to 0.2 ms. An offline fixture, so it runs without the integration tag |
 | **Edge Cases** | | | |
-| Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | circumpolar agreement |
+| Polar Sun (Midnight Sun / Polar Night) | `TestUSNO_PolarSun` | ✅ PASS | the same events listed on both sides; ≤0.5 min |
 | High Altitude (Everest 8849m) | `TestUSNO_HighAltitude` | ✅ PASS | 0m vs USNO ≤0.5 min |
-| Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun ≤1 min, ~12h day |
-| Polar Moon | `TestUSNO_PolarMoon` | ✅ PASS | circumpolar agreement |
+| Equator (0°, 0°) | `TestUSNO_Equator` | ✅ PASS | Sun ≤0.5 min, ~12h day |
+| Polar Moon | `TestUSNO_PolarMoon` | ✅ PASS | the same events listed on both sides; ≤0.7 min |
 | CelNav at Extreme Locations | `TestUSNO_CelNav` | ✅ PASS | the same fixture: near both poles, on the equator, at Everest |
 | Altitude Shift (Sea Level vs Summit) | `TestUSNO_AltitudeShift` | ✅ PASS | monotonic shift verified |
 
@@ -44,10 +44,16 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | Event Type | Mean Δ | Max Δ | Tolerance |
 |---|---|---|---|
 | **Sun Transit** | 0.2 min | 0.5 min | 1 min |
-| **Sun Rise/Set** | 0.2 min | 0.5 min | 2 min |
+| **Sun Rise/Set** | 0.2 min | 0.5 min | 1 min |
 | **Sun Civil Twilight** | 0.3 min | 0.5 min | 1 min |
 | **Moon Transit** | 0.2 min | 0.5 min | 1 min |
-| **Moon Rise/Set** | 0.3 min | 0.6 min | 3 min |
+| **Moon Rise/Set** | 0.3 min | 0.6 min | 1 min |
+
+Every rise, set and upper transit is held to 1 minute: USNO's half-minute
+rounding plus half a minute. Until #678 rise and set were held to 2 minutes
+for the Sun and 3 for the Moon, 5 near the poles, and a body rising on its
+center instead of its upper limb passed. A USNO event with no astrogo event,
+or the reverse, fails; USNO lists an upper transit only while the body is up.
 
 Coordinate pipeline: solar system bodies use `GeocentricToObserved` (full
 topocentric parallax correction). Thresholds follow the USNO/Explanatory
