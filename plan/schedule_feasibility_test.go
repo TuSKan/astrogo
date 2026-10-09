@@ -15,9 +15,9 @@ import (
 // it depend on the epoch.
 type pairTransition struct{ a, b string }
 
-func (m pairTransition) Overhead(ctx TransitionContext) (time.Duration, error) {
-	if ctx.FromBlock != nil {
-		from, to := ctx.FromBlock.ID, ctx.ToBlock.ID
+func (m pairTransition) Overhead(tr Transition) (time.Duration, error) {
+	if tr.FromBlock != nil {
+		from, to := tr.FromBlock.ID, tr.ToBlock.ID
 		if (from == m.a && to == m.b) || (from == m.b && to == m.a) {
 			return 30 * time.Minute, nil
 		}
@@ -37,7 +37,7 @@ func assertExecutable(t *testing.T, sched *Schedule, model TransitionModel) {
 	var prev *Block
 
 	for k, sb := range sched.Blocks {
-		need, err := model.Overhead(TransitionContext{FromBlock: prev, ToBlock: sb.Block})
+		need, err := model.Overhead(Transition{FromBlock: prev, ToBlock: sb.Block})
 		if err != nil {
 			t.Fatalf("overhead into %s: %v", sb.Block.ID, err)
 		}

@@ -13,7 +13,7 @@ import (
 
 // plannerContexts is the Context source a strategy builds for one Schedule.
 func plannerContexts(planner *Planner) func(time.Time) *coord.Context {
-	return newContextCache(planner.Site.Location(), planner.Site.Refraction())
+	return movingContext(planner.Site.Location(), planner.Site.Refraction())
 }
 
 // everyInstantContexts is the Context source the scheduler used before #481:
@@ -165,12 +165,13 @@ func TestBlockIsScoredAtItsMidpoint(t *testing.T) {
 	}
 }
 
-// TestSetTimeProbesThroughAtTime holds estimateHoursUntilSet, whose probes are
-// derived from the scoring Context with AtTime since #481, to the same probes
-// on full Contexts. The furthest probe is eight hours out, where AtTime is
-// ≲0.8″ off; the estimate is a linear interpolation between probes, so that
-// moves it by milliseconds. The bound is 1e-3 h, 3.6 s.
-func TestSetTimeProbesThroughAtTime(t *testing.T) {
+// TestHoursUntilSetProbesMoveACopy holds estimateHoursUntilSet, whose probes
+// move a copy of the scoring Context with SetTime (#481, #675), to the same
+// probes on full Contexts. SetTime holds each probe to ≲0.1″; the estimate is
+// a linear interpolation between probes, so that moves it by milliseconds. The
+// bound is 1e-3 h, 3.6 s. The scoring Context itself must be where the caller
+// left it: the probes move a copy, never the caller's.
+func TestHoursUntilSetProbesMoveACopy(t *testing.T) {
 	t.Parallel()
 
 	planner, window, blocks, _ := scheduleFixture(t)
@@ -178,7 +179,7 @@ func TestSetTimeProbesThroughAtTime(t *testing.T) {
 	// The same probes and the same interpolation as estimateHoursUntilSet,
 	// differing only in where each probe's Context comes from. Until #554 it
 	// restated the old interpolation, from now to the first probe below the
-	// horizon, and so held that defect in place as well as testing AtTime.
+	// horizon, and so held that defect in place as well as testing the probes.
 	reference := func(obj Observable, t0 time.Time, currentAlt float64) float64 {
 		if currentAlt <= 0 {
 			return 0
@@ -227,6 +228,11 @@ func TestSetTimeProbesThroughAtTime(t *testing.T) {
 			}
 
 			got := estimateHoursUntilSet(b.Target, at, ctx, aa.Alt().Degrees())
+
+			if !ctx.Time().Equal(at) {
+				t.Fatalf("%s at %v: estimateHoursUntilSet moved the scoring Context to %v", b.ID, at, ctx.Time())
+			}
+
 			want := reference(b.Target, at, aa.Alt().Degrees())
 
 			if math.IsInf(want, 1) || want == 0 {

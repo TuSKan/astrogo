@@ -25,12 +25,13 @@ func (leapStepEOP) EOP(mjd float64) (time.EOP, error) {
 	return time.EOP{DUT1: dut1, XP: angle.Arcsec(0.077).Radians(), YP: angle.Arcsec(0.264).Radians()}, nil
 }
 
-// TestAtTimeAcrossALeapSecond is #489. AtTime reused its base's DUT1, and DUT1
-// jumps by a second at a leap second, so a Context derived across one was
-// rotated a second away from the one NewContext builds: 13″ for this star.
-// AtTime now takes t's own DUT1. What remains is what it holds fixed on any
-// hour, bounded by its doc comment at 0.1″ per hour of separation.
-func TestAtTimeAcrossALeapSecond(t *testing.T) {
+// TestSetTimeAcrossALeapSecond is #489. AtTime, which SetTime replaces,
+// reused its base's DUT1, and DUT1 jumps by a second at a leap second, so a
+// Context derived across one was rotated a second away from the one
+// NewContext builds: 13″ for this star. SetTime takes t's own DUT1. What
+// remains is what it holds fixed inside the hour, bounded by its doc comment
+// at 0.1″ per hour of separation.
+func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
 	t.Cleanup(time.ResetEOP)
 	time.RegisterModel(leapStepEOP{})
@@ -53,7 +54,10 @@ func TestAtTimeAcrossALeapSecond(t *testing.T) {
 		{"forward across the leap", before, after},
 		{"backward across the leap", after, before},
 	} {
-		derived, err := coord.NewContext(c.base, site, atm).AtTime(c.at).ICRSToAltAz(star)
+		ctx := coord.NewContext(c.base, site, atm)
+		ctx.SetTime(c.at)
+
+		derived, err := ctx.ICRSToAltAz(star)
 		if err != nil {
 			t.Fatalf("%s: derived ICRSToAltAz: %v", c.name, err)
 		}
@@ -63,10 +67,10 @@ func TestAtTimeAcrossALeapSecond(t *testing.T) {
 			t.Fatalf("%s: full ICRSToAltAz: %v", c.name, err)
 		}
 
-		// 45 minutes apart, so AtTime's own bound is 0.075″; 0.1″ allows the
-		// hour it is stated for.
+		// 45 minutes apart, inside the hour SetTime moves without rebuilding,
+		// so its own bound is 0.075″; 0.1″ allows the hour it is stated for.
 		if sep := altAzSeparationArcsec(derived, full); sep > 0.1 {
-			t.Errorf("%s: AtTime is %.3f″ from NewContext; a reused DUT1 is a second of Earth rotation", c.name, sep)
+			t.Errorf("%s: SetTime is %.3f″ from NewContext; a reused DUT1 is a second of Earth rotation", c.name, sep)
 		}
 	}
 }

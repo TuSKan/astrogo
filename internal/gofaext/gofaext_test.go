@@ -97,7 +97,7 @@ func TestGofaExtWrappers(t *testing.T) {
 
 // TestC2tcioDecompositionMatchesC2t06a proves that composing the
 // decomposed factors (C2i06a, Era00, Pom00/Sp00) via C2tcio reproduces the
-// monolithic C2t06a call exactly — the property coord.Context.AtTime relies
+// monolithic C2t06a call exactly — the property coord.Context.SetTime relies
 // on to cheaply recompute only the Earth-rotation-dependent factor.
 func TestC2tcioDecompositionMatchesC2t06a(t *testing.T) {
 	const (

@@ -20,7 +20,7 @@ type failingTransition struct {
 	calls  int
 }
 
-func (m *failingTransition) Overhead(_ TransitionContext) (time.Duration, error) {
+func (m *failingTransition) Overhead(_ Transition) (time.Duration, error) {
 	m.calls++
 	if m.failAt == 0 || m.calls == m.failAt {
 		return 0, errOverheadUnknown
