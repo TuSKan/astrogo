@@ -18,6 +18,9 @@ var (
 	ErrNoPrimaryTarget = errors.New("event spec must contain a primary target")
 	// ErrNoObserverLocation indicates visibility events require a geodetic location.
 	ErrNoObserverLocation = errors.New("visibility events require an observer geodetic location")
+	// ErrUpperLimbNeedsBody indicates an EventSpec with UpperLimb whose target
+	// has no distance to take a semi-diameter from.
+	ErrUpperLimbNeedsBody = errors.New("an upper-limb event needs a moving body with a known radius")
 	// ErrNoSecondaryTarget indicates a geometry event requires a secondary target.
 	ErrNoSecondaryTarget = errors.New("geometry requires a secondary target")
 	// ErrReversedInterval is returned for a search interval whose end is before

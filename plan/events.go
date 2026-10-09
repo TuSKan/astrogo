@@ -179,6 +179,20 @@ type EventSpec struct {
 	Family    EventFamily
 	Kind      EventKind
 	Threshold angle.Angle
+
+	// UpperLimb applies Threshold to the target's upper limb rather than its
+	// center, for a visibility event: at every instant the solver raises the
+	// target's geometric altitude by its semi-diameter then, half its
+	// [AngularDiameter], so a target whose distance varies is held to the
+	// size it has at that moment. The target must be a [MovingBody] with a
+	// known radius.
+	//
+	// [MoonEvents] sets it against [Site.RiseSetThreshold], which is the
+	// almanac's moonrise: the upper limb on the horizon. It used to subtract
+	// a fixed mean semi-diameter of 15.5′ instead, while the Moon's runs from
+	// 14.7′ to 16.8′, which put moonrise and moonset up to 12 s off at London
+	// and 28 s at 60°N (#693).
+	UpperLimb bool
 }
 
 // Validate checks if the Spec configuration is fully provided for its type.
@@ -191,6 +205,10 @@ func (s EventSpec) Validate() error {
 	case EventFamilyVisibility:
 		if s.Observer == nil {
 			return ErrNoObserverLocation
+		}
+
+		if _, ok := s.Target.(MovingBody); s.UpperLimb && !ok {
+			return ErrUpperLimbNeedsBody
 		}
 	case EventFamilyRelativeGeometry, EventFamilyOverlap:
 		if s.Other == nil && !isPhaseEvent(s.Kind) {
@@ -311,8 +329,25 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// every sample and bisection iteration within this solveVisibility call.
 	evalCtx := movingContext(spec.Observer.Location(), geomAtm)
 
-	// observe is the target's geometric observed position.
-	observe := func(t time.Time) (coord.AltAz, error) {
+	// limb is what spec.UpperLimb adds to the geometric altitude, in degrees:
+	// the target's semi-diameter at t, or nothing for its center.
+	limb := func(time.Time, *coord.Context) (float64, error) { return 0, nil }
+
+	if spec.UpperLimb {
+		mb, _ := spec.Target.(MovingBody) // Validate has checked it is one
+
+		limb = func(t time.Time, ctx *coord.Context) (float64, error) {
+			d, err := AngularDiameter(mb, t, ctx)
+			if err != nil {
+				return 0, fmt.Errorf("events: upper limb: %w", err)
+			}
+
+			return d.Degrees() / 2, nil
+		}
+	}
+
+	// observeCenter is the target's center, geometric and observed.
+	observeCenter := func(t time.Time) (coord.AltAz, error) {
 		ctx := evalCtx(t)
 
 		// For solar system bodies, use the vector-based topocentric pipeline
@@ -340,7 +375,22 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		return aa, nil
 	}
 
-	altitude := func(aa coord.AltAz) float64 { return aa.Alt().Degrees() - spec.Threshold.Degrees() }
+	// observe is the target's geometric observed position, and the altitude
+	// the threshold is measured against there: its center's, or its upper
+	// limb's with spec.UpperLimb, less the threshold.
+	observe := func(t time.Time) (coord.AltAz, float64, error) {
+		aa, err := observeCenter(t)
+		if err != nil {
+			return coord.AltAz{}, 0, err
+		}
+
+		sd, err := limb(t, evalCtx(t))
+		if err != nil {
+			return coord.AltAz{}, 0, err
+		}
+
+		return aa, aa.Alt().Degrees() + sd - spec.Threshold.Degrees(), nil
+	}
 
 	// hourAngle is the hour angle of an observed position in degrees,
 	// [-180, 180]. Its upward zero crossing is the upper meridian transit, and
@@ -358,13 +408,13 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	}
 
 	evalVal := func(t time.Time) (float64, error) {
-		aa, err := observe(t)
+		_, h, err := observe(t)
 
-		return altitude(aa), err
+		return h, err
 	}
 
 	evalHA := func(t time.Time) (float64, error) {
-		aa, err := observe(t)
+		aa, err := observeCenter(t)
 
 		return hourAngle(aa), err
 	}
@@ -382,13 +432,13 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	// One observation per sample serves the rise/set and the transit search.
 	sample := func(t time.Time) error {
-		aa, err := observe(t)
+		aa, h, err := observe(t)
 		if err != nil {
 			return err
 		}
 
 		times = append(times, t)
-		alts = append(alts, altitude(aa))
+		alts = append(alts, h)
 
 		if wantTransit {
 			has = append(has, hourAngle(aa))
@@ -436,13 +486,18 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 			return err
 		}
 
+		sd, err := limb(resTime, evalCtx(resTime))
+		if err != nil {
+			return err
+		}
+
 		events = append(events, Event{
 			Kind:              kind,
 			Time:              resTime,
 			Altitude:          refr.Alt(),
 			GeometricAltitude: geom.Alt(),
 			Azimuth:           geom.Az(),
-			Value:             geom.Alt().Degrees() - spec.Threshold.Degrees(),
+			Value:             geom.Alt().Degrees() + sd - spec.Threshold.Degrees(),
 		})
 
 		return nil
@@ -846,7 +901,10 @@ type TwilightEvent struct {
 // of a standard refraction of 34', the body's semi-diameter, and the horizon
 // dip for the site's elevation, 1.76'√h, which includes terrestrial
 // refraction. RiseSetThreshold, for any other target, is the same without a
-// semi-diameter. The 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
+// semi-diameter. The Sun's is the almanac's fixed 16'. The Moon's varies by
+// two arcminutes with its distance, so MoonEvents measures RiseSetThreshold
+// against its upper limb instead, and MoonRiseSetThreshold's mean is for a
+// single-instant check. The 34' is a fixed convention, not a SOFA computation -- USNO and the Astronomical
 // Almanac define rise and set the same way, so that two implementations agree on
 // an instant that is otherwise sensitive to the air on the night. SOFA's
 // rigorous refraction is used where refraction is being modeled rather than
@@ -894,8 +952,10 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 }
 
 // MoonEvents returns all rise, set, and transit events for the Moon in the given interval.
-// The threshold accounts for atmospheric refraction, mean lunar semi-diameter,
-// horizontal parallax, and the horizon dip from the site's elevation.
+// Rise and set are the almanac's: the Moon's upper limb on the horizon of
+// [Site.RiseSetThreshold], standard refraction plus the dip from the site's
+// elevation, with the Moon's topocentric position, so its parallax, and its
+// semi-diameter at each instant; see [EventSpec.UpperLimb].
 func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
 	moon := NewMoon(provider)
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
@@ -904,7 +964,8 @@ func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Even
 		Kind:      EventAnyVisibility,
 		Target:    moon,
 		Observer:  site,
-		Threshold: site.MoonRiseSetThreshold(),
+		Threshold: site.RiseSetThreshold(),
+		UpperLimb: true,
 	}
 
 	return solver.Find(spec, start, end)

@@ -47,7 +47,7 @@ go test -tags integration -run TestUSNO -v -timeout 300s ./plan/
 | **Sun Rise/Set** | 0.2 min | 0.5 min | 1 min |
 | **Sun Civil Twilight** | 0.3 min | 0.5 min | 1 min |
 | **Moon Transit** | 0.2 min | 0.5 min | 1 min |
-| **Moon Rise/Set** | 0.3 min | 0.6 min | 1 min |
+| **Moon Rise/Set** | 0.3 min | 0.55 min | 1 min |
 
 Every rise, set and upper transit is held to 1 minute: USNO's half-minute
 rounding plus half a minute. Until #678 rise and set were held to 2 minutes
@@ -62,6 +62,7 @@ Supplement convention:
 | Component | Value |
 |---|---|
 | Solar semi-diameter | 16' (0.2667°) |
+| Lunar semi-diameter | the Moon's at that instant, 14.7'–16.8' (#693) |
 | Standard atmospheric refraction | 34' (0.5667°) |
 | Total at sea level | **−50' (−0.8333°)** |
 | Horizon dip from elevation _h_ | 1.76'√_h_ |
