@@ -82,6 +82,20 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 		return records
 	}
 
+	// A skip is remembered too. Degraded, FINK takes 33 s to answer this
+	// query with nothing in it and 60 s to time out, and each of the tests
+	// sharing it used to spend its own retries finding out: in CI that ran
+	// the package past go test's ten-minute limit (#700).
+	if finkDegraded[key] {
+		t.Skipf("FINK was degraded for %s earlier in this run; see the first test that asked (#700)", numberOrDesig)
+	}
+
+	defer func() {
+		if t.Skipped() {
+			finkDegraded[key] = true
+		}
+	}()
+
 	body := map[string]any{
 		"n_or_d":        numberOrDesig,
 		"withResiduals": withResiduals,
@@ -131,8 +145,9 @@ type finkKey struct {
 }
 
 var (
-	finkMu    sync.Mutex
-	finkCache = map[finkKey][]map[string]any{}
+	finkMu       sync.Mutex
+	finkCache    = map[finkKey][]map[string]any{}
+	finkDegraded = map[finkKey]bool{}
 )
 
 // finkRetryPause is how long an unusable answer waits before it is asked
