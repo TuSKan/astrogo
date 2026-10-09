@@ -237,7 +237,7 @@ var defaultAtm = atmosphere.Refraction{}
 // range needs. So there is nothing to rebuild.
 //
 // Using the given Context is also what the signature promises. A caller who
-// derived it with Context.AtTime — the cheap Earth-rotation-only update —
+// moved it with Context.SetTime — the cheap Earth-rotation-only update —
 // previously had that quietly discarded and a full rebuild substituted, which
 // is the opposite of what they asked for.
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
@@ -297,13 +297,13 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	// 61% of every 30-second sample went on rebuilding state that barely
 	// changes. The reuse window's ≲0.1″ is three to four orders of magnitude
 	// inside SGP4's own kilometer-scale along-track error, which at a few
-	// hundred km of range is minutes of arc — see newContextCache and #166.
+	// hundred km of range is minutes of arc — see movingContext and #166.
 	//
 	// Body id 0 is not a placeholder: satellite.Satellite carries one TLE and
 	// its State rejects any other id with ErrUnexpectedID, so 0 is the only
 	// one a satellite provider accepts. The name parameter is a label for the
 	// returned pass, not a lookup key.
-	ctxAt := newContextCache(observer, defaultAtm)
+	ctxAt := movingContext(observer, defaultAtm)
 
 	lookAt := func(t time.Time) (coord.AltAz, error) {
 		return LookAngle(prov, 0, ctxAt(t))
@@ -420,12 +420,13 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 // findCulmination finds the point of maximum elevation during a pass
 // by sampling at 5-second intervals and refining the peak.
 //
-// Samples are looked up through ctxAt, the Context cache the pass scan
+// Samples are looked up through ctxAt, the moving Context the pass scan
 // itself uses, rather than a full coord.NewContext at each one: it built
 // about 130 per pass, each a full evaluation of the precession-nutation
-// series, where the cache derives them from one with Context.AtTime (#476).
-// The culmination it reports is computed from a full Context at the chosen
-// instant, as rise and set are, so the cache decides only which sample wins.
+// series, where one Context moved with Context.SetTime serves them all
+// (#476). The culmination it reports is computed from a full Context at the
+// chosen instant, as rise and set are, so the moving Context decides only
+// which sample wins.
 func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	ctxAt func(time.Time) *coord.Context, start, end time.Time,
 ) (PassEvent, error) {

@@ -663,7 +663,7 @@ func PositionAngle(from, to ICRS) angle.Angle {
 //
 // This is rigorous relativistic space-motion propagation (good to
 // sub-milliarcsecond over the years-to-decades spans catalog cross-matching
-// needs) — a different problem from Context.AtTime's O(1) approximate
+// needs) — a different problem from Context.SetTime's O(1) approximate
 // short-span Earth-rotation update, which re-derives observer-frame state,
 // not a star's own kinematics.
 func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {

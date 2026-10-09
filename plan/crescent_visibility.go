@@ -29,8 +29,8 @@ import (
 //
 // An evening is evaluated at four instants: geometric sunset, the almanac's
 // sunset, Yallop's best time and Qureshi's. One coord.Context is built, at
-// sunset, and the others derived from it with AtTime: an hour of AtTime costs
-// ≲0.1″, against these criteria's tenths of a degree. The Sun and Moon are
+// sunset, and moved to the others with SetTime, which holds it to ≲0.1″
+// against these criteria's tenths of a degree. The Sun and Moon are
 // each looked up once per instant, and every criterion at that instant reads
 // the same two lookups.
 //
@@ -133,7 +133,9 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 		g *crescentGeometry
 		t time.Time
 	}{{&gGeometric, geometric}, {&gSunset, sunset}, {&gBest, best}, {&gQureshi, qureshiBest}} {
-		if *at.g, err = crescentGeometryAt(ctx.AtTime(at.t), prov); err != nil {
+		ctx.SetTime(at.t)
+
+		if *at.g, err = crescentGeometryAt(ctx, prov); err != nil {
 			return CrescentResult{}, err
 		}
 	}
@@ -197,10 +199,10 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 // Fotheringham, Maunder, Ilyas and Krauss, a few minutes before the almanac's.
 //
 // Newton's method from sunset converges in three or four steps, each two
-// lookups of the Sun through ctx. Where the Sun sinks too slowly for it, near
-// the pole, the event solver searches the day before sunset instead; it reads
-// the Sun's topocentric altitude, off the geocentric by the solar parallax,
-// 8.8″.
+// lookups of the Sun through ctx, which it moves. Where the Sun sinks too
+// slowly for it, near the pole, the event solver searches the day before
+// sunset instead; it reads the Sun's topocentric altitude, off the geocentric
+// by the solar parallax, 8.8″.
 func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.Provider) (time.Time, error) {
 	alt := func(t time.Time) (float64, error) {
 		sun, err := eph.Position(prov, eph.Sun, t)
@@ -208,9 +210,9 @@ func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.
 			return 0, fmt.Errorf("crescent: sun position: %w", err)
 		}
 
-		c := ctx.AtTime(t)
+		ctx.SetTime(t)
 
-		return c.GeocentricToObserved(sun.Add(c.ObsVec())).Alt().Degrees(), nil
+		return ctx.GeocentricToObserved(sun.Add(ctx.ObsVec())).Alt().Degrees(), nil
 	}
 
 	t := sunset

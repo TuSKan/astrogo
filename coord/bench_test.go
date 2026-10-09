@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -32,6 +33,40 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 
 	for b.Loop() {
 		_ = coord.NewContext(t, loc, atm)
+	}
+}
+
+// BenchmarkSetTime moves one Context in five-minute steps, the samplers'
+// pattern #675 measured AtTime on. Within the hour is the cheap path alone:
+// eleven steps and back to the start. A night is 96 steps, seven of them
+// more than an hour from the epoch and so rebuilt, and the step back to the
+// start an eighth.
+func BenchmarkSetTime(b *testing.B) {
+	loc, _ := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	start := time.FromJD(2461056.25, time.UTC)
+
+	for _, c := range []struct {
+		name  string
+		steps int
+	}{{"within the hour", 11}, {"a night", 96}} {
+		b.Run(c.name, func(b *testing.B) {
+			ctx := coord.NewContext(start, loc, atmosphere.StandardRefraction())
+
+			steps := make([]time.Time, c.steps)
+			for i := range steps {
+				steps[i] = start.Add(unit.Minutes(5 * float64(i+1)))
+			}
+
+			b.ReportAllocs()
+
+			for b.Loop() {
+				ctx.SetTime(start)
+
+				for _, t := range steps {
+					ctx.SetTime(t)
+				}
+			}
+		})
 	}
 }
 

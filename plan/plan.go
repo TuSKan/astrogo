@@ -375,10 +375,10 @@ func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 // Returns math.Inf(1) if the target is still above threshold at all probe
 // points (circumpolar or very long visibility window).
 //
-// Each probe's Context is derived from ctx, the scoring instant's, with
-// AtTime. They were five full Contexts per score; AtTime's error at the
-// furthest probe, eight hours out, is ≲0.8″, against an interpolation whose
-// own error is degrees (#481).
+// The probes move a copy of ctx, the scoring instant's, with SetTime, and
+// leave ctx where the caller has it. They were five full Contexts per score
+// (#481); SetTime rebuilds past the hour, so no probe is more than ≲0.1″
+// out, against an interpolation whose own error is degrees.
 func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, currentAlt float64) float64 {
 	// If already below horizon, urgency is maximum.
 	if currentAlt <= 0 {
@@ -397,6 +397,8 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 	// The last instant known to be above the horizon, starting from now.
 	prevHours, prevAlt := 0.0, currentAlt
 
+	probe := *ctx
+
 	for _, offset := range probeOffsets {
 		ft := t.Add(time.FromGoDuration(offset))
 
@@ -405,7 +407,9 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 			continue
 		}
 
-		aa, err := observedAltAz(obj, ft, ctx.AtTime(ft), pos)
+		probe.SetTime(ft)
+
+		aa, err := observedAltAz(obj, ft, &probe, pos)
 		if err != nil {
 			continue
 		}
@@ -613,7 +617,7 @@ func ObservableWindows(
 	site *Site,
 	constraints ...Constraint,
 ) ([]Window, error) {
-	return observableWindows(obj, start, end, step, site, newContextCache(site.Location(), site.Refraction()), constraints...)
+	return observableWindows(obj, start, end, step, site, movingContext(site.Location(), site.Refraction()), constraints...)
 }
 
 // observableWindows is ObservableWindows with the Context for each instant

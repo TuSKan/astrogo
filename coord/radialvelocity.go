@@ -135,9 +135,9 @@ func (ctx *Context) ObservedRadialVelocity(target ICRS, rvBarycentric unit.Veloc
 //	rvHeliocentric = rvMeasured + corr  // corr, err := ctx.HeliocentricRVCorrection(target)
 //
 // This calls gofaext.Epv00 fresh on every invocation (not cached on
-// Context) — deliberately: Context.AtTime derives new epochs via a
-// shallow Clone, and a cached heliocentric-velocity field would go
-// silently stale across those epoch changes. Epv00 is microseconds;
+// Context) — deliberately: Context.SetTime moves a Context to new instants
+// without rebuilding it, and a cached heliocentric-velocity field would go
+// silently stale across them. Epv00 is microseconds;
 // this is not a hot path. Returns ErrSofaEpv00Failed if the underlying
 // SOFA computation reports a failure status.
 func (ctx *Context) HeliocentricRVCorrection(target ICRS) (unit.Velocity, error) {

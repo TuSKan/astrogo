@@ -40,16 +40,15 @@ func main() {
 	// 4. Time of Slew
 	t := time.NowUTC()
 
-	// 5. Estimate Transition Time from Block A to Block B
-	ctx := plan.TransitionContext{
-		FromBlock: &blockA,
-		ToBlock:   &blockB,
-		FromTime:  t,
-		ToTime:    t,
-		Site:      site,
+	// 5. Estimate Transition Time from Block A to Block B: where each target
+	// is in the sky, then what the model charges to move between them.
+	tr, err := plan.NewTransition(&blockA, &blockB, t, t, site)
+	if err != nil {
+		fmt.Printf("Calculation error: %v\n", err)
+		return
 	}
 
-	transitionTime, err := model.Overhead(ctx)
+	transitionTime, err := model.Overhead(tr)
 	if err != nil {
 		fmt.Printf("Calculation error: %v\n", err)
 		return

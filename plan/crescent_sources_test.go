@@ -196,7 +196,9 @@ func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
 		t.Fatalf("geometricSunset: %v", err)
 	}
 
-	g, err := crescentGeometryAt(ctx.AtTime(geometric), prov)
+	ctx.SetTime(geometric)
+
+	g, err := crescentGeometryAt(ctx, prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}

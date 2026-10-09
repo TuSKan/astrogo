@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -126,5 +127,47 @@ func TestNewContextAllocationIsBounded(t *testing.T) {
 	if got := testing.AllocsPerRun(200, func() { _ = coord.NewContext(epoch, loc, atm) }); got > maxAllocs {
 		t.Errorf("NewContext allocates %v times per call, want at most %d (measured 1)",
 			got, maxAllocs)
+	}
+}
+
+// TestSetTimeDoesNotAllocate pins SetTime's reason to exist. AtTime, which it
+// replaces, copied the whole Context to the heap for every instant, 704 bytes
+// to change four values, and in plan's event solver that was 72% of every
+// byte allocated (#675). Both of SetTime's paths are held: the cheap update
+// inside the hour and the rebuild beyond it, which writes the new epoch into
+// the Context it already has.
+func TestSetTimeDoesNotAllocate(t *testing.T) {
+	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	atm := atmosphere.AtAltitude(2635)
+	epoch := time.FromJD(2460000.5, time.UTC)
+	ctx := coord.NewContext(epoch, loc, atm)
+
+	near := []time.Time{epoch.Add(unit.Minutes(5)), epoch.Add(unit.Minutes(-20))}
+	far := []time.Time{epoch.Add(unit.Hours(3)), epoch.Add(unit.Hours(-3))}
+
+	for _, tc := range []struct {
+		name string
+		at   []time.Time
+	}{
+		{"inside the hour", near},
+		{"rebuilding", far},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx.SetTime(epoch)
+
+			i := 0
+			step := func() {
+				ctx.SetTime(tc.at[i%len(tc.at)])
+				i++
+			}
+
+			if got := testing.AllocsPerRun(200, step); got != 0 {
+				t.Errorf("SetTime %s allocates %v times per call, want 0", tc.name, got)
+			}
+		})
 	}
 }

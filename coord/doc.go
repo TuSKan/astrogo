@@ -126,11 +126,13 @@
 //
 // # Concurrency
 //
-// A [Context] is read-only once built: no method assigns to its fields, and
-// [Context.Clone] and [Context.AtTime] return new values rather than mutating
-// the receiver. One Context may therefore be shared across goroutines, which
-// is what makes the "build one per epoch and reuse it" rule practical — the
-// expensive SOFA matrix is computed once and read concurrently.
+// A [Context]'s methods only read it, except [Context.SetTime], which moves it
+// to another instant in place. One Context may therefore be read from many
+// goroutines at once, which is what makes the "build one per epoch and reuse
+// it" rule practical — the expensive SOFA matrix is computed once and read
+// concurrently — as long as nothing moves it meanwhile. A goroutine that moves
+// through time needs a Context of its own: c := *ctx copies one, and
+// [NewContext] builds one.
 //
 // Everything else here is a value type.
 package coord

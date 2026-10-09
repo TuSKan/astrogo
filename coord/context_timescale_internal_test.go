@@ -45,7 +45,7 @@ var sofaStepDays = []time.Time{
 // TestContextRotatesStarsByItsOwnUT1 is #474's defect, stated as the property
 // the fix gives: the Earth rotation in a Context's astrometry, the one the
 // stellar path applies, is the rotation of the Context's own UT1, the one its
-// vector path and AtTime apply.
+// vector path and SetTime apply.
 //
 // They were different Earths. The astrometry came from SOFA's Apco13, which
 // derives UT1 from UTC itself, and on the eleven days SOFA stretches for a

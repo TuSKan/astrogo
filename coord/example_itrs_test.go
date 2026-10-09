@@ -54,10 +54,12 @@ func ExampleContext_ICRSToITRS_earthRotation() {
 
 	star := coord.NewICRS(angle.Deg(101.2871), angle.Deg(-16.7161)).ToUnitVector() // Sirius
 
-	for _, hours := range []float64{0, 6, 12} {
-		at := ctx.AtTime(ctx.Time().Add(unit.Days(hours / 24)))
+	start := ctx.Time()
 
-		lon, lat := at.ICRSToITRS(star).ToSpherical()
+	for _, hours := range []float64{0, 6, 12} {
+		ctx.SetTime(start.Add(unit.Days(hours / 24)))
+
+		lon, lat := ctx.ICRSToITRS(star).ToSpherical()
 
 		fmt.Printf("+%2.0f h: earth-fixed lon %+8.3f deg, lat %+7.3f deg\n",
 			hours, angle.Rad(lon).Wrap180().Degrees(), angle.Rad(lat).Degrees())
