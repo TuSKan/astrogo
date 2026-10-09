@@ -256,10 +256,6 @@ func Airmass(alt angle.Angle) (float64, error) {
 
 // ── Elevation-Aware Corrections ──────────────────────────────────────────────
 
-// const (
-// 	meanEarthRadius = 6371000.0 // Mean Earth radius in meters (IAU nominal)
-// )
-
 // HorizonDip returns the apparent dip angle of the horizon for an observer at
 // height h meters above the reference ellipsoid. The dip is the angular depression
 // of the visible horizon below the mathematical (level) horizon, corrected for
@@ -267,9 +263,11 @@ func Airmass(alt angle.Angle) (float64, error) {
 //
 // Formula: dip ≈ 1.76' × √h (arcminutes), where h is in meters.
 //
-// This is the standard navigational/astronomical formula that accounts for the
-// atmospheric refraction coefficient k ≈ 0.13 (light bending reduces the geometric
-// dip by roughly 1/7). At sea level (h=0), dip = 0. At 786m, dip ≈ 0.82°.
+// This is the Nautical Almanac's dip of the sea horizon. Without refraction the
+// dip would be √(2h/R) radians, 1.926' × √h for R = 6371 km; light bending
+// toward the ground lowers it by 8.6 per cent, which is the geometric dip
+// scaled by √(1 − k) with a refraction coefficient k of 0.165. At sea level
+// (h=0), dip = 0. At 786m, dip ≈ 0.82°.
 func HorizonDip(h unit.Length) angle.Angle {
 	if h <= 0 {
 		return angle.Zero()
