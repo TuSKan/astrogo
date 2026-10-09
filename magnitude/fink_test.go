@@ -82,6 +82,20 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 		return records
 	}
 
+	// A skip is remembered too. Degraded, FINK takes 33 s to answer this
+	// query with nothing in it and 60 s to time out, and each of the tests
+	// sharing it used to spend its own retries finding out: in CI that ran
+	// the package past go test's ten-minute limit (#700).
+	if finkDegraded[key] {
+		t.Skipf("FINK was degraded for %s earlier in this run; see the first test that asked (#700)", numberOrDesig)
+	}
+
+	defer func() {
+		if t.Skipped() {
+			finkDegraded[key] = true
+		}
+	}()
+
 	body := map[string]any{
 		"n_or_d":        numberOrDesig,
 		"withResiduals": withResiduals,
@@ -98,6 +112,18 @@ func finkSSOQuery(t *testing.T, numberOrDesig string, withResiduals, withEphem b
 	}
 
 	if !finkUsable(records, withResiduals) {
+		// Every record carrying the residual column, every value null, is
+		// FINK saying it computed none: its ephemeris service failed inside
+		// the request. Measured on one request sent twice: 327 records with
+		// residuals in 6.7 s, then the same 327 with every residual null in
+		// 32.7 s. The control below cannot see that; Eros's dates come from
+		// FINK's own store (#700). A column that is absent is not this, and
+		// still goes to the control.
+		if withResiduals && finkResidualsAllNull(records) {
+			t.Skipf("FINK answered %s with %d records whose residuals_shg1g2 are all null, twice: "+
+				"it computed none, as it does when its ephemeris service fails (#700)", numberOrDesig, len(records))
+		}
+
 		control := finkPost(t, map[string]any{"n_or_d": "433", "columns": "i:jd", "output-format": "json"})
 		if len(control) == 0 {
 			t.Skipf("FINK answered %s with %d records and no usable ones, twice, and its control "+
@@ -119,8 +145,9 @@ type finkKey struct {
 }
 
 var (
-	finkMu    sync.Mutex
-	finkCache = map[finkKey][]map[string]any{}
+	finkMu       sync.Mutex
+	finkCache    = map[finkKey][]map[string]any{}
+	finkDegraded = map[finkKey]bool{}
 )
 
 // finkRetryPause is how long an unusable answer waits before it is asked
@@ -149,8 +176,26 @@ func finkUsable(records []map[string]any, withResiduals bool) bool {
 	return false
 }
 
+// finkResidualsAllNull reports whether every record carries the
+// residuals_shg1g2 column with no value in it.
+func finkResidualsAllNull(records []map[string]any) bool {
+	if len(records) == 0 {
+		return false
+	}
+
+	for _, r := range records {
+		v, present := r["residuals_shg1g2"]
+		if !present || v != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
 // finkPost sends one SSO query. A transport failure or a 5xx skips, as an
-// outage; any other non-200 fails.
+// outage, and so does a 400 in which FINK names its ephemeris service,
+// Miriade, as what failed (#700); any other non-200 fails.
 func finkPost(t *testing.T, body map[string]any) []map[string]any {
 	t.Helper()
 
@@ -188,6 +233,15 @@ func finkPost(t *testing.T, body map[string]any) []map[string]any {
 		// failing the run for external downtime.
 		t.Skipf("FINK SSO service unavailable, skipping live test: HTTP %d: %s",
 			resp.StatusCode, string(data[:min(200, len(data))]))
+	}
+
+	// FINK computes ephemerides through IMCCE's Miriade, and when Miriade does
+	// not answer it says so in a 400: "We could not obtain the ephemerides
+	// information. Check Miriade availabilities." That is FINK reporting its
+	// dependency down, not a malformed request.
+	if resp.StatusCode == http.StatusBadRequest && bytes.Contains(data, []byte("Miriade")) {
+		t.Skipf("FINK's ephemeris service, Miriade, did not answer: HTTP 400: %s (#700)",
+			string(data[:min(200, len(data))]))
 	}
 
 	if resp.StatusCode != http.StatusOK {
