@@ -169,7 +169,7 @@ tables you can check against published references.
 
 | | |
 |---|---|
-| **Time** | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (±3 µs), explicit IERS UT1 error propagation |
+| **Time** | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (≤1 µs over 1600–2400), explicit IERS UT1 error propagation |
 | **Coordinates** | ICRS/Galactic/Ecliptic/AltAz/Geodetic, full Geometric→Astrometric→CIRS→Observed pipeline, `Context` caching (91 µs → 325 ns/transform) |
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
@@ -189,7 +189,7 @@ tables you can check against published references.
 - Angles (radians, degrees, sexagesimal — HMS/DMS parsing)
 - Units and quantities
 - **Scale-aware time system** (JD-based, full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph)
-  - Fairhead & Bretagnon (1990) TDB correction (±3 µs residual)
+  - Fairhead & Bretagnon (1990) TDB correction, its leading 37 terms (≤0.79 µs over 1900–2100, ≤3 µs over −1000 to 3000)
   - Cross-scale comparisons auto-unify via TT (2 ns same-scale fast path)
   - `UT1()` returns `(Time, error)`: an error when a loaded IERS bulletin does not reach the epoch; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
 
@@ -209,7 +209,7 @@ tables you can check against published references.
 - `coord.SubPoint`/`SmallCircle` — the geodetic point where a distant body (Sun, Moon, planet) is at the zenith, and a spherical small-circle sampler for drawing it (used by `plan.Terminator` below)
 
 ### Atmospheric Modeling (`atmosphere`)
-- **Refraction to the horizon by default** (ICAO standard atmosphere): SOFA's series above 10° altitude, handed over to Bennett-NA below 5°, within 13″ of Hohenkerk & Sinclair's ray tracing on the horizon
+- **Refraction to the horizon by default** (ICAO standard atmosphere): SOFA's series above 10° altitude, handed over to Bennett-NA below 5°, within 13.4″ of Hohenkerk & Sinclair's ray tracing on the horizon (held to 15″)
 - Pluggable `RefractionModel` interface with bidirectional refraction
 - `RefractionNone` — bypass refraction
 - `RefractionBennett` — Bennett's formula as refitted to the Nautical Almanac's tables, with pressure, temperature and wavelength; the almanac's table to 0.12′
@@ -300,7 +300,7 @@ Every component traces to primary literature: artificial skyglow follows Kocifaj
 - **Unified `Solver`** — Chandrupatla root-finding (1997) + Brent's minimization
 - **Moon Phases**: New, First Quarter, Full, Last Quarter — ≤1 min vs USNO
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
-- **Earth's Seasons**: Equinoxes and Solstices — 2–4 min vs USNO
+- **Earth's Seasons**: Equinoxes and Solstices — ≤0.74 min vs USNO over 2020–2035 (held to 1 min, USNO printing to the minute)
 - **Visibility Events**: Rise/Set ≤0.6 min vs USNO, Transit ≤0.5 min — 41/41 edge cases passing (polar, equatorial, 8849m altitude)
 - **Horizon refraction**: the almanacs' 34′ by default, so rises and sets agree with USNO's; `plan.WithHorizonRefraction` sets the air the horizon refracts through instead. Against the real sky, refraction near the horizon limits any rise or set to about 2 minutes, whatever the model (Wilson 2018)
 - **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
@@ -773,7 +773,7 @@ The library logs a one-time warning when EOP data is unavailable (users who redi
 
 ### TDB Precision
 
-The Fairhead & Bretagnon (1990) single-term TDB−TT correction has a ±3 µs residual. This is sufficient for observatory planning and even millisecond-precision pulsar timing. It is **not** sufficient for:
+The TDB−TT correction is Fairhead & Bretagnon (1990) truncated to its leading 37 terms, as SOFA's `iauDtdb` tabulates them: within 0.79 µs over 1900–2100, 1 µs over 1600–2400 and 3 µs over −1000 to 3000. This is sufficient for observatory planning and even millisecond-precision pulsar timing. It is **not** sufficient for:
 - Deep-space probe telemetry (needs full JPL DE-based TDB)
 - Sub-microsecond timing array work
 
