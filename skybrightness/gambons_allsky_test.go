@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/metrology"
@@ -631,20 +630,14 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 	}
 
 	if !onTurnsOver {
-		// Reported rather than failed, because the cause is known and cannot be
-		// removed here. GAMBONS' profile turns over because van Rhijn brightens
-		// the limb and extinction darkens it; ours now applies both, but it
-		// also attenuates without returning any of the light scattered back
-		// into the beam, and that omission is largest exactly where extinction
-		// is largest. The horizon is therefore dimmed too far and becomes the
-		// faintest band instead of an interior one.
-		//
-		// Closing it needs the scattered term of Masana et al. Eq. 8, which
-		// this project does not have; see docs/skybrightness.md section 16.
-		// Inventing a substitute would make the profile agree by construction,
-		// which is the one way of agreeing that would mean nothing.
-		t.Logf("  the profile does not turn over: ours is faintest at the horizon, which is "+
-			"the missing scattered-in term dimming it too far there: %.2f", medians)
+		// Reported rather than failed. GAMBONS' profile turns over because van
+		// Rhijn brightens the limb and extinction darkens it, and ours applies
+		// both. Where that balance falls depends on the airglow normalization
+		// and on kappa, the effective-depth factor standing in for the light
+		// scattered back into the beam, and both are parameters rather than
+		// predictions. A profile that stops turning over is a change in that
+		// balance to read in docs/skybrightness.md section 13, not a wrong sign.
+		t.Logf("  the profile does not turn over: ours is faintest at the horizon: %.2f", medians)
 	}
 }
 
@@ -673,7 +666,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 	//
 	// Airglow is a free parameter in both models rather than a prediction by
 	// either: GAMBONS drives it from ESO_SkyCalc_100_10.dat and this test asks
-	// SkyCalc for 100 sfu, and those are about a factor of 1.6 apart. Comparing
+	// SkyCalc for 100 sfu, and those need not be the same normalization. Comparing
 	// two models that were handed different airglow measures the files, not the
 	// physics, which is the trap this repository's own validation notes warn
 	// about.
@@ -774,11 +767,13 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 	// ── where the remaining difference comes from ───────────────────────────
 	//
-	// Two mechanisms account for it, and both are already declared rather than
-	// discovered here. This computes what each is worth so the declaration is
-	// a number instead of a caveat.
+	// Only what is computed here is printed. This used to print a fixed
+	// account as well, written before the airglow was extinguished along its
+	// slant path and before the scene carried kappa, and it went on printing
+	// that account for weeks beside numbers that contradicted it (#666). What
+	// the numbers mean is docs/skybrightness.md section 13's to say.
 	t.Log("")
-	t.Log("difference budget:")
+	t.Log("difference budget (read with docs/skybrightness.md section 13):")
 	t.Log("")
 	t.Log("  1. airglow: compared as flux, not as a difference of magnitudes.")
 	t.Log("     How much airglow 'adds' in magnitudes depends on the airglow-free")
@@ -786,9 +781,7 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 	t.Log("     not compare the airglow. Ours is taken from the component itself;")
 	t.Log("     theirs is the flux difference of their two exports, which is only")
 	t.Log("     available for the two bands they recorded both runs for.")
-	t.Logf("     %-12s %13s %13s %11s %11s", "band", "our airglow", "their airglow", "ours/theirs", "unapplied")
-
-	const representativeKV = 0.12 // mag per airmass, a clear sea-level site in V
+	t.Logf("     %-12s %13s %13s", "band", "our airglow", "their airglow")
 
 	airglowRatioMag := make(map[int]float64)
 
@@ -805,17 +798,8 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 
 		ourFlux := metrology.Quantile(ours, 0.5)
 
-		sinMid := (math.Sin(b.loAlt*math.Pi/180) + math.Sin(b.hiAlt*math.Pi/180)) / 2
-		mid := math.Asin(sinMid) * 180 / math.Pi
-
-		unapplied := math.NaN()
-		if am, err := atmosphere.Airmass(angle.Deg(mid)); err == nil {
-			unapplied = representativeKV * am
-		}
-
 		if math.IsNaN(b.medianNoAirglow) {
-			t.Logf("     %3.0f-%3.0f deg %13.4g %13s %11s %11.3f",
-				b.loAlt, b.hiAlt, ourFlux, "(not recorded)", "-", unapplied)
+			t.Logf("     %3.0f-%3.0f deg %13.4g %13s", b.loAlt, b.hiAlt, ourFlux, "(not recorded)")
 
 			continue
 		}
@@ -828,73 +812,32 @@ func TestGAMBONSAllSkyWithAirglowMatched(t *testing.T) {
 		// it is normalized below against the highest band.
 		airglowRatioMag[bi] = -2.5 * math.Log10(ourFlux/theirFlux)
 
-		t.Logf("     %3.0f-%3.0f deg %13.4g %13.4g %11s %11.3f",
-			b.loAlt, b.hiAlt, ourFlux, theirFlux, "see below", unapplied)
+		t.Logf("     %3.0f-%3.0f deg %13.4g %13.4g", b.loAlt, b.hiAlt, ourFlux, theirFlux)
 	}
 
-	// Only the change in the ratio across the sky is free of the unit
-	// mismatch, and that change is what extinction would explain.
+	// Ours is in physical units and theirs in the arbitrary units of that
+	// power law, so only the change in the ratio across the sky is free of the
+	// mismatch. The airglow is already extinguished along its slant path at
+	// the scene's kappa, so this is what is left of the slope after that.
 	if lo, okLo := airglowRatioMag[0]; okLo {
 		if hi, okHi := airglowRatioMag[len(gambonsAltitudeBands)-1]; okHi {
-			swing := lo - hi
-
-			var differential float64
-
-			amLo, errLo := atmosphere.Airmass(angle.Deg(7.44))
-			amHi, errHi := atmosphere.Airmass(angle.Deg(79.41))
-
-			if errLo == nil && errHi == nil {
-				differential = representativeKV * (amLo - amHi)
-			}
-
 			t.Log("")
 			t.Logf("     our airglow relative to theirs swings %+.3f mag from the 75-90 band"+
-				" to the 0-15 one", swing)
-			t.Logf("     the slant extinction never applied differs by %+.3f mag across the same span",
-				differential)
-			t.Logf("     leaving %+.3f mag the missing extinction does not account for, which is"+
-				" the van Rhijn layer height or their own angular treatment",
-				math.Abs(swing)-differential)
+				" to the 0-15 one", lo-hi)
 		}
 	}
 
-	t.Log("")
-	t.Log("     Separately from the slope, the normalization differs. Near the")
-	t.Log("     zenith, where the geometry is reliable and extinction is a tenth")
-	t.Log("     of a magnitude, our airglow is a factor of about 1.6 fainter than")
-	t.Log("     GAMBONS'. Both drive it from an ESO SkyCalc spectrum, so that is a")
-	t.Log("     parameter difference rather than physics: their reference file is")
-	t.Log("     ESO_SkyCalc_100_10.dat and this test asks SkyCalc for 100 sfu,")
-	t.Log("     which need not be the same normalization.")
-
-	t.Log("")
-	t.Log("  2. no light is scattered back into the beam.")
-	t.Log("     Starlight, diffuse galactic light, zodiacal light and the")
-	t.Log("     extragalactic background are attenuated by the atmosphere and")
-	t.Log("     nothing is scattered in to replace what is scattered out.")
-	t.Log("     atmosphere.MultipleScatteringFactor exists and is applied only by")
-	t.Log("     the moonlight component, so the airglow-free sky here is the")
-	t.Log("     singly-transmitted sky alone.")
-
-	rayleigh, err := atmosphere.RayleighOpticalDepth(550, 1013)
-	if err == nil {
-		if f, ferr := atmosphere.MultipleScatteringFactor(rayleigh); ferr == nil {
-			offDiff := magFromRadiance(skyFluxOff/skySR, band) - gambonsWholeSkyNoAirglow
-
-			t.Logf("     Rayleigh depth at 550 nm: %.4f, so 1 + 4.5 tau = %.3f, worth %.3f mag",
-				float64(rayleigh), f, 2.5*math.Log10(f))
-			t.Logf("     our airglow-off whole sky is %+.3f mag from GAMBONS, a factor of %.3f",
-				offDiff, math.Pow(10, offDiff/2.5))
-		}
+	kappa, err := skybrightness.GAMBONSWeb.DiffuseKappa()
+	if err != nil {
+		t.Fatalf("DiffuseKappa: %v", err)
 	}
 
+	offDiff := magFromRadiance(skyFluxOff/skySR, band) - gambonsWholeSkyNoAirglow
+
 	t.Log("")
-	t.Log("  These pull opposite ways in the airglow-on total — too much light at")
-	t.Log("  the horizon, too little everywhere from the missing scattered-in")
-	t.Log("  term — which is why the whole-sky airglow-on figure agrees far")
-	t.Log("  better than either mechanism alone would suggest. Agreement there is")
-	t.Log("  partly cancellation and should not be read as the model being right")
-	t.Log("  in both respects.")
+	t.Logf("  2. the airglow-free sky, attenuated at kappa = %.2f:", kappa)
+	t.Logf("     whole sky %+.3f mag from GAMBONS, a factor of %.3f",
+		offDiff, math.Pow(10, offDiff/2.5))
 
 	_ = medians
 	_ = mediansOff
