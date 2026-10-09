@@ -874,15 +874,37 @@ func DateJulianCal(year, month, day, hour, minute, second int) Time {
 	return FromJDParts(float64(jdn)-0.5, float64(hour*3600+minute*60+second)/86400.0, UTC)
 }
 
-// DecimalYear returns the decimal year representation of the time.
-// This is commonly used for ΔT computation and slow-varying astronomical
-// parameters. The formula is: year + (month − 0.5) / 12, which gives
-// the middle of the month — accurate enough for ΔT purposes.
+// DecimalYear returns t as a fractional year: its calendar year plus the
+// fraction of that year elapsed at t, the day of the year and the day's
+// fraction over the year's 365 or 366 days, in the proleptic Gregorian
+// calendar [Time.Calendar] reads. ΔT is read at it before 1960.
+//
+// It used to be year + (month − 0.5 + dayFraction)/12: the middle of the
+// month, with the day's fraction added as if it were the month's and the day
+// of the month dropped. Within a month it ran backward with the date and
+// forward with the hour, so 2026-03-01 23:59 read 2026.2916 and 2026-03-31
+// 00:00 read 2026.2083, and ΔT before 1960 was read up to half a month off:
+// 0.4 s in the first century, where ΔT changes by about 10 s a year (#697).
 func (t Time) DecimalYear() float64 {
-	y, m, _, f := t.Calendar()
-	// Day fraction → fractional month contribution
-	return float64(y) + (float64(m)-0.5+f)/12.0
+	y, m, d, f := t.Calendar()
+
+	leap := y%4 == 0 && (y%100 != 0 || y%400 == 0)
+
+	days, doy := 365.0, daysBeforeMonth[m-1]+d
+	if leap {
+		days = 366
+
+		if m > 2 {
+			doy++
+		}
+	}
+
+	return float64(y) + (float64(doy-1)+f)/days
 }
+
+// daysBeforeMonth is the number of days in a common year before the first of
+// each month.
+var daysBeforeMonth = [12]int{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334}
 
 // ApplyDeltaT converts a UTC/UT time to TT by applying the ΔT polynomial
 // (Espenak & Meeus 2006). This is the correct conversion for historical
