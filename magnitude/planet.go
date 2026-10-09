@@ -56,7 +56,7 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 	phAngRad := angleBetween(sunToPlanet, observerToPlanet)
 	phAng := phAngRad * 180 / math.Pi // degrees
 
-	switch target {
+	switch target { //nolint:exhaustive // the default rejects the Earth, Moon, Sun and barycenter, which have no planetary magnitude
 	case eph.Mercury:
 		return mercuryMag(r, delta, phAng), nil
 	case eph.Venus:
