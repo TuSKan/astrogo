@@ -61,6 +61,33 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	}
 }
 
+// TestSimbadNetworkSearch runs Search against the live service. Nothing did
+// before #705, and every Search had failed with an HTTP 400 for five weeks:
+// the query ordered by a qualified column, which SIMBAD's parser rejects and
+// the offline tests, reading only the query's text, could not see. A 400 is
+// not an upstream failure, so it fails here.
+func TestSimbadNetworkSearch(t *testing.T) {
+	requireSimbad(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	targets, err := New().Search(ctx, "HD 18973")
+	testutil.SkipOnUpstreamFailure(t, err)
+
+	if err != nil {
+		t.Fatalf("live Search failed: %v", err)
+	}
+
+	for _, tgt := range targets {
+		if tgt.Name == "HD 189733" {
+			return
+		}
+	}
+
+	t.Errorf("Search(%q) returned %d targets, none HD 189733, which SIMBAD lists for that prefix", "HD 18973", len(targets))
+}
+
 // TestSimbadNetworkSearchBright is a live end-to-end check of
 // BuildBrightQuery/ParseBrightCSV against the real TAP service — this is
 // exactly the path a prior version got wrong twice (an ORDER BY the live
