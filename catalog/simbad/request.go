@@ -137,6 +137,11 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 // Brightest first, since between two objects whose identifiers both begin
 // with the query, the brighter is overwhelmingly the one meant. Nulls sort
 // last so an object with no V magnitude never displaces one that has it.
+//
+// Both sort keys are unqualified, as [BuildBrightQuery] explains: SIMBAD's
+// parser rejects a table.column in ORDER BY. The tie-break was written
+// basic.main_id, and every Search failed with an HTTP 400 for five weeks
+// (#705). main_id is unambiguous here, since only basic has one.
 func BuildSearchQuery(req resolve.ObjectRequest) string {
 	limit := req.Limit
 	if limit <= 0 {
@@ -163,7 +168,7 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 	LEFT JOIN allfluxes ON basic.oid = allfluxes.oidref
 	LEFT JOIN otypedef ON basic.otype = otypedef.otype
 	WHERE ident.id LIKE '%s%%'
-	ORDER BY vmag ASC, basic.main_id ASC`, limit, safeQ)
+	ORDER BY vmag ASC, main_id ASC`, limit, safeQ)
 }
 
 // BuildBrightQuery constructs an ADQL query enumerating every object
