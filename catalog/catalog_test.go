@@ -564,7 +564,7 @@ func finkPhotometry() Target {
 	return Target{
 		H: 10.62, HasH: true,
 		G1: 0.29, G2: 0.33, HasG1G2: true,
-		SpinRA: 11.4, SpinDec: 17.2, HasSpin: true,
+		SpinRA: angle.Deg(11.4), SpinDec: angle.Deg(17.2), HasSpin: true,
 		Oblateness: 0.71, HasOblateness: true,
 	}
 }

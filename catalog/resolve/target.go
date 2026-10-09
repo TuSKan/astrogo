@@ -113,14 +113,14 @@ type Target struct {
 	PmRA angle.Angle
 	// Oblateness is the oblateness of the target.
 	Oblateness float64
-	// SpinDec is the spin declination of the target.
-	SpinDec float64
+	// SpinDec is the declination of the target's spin-axis pole, J2000.
+	SpinDec angle.Angle
 	// H is the absolute magnitude of the target.
 	H float64
 	// G is the phase coefficient of the target.
 	G float64
-	// SpinRA is the spin right ascension of the target.
-	SpinRA float64
+	// SpinRA is the right ascension of the target's spin-axis pole, J2000.
+	SpinRA angle.Angle
 	// M1 is a comet's absolute total magnitude (SBDB's M1).
 	M1 float64
 	// K1 is the total magnitude's slope in log r (SBDB's K1), not a phase

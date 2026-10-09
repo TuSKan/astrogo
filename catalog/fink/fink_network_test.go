@@ -38,8 +38,8 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 	t.Logf("  H       = %.4f", tgt.H)
 	t.Logf("  G1      = %.4f", tgt.G1)
 	t.Logf("  G2      = %.4f", tgt.G2)
-	t.Logf("  SpinRA  = %.2f°", tgt.SpinRA)
-	t.Logf("  SpinDec = %.2f°", tgt.SpinDec)
+	t.Logf("  SpinRA  = %.2f°", tgt.SpinRA.Degrees())
+	t.Logf("  SpinDec = %.2f°", tgt.SpinDec.Degrees())
 	t.Logf("  R       = %.4f", tgt.Oblateness)
 
 	if !tgt.HasH {
@@ -75,12 +75,12 @@ func TestFINKProvider_SingleObjectJSON(t *testing.T) {
 		t.Errorf("R = %.4f out of (0,1]", tgt.Oblateness)
 	}
 
-	if tgt.SpinRA < 0 || tgt.SpinRA >= 360 {
-		t.Errorf("SpinRA = %.2f out of [0,360)", tgt.SpinRA)
+	if ra := tgt.SpinRA.Degrees(); ra < 0 || ra >= 360 {
+		t.Errorf("SpinRA = %.2f° out of [0,360)", ra)
 	}
 
-	if tgt.SpinDec < -90 || tgt.SpinDec > 90 {
-		t.Errorf("SpinDec = %.2f out of [-90,90]", tgt.SpinDec)
+	if dec := tgt.SpinDec.Degrees(); dec < -90 || dec > 90 {
+		t.Errorf("SpinDec = %.2f° out of [-90,90]", dec)
 	}
 
 	// Cross-check by name.

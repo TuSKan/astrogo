@@ -190,7 +190,7 @@ func TestAsteroid_HG1G2AndSHG1G2(t *testing.T) {
 	}
 
 	spin := NewAsteroid("Test sHG1G2", asteroidID, prov,
-		WithHG1G2(10.0, 0.3, 0.2), WithSpin(45, 30, 0.9))
+		WithHG1G2(10.0, 0.3, 0.2), WithSpin(angle.Deg(45), angle.Deg(30), 0.9))
 
 	m2, err := spin.ApparentMagnitude(tm)
 	if err != nil {

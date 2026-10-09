@@ -3,6 +3,8 @@ package fink
 import (
 	"math"
 	"testing"
+
+	"github.com/TuSKan/astrogo/angle"
 )
 
 func TestRecordToTarget_RBand(t *testing.T) {
@@ -50,8 +52,9 @@ func TestRecordToTarget_RBand(t *testing.T) {
 		t.Errorf("G1=%.2f G2=%.2f (HasG1G2=%v), want 0.25/0.35", tgt.G1, tgt.G2, tgt.HasG1G2)
 	}
 
-	if !tgt.HasSpin || tgt.SpinRA != 30.0 || tgt.SpinDec != 45.0 {
-		t.Errorf("SpinRA=%.1f SpinDec=%.1f (HasSpin=%v), want 30/45", tgt.SpinRA, tgt.SpinDec, tgt.HasSpin)
+	if !tgt.HasSpin || tgt.SpinRA != angle.Deg(30) || tgt.SpinDec != angle.Deg(45) {
+		t.Errorf("SpinRA=%.1f° SpinDec=%.1f° (HasSpin=%v), want 30°/45°",
+			tgt.SpinRA.Degrees(), tgt.SpinDec.Degrees(), tgt.HasSpin)
 	}
 
 	if !tgt.HasOblateness || tgt.Oblateness != 0.75 {

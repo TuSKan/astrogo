@@ -13,16 +13,15 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// SpinAxis holds the pole direction of an asteroid's spin axis (J2000).
-type SpinAxis struct {
-	RA  float64 // degrees
-	Dec float64 // degrees
+// spinAxis is the pole of an asteroid's spin axis, J2000.
+type spinAxis struct {
+	ra, dec angle.Angle
 }
 
 // Asteroid represents a minor planet with phase-curve photometry parameters.
 type Asteroid struct {
 	provider    eph.Provider
-	spin        *SpinAxis
+	spin        *spinAxis
 	name        string
 	H           float64
 	G           float64
@@ -73,10 +72,11 @@ func WithHG1G2(absH, g1, g2 float64) AsteroidOption {
 	}
 }
 
-// WithSpin sets the spin axis pole direction and oblateness for sHG1G2.
-func WithSpin(ra, dec, oblateness float64) AsteroidOption {
+// WithSpin sets the spin-axis pole, its J2000 right ascension and
+// declination, and the oblateness for sHG1G2.
+func WithSpin(ra, dec angle.Angle, oblateness float64) AsteroidOption {
 	return func(a *Asteroid) {
-		a.spin = &SpinAxis{RA: ra, Dec: dec}
+		a.spin = &spinAxis{ra: ra, dec: dec}
 		a.oblat = oblateness
 	}
 }
@@ -178,7 +178,7 @@ func (a *Asteroid) ApparentMagnitude(t time.Time) (float64, error) {
 	case a.hasG1G2 && a.spin != nil && a.oblat > 0:
 		ra := angle.Rad(math.Atan2(st.Pos.Y, st.Pos.X))
 		dec := angle.Rad(math.Asin(st.Pos.Z / delta))
-		cosL := mag.CosAspectAngle(ra, dec, angle.Deg(a.spin.RA), angle.Deg(a.spin.Dec))
+		cosL := mag.CosAspectAngle(ra, dec, a.spin.ra, a.spin.dec)
 
 		return mag.AsteroidSHG1G2(a.H, a.G1, a.G2, r, delta, alpha, a.oblat, cosL), nil
 	case a.hasG1G2:
