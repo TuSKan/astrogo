@@ -84,6 +84,15 @@
 // has no 0.9 s assumption of its own to unlearn. Only the stated bound goes
 // stale, and only for the caller who has no EOP data at all.
 //
+// A bulletin ends, about a year past its issue, and the epochs after it are
+// the one place this package forecasts UT1. It holds ΔT = TT − UT1 at its
+// value on the bulletin's last day, continuous with the measurement, rather
+// than pinning UT1 to UTC, which leap seconds stop justifying in 2035, or
+// following the Espenak & Meeus (2006) extrapolation, which was 6.2 s high in
+// 2026 against a ΔT the bulletin shows flat since 2020. [DeltaT] is that same
+// value at every epoch, so no conversion disagrees with it, and
+// [DeltaTUncertainty] grows from the bulletin's end (#696).
+//
 // Where those bytes come from is supplied by a registered [EOPLoader], not
 // reached for by this package. Importing astrogo/remote registers one — as
 // any program granting download consent necessarily does — so nothing

@@ -639,7 +639,7 @@ func TestTT_FromAllScales(t *testing.T) {
 func TestTT_UTCIsUTBefore1960AndSOFAsFrom1960(t *testing.T) {
 	early := time.FromGo(time.GoDate(1955, 6, 15, 0, 0, 0, 0, time.LocationUTC))
 	earlyOffset := (early.TT().JD() - early.JD()) * 86400.0
-	testutil.AssertNear(t, "TT-UTC offset before 1960 (ΔT)", earlyOffset, time.DeltaT(early.DecimalYear()), 1e-4)
+	testutil.AssertNear(t, "TT-UTC offset before 1960 (ΔT)", earlyOffset, time.DeltaT(early), 1e-4)
 
 	utc := time.FromGo(time.GoDate(1965, 6, 15, 0, 0, 0, 0, time.LocationUTC))
 	offsetSeconds := (utc.TT().JD() - utc.JD()) * 86400.0
