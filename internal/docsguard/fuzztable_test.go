@@ -26,6 +26,8 @@ var (
 // countWords spells the package counts the sentence can plausibly need.
 var countWords = map[string]int{
 	"Five": 5, "Six": 6, "Seven": 7, "Eight": 8, "Nine": 9, "Ten": 10, "Eleven": 11, "Twelve": 12,
+	"Thirteen": 13, "Fourteen": 14, "Fifteen": 15, "Sixteen": 16, "Seventeen": 17, "Eighteen": 18,
+	"Nineteen": 19, "Twenty": 20,
 }
 
 // TestEveryFuzzTargetIsDocumented holds CLAUDE.md's table of fuzz targets to
