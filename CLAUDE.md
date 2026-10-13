@@ -38,7 +38,7 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Sixteen packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-two packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -58,6 +58,12 @@ Sixteen packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this
 | `skybrightness/dataset/passband` | `FuzzParse` | SVO filter profiles |
 | `skybrightness/dataset/solar` | `FuzzParse` | the solar spectrum's FITS table |
 | `skybrightness/dataset/starlight` | `FuzzLoad`, `FuzzParseHipparcos`, `FuzzParseCache` | the star map, VizieR Hipparcos answers, and the on-disk build cache |
+| `catalog/gaia` | `FuzzParseResult` | Gaia archive answers, CSV or VOTable |
+| `catalog/vizier` | `FuzzParseCSV` | VizieR TAP CSV answers |
+| `catalog/jpl` | `FuzzParseHorizons` | Horizons text tables, cut at column offsets |
+| `catalog/openngc` | `FuzzParseOpenNGC` | the OpenNGC repository's CSVs |
+| `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
+| `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
 
 **Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
 
