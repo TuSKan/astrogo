@@ -58,14 +58,14 @@ func TestCrescentVisibilityReadsTheMABIMSElongationGeocentric(t *testing.T) {
 	p := r.MABIMS2021.Params
 
 	// The fixture must still straddle the limit for the test to mean anything.
-	if p.MAlt < 3.4 || g.arclGeo < 6.8 || g.arclTopo > 6.0 {
+	if p.MAlt.Degrees() < 3.4 || g.arclGeo < 6.8 || g.arclTopo > 6.0 {
 		t.Fatalf("fixture moved: altitude %.3f°, geocentric elongation %.3f°, topocentric %.3f°",
-			p.MAlt, g.arclGeo, g.arclTopo)
+			p.MAlt.Degrees(), g.arclGeo, g.arclTopo)
 	}
 
-	if math.Abs(p.ArcL-g.arclGeo) > 1e-9 {
+	if math.Abs(p.ArcL.Degrees()-g.arclGeo) > 1e-9 {
 		t.Errorf("MABIMS read ArcL = %.6f°, want the geocentric elongation %.6f°, not the topocentric %.6f°",
-			p.ArcL, g.arclGeo, g.arclTopo)
+			p.ArcL.Degrees(), g.arclGeo, g.arclTopo)
 	}
 
 	if !r.MABIMS2021.Visible {
@@ -100,12 +100,12 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 		t.Errorf("best time %.3f s after sunset, want 4/9 of the lag, %.3f s", got, wantBest)
 	}
 
-	if got, want := geocentric.Age-atSunset.Age, r.BestTime.Sub(r.Sunset).Hours(); math.Abs(got-want) > 1e-9 {
+	if got, want := (geocentric.Age - atSunset.Age).Hours(), r.BestTime.Sub(r.Sunset).Hours(); math.Abs(got-want) > 1e-9 {
 		t.Errorf("best-time age is %.6f h past the sunset age, want %.6f h", got, want)
 	}
 
-	if atSunset.LT != geocentric.LT || atSunset.LT != r.Moonset.Sub(r.Sunset).Minutes() {
-		t.Errorf("lag %.3f / %.3f min, want the sunset-to-moonset %.3f min", atSunset.LT, geocentric.LT, r.Moonset.Sub(r.Sunset).Minutes())
+	if atSunset.LT != geocentric.LT || atSunset.LT != r.Moonset.Sub(r.Sunset) {
+		t.Errorf("lag %.3f / %.3f min, want the sunset-to-moonset %.3f min", atSunset.LT.Minutes(), geocentric.LT.Minutes(), r.Moonset.Sub(r.Sunset).Minutes())
 	}
 
 	// Qureshi's eq. 6, Tb = Ts + (4.3/9.3)·Lag.
@@ -125,9 +125,9 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 	}
 
 	sinPi := math.Sin(g.parallax * math.Pi / 180)
-	want := math.Asin(sinPi*math.Cos(geocentric.MAlt*math.Pi/180)) * 180 / math.Pi
+	want := math.Asin(sinPi*math.Cos(geocentric.MAlt.Radians())) * 180 / math.Pi
 
-	if got := geocentric.MAlt - topocentric.MAlt; math.Abs(got-want) > 0.005 {
+	if got := (geocentric.MAlt - topocentric.MAlt).Degrees(); math.Abs(got-want) > 0.005 {
 		t.Errorf("geocentric − topocentric altitude = %.4f°, the parallax gives %.4f°", got, want)
 	}
 }

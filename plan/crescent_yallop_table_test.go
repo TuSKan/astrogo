@@ -79,12 +79,12 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 			got, want float64
 			tol       float64
 		}{
-			{"ARCL", g.ArcL, o.arcl, 0.1},
-			{"ARCV", g.ArcV, o.arcv, 0.1},
-			{"DAZ", g.DAZ, math.Abs(o.daz), 0.1},
-			{"Age", g.Age, o.age, 0.1},
-			{"Lag", g.LT, o.lag, 1},
-			{"W′", g.W, o.w, 0.01},
+			{"ARCL", g.ArcL.Degrees(), o.arcl, 0.1},
+			{"ARCV", g.ArcV.Degrees(), o.arcv, 0.1},
+			{"DAZ", g.DAZ.Degrees(), math.Abs(o.daz), 0.1},
+			{"Age", g.Age.Hours(), o.age, 0.1},
+			{"Lag", g.LT.Minutes(), o.lag, 1},
+			{"W′", g.W.Arcminutes(), o.w, 0.01},
 			{"q", r.Yallop.Value, o.q, 0.005},
 		} {
 			if math.Abs(c.got-c.want) > c.tol {

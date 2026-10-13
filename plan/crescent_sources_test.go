@@ -45,8 +45,8 @@ func TestFotheringhamTableIsGeocentricAtGeometricSunset(t *testing.T) {
 		}
 
 		p := r.Fotheringham.Params
-		if math.Abs(p.MAlt-o.alt) > 0.25 || math.Abs(p.DAZ-o.daz) > 0.25 {
-			t.Errorf("No. %d: altitude %.2f°, DAZ %.2f°; Fotheringham has %.1f°, %.1f°", o.no, p.MAlt, p.DAZ, o.alt, o.daz)
+		if math.Abs(p.MAlt.Degrees()-o.alt) > 0.25 || math.Abs(p.DAZ.Degrees()-o.daz) > 0.25 {
+			t.Errorf("No. %d: altitude %.2f°, DAZ %.2f°; Fotheringham has %.1f°, %.1f°", o.no, p.MAlt.Degrees(), p.DAZ.Degrees(), o.alt, o.daz)
 		}
 
 		for _, v := range []CrescentVerdict{r.Maunder, r.Ilyas1988, r.KraussAthenian, r.Ilyas1983} {
@@ -90,7 +90,7 @@ func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 			t.Fatalf("row %d: %v", o.row, err)
 		}
 
-		if got := r.Fatoohi1998.Params.ArcL; math.Abs(got-o.elong) > 0.07 {
+		if got := r.Fatoohi1998.Params.ArcL.Degrees(); math.Abs(got-o.elong) > 0.07 {
 			t.Errorf("row %d: elongation %.3f°, Fatoohi's Table I has %.1f°", o.row, got, o.elong)
 		}
 
@@ -131,14 +131,15 @@ func TestAlrefayTableIIsTopocentricAtSunset(t *testing.T) {
 		}
 
 		p := r.AlrefayNakedEye.Params
-		if math.Abs(p.ArcV-o.arcv) > 0.16 || math.Abs(p.DAZ-o.daz) > 0.15 ||
-			math.Abs(p.Age-o.age) > 0.02 || math.Abs(p.LT-o.lag) > 1.5 {
+		if math.Abs(p.ArcV.Degrees()-o.arcv) > 0.16 || math.Abs(p.DAZ.Degrees()-o.daz) > 0.15 ||
+			math.Abs(p.Age.Hours()-o.age) > 0.02 || math.Abs(p.LT.Minutes()-o.lag) > 1.5 {
 			t.Errorf("%d-%02d-%02d at %.2f° %.2f°: ARCV %.2f°, DAZ %.2f°, age %.2f h, lag %.1f min; Alrefay's Table I has %.2f°, %.2f°, %.2f h, %.0f min",
-				o.y, o.m, o.d, o.lat, o.lon, p.ArcV, p.DAZ, p.Age, p.LT, o.arcv, o.daz, o.age, o.lag)
+				o.y, o.m, o.d, o.lat, o.lon, p.ArcV.Degrees(), p.DAZ.Degrees(), p.Age.Hours(), p.LT.Minutes(),
+				o.arcv, o.daz, o.age, o.lag)
 		}
 
-		if want := 16 * (1 - math.Cos(p.ArcL*math.Pi/180)); math.Abs(p.W-want) > 1e-12 {
-			t.Errorf("Alrefay's W = %.4f′, want 16′(1 − cos ARCL) = %.4f′", p.W, want)
+		if want := 16 * (1 - math.Cos(p.ArcL.Radians())); math.Abs(p.W.Arcminutes()-want) > 1e-12 {
+			t.Errorf("Alrefay's W = %.4f′, want 16′(1 − cos ARCL) = %.4f′", p.W.Arcminutes(), want)
 		}
 	}
 }
@@ -303,7 +304,7 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 		}
 
 		airlessLimb := g.moonTopo.Alt().Degrees() - g.topocentricSemiDiameterArcmin()/60
-		limb := r.CaldwellNakedEye.Params.MAlt
+		limb := r.CaldwellNakedEye.Params.MAlt.Degrees()
 
 		if refraction := limb - airlessLimb; refraction < c.lo || refraction > c.hi {
 			t.Errorf("%s: apparent lower limb %.3f°, airless %.3f°: refraction %.3f°, want %.2f°–%.2f°",

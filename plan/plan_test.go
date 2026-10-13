@@ -632,7 +632,7 @@ func TestScorerMeritTerms(t *testing.T) {
 		}
 	})
 
-	t.Run("a zero MoonFullPenaltyDeg falls back to 30 degrees", func(t *testing.T) {
+	t.Run("a zero MoonFullPenalty falls back to 30 degrees", func(t *testing.T) {
 		t.Parallel()
 
 		// ScoreConfig{MoonWeight: 1} is a natural thing to write, and without
@@ -652,7 +652,7 @@ func TestScorerMeritTerms(t *testing.T) {
 
 		explicit, err := Scorer{
 			Site:   site,
-			Config: ScoreConfig{MoonWeight: 1, MoonFullPenaltyDeg: 30},
+			Config: ScoreConfig{MoonWeight: 1, MoonFullPenalty: angle.Deg(30)},
 		}.Score(near, tm)
 		testutil.AssertNoError(t, err)
 		testutil.AssertNear(t, "score with an explicit 30° threshold", explicit, wantHalfMerit, 1e-6)

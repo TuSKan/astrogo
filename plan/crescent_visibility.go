@@ -140,12 +140,11 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 		}
 	}
 
-	lagMinutes := lag.Minutes()
 	ageAt := func(t time.Time) float64 { return age + t.Sub(sunset).Hours() }
 
-	atGeometric := gGeometric.geocentric(lagMinutes, ageAt(geometric))
-	topocentric := gSunset.topocentric(lagMinutes, age)
-	yallop := gBest.geocentric(lagMinutes, ageAt(best))
+	atGeometric := gGeometric.geocentric(lag, ageAt(geometric))
+	topocentric := gSunset.topocentric(lag, age)
+	yallop := gBest.geocentric(lag, ageAt(best))
 
 	r := CrescentResult{
 		Sunset: sunset, Moonset: moonset, GeometricSunset: geometric,
@@ -165,27 +164,27 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 	r.Danjon = verdict(topocentric, (*CrescentParams).Danjon)
 	r.Fatoohi1998 = verdict(topocentric, (*CrescentParams).Fatoohi1998)
 
-	mabims := gSunset.sunset(lagMinutes, age)
+	mabims := gSunset.sunset(lag, age)
 	r.MABIMS1995 = verdict(mabims, (*CrescentParams).MABIMS1995)
 	r.MABIMS2021 = verdict(mabims, (*CrescentParams).MABIMS2021)
 	r.Istanbul2016 = verdict(mabims, (*CrescentParams).Istanbul2016)
 
 	alrefay := topocentric
-	alrefay.W = crescentWidth(16, alrefay.ArcL)
+	alrefay.W = angle.Arcmin(crescentWidth(16, alrefay.ArcL.Degrees()))
 	r.AlrefayNakedEye = verdict(alrefay, (*CrescentParams).AlrefayNakedEye)
 	r.AlrefayOpticalAid = verdict(alrefay, (*CrescentParams).AlrefayOpticalAid)
 
 	saao := topocentric
-	saao.MAlt = apparentLowerLimb(gSunset, site.Refraction())
+	saao.MAlt = angle.Deg(apparentLowerLimb(gSunset, site.Refraction()))
 	r.CaldwellNakedEye = verdict(saao, (*CrescentParams).CaldwellNakedEye)
 	r.CaldwellOptical = verdict(saao, (*CrescentParams).CaldwellOptical)
 
 	bruin := yallop
-	bruin.W = crescentWidth(15, bruin.ArcL)
+	bruin.W = angle.Arcmin(crescentWidth(15, bruin.ArcL.Degrees()))
 	r.Bruin = verdict(bruin, (*CrescentParams).Bruin)
 
-	odeh := gBest.topocentric(lagMinutes, ageAt(best))
-	qureshi := gQureshi.geocentric(lagMinutes, ageAt(qureshiBest))
+	odeh := gBest.topocentric(lag, ageAt(best))
+	qureshi := gQureshi.geocentric(lag, ageAt(qureshiBest))
 
 	r.Yallop = yallop.Yallop()
 	r.Odeh = odeh.Odeh()
@@ -463,28 +462,28 @@ func (g crescentGeometry) topocentricSemiDiameterArcmin() float64 {
 
 // geocentric is Yallop's convention: geocentric ARCV and ARCL, and W′ from
 // the geocentric ARCL.
-func (g crescentGeometry) geocentric(lagMinutes, age float64) CrescentParams {
+func (g crescentGeometry) geocentric(lag unit.Duration, age float64) CrescentParams {
 	return CrescentParams{
-		ArcV: g.moonGeo.Alt().Degrees() - g.sunGeo.Alt().Degrees(),
-		ArcL: g.arclGeo,
-		DAZ:  azimuthGapDeg(g.moonGeo, g.sunGeo),
-		MAlt: g.moonGeo.Alt().Degrees(),
-		W:    g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclGeo*math.Pi/180)),
-		LT:   lagMinutes,
-		Age:  age,
+		ArcV: g.moonGeo.Alt() - g.sunGeo.Alt(),
+		ArcL: angle.Deg(g.arclGeo),
+		DAZ:  angle.Deg(azimuthGapDeg(g.moonGeo, g.sunGeo)),
+		MAlt: g.moonGeo.Alt(),
+		W:    angle.Arcmin(g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclGeo*math.Pi/180))),
+		LT:   lag,
+		Age:  unit.Hours(age),
 	}
 }
 
 // topocentric is Odeh's convention: everything from the observer.
-func (g crescentGeometry) topocentric(lagMinutes, age float64) CrescentParams {
+func (g crescentGeometry) topocentric(lag unit.Duration, age float64) CrescentParams {
 	return CrescentParams{
-		ArcV: g.moonTopo.Alt().Degrees() - g.sunTopo.Alt().Degrees(),
-		ArcL: g.arclTopo,
-		DAZ:  azimuthGapDeg(g.moonTopo, g.sunTopo),
-		MAlt: g.moonTopo.Alt().Degrees(),
-		W:    g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclTopo*math.Pi/180)),
-		LT:   lagMinutes,
-		Age:  age,
+		ArcV: g.moonTopo.Alt() - g.sunTopo.Alt(),
+		ArcL: angle.Deg(g.arclTopo),
+		DAZ:  angle.Deg(azimuthGapDeg(g.moonTopo, g.sunTopo)),
+		MAlt: g.moonTopo.Alt(),
+		W:    angle.Arcmin(g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclTopo*math.Pi/180))),
+		LT:   lag,
+		Age:  unit.Hours(age),
 	}
 }
 
@@ -494,10 +493,10 @@ func (g crescentGeometry) topocentric(lagMinutes, age float64) CrescentParams {
 // That is MABIMS's convention, whose altitude is topocentric and elongation
 // geocentric, and Istanbul 2016's as this package reads it. W takes the
 // Moon's semi-diameter at the time.
-func (g crescentGeometry) sunset(lagMinutes, age float64) CrescentParams {
-	p := g.topocentric(lagMinutes, age)
-	p.ArcL = g.arclGeo
-	p.W = g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclGeo*math.Pi/180))
+func (g crescentGeometry) sunset(lag unit.Duration, age float64) CrescentParams {
+	p := g.topocentric(lag, age)
+	p.ArcL = angle.Deg(g.arclGeo)
+	p.W = angle.Arcmin(g.topocentricSemiDiameterArcmin() * (1 - math.Cos(g.arclGeo*math.Pi/180)))
 
 	return p
 }
