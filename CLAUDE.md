@@ -38,7 +38,7 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Twenty-two packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-three packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -64,6 +64,7 @@ Twenty-two packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds t
 | `catalog/openngc` | `FuzzParseOpenNGC` | the OpenNGC repository's CSVs |
 | `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
 | `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
+| `skybrightness/dataset/raster` | `FuzzOpen` | GeoTIFFs from a third-party mirror (VIIRS), or any file a caller opens |
 
 **Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
 
@@ -104,7 +105,7 @@ Two things follow, and both matter more than the numbers.
 
 The low `fits` figures are minimization, not a slow parser: those two targets find ~110 interesting inputs from a fresh corpus and pay up to 5s minimizing each. `fits`'s `FuzzRead` measures ~800 exec/s here, against the "~4" this table claimed before it was measured this way — that figure was the default 60s minimize time, not the parser.
 
-Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Five are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, a VOTable with rows but no field declarations, and from #746 a comet row ending before its name column, a star-map band header whose lowercase is a different length, and a star-map row numbered 200000000000000 that sized a 200 TB allocation.
+Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Six are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, a VOTable with rows but no field declarations, a GeoTIFF with a tile width but no tile length (#744), and from #746 a comet row ending before its name column, a star-map band header whose lowercase is a different length, and a star-map row numbered 200000000000000 that sized a 200 TB allocation.
 
 ## Performance
 

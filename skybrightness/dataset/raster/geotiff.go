@@ -405,13 +405,24 @@ func (t *Reader) configureLayout(f map[uint16]field) error {
 	}
 
 	if tw, ok := f[tagTileWidth]; ok {
+		// Every value is checked before it is indexed. A TileWidth with no
+		// TileLength panicked here until #744, from bytes a third-party
+		// server supplies; a fuzzer found it in twenty seconds.
+		widths, heights := tw.ints(), f[tagTileLength].ints()
+		if len(widths) == 0 || len(heights) == 0 {
+			return fmt.Errorf("%w: tile width and length must both be present", ErrBadTIFF)
+		}
+
 		t.tiled = true
-		t.tileWidth = clampPos(tw.ints()[0])
-		t.tileHeight = clampPos(f[tagTileLength].ints()[0])
+		t.tileWidth = clampPos(widths[0])
+		t.tileHeight = clampPos(heights[0])
 		t.blockOffsets = toInt64(f[tagTileOffsets].ints())
 		t.blockByteCounts = toInt64(f[tagTileByteCounts].ints())
 
-		if t.tileWidth <= 0 || t.tileHeight <= 0 || len(t.blockOffsets) == 0 {
+		// As the strip branch requires: a tile with an offset and no byte
+		// count would be read past the end of the counts.
+		if t.tileWidth <= 0 || t.tileHeight <= 0 || len(t.blockOffsets) == 0 ||
+			len(t.blockOffsets) != len(t.blockByteCounts) {
 			return fmt.Errorf("%w: bad tile layout", ErrBadTIFF)
 		}
 
