@@ -61,7 +61,20 @@ const (
 	tagModelPixelScale     = 33550
 	tagModelTiepoint       = 33922
 	tagModelTransformation = 34264
+	tagGeoKeyDirectory     = 34735
 	tagGDALNoData          = 42113
+)
+
+// GeoKey identifiers and values read from the GeoKey directory (GeoTIFF 1.1,
+// OGC 19-008r4, §7.5): the model type, the raster type and the angular units.
+const (
+	geoKeyModelType    = 1024
+	geoKeyRasterType   = 1025
+	geoKeyAngularUnits = 2054
+
+	modelTypeGeographic = 2
+	rasterPixelIsPoint  = 2
+	angularUnitDegree   = 9102
 )
 
 // TIFF field types.
@@ -428,16 +441,91 @@ func (t *Reader) configureLayout(f map[uint16]field) error {
 	return nil
 }
 
+// geoRaster reads the GeoKey directory, when the file has one, for the two
+// things the model tags do not say: whether their coordinates are longitude
+// and latitude at all, and whether they name a pixel's corner or its center.
+//
+// A model type other than geographic, or angular units other than degrees, is
+// refused: this package addresses samples by longitude and latitude in
+// degrees, and a projected raster read that way puts every sample somewhere
+// else without an error. pointRaster reports PixelIsPoint, whose tiepoint is
+// a pixel center rather than a corner. A file with no GeoKey directory is read
+// as before, as geographic, in degrees, with pixels as areas.
+//
+// Until #742 the directory was never read.
+func geoRaster(f map[uint16]field) (pointRaster bool, err error) {
+	dir, ok := f[tagGeoKeyDirectory]
+	if !ok {
+		return false, nil
+	}
+
+	keys := dir.ints()
+	if len(keys) < 4 {
+		return false, fmt.Errorf("%w: GeoKey directory of %d values", ErrBadTIFF, len(keys))
+	}
+
+	for i := range min(clampPos(keys[3]), (len(keys)-4)/4) {
+		id, location, value := keys[4+4*i], keys[5+4*i], keys[7+4*i]
+		if location != 0 {
+			continue // stored in another tag; none of the keys read here are
+		}
+
+		switch {
+		case id == geoKeyModelType && value != modelTypeGeographic:
+			return false, fmt.Errorf("%w: GeoTIFF model type %d, want %d (geographic)",
+				ErrUnsupportedTIFF, value, modelTypeGeographic)
+		case id == geoKeyAngularUnits && value != angularUnitDegree:
+			return false, fmt.Errorf("%w: GeoTIFF angular units %d, want %d (degree)",
+				ErrUnsupportedTIFF, value, angularUnitDegree)
+		case id == geoKeyRasterType:
+			pointRaster = value == rasterPixelIsPoint
+		}
+	}
+
+	return pointRaster, nil
+}
+
 // configureGeo resolves the affine geotransform from the GeoTIFF model tags or
 // the caller-supplied override.
+//
+// A PixelIsPoint raster's model tags place pixel centers where an area
+// raster's place corners, so its transform moves back half a pixel along both
+// axes, as GDAL does; see [geoRaster]. An override is the caller's own
+// transform and is taken as given.
 func (t *Reader) configureGeo(f map[uint16]field, override *GeoTransform) error {
+	pointRaster, err := geoRaster(f)
+	if err != nil {
+		return err
+	}
+
+	if gt, ok := modelTransform(f); ok {
+		if pointRaster {
+			gt.A -= 0.5*gt.B + 0.5*gt.C
+			gt.D -= 0.5*gt.E + 0.5*gt.F
+		}
+
+		t.gt = gt
+
+		return nil
+	}
+
+	if override != nil {
+		t.gt = *override
+
+		return nil
+	}
+
+	return fmt.Errorf("%w: no geotransform tags and no override supplied", ErrBadTIFF)
+}
+
+// modelTransform reads the affine transform from ModelTransformation, or from
+// ModelTiepoint with ModelPixelScale, in the file's own raster convention.
+func modelTransform(f map[uint16]field) (GeoTransform, bool) {
 	if mt, ok := f[tagModelTransformation]; ok {
 		m := mt.doubles()
 		if len(m) >= 16 {
 			// 4×4 row-major: x = m0·col + m1·row + m3; y = m4·col + m5·row + m7.
-			t.gt = GeoTransform{A: m[3], B: m[0], C: m[1], D: m[7], E: m[4], F: m[5]}
-
-			return nil
+			return GeoTransform{A: m[3], B: m[0], C: m[1], D: m[7], E: m[4], F: m[5]}, true
 		}
 	}
 
@@ -451,22 +539,14 @@ func (t *Reader) configureGeo(f map[uint16]field, override *GeoTransform) error 
 		if len(s) >= 2 && len(p) >= 6 {
 			// Tiepoint maps raster (i,j) → (x,y); pixel scale gives (sx,sy).
 			// lon = x − i·sx + col·sx ; lat = y + j·sy − row·sy  (sy applied negative).
-			t.gt = GeoTransform{
+			return GeoTransform{
 				A: p[3] - p[0]*s[0], B: s[0], C: 0,
 				D: p[4] + p[1]*s[1], E: 0, F: -s[1],
-			}
-
-			return nil
+			}, true
 		}
 	}
 
-	if override != nil {
-		t.gt = *override
-
-		return nil
-	}
-
-	return fmt.Errorf("%w: no geotransform tags and no override supplied", ErrBadTIFF)
+	return GeoTransform{}, false
 }
 
 // decodeBlock reads and decodes block i into a flat []float64 of its samples,
