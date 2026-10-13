@@ -3,10 +3,13 @@ package ephemeris_test
 import (
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // metersInAU converts the tolerance below into the AU that State reports in.
@@ -56,9 +59,15 @@ const scaleTolerance = 1.0 * metersInAU
 //
 // # Coverage
 //
-// SOFA and SGP4 run here because they need no kernel. The JPL provider needs
-// one, so its case lives in ephemeris/jpl/validation under the validation tag —
-// it is the same assertion against the same table.
+// SOFA, SGP4 and the two-body kepler provider run here because they need no
+// kernel. The JPL provider needs one, so its case lives in
+// ephemeris/jpl/validation under the validation tag — it is the same
+// assertion against the same table.
+//
+// kepler joined after the fact (#729): it was added as a fourth provider
+// without being enrolled, and passed when it was. It measures elapsed time
+// with time.Time.Sub, which takes mismatched scales through TT; the case is
+// here so that reading JDParts raw, #148's defect, cannot come back unseen.
 func TestProviderStateIsScaleInvariant(t *testing.T) {
 	t.Parallel()
 
@@ -75,6 +84,21 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 		"2 25544  51.6329 230.6068 0006631 325.6576  34.3983 15.48833250562656")
 	if err != nil {
 		t.Fatalf("NewFromTLE: %v", err)
+	}
+
+	// An asteroid-belt orbit, the element set kepler's own central-body tests
+	// use. Any valid set serves: the test compares the provider with itself.
+	belt, err := kepler.NewElements(time.J2000(), unit.AU(2.7658), 0.07839,
+		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
+	if err != nil {
+		t.Fatalf("NewElements: %v", err)
+	}
+
+	const beltID = core.ID(2000001)
+
+	twoBody := kepler.New()
+	if err := twoBody.Register(beltID, belt); err != nil {
+		t.Fatalf("Register: %v", err)
 	}
 
 	providers := []struct {
@@ -99,6 +123,11 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 			name: "sgp4",
 			prov: sat,
 			ids:  map[string]core.ID{"ISS": core.ID(0)},
+		},
+		{
+			name: "kepler",
+			prov: twoBody,
+			ids:  map[string]core.ID{"belt asteroid": beltID},
 		},
 	}
 
