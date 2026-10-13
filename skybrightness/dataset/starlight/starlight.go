@@ -269,13 +269,17 @@ func Load(r io.Reader, frame Frame) (*Map, error) {
 func bandHeader(comment string) ([]string, bool) {
 	trimmed := strings.TrimSpace(strings.TrimPrefix(comment, "#"))
 
-	rest, ok := strings.CutPrefix(strings.ToLower(trimmed), "bands:")
-	if !ok {
+	// The prefix is matched case-insensitively on the original bytes, so the
+	// names after it keep their casing. Until #746 this lowercased the whole
+	// line and sliced the original by the lowercased length, which panicked
+	// on any line whose lowercase is a different length — invalid UTF-8
+	// becomes the three-byte U+FFFD — as a fuzzer found.
+	const prefix = "bands:"
+	if len(trimmed) < len(prefix) || !strings.EqualFold(trimmed[:len(prefix)], prefix) {
 		return nil, false
 	}
 
-	// Recover the original casing for the names themselves.
-	original := strings.TrimSpace(trimmed[len(trimmed)-len(rest):])
+	original := strings.TrimSpace(trimmed[len(prefix):])
 
 	fields := strings.FieldsFunc(original, func(r rune) bool {
 		return r == ',' || r == ' ' || r == '\t'
@@ -334,19 +338,21 @@ func assemble(pixels []int64, flat []float64, names []string, nbands int, frame 
 	// Duplicates are found before the pixel count is judged, because a
 	// repeated pixel also makes the count wrong and the count's complaint
 	// would bury the cause.
-	var highest int64
-
-	for _, pixel := range pixels {
-		if pixel > highest {
-			highest = pixel
-		}
-	}
-
-	seen := make([]bool, highest+1)
+	//
+	// A complete map holds len(pixels) pixels, so that is all seen needs. It
+	// was sized by the largest index in the file until #746, and one row
+	// numbered 200000000000000 asked for 200 TB and killed the process, as a
+	// fuzzer found. An index past the end cannot repeat a valid one; the range
+	// check below reports it.
+	seen := make([]bool, len(pixels))
 
 	for _, pixel := range pixels {
 		if pixel < 0 {
 			return nil, fmt.Errorf("%w: %d is negative", ErrPixelRange, pixel)
+		}
+
+		if pixel >= int64(len(seen)) {
+			continue
 		}
 
 		if seen[pixel] {

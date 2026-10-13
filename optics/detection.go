@@ -54,7 +54,7 @@ func (i Instrument) SNR(
 		return 0, err
 	}
 
-	if signal < 0 || math.IsNaN(float64(signal)) {
+	if !nonNegativeFinite(float64(signal)) {
 		return 0, fmt.Errorf("%w: signal %g e/s", ErrExposure, float64(signal))
 	}
 
@@ -131,11 +131,13 @@ func (i Instrument) noiseVariance(
 		return 0, fmt.Errorf("%w: aperture %g pixels", ErrExposure, pixels)
 	}
 
-	if background < 0 || math.IsNaN(float64(background)) {
+	if !nonNegativeFinite(float64(background)) {
 		return 0, fmt.Errorf("%w: background %g e/pixel/s", ErrExposure, float64(background))
 	}
 
-	if i.ReadNoiseElectrons < 0 || i.DarkCurrent < 0 {
+	// NaN fails every comparison, so a bare "< 0" let it through to an answer
+	// of NaN with no error, as it did +Inf to one of 0 or +Inf, until #748.
+	if !nonNegativeFinite(i.ReadNoiseElectrons) || !nonNegativeFinite(float64(i.DarkCurrent)) {
 		return 0, fmt.Errorf("%w: read noise %g e, dark current %g e/pixel/s",
 			ErrExposure, i.ReadNoiseElectrons, float64(i.DarkCurrent))
 	}

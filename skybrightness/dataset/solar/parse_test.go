@@ -53,11 +53,11 @@ func pad(b []byte) []byte {
 // The column names are padded the way FITS pads a string to its TFORM width,
 // because that padding is the thing floatColumn's case-folded trim exists for
 // and an exact-match lookup would find neither column.
-func calspecLike(t *testing.T, wavelengthA, fluxErg []float64) []byte {
-	t.Helper()
+func calspecLike(tb testing.TB, wavelengthA, fluxErg []float64) []byte {
+	tb.Helper()
 
 	if len(wavelengthA) != len(fluxErg) {
-		t.Fatalf("fixture: %d wavelengths and %d fluxes", len(wavelengthA), len(fluxErg))
+		tb.Fatalf("fixture: %d wavelengths and %d fluxes", len(wavelengthA), len(fluxErg))
 	}
 
 	primary := card("SIMPLE", "T") + card("BITPIX", "8") + card("NAXIS", "0") +
@@ -78,7 +78,7 @@ func calspecLike(t *testing.T, wavelengthA, fluxErg []float64) []byte {
 		"END"
 
 	if rowSize != 16 {
-		t.Fatalf("fixture row is %d bytes, header declares 16", rowSize)
+		tb.Fatalf("fixture row is %d bytes, header declares 16", rowSize)
 	}
 
 	var payload bytes.Buffer

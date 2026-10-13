@@ -45,6 +45,25 @@ func TestParseReadsTheCVRLForm(t *testing.T) {
 	}
 }
 
+// The parser reads CIE's own form too, which has no space after the comma —
+// the files the luminosity endpoint fetches since #739. These are the first
+// three rows of CIE_sle_photopic.csv, read 2026-10-13.
+func TestParseReadsTheCIEForm(t *testing.T) {
+	t.Parallel()
+
+	band, err := luminosity.Parse(strings.NewReader(
+		"360,0.0000039170000\n" +
+			"361,0.0000043935810\n" +
+			"362,0.0000049296040\n"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	if len(band.WavelengthNM) != 3 || float64(band.WavelengthNM[0]) != 360 || band.Response[2] != 0.0000049296040 {
+		t.Errorf("parsed %v / %v, want 360-362 nm ending at 4.929604e-06", band.WavelengthNM, band.Response)
+	}
+}
+
 // A curve whose wavelengths do not ascend is refused.
 //
 // Every consumer interpolates, and a repeated or reversed sample makes that
