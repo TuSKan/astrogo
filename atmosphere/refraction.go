@@ -2,6 +2,7 @@ package atmosphere
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -241,6 +242,12 @@ func ZenithDistance(alt angle.Angle) angle.Angle {
 // ozone their own airmasses, which differ from this one at low altitude:
 // aerosol, in a thinner layer, has the larger airmass near the horizon.
 func Airmass(alt angle.Angle) (float64, error) {
+	// NaN is below nothing, so it passed the horizon check and came back as
+	// an airmass of NaN until #750.
+	if h := alt.Degrees(); math.IsNaN(h) || math.IsInf(h, 0) {
+		return 0, fmt.Errorf("%w: elevation %g degrees", ErrAltitude, h)
+	}
+
 	if alt.Degrees() < 0 {
 		return 0, ErrBelowHorizon
 	}
