@@ -17,15 +17,31 @@ var ErrAtmosphereBuilder = errors.New("atmosphere: invalid Atmosphere")
 // via errors.Join so a caller can errors.Is against any specific
 // violation.
 var (
-	errSurfacePressure    = errors.New("Surface: pressure must be > 0 hPa")
-	errSurfaceTemperature = errors.New("Surface: temperature must be > 0 K")
-	errAerosolAOD         = errors.New("Aerosol: AOD must be >= 0")
+	errSurfacePressure    = errors.New("Surface: pressure must be finite and > 0 hPa")
+	errSurfaceTemperature = errors.New("Surface: temperature must be finite and > 0 K")
+	errAerosolAOD         = errors.New("Aerosol: AOD must be finite and >= 0")
+	errAerosolReference   = errors.New("Aerosol: reference wavelength must be finite and > 0 nm")
+	errAerosolAngstrom    = errors.New("Aerosol: Angstrom exponent must be finite")
 	errAerosolSSA         = errors.New("Aerosol: single-scattering albedo must be in [0,1]")
 	errAerosolAsymmetry   = errors.New("Aerosol: asymmetry parameter must be in [-1,1]")
 	errCloudFraction      = errors.New("AddCloud: Fraction must be in [0,1]")
-	errCloudOpticalDepth  = errors.New("AddCloud: OpticalDepth must be >= 0")
+	errCloudOpticalDepth  = errors.New("AddCloud: OpticalDepth must be finite and >= 0")
 	errOzoneColumn        = errors.New("Ozone: column must be finite and >= 0 DU")
 )
+
+// Every check below is written so that NaN fails it: "!(x > 0)" rather than
+// "x <= 0", and a range as "!(lo <= x && x <= hi)". NaN compares false with
+// everything, so until #750 only Ozone refused it, and a NaN AOD built an
+// atmosphere whose extinction was NaN with no error anywhere.
+
+// finitePositive reports whether v is a finite number above zero.
+func finitePositive(v float64) bool { return v > 0 && !math.IsInf(v, 1) }
+
+// finiteNonNegative reports whether v is a finite number at or above zero.
+func finiteNonNegative(v float64) bool { return v >= 0 && !math.IsInf(v, 1) }
+
+// within reports whether v lies in [lo, hi]; NaN does not.
+func within(v, lo, hi float64) bool { return lo <= v && v <= hi }
 
 // CloudPhase distinguishes the thermodynamic phase of a cloud layer.
 type CloudPhase uint8
@@ -309,11 +325,11 @@ func NewBuilder() *Builder {
 // Atmosphere's own Surface() accessor stays in Kelvin for consistency with
 // every other skybrightness-native unit.
 func (b *Builder) Surface(pressureHPa, tempK float64) *Builder {
-	if pressureHPa <= 0 {
+	if !finitePositive(pressureHPa) {
 		b.errs = append(b.errs, errSurfacePressure)
 	}
 
-	if tempK <= 0 {
+	if !finitePositive(tempK) {
 		b.errs = append(b.errs, errSurfaceTemperature)
 	}
 
@@ -340,15 +356,23 @@ func (b *Builder) Refraction(model RefractionModel, humidityFrac, wavelengthUM f
 // wavelength, the Angstrom exponent, single-scattering albedo, and asymmetry
 // parameter.
 func (b *Builder) Aerosol(aod float64, reference unit.WavelengthNM, angstrom, ssa, g float64) *Builder {
-	if aod < 0 {
+	if !finiteNonNegative(aod) {
 		b.errs = append(b.errs, errAerosolAOD)
 	}
 
-	if ssa < 0 || ssa > 1 {
+	if !finitePositive(float64(reference)) {
+		b.errs = append(b.errs, errAerosolReference)
+	}
+
+	if math.IsNaN(angstrom) || math.IsInf(angstrom, 0) {
+		b.errs = append(b.errs, errAerosolAngstrom)
+	}
+
+	if !within(ssa, 0, 1) {
 		b.errs = append(b.errs, errAerosolSSA)
 	}
 
-	if g < -1 || g > 1 {
+	if !within(g, -1, 1) {
 		b.errs = append(b.errs, errAerosolAsymmetry)
 	}
 
@@ -475,11 +499,11 @@ func (b *Builder) Clear() *Builder {
 
 // AddCloud appends one cloud layer.
 func (b *Builder) AddCloud(l CloudLayer) *Builder {
-	if l.Fraction < 0 || l.Fraction > 1 {
+	if !within(float64(l.Fraction), 0, 1) {
 		b.errs = append(b.errs, errCloudFraction)
 	}
 
-	if l.OpticalDepth < 0 {
+	if !finiteNonNegative(float64(l.OpticalDepth)) {
 		b.errs = append(b.errs, errCloudOpticalDepth)
 	}
 

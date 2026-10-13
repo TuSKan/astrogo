@@ -159,6 +159,11 @@ func pickeringAerosolAirmass(alt angle.Angle) float64 {
 //
 // Below the horizon the error wraps [ErrBelowHorizon], as Airmass's does.
 func OzoneAirmass(alt angle.Angle) (float64, error) {
+	// As Airmass: NaN is below nothing (#750).
+	if h := alt.Degrees(); math.IsNaN(h) || math.IsInf(h, 0) {
+		return 0, fmt.Errorf("%w: elevation %g degrees", ErrAltitude, h)
+	}
+
 	if alt.Degrees() < 0 {
 		return 0, ErrBelowHorizon
 	}
