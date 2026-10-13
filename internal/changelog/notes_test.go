@@ -3,7 +3,9 @@ package changelog
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -78,8 +80,14 @@ func TestReleaseNotesFile(t *testing.T) {
 			t.Fatalf("%s has no released section", changelogPath)
 		}
 
-		if _, err := ReleaseNotes(string(src), newest[1]); err != nil {
+		notes, err := ReleaseNotes(string(src), newest[1])
+		if err != nil {
 			t.Errorf("the newest release, %s: %v", newest[1], err)
+		}
+
+		if len(notes) > githubReleaseBodyLimit {
+			t.Errorf("the newest release's notes, %s, are %d bytes, over GitHub's %d",
+				newest[1], len(notes), githubReleaseBodyLimit)
 		}
 
 		return
@@ -96,5 +104,74 @@ func TestReleaseNotesFile(t *testing.T) {
 
 	if err := os.WriteFile(*notesOut, []byte(notes+"\n"), 0o600); err != nil {
 		t.Fatalf("write %s: %v", *notesOut, err)
+	}
+}
+
+// TestReleaseNotesFitAGitHubRelease is v0.20.0's release: its section came
+// to 165,662 characters, GitHub refuses a release body over 125,000, and the
+// tag's release failed at creation. Notes that fit are returned unchanged;
+// notes that do not keep whole sections in priority order, in their own
+// order, and point to CHANGELOG.md at the tag for the rest.
+func TestReleaseNotesFitAGitHubRelease(t *testing.T) {
+	t.Parallel()
+
+	entries := func(prefix string, size int) string {
+		var b strings.Builder
+
+		for i := 0; b.Len() < size; i++ {
+			fmt.Fprintf(&b, "- %s entry %d, long enough to take some room in the notes. (#%d)\n", prefix, i, i)
+		}
+
+		return strings.TrimSpace(b.String())
+	}
+
+	release := func(sections ...string) string {
+		return "# Changelog\n\n## [Unreleased]\n\n## [0.2.0] — 2026-10-12\n\n" +
+			strings.Join(sections, "\n\n") + "\n\n## [0.1.0] — 2026-10-05\n\n### Added\n\n- One. (#1)\n\n" +
+			"[Unreleased]: https://example.org/r/compare/v0.2.0...HEAD\n" +
+			"[0.2.0]: https://example.org/r/compare/v0.1.0...v0.2.0\n"
+	}
+
+	const link = "[CHANGELOG.md](https://example.org/r/blob/v0.2.0/CHANGELOG.md)"
+
+	added := entries("Added", 70_000)
+	breaking := entries("Breaking", 10_000)
+	fixed := entries("Fixed", 70_000)
+
+	got, err := ReleaseNotes(release(
+		"### Added\n\n"+added,
+		"### Changed — BREAKING\n\n"+breaking,
+		"### Fixed\n\n"+fixed,
+	), "0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) > githubReleaseBodyLimit {
+		t.Fatalf("notes are %d bytes, over %d", len(got), githubReleaseBodyLimit)
+	}
+
+	// Added outranks Fixed and only one of the two fits beside the breaking
+	// changes, so Added and the breaking changes stay whole and Fixed points
+	// to the changelog.
+	for _, want := range []string{added, breaking, link} {
+		if !strings.Contains(got, want) {
+			t.Errorf("notes leave out %.60q", want)
+		}
+	}
+
+	if strings.Contains(got, "Fixed entry 0,") {
+		t.Errorf("notes kept Fixed, which does not fit beside Added")
+	}
+
+	if a, b, f := strings.Index(got, "### Added"), strings.Index(got, "### Changed — BREAKING"),
+		strings.Index(got, "### Fixed"); a < 0 || b < a || f < b {
+		t.Errorf("sections out of their own order: Added %d, Changed — BREAKING %d, Fixed %d", a, b, f)
+	}
+
+	// Notes that fit are the section as it is, with no pointer.
+	small, err := ReleaseNotes(release("### Fixed\n\n- Two. (#2)"), "0.2.0")
+	if err != nil || small != "### Fixed\n\n- Two. (#2)" {
+		t.Errorf("notes that fit = %q, %v; want the section unchanged", small, err)
 	}
 }
