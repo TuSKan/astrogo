@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 
@@ -404,8 +405,8 @@ func (p *Provider) recordToTarget(rec *ssoRecord) resolve.Target {
 
 	// Spin axis.
 	if !math.IsNaN(rec.Alpha0) && !math.IsNaN(rec.Delta0) {
-		t.SpinRA = rec.Alpha0
-		t.SpinDec = rec.Delta0
+		t.SpinRA = angle.Deg(rec.Alpha0)
+		t.SpinDec = angle.Deg(rec.Delta0)
 		t.HasSpin = true
 	}
 

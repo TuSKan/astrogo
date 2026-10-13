@@ -335,8 +335,8 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	t.Logf("  G1      = %.4f", tgt.G1)
 	t.Logf("  G2      = %.4f", tgt.G2)
 	t.Logf("  R       = %.4f", tgt.Oblateness)
-	t.Logf("  SpinRA  = %.2f°", tgt.SpinRA)
-	t.Logf("  SpinDec = %.2f°", tgt.SpinDec)
+	t.Logf("  SpinRA  = %.2f°", tgt.SpinRA.Degrees())
+	t.Logf("  SpinDec = %.2f°", tgt.SpinDec.Degrees())
 
 	if !tgt.HasH || !tgt.HasG1G2 {
 		t.Fatal("missing H or G1/G2 from SSOFT — cannot validate")
@@ -370,8 +370,8 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	// and the loop cannot drift apart.
 	fields := []string{"residuals_shg1g2", "i:magpsf_red", "Phase", "Dhelio", "Dobs", "RA", "DEC"}
 
-	spinRA := angle.Deg(tgt.SpinRA)
-	spinDec := angle.Deg(tgt.SpinDec)
+	spinRA := tgt.SpinRA
+	spinDec := tgt.SpinDec
 
 	for _, r := range records {
 		// The band selector is read first, and its absence counted as a
@@ -559,8 +559,8 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 		t.Skip("no spin/R parameters available for 8467")
 	}
 
-	spinRA := angle.Deg(tgt.SpinRA)
-	spinDec := angle.Deg(tgt.SpinDec)
+	spinRA := tgt.SpinRA
+	spinDec := tgt.SpinDec
 	R := tgt.Oblateness
 
 	records := finkSSOQuery(t, "8467", false, true)
