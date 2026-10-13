@@ -1,6 +1,7 @@
 package magnitude_test
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -433,18 +434,56 @@ func TestSatelliteApparent_PhaseMonotonicity(t *testing.T) {
 	t.Logf("Satellite: α=0°:%.2f, 90°:%.2f, 150°:%.2f", m0, m90, m150)
 }
 
-func TestSatelliteApparent_CylinderVsSphere(t *testing.T) {
-	stdMag := 3.0
-	observerRange := unit.Km(1000)
+// TestSatellitePhaseSphereIsMallamasStandardMagnitudeCorrection holds
+// PhaseSphere to the law it is documented as (#724): the illuminated fraction
+// of a sphere, as the satellite community's standard magnitude uses it.
+//
+// Mallama (2021), "The Brightness of VisorSat-Design Starlink Satellites",
+// Eq. 1, gives the correction added to a 1000-km magnitude to reach the
+// standard (90°) magnitude as
+//
+//	C = 2.5·log₁₀(0.5 + 0.5·cos B) + 0.753
+//
+// so a Molczan-convention magnitude seen from 1000 km at phase angle B is
+// the standard magnitude minus C. The tolerance is the rounding of the
+// printed 0.753, which is 2.5·log₁₀2 = 0.75257.
+//
+// The test this replaces asserted only that the sphere and cylinder laws
+// differ, and so could not notice that the sphere law was documented as a
+// Lambertian sphere, which it is not.
+func TestSatellitePhaseSphereIsMallamasStandardMagnitudeCorrection(t *testing.T) {
+	t.Parallel()
 
-	mSphere := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(45), magnitude.PhaseSphere)
-	mCyl := magnitude.SatelliteApparent(stdMag, magnitude.ConventionMcCants, observerRange, angle.Deg(45), magnitude.PhaseCylinder)
+	const standard = 4.0
 
-	if mSphere == mCyl {
-		t.Error("sphere and cylinder should give different results")
+	for _, deg := range []float64{0, 30, 60, 90, 120, 150} {
+		b := angle.Deg(deg)
+
+		got := magnitude.SatelliteApparent(standard, magnitude.ConventionMolczan, unit.Km(1000), b, magnitude.PhaseSphere)
+		c := 2.5*math.Log10(0.5+0.5*math.Cos(b.Radians())) + 0.753
+
+		assertNear(t, fmt.Sprintf("B = %g°", deg), got, standard-c, 5e-4)
 	}
+}
 
-	t.Logf("Sphere=%.3f, Cylinder=%.3f", mSphere, mCyl)
+// TestSatellitePhaseCylinderIsTheDiffuseSphereLaw holds PhaseCylinder to the
+// diffuse-sphere law of Fankhauser, Tyson & Askari (2023, AJ 166:59,
+// Eq. 30), I ∝ (π − φ)·cos φ + sin φ, which is also a diffuse cylinder's
+// seen broadside (#724). Normalized at full phase, where the bracket is π,
+// a McCants magnitude seen from 1000 km dims by −2.5·log₁₀ of the ratio.
+func TestSatellitePhaseCylinderIsTheDiffuseSphereLaw(t *testing.T) {
+	t.Parallel()
+
+	const standard = 3.0
+
+	for _, deg := range []float64{0, 30, 60, 90, 120, 150} {
+		phi := angle.Deg(deg).Radians()
+
+		got := magnitude.SatelliteApparent(standard, magnitude.ConventionMcCants, unit.Km(1000), angle.Rad(phi), magnitude.PhaseCylinder)
+		want := standard - 2.5*math.Log10(((math.Pi-phi)*math.Cos(phi)+math.Sin(phi))/math.Pi)
+
+		assertNear(t, fmt.Sprintf("φ = %g°", deg), got, want, 1e-12)
+	}
 }
 
 // TestSatelliteStandardMagnitudeReproducesItself is #560's definitional

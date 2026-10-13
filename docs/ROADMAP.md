@@ -101,7 +101,7 @@ which sends the next contributor to build it twice.
 |---|---|---|
 | 24 | **Constraint Framework** — `Altitude`, `Airmass`, `Sun` (twilight), `MoonSep` (lunar separation), all with shared `coord.Context` via `CheckCtx` | ✅ v0.1.4 |
 | 25 | **Generic Moving Body** — `GenericBody` fallback for ephemeris targets without a photometric model (no spurious magnitude in `GetDetails`) | ✅ v0.2.0 |
-| 26 | **Satellite Magnitude Models** — Lambertian-sphere / diffuse-cylinder phase functions, McCants standard-magnitude convention | ✅ v0.2.0 |
+| 26 | **Satellite Magnitude Models** — illuminated-fraction and diffuse-cylinder (equivalently Lambertian-sphere) phase functions, McCants standard-magnitude convention | ✅ v0.2.0 |
 | 27 | **Lint-Zero Quality Gate** — full `golangci-lint` v2 compliance, zero violations, exported-symbol docs across all packages | ✅ v0.1.5 |
 
 ---

@@ -13,11 +13,28 @@ import (
 type SatPhaseModel int
 
 const (
-	// PhaseSphere uses a Lambertian sphere model: Ψ(α) = (1 + cos α) / 2
+	// PhaseSphere is the illuminated fraction of a sphere's disk:
+	// Ψ(α) = (1 + cos α) / 2.
+	//
+	// It is the law the standard-magnitude conventions are defined with:
+	// Mallama (2021, "The Brightness of VisorSat-Design Starlink
+	// Satellites", Eq. 1) gives the standard-magnitude correction as
+	// 2.5·log₁₀(0.5 + 0.5 cos B) + 0.753, the term being "the fraction of a
+	// spherical object that is illuminated by the Sun". Its full-phase to
+	// 90° step is that 0.753 mag.
+	//
+	// It is not a Lambertian sphere, which dims faster with phase — 0.49 mag
+	// more at 90°, 1.64 mag more at 150°. That law is PhaseCylinder's.
 	PhaseSphere SatPhaseModel = iota
 
-	// PhaseCylinder uses a diffuse cylinder model (e.g. rocket bodies):
-	// Ψ(α) = (sin α + (π−α)·cos α) / π
+	// PhaseCylinder is a diffuse cylinder seen broadside, its axis
+	// perpendicular to both the Sun and the observer (e.g. rocket bodies):
+	// Ψ(α) = (sin α + (π−α)·cos α) / π.
+	//
+	// The same normalized law describes a Lambertian (diffuse) sphere —
+	// Fankhauser, Tyson & Askari (2023, AJ 166:59, Eq. 30) scatter
+	// I ∝ (π − φ)·cos φ + sin φ — so it is also the choice for a satellite
+	// modeled as a diffuse sphere.
 	PhaseCylinder
 )
 
