@@ -204,12 +204,12 @@ func trimToLines(line1, line2 string) (l1, l2 string, err error) {
 // that does not exist. The check digits do not catch it — each line is
 // individually intact.
 func parseSatelliteNumbers(l1, l2 string) (int, error) {
-	n1, err := parseIntField(l1, spanSatNum1, "satellite number on line 1")
+	n1, err := parseCatalogNumber(l1, spanSatNum1, "satellite number on line 1")
 	if err != nil {
 		return 0, err
 	}
 
-	n2, err := parseIntField(l2, spanSatNum2, "satellite number on line 2")
+	n2, err := parseCatalogNumber(l2, spanSatNum2, "satellite number on line 2")
 	if err != nil {
 		return 0, err
 	}
@@ -221,6 +221,35 @@ func parseSatelliteNumbers(l1, l2 string) (int, error) {
 
 	return n1, nil
 }
+
+// parseCatalogNumber reads a catalog-number field, five digits or Alpha-5.
+//
+// Five columns hold numbers up to 99999, and catalog numbers passed that on
+// 2026-07-11 (#737). Alpha-5 is the extension python-sgp4 has read since
+// 2.14: the first column becomes a letter standing for its tens of thousands,
+// A for 10 through Z for 33 with I and O left out, so "E8493" is 148493 and
+// "Z9999" is 339999, the most the field can name. Any other letter, and
+// lowercase, is not the scheme and is refused rather than guessed at.
+func parseCatalogNumber(line string, at span, name string) (int, error) {
+	raw := strings.TrimSpace(field(line, at))
+	if raw == "" || raw[0] < 'A' || raw[0] > 'Z' {
+		return parseIntField(line, at, name)
+	}
+
+	tens := strings.IndexByte(alpha5Letters, raw[0])
+	if tens < 0 || len(raw) != 5 || strings.Trim(raw[1:], "0123456789") != "" {
+		return 0, fmt.Errorf("%w: %s is %q, which is neither an integer nor Alpha-5",
+			ErrMalformedTLE, name, field(line, at))
+	}
+
+	rest, _ := strconv.Atoi(raw[1:]) // four ASCII digits, checked just above
+
+	return (tens+10)*10000 + rest, nil
+}
+
+// alpha5Letters are Alpha-5's leading letters in order, A standing for 10:
+// the alphabet without I and O, which read as 1 and 0.
+const alpha5Letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 // parseEpoch reads the two-digit year and fractional day of year.
 //
