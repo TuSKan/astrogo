@@ -32,10 +32,11 @@ func TestCoordCarriesTheTargetsOwnMotion(t *testing.T) {
 		t.Errorf("Coord dropped the motion: pm (%v, %v) plx %v rv %v", c.PmRA(), c.PmDec(), c.Parallax(), c.RV())
 	}
 
-	// Not an exact zero: NewICRSWithKinematics and NewICRS build the vector by
-	// different arithmetic, and on arm64 fused multiply-add leaves 2e-13″
-	// between them. A microarcsecond is far below any catalog's precision and
-	// far above that rounding.
+	// Not an exact zero: the two positions hold the same RA and Dec, but
+	// coord.Separation of a point with itself is atan2(|a×a|, a·a), and on
+	// arm64 fused multiply-add turns each x·y − y·x of the cross product into
+	// the rounding error of one product — 2e-13″, measured on macOS CI. A
+	// microarcsecond is far below any catalog's precision and far above that.
 	if sep := coord.Separation(c, barnard.Coord).Arcseconds(); sep > 1e-6 {
 		t.Errorf("Coord moved the position by %g″; it should only attach the motion", sep)
 	}
