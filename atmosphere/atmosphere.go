@@ -336,10 +336,10 @@ func (b *Builder) Refraction(model RefractionModel, humidityFrac, wavelengthUM f
 	return b
 }
 
-// Aerosol sets a broadband aerosol state: optical depth at referenceNM,
-// the Angstrom exponent, single-scattering albedo, and asymmetry
+// Aerosol sets a broadband aerosol state: optical depth at the reference
+// wavelength, the Angstrom exponent, single-scattering albedo, and asymmetry
 // parameter.
-func (b *Builder) Aerosol(aod, referenceNM, angstrom, ssa, g float64) *Builder {
+func (b *Builder) Aerosol(aod float64, reference unit.WavelengthNM, angstrom, ssa, g float64) *Builder {
 	if aod < 0 {
 		b.errs = append(b.errs, errAerosolAOD)
 	}
@@ -353,7 +353,7 @@ func (b *Builder) Aerosol(aod, referenceNM, angstrom, ssa, g float64) *Builder {
 	}
 
 	b.s.aerosol.OpticalDepth = unit.AerosolOpticalDepth(aod)
-	b.s.aerosol.ReferenceWavelength = unit.WavelengthNM(referenceNM)
+	b.s.aerosol.ReferenceWavelength = reference
 	b.s.aerosol.AngstromExp = unit.AngstromExponent(angstrom)
 	b.s.aerosol.SingleScatteringAlbedo = unit.SingleScatteringAlbedo(ssa)
 	b.s.aerosol.Asymmetry = unit.AsymmetryParameter(g)
