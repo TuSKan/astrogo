@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"strconv"
 
@@ -117,19 +118,30 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		}
 	}
 
-	ra := center.RA().Degrees()
-	dec := center.Dec().Degrees()
 	rad := req.Radius.Degrees()
+	if math.IsNaN(rad) || math.IsInf(rad, 0) || rad < 0 {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("gaia: %w: %g deg", resolve.ErrInvalidRadius, rad))
+		}
+	}
+
+	// Every number goes out exactly, as the shortest decimal that reads back
+	// to the same float64. It was %f, six decimals of a degree, so a radius
+	// under 1.8 mas was sent as 0, an empty cone, and cones within 3.6 mas of
+	// one another shared a cache entry (#762).
+	ra := strconv.FormatFloat(center.RA().Degrees(), 'f', -1, 64)
+	dec := strconv.FormatFloat(center.Dec().Degrees(), 'f', -1, 64)
+	radius := strconv.FormatFloat(rad, 'f', -1, 64)
 
 	// Query gaia source for ra, dec, pmra, pmdec, parallax
 	// Ordered by an alias rather than by the DISTANCE expression itself, which
 	// ADQL 2.0 does not allow in ORDER BY.
-	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %f, %f)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %f, %f, %f)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, rad)
+	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, radius)
 
 	// The archive is part of the key. Two providers over one cache would
 	// otherwise serve each other's answers, and the whole point of holding
 	// both is to be able to tell them apart.
-	cacheKey := fmt.Sprintf("gaia:cone:%s:%f:%f:%f:%d", p.endpoint, ra, dec, rad, limit)
+	cacheKey := fmt.Sprintf("gaia:cone:%s:%s:%s:%s:%d", p.endpoint, ra, dec, radius, limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}

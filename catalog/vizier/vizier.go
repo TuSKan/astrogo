@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -110,10 +111,21 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		}
 	}
 
-	// CIRCLE receives coordinates in DEGREES for ADQL natively.
-	ra := center.RA().Degrees()
-	dec := center.Dec().Degrees()
 	rad := req.Radius.Degrees()
+	if math.IsNaN(rad) || math.IsInf(rad, 0) || rad < 0 {
+		return func(yield func(resolve.Target, error) bool) {
+			yield(resolve.Target{}, fmt.Errorf("vizier: %w: %g deg", resolve.ErrInvalidRadius, rad))
+		}
+	}
+
+	// CIRCLE receives coordinates in DEGREES for ADQL natively, each sent
+	// exactly as the shortest decimal that reads back to the same float64.
+	// It was %f, six decimals of a degree, so a radius under 1.8 mas was sent
+	// as 0, an empty cone, and cones within 3.6 mas of one another shared a
+	// cache entry (#762).
+	ra := strconv.FormatFloat(center.RA().Degrees(), 'f', -1, 64)
+	dec := strconv.FormatFloat(center.Dec().Degrees(), 'f', -1, 64)
+	radius := strconv.FormatFloat(rad, 'f', -1, 64)
 
 	// A table whose rows carry their own epochs is asked for them.
 	epochCol := ""
@@ -123,16 +135,16 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 	adql := fmt.Sprintf(`SELECT TOP %d
 	%s as designation, %s as ra, %s as dec, %s
-	DISTANCE(POINT('ICRS', %s, %s), POINT('ICRS', %f, %f)) AS dist
+	DISTANCE(POINT('ICRS', %s, %s), POINT('ICRS', %s, %s)) AS dist
 	FROM "%s"
-	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %f, %f, %f))
+	WHERE 1=CONTAINS(POINT('ICRS', %s, %s), CIRCLE('ICRS', %s, %s, %s))
 	ORDER BY dist ASC`,
 		limit, schema.DesigCol, schema.RACol, schema.DecCol, epochCol, schema.RACol, schema.DecCol, ra, dec,
-		tableName, schema.RACol, schema.DecCol, ra, dec, rad)
+		tableName, schema.RACol, schema.DecCol, ra, dec, radius)
 
 	// The table name is part of the cache key: two different tables queried
 	// with the same cone would otherwise collide on the same entry.
-	cacheKey := fmt.Sprintf("vizier:cone:%s:%f:%f:%f:%d", tableName, ra, dec, rad, limit)
+	cacheKey := fmt.Sprintf("vizier:cone:%s:%s:%s:%s:%d", tableName, ra, dec, radius, limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}

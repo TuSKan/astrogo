@@ -300,6 +300,11 @@ var (
 	// complete. A [BrightObjectSearcher] promises every object brighter than
 	// the bound, and this is how one that cannot deliver all of them says so.
 	ErrTruncated = errors.New("result cut short at the provider's limit")
+	// ErrInvalidRadius is returned by a [ConeSearcher] for a cone radius that
+	// is NaN, infinite or negative, before anything is sent: an archive's
+	// error for one would otherwise come back as a remote failure rather than
+	// the caller's mistake.
+	ErrInvalidRadius = errors.New("cone radius must be finite and non-negative")
 )
 
 // Normalize converts a query to a canonical form for matching.
