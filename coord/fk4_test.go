@@ -237,7 +237,14 @@ func TestFK4EpochIsCarried(t *testing.T) {
 
 	t.Logf("the same B1950 position at epoch 1950 vs 1975 lands %.3f\" apart", sep)
 
-	if sep == 0 {
+	// A floor, not an exact zero (#731). Separation of a point with itself is
+	// not zero on arm64, where fused multiply-add leaves the rounding error of
+	// one product in each x·y − y·x of the cross product: 2e-13″, measured on
+	// macOS CI. An ignored epoch would pass `sep == 0` there. The real effect
+	// is 0.11″; 0.01″ is far above the rounding and far below the effect.
+	const epochEffectFloorArcsec = 0.01
+
+	if sep < epochEffectFloorArcsec {
 		t.Error("the epoch of observation had no effect; it is an input to the " +
 			"conversion, not decoration")
 	}
@@ -261,7 +268,7 @@ func TestFK4EpochIsCarried(t *testing.T) {
 
 	t.Logf("ICRS -> FK4 at epoch 1950 vs 1975 lands %.3f\" apart", back)
 
-	if back == 0 {
+	if back < epochEffectFloorArcsec {
 		t.Error("ICRSToFK4 ignored its bepoch argument")
 	}
 
