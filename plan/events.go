@@ -915,17 +915,34 @@ type TwilightEvent struct {
 // The threshold accounts for atmospheric refraction (34'), solar semi-diameter (16'),
 // and the horizon dip from the site's elevation.
 func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
-	sun := NewSun(provider)
-	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewSun(provider), site), start, end)
+}
+
+// riseSetSpec is the almanac's rise and set for target as seen from site:
+// the Sun's center against SunRiseSetThreshold, the Moon's upper limb against
+// RiseSetThreshold, and any other target's center against RiseSetThreshold.
+// SunEvents, MoonEvents and the rise and set GetDetails reports all come from
+// it, so they are the same instants. GetDetails used to search a geometric 0°
+// horizon of its own instead, minutes from all three (#704).
+func riseSetSpec(target Observable, site *Site) EventSpec {
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
-		Target:    sun,
+		Target:    target,
 		Observer:  site,
-		Threshold: site.SunRiseSetThreshold(),
+		Threshold: site.RiseSetThreshold(),
 	}
 
-	return solver.Find(spec, start, end)
+	if p, ok := target.(*Planet); ok {
+		switch {
+		case p.IsSun():
+			spec.Threshold = site.SunRiseSetThreshold()
+		case p.IsMoon():
+			spec.UpperLimb = true
+		}
+	}
+
+	return spec
 }
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
@@ -957,18 +974,7 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 // elevation, with the Moon's topocentric position, so its parallax, and its
 // semi-diameter at each instant; see [EventSpec.UpperLimb].
 func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
-	moon := NewMoon(provider)
-	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
-	spec := EventSpec{
-		Family:    EventFamilyVisibility,
-		Kind:      EventAnyVisibility,
-		Target:    moon,
-		Observer:  site,
-		Threshold: site.RiseSetThreshold(),
-		UpperLimb: true,
-	}
-
-	return solver.Find(spec, start, end)
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewMoon(provider), site), start, end)
 }
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.

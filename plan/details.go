@@ -15,7 +15,15 @@ import (
 
 // TargetDetails holds descriptive and ephemeris properties of an Observable.
 type TargetDetails struct {
-	ExtraProps     map[string]string
+	ExtraProps map[string]string
+
+	// RiseTime, TransitTime and SetTime are the target's pass at the
+	// Context's time: the one in progress when the target is up, the next
+	// one when it is down. Rise and set are the instants SunEvents,
+	// MoonEvents and VisibilityEvents report, on the same horizon. A target
+	// that neither rises nor sets has no RiseTime or SetTime, and its
+	// TransitTime is its next culmination. RiseAzimuth, SetAzimuth and
+	// MaxElevation go with them.
 	SetTime        *time.Time
 	TransitTime    *time.Time
 	RiseTime       *time.Time
@@ -421,8 +429,17 @@ func (o DetailOverrides) apply(d *TargetDetails) {
 
 // ── Rise/Set/Transit events ─────────────────────────────────────────────────
 
-// fillRiseSetTransit finds the next rise, set, and transit events within
-// ±12/+24 hours of the context time.
+// fillRiseSetTransit fills the rise, transit and set of the target's pass
+// at the Context's time: the pass in progress when the target is up then,
+// and the next one when it is down. A target that neither rises nor sets
+// across the search gets its next culmination alone.
+//
+// Rise and set are on the horizon riseSetSpec gives SunEvents, MoonEvents
+// and VisibilityEvents, so they are those functions' instants. This used to
+// search a geometric 0° horizon of its own, which put rise and set 4 to 8
+// minutes from every other rise and set in the package, and it reported the
+// first rise after twelve hours before the Context's time, which was often
+// a pass already over (#704).
 func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 	site, err := NewSite("Observer", ctx.Site())
 	if err != nil {
@@ -433,50 +450,86 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 
 	t := ctx.Time()
 
-	start := t.Add(unit.Hours(-12))
-	end := t.Add(unit.Hours(24))
-
-	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
-
-	spec := EventSpec{
-		Family:    EventFamilyVisibility,
-		Kind:      EventAnyVisibility,
-		Target:    obs,
-		Observer:  site,
-		Threshold: angle.Deg(0),
-	}
-
-	events, err := solver.Find(spec, start, end)
+	// A day back finds the rise of a pass in progress; two ahead find the
+	// next pass's rise and its set.
+	events, err := NewEventSolver(unit.Minutes(15), unit.Seconds(1)).
+		Find(riseSetSpec(obs, site), t.Add(unit.Hours(-24)), t.Add(unit.Hours(48)))
 	if err != nil {
 		return
 	}
 
-	for _, ev := range events {
-		if !ev.Time.After(start) {
+	rise, transit, set := passAt(events, t)
+
+	if rise != nil {
+		d.RiseTime, d.RiseAzimuth = &rise.Time, rise.Azimuth
+	}
+
+	if transit != nil {
+		d.TransitTime, d.MaxElevation = &transit.Time, transit.Altitude
+	}
+
+	if set != nil {
+		d.SetTime, d.SetAzimuth = &set.Time, set.Azimuth
+	}
+}
+
+// passAt picks, from time-ordered visibility events, the rise, transit and
+// set of the pass at t. The target is up at t when the last rise or set
+// before t is a rise; that rise starts the pass. When it is down, the pass
+// is the next one, from its rise. With no rise or set before t, the first
+// one after says which: a set means a pass in progress whose rise is out of
+// reach. With none at all, the target neither rises nor sets, and the pass
+// is its next culmination. Any of the three may be nil.
+func passAt(events []Event, t time.Time) (rise, transit, set *Event) {
+	var last *Event
+
+	for i := range events {
+		e := &events[i]
+		if e.Time.Before(t) && (e.Kind == EventRise || e.Kind == EventSet) {
+			last = e
+		}
+	}
+
+	from := t
+	if last != nil && last.Kind == EventRise {
+		rise, from = last, last.Time
+	}
+
+	// waiting is a target down at t whose next rise is still ahead: a
+	// culmination before that rise belongs to no pass.
+	waiting := last != nil && last.Kind == EventSet
+
+	for i := range events {
+		e := &events[i]
+		if e.Time.Before(from) {
 			continue
 		}
 
-		switch ev.Kind { //nolint:exhaustive // only rise/set/transit relevant
+		switch e.Kind { //nolint:exhaustive // a pass is a rise, a transit and a set
 		case EventRise:
-			if d.RiseTime == nil {
-				tt := ev.Time
-				d.RiseTime = &tt
-				d.RiseAzimuth = ev.Azimuth
+			if e == rise {
+				continue
+			}
+
+			if rise != nil || set != nil {
+				return rise, transit, set
+			}
+
+			// A culmination before the rise was below the horizon, on a
+			// day the target did not rise; it is not this pass's.
+			rise, transit, waiting = e, nil, false
+		case EventTransit:
+			if transit == nil && !waiting {
+				transit = e
 			}
 		case EventSet:
-			if d.SetTime == nil {
-				tt := ev.Time
-				d.SetTime = &tt
-				d.SetAzimuth = ev.Azimuth
-			}
-		case EventTransit:
-			if d.TransitTime == nil {
-				tt := ev.Time
-				d.TransitTime = &tt
-				d.MaxElevation = ev.Altitude
+			if !waiting {
+				return rise, transit, e
 			}
 		}
 	}
+
+	return rise, transit, set
 }
 
 // clamp restricts v to the range [lo, hi].
