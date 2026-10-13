@@ -32,7 +32,11 @@ func TestCoordCarriesTheTargetsOwnMotion(t *testing.T) {
 		t.Errorf("Coord dropped the motion: pm (%v, %v) plx %v rv %v", c.PmRA(), c.PmDec(), c.Parallax(), c.RV())
 	}
 
-	if sep := coord.Separation(c, barnard.Coord).Arcseconds(); sep != 0 {
+	// Not an exact zero: NewICRSWithKinematics and NewICRS build the vector by
+	// different arithmetic, and on arm64 fused multiply-add leaves 2e-13″
+	// between them. A microarcsecond is far below any catalog's precision and
+	// far above that rounding.
+	if sep := coord.Separation(c, barnard.Coord).Arcseconds(); sep > 1e-6 {
 		t.Errorf("Coord moved the position by %g″; it should only attach the motion", sep)
 	}
 

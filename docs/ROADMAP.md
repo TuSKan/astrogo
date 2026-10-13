@@ -326,8 +326,8 @@ atmospheric dispersion compensator planning.
 **Status:** 🟡 In Progress
 
 - [x] Positional cross-match (nearest neighbor, cone radius) — `catalog/xmatch.Match`'s
-      positional fallback pass (epoch-normalized via `coord.PropagateEpoch`, nearest
-      match within `WithPositionMatchThreshold`, default 2″).
+      positional fallback pass (compared at a common epoch carrying each Target's own
+      proper motion, nearest match within `WithPositionMatchThreshold`, default 2″).
 - [x] Multi-catalog cross-match (SIMBAD × Gaia × OpenNGC) — `catalog/xmatch.Match`
       operates on any two `resolve.Target` slices, independent of `catalog.Resolver`;
       alias-graph union-find (shared ID/`Aliases` entries) is the primary signal, the
