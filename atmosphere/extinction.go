@@ -94,12 +94,15 @@ func (s *Atmosphere) Extinction(lambda unit.WavelengthNM) (float64, error) {
 //     38.75 at 0°, so charging ozone X_R over-dimmed a target there: by
 //     0.63 mag at 0°, 0.34 at 1° and 0.19 at 2° on VisibleTonight's
 //     default air (#625).
-//   - X_aer is X_R as well. That is the right airmass for aerosol with the
-//     molecular scale height, 8 km, which OPAC gives its continental and
-//     urban types. A thinner layer, maritime (1 km) or desert (2 km), has a
-//     larger airmass near the horizon (Pickering's for 2 km is 88.8 at 0°),
-//     which this does not model, so below about 5° it under-dims through
-//     such air.
+//   - X_aer follows the aerosol's scale height, [Builder.AerosolScaleHeight].
+//     At exactly 2 km, [DesertScaleHeight], it is Pickering's aerosol airmass
+//     for that height, 88.81 at 0° against X_R's 38.75: a ray grazing a thin
+//     low layer spends far longer in it, and charging it X_R under-dimmed a
+//     target 1° up through desert air by 17 aerosol airmasses (#630). At any
+//     other height it is X_R, which is right at the molecular 8 km of OPAC's
+//     continental and urban types. A thinner layer, maritime at 1 km, has
+//     the larger airmass near the horizon too, but no published formula for
+//     it is in hand, so below about 5° this still under-dims through such air.
 //
 // High in the sky the three airmasses agree and this is Extinction times
 // Airmass: at 30° they differ by 0.6%. It errors where Extinction does, and
@@ -120,7 +123,27 @@ func (s *Atmosphere) ExtinctionToward(lambda unit.WavelengthNM, alt angle.Angle)
 		return 0, err
 	}
 
-	return magnitudesPerOpticalDepth * ((rayleigh+aerosol)*x + ozone*xO3), nil
+	if s.aerosol.ScaleHeight != DesertScaleHeight {
+		return magnitudesPerOpticalDepth * ((rayleigh+aerosol)*x + ozone*xO3), nil
+	}
+
+	return magnitudesPerOpticalDepth * (rayleigh*x + aerosol*pickeringAerosolAirmass(alt) + ozone*xO3), nil
+}
+
+// pickeringAerosolAirmass is Pickering's airmass for aerosol in a layer of
+// 2 km scale height, DIO 12 ‡1 (2002), footnote 39,
+//
+//	Xa = 1/sin(h + 20/(31 + 32·h^1.1)),  h the apparent altitude in degrees
+//
+// his fit to the same onion-skin integration [Airmass] is a fit to. It is the
+// one published aerosol airmass in hand, which is why
+// [Atmosphere.ExtinctionToward] uses
+// it at exactly that height and nowhere else (#630). alt is at or above the
+// horizon; ExtinctionToward has checked.
+func pickeringAerosolAirmass(alt angle.Angle) float64 {
+	h := alt.Degrees()
+
+	return 1 / math.Sin((h+20/(31+32*math.Pow(h, 1.1)))*math.Pi/180)
 }
 
 // OzoneAirmass returns the airmass of a thin absorbing shell 20 km above an
