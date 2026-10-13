@@ -287,9 +287,10 @@ func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
 // It is not parsed into a typed quantity because FITS units are a small
 // language of their own (Paper I §4.3: prefixes, powers, products, and forms
 // like "10**(-20) erg/s/cm**2/Angstrom"), and a partial parser that silently
-// mishandled the rest would be worse than the string. Interpreting it is #178
-// and #130's decision; making it visible is not, and it is a precondition for
-// either.
+// mishandled the rest would be worse than the string. That is also why
+// [WCS.PixelToWorld] returns a bare float64 per axis rather than a typed
+// quantity (#178): a non-celestial axis is in whatever unit this says, and
+// this is how a caller finds out which.
 //
 // Celestial axes are the exception that needs no interpretation: WCS Paper II
 // requires degrees, which is what this package assumes and what
@@ -338,8 +339,11 @@ func (w *WCS) SetCUnit(cunit []string) error {
 //   - When no celestial pair is present, every axis is the linear case above.
 //
 // A caller mixing the two — passing a spectral value to something expecting an
-// angle — is not stopped by anything here. That is the shape question #178 and
-// #130 exist to settle; this is what the shape does today.
+// angle — is not stopped by anything here, and that is decided rather than
+// pending (#178). A typed return would need a unit for every axis, and for
+// anything but a celestial one that unit is the header's CUNITi, a small
+// language astrogo does not parse: a typed shape would have to refuse most
+// headers or guess at them.
 func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	if len(pixels) != w.nAxis {
 		return nil, fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
