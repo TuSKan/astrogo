@@ -268,3 +268,31 @@ func TestOffsetNil(t *testing.T) {
 		t.Errorf("Offset(nil, ...) = %v, want ErrNilGeodetic", err)
 	}
 }
+
+// TestOffsetRefusesANonFiniteInputAsNotFinite holds both of Offset's numeric
+// inputs to the sentinel NewGeodetic and FromECEF give for a non-finite
+// component (#758). A NaN or infinite distance used to wrap ErrNilGeodetic,
+// so a caller branching on that read a bad distance as a missing start.
+func TestOffsetRefusesANonFiniteInputAsNotFinite(t *testing.T) {
+	t.Parallel()
+
+	start := geo(t, 10, 45)
+
+	cases := []struct {
+		name     string
+		bearing  angle.Angle
+		distance unit.Length
+	}{
+		{"NaN distance", angle.Deg(90), unit.Meters(math.NaN())},
+		{"+Inf distance", angle.Deg(90), unit.Meters(math.Inf(1))},
+		{"-Inf distance", angle.Deg(90), unit.Meters(math.Inf(-1))},
+		{"NaN bearing", angle.Rad(math.NaN()), 1000},
+	}
+
+	for _, c := range cases {
+		_, err := coord.Offset(start, c.bearing, c.distance)
+		if !errors.Is(err, coord.ErrNotFinite) || errors.Is(err, coord.ErrNilGeodetic) {
+			t.Errorf("Offset with %s: %v; want ErrNotFinite and not ErrNilGeodetic", c.name, err)
+		}
+	}
+}
