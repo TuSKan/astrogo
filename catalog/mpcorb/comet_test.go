@@ -208,3 +208,23 @@ func TestReadYieldsABadCometRowAndKeepsGoing(t *testing.T) {
 		testutil.AssertEqual(t, "bad "+name+": rows read after it", read, 1)
 	}
 }
+
+// TestCometRowEndingBeforeItsNameIsRead (#746): isCometRow admits a row that
+// reaches the slope parameter, column 100, two columns short of the name. A
+// fuzzer found that such a row panicked slicing the name past the row's end.
+// It is read, with no name, rather than taking the reader down.
+func TestCometRowEndingBeforeItsNameIsRead(t *testing.T) {
+	t.Parallel()
+
+	row := cometRows[0][:100]
+
+	for tgt, err := range mpcorb.Read(strings.NewReader(row + "\n")) {
+		if err != nil {
+			t.Fatalf("Read: %v", err)
+		}
+
+		if tgt.ID != "CJ95O010" || tgt.Name != "" {
+			t.Errorf("read %q named %q, want CJ95O010 with no name", tgt.ID, tgt.Name)
+		}
+	}
+}

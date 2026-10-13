@@ -86,7 +86,13 @@ func isCometRow(row string) bool {
 // the three angles. The asteroid form is left at zero; the file does not
 // publish it, and a parabola or hyperbola has none.
 func parseCometRow(row string) (resolve.Target, error) {
-	name := strings.TrimSpace(row[cometNameStart:min(len(row), cometNameEnd)])
+	// A row may end before the name column: isCometRow admits any row that
+	// reaches the slope parameter, two columns short of the name. Until #746
+	// such a row panicked here slicing past its end, as a fuzzer found.
+	var name string
+	if len(row) > cometNameStart {
+		name = strings.TrimSpace(row[cometNameStart:min(len(row), cometNameEnd)])
+	}
 
 	t := resolve.Target{
 		// The packed number, type and designation, with the padding between

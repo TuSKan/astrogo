@@ -203,18 +203,21 @@ const (
 	// them.
 	SVOFilterProfile EndpointID = "svo.fps"
 
-	// CVRLLuminosity is the Colour & Vision Research Laboratory database at
-	// UCL's Institute of Ophthalmology.
+	// CIELuminosity is the International Commission on Illumination's own
+	// dataset store.
 	//
 	// It serves the CIE luminous efficiency functions - photopic V(lambda)
 	// and scotopic V'(lambda) - which are what turn a spectral radiance into
 	// a luminance in cd m^-2. Nothing in this module can produce one without
 	// them: they are measurements of the human eye and cannot be derived.
 	//
-	// CIE publishes these as paid standards; CVRL distributes the same
-	// tabulations openly, which is why the registry points here. The URL is
-	// http rather than https because the host does not serve TLS.
-	CVRLLuminosity EndpointID = "cvrl.lum"
+	// CIE publishes both as citable datasets under CC BY-SA 4.0, over https:
+	// DOI 10.25039/CIE.DS.dktna2s3 (photopic) and 10.25039/CIE.DS.gr6w4b5g
+	// (scotopic). Until #739 the registry pointed at a mirror, CVRL at UCL,
+	// on the premise that CIE sold them; that mirror served no TLS and was
+	// unreachable from 2026-10-10. Its tables and these hold the same values
+	// on the same wavelengths, to the last digit.
+	CIELuminosity EndpointID = "cie.lum"
 
 	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
 	//
@@ -713,25 +716,19 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			DownloadTimeout: 20 * time.Minute,
 		},
 
-		CVRLLuminosity: {
-			ID:  CVRLLuminosity,
-			URL: "http://www.cvrl.org/database/data/lum/",
-			InsecureReason: "www.cvrl.org serves no TLS at all: port 443 refuses " +
-				"the connection while port 80 answers, and the bare cvrl.org name " +
-				"does not resolve. Verified 2026-09-05. Not a certificate problem " +
-				"that could be waved through — there is no listener. Re-check when " +
-				"UCL modernises the host; the two CSVs here are CIE luminous " +
-				"efficiency functions, fixed published tables, so the exposure is " +
-				"tampering rather than disclosure.",
+		CIELuminosity: {
+			ID:        CIELuminosity,
+			URL:       "https://files.cie.co.at/Publications-datasets/",
 			Kind:      KindFile,
 			Subsystem: "skybrightness/dataset/luminosity",
-			Description: "CVRL (UCL Institute of Ophthalmology) CIE luminous efficiency " +
-				"functions: photopic V(lambda) 360-830 nm and scotopic V'(lambda) 380-780 nm",
-			ApproxSize:      64_000,
+			Description: "CIE luminous efficiency functions, CC BY-SA 4.0: photopic " +
+				"V(lambda) 360-830 nm and scotopic V'(lambda) 380-780 nm, 1 nm steps",
+			// Per file: 9,891 and 7,218 bytes, measured 2026-10-13.
+			ApproxSize:      12_000,
 			Enabled:         true,
 			DownloadTimeout: time.Minute,
 			Downloadable:    true,
-			Files:           []string{"vl1924e_1.csv", "scvle_1.csv"},
+			Files:           []string{"CIE_sle_photopic.csv", "CIE_sle_scotopic.csv"},
 		},
 
 		SVOFilterProfile: {

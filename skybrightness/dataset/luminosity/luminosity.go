@@ -83,17 +83,18 @@ func (v Vision) Efficacy() float64 {
 	return PhotopicEfficacy
 }
 
-// file is the CVRL table each function is published in.
-func (v Vision) file() (string, error) {
+// file is the CIE dataset each function is published in, and its DOI.
+//
+// Both are energy-based, which is what a radiance must be weighted by: the
+// functions are defined on radiant power, not on photon counts.
+func (v Vision) file() (name, doi string, err error) {
 	switch v {
 	case Photopic:
-		// The "e" is energy-based, which is what a radiance must be weighted
-		// by; CVRL also publishes a quantal form that would be wrong here.
-		return "vl1924e_1.csv", nil
+		return "CIE_sle_photopic.csv", "10.25039/CIE.DS.dktna2s3", nil
 	case Scotopic:
-		return "scvle_1.csv", nil
+		return "CIE_sle_scotopic.csv", "10.25039/CIE.DS.gr6w4b5g", nil
 	default:
-		return "", fmt.Errorf("%w: unknown vision %d", ErrCurve, int(v))
+		return "", "", fmt.Errorf("%w: unknown vision %d", ErrCurve, int(v))
 	}
 }
 
@@ -110,15 +111,15 @@ func (v Vision) file() (string, error) {
 // lambda and leave a luminance that is smooth, positive and wrong.
 //
 // It is a download, so it is gated: grant [remote.EnableDownloads] for
-// [remote.CVRLLuminosity] first. Both curves together are about 64 KB, and
+// [remote.CIELuminosity] first. Both curves together are about 17 KB, and
 // they never change — CIE 1924 and 1951 are fixed tabulations.
 func Open(ctx context.Context, v Vision) (magnitude.Passband, error) {
-	name, err := v.file()
+	name, doi, err := v.file()
 	if err != nil {
 		return magnitude.Passband{}, err
 	}
 
-	fsys, key, err := remote.GetFile(ctx, remote.CVRLLuminosity, name)
+	fsys, key, err := remote.GetFile(ctx, remote.CIELuminosity, name)
 	if err != nil {
 		return magnitude.Passband{}, fmt.Errorf("%w: fetch %s: %w", ErrCurve, name, err)
 	}
@@ -136,17 +137,17 @@ func Open(ctx context.Context, v Vision) (magnitude.Passband, error) {
 	}
 
 	band.Name = "CIE " + v.String()
-	band.Reference = "CVRL, UCL Institute of Ophthalmology (" + name + ")"
+	band.Reference = "CIE, " + name + ", CC BY-SA 4.0, doi:" + doi
 
 	return band, nil
 }
 
-// Parse reads CVRL's two-column "wavelength, value" CSV.
+// Parse reads a two-column "wavelength,value" CSV: CIE's own datasets, and
+// the same tables as CVRL's mirror writes them, with a space after the comma.
 //
 // Exported because it is the half of this package that needs no network, and
-// because a caller holding a CIE tabulation from elsewhere — the standards
-// themselves are not free — should be able to use it without this package
-// fetching anything.
+// because a caller holding a CIE tabulation already should be able to use it
+// without this package fetching anything.
 //
 // Rows that do not parse are skipped rather than fatal. CVRL's files carry
 // blank trailing lines, and some of its tables use an empty field where a

@@ -18,7 +18,7 @@ var (
 	fuzzTableRow = regexp.MustCompile("(?m)^\\| `([a-z0-9/]+)` \\| ((?:`Fuzz\\w+`(?:, )?)+) \\|")
 
 	// fuzzPackageCount is the sentence introducing that table.
-	fuzzPackageCount = regexp.MustCompile(`(?m)^(\w+) packages carry targets\b`)
+	fuzzPackageCount = regexp.MustCompile(`(?m)^([\w-]+) packages carry targets\b`)
 
 	fuzzTarget = regexp.MustCompile("`(Fuzz\\w+)`")
 )
@@ -26,6 +26,10 @@ var (
 // countWords spells the package counts the sentence can plausibly need.
 var countWords = map[string]int{
 	"Five": 5, "Six": 6, "Seven": 7, "Eight": 8, "Nine": 9, "Ten": 10, "Eleven": 11, "Twelve": 12,
+	"Thirteen": 13, "Fourteen": 14, "Fifteen": 15, "Sixteen": 16, "Seventeen": 17, "Eighteen": 18,
+	"Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22, "Twenty-three": 23,
+	"Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26, "Twenty-seven": 27, "Twenty-eight": 28,
+	"Twenty-nine": 29, "Thirty": 30,
 }
 
 // TestEveryFuzzTargetIsDocumented holds CLAUDE.md's table of fuzz targets to
