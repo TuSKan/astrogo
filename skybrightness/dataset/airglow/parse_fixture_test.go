@@ -115,7 +115,7 @@ func TestParseReadsAWellFormedTable(t *testing.T) {
 	}
 
 	for i, nm := range lam {
-		if got.LambdaNM[i] != nm {
+		if float64(got.LambdaNM[i]) != nm {
 			t.Errorf("row %d wavelength = %g, want %g", i, got.LambdaNM[i], nm)
 		}
 

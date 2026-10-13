@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -447,7 +448,7 @@ func readPixelCenters(t *testing.T, s synthTIFF) {
 		for col := range s.width {
 			lon, lat := s.centerLonLat(col, row)
 
-			got, err := gt.SampleBilinear(lon, lat)
+			got, err := gt.SampleBilinear(angle.Deg(lon), angle.Deg(lat))
 			if err != nil {
 				t.Fatalf("SampleBilinear(%d,%d): %v", col, row, err)
 			}
@@ -568,7 +569,7 @@ func TestGeoTIFFBilinearMidpoint(t *testing.T) {
 	lon0, lat0 := s.centerLonLat(0, 0)
 	lon1, _ := s.centerLonLat(1, 0)
 
-	got, err := gt.SampleBilinear((lon0+lon1)/2, lat0)
+	got, err := gt.SampleBilinear(angle.Deg((lon0+lon1)/2), angle.Deg(lat0))
 	if err != nil {
 		t.Fatalf("SampleBilinear: %v", err)
 	}

@@ -209,7 +209,7 @@ func (r *Raster) walkAzimuth(region Region, bearing angle.Angle, step float64) (
 			return 0, 0, fmt.Errorf("viirs: sample at %.0f m: %w", distance, err)
 		}
 
-		radiance, err := r.RadianceAt(at.Lon().Degrees(), at.Lat().Degrees())
+		radiance, err := r.RadianceAt(at.Lon(), at.Lat())
 		if err != nil {
 			continue // outside coverage, or no data: not darkness
 		}

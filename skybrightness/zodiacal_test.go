@@ -17,7 +17,7 @@ func zodiacalAt(t *testing.T, dlon, beta float64) float64 {
 	v, err := skybrightness.ZodiacalBrightnessAt(skybrightness.ZodiacalGeometry{
 		DifferentialLongitude: angle.Deg(dlon),
 		EclipticLatitude:      angle.Deg(beta),
-		SunDistanceAU:         1,
+		SunDistance:           unit.AU(1),
 	})
 	if err != nil {
 		t.Fatalf("ZodiacalBrightnessAt(%v, %v): %v", dlon, beta, err)
@@ -52,7 +52,7 @@ func TestZodiacalPoleMatchesKnownBrightness(t *testing.T) {
 	pole, err := skybrightness.ZodiacalBrightnessAt(skybrightness.ZodiacalGeometry{
 		DifferentialLongitude: angle.Deg(90),
 		EclipticLatitude:      angle.Deg(90),
-		SunDistanceAU:         1,
+		SunDistance:           unit.AU(1),
 	})
 	if err != nil {
 		t.Fatalf("ZodiacalBrightnessAt(pole): %v", err)
@@ -178,7 +178,7 @@ func TestZodiacalRefusesTheSolarVicinity(t *testing.T) {
 		_, err := skybrightness.ZodiacalBrightnessAt(skybrightness.ZodiacalGeometry{
 			DifferentialLongitude: angle.Deg(tc[0]),
 			EclipticLatitude:      angle.Deg(tc[1]),
-			SunDistanceAU:         1,
+			SunDistance:           unit.AU(1),
 		})
 		if !errors.Is(err, skybrightness.ErrZodiacalGeometry) {
 			t.Errorf("(%v, %v): err = %v, want ErrZodiacalGeometry", tc[0], tc[1], err)
@@ -273,7 +273,7 @@ func TestZodiacalHeliocentricScaling(t *testing.T) {
 		if _, err := skybrightness.ZodiacalRadiance(dst, grid, skybrightness.ZodiacalGeometry{
 			DifferentialLongitude: angle.Deg(90),
 			EclipticLatitude:      angle.Deg(0),
-			SunDistanceAU:         au,
+			SunDistance:           unit.AU(au),
 		}); err != nil {
 			t.Fatalf("ZodiacalRadiance(%v AU): %v", au, err)
 		}
@@ -309,7 +309,7 @@ func TestZodiacalSeasonalTerm(t *testing.T) {
 		if _, err := skybrightness.ZodiacalRadiance(dst, grid, skybrightness.ZodiacalGeometry{
 			DifferentialLongitude: angle.Deg(90),
 			EclipticLatitude:      angle.Deg(beta),
-			SunDistanceAU:         1,
+			SunDistance:           unit.AU(1),
 			EarthLongitude:        angle.Deg(earthLon),
 		}); err != nil {
 			t.Fatalf("ZodiacalRadiance: %v", err)
@@ -342,7 +342,7 @@ func TestZodiacalLightRejectsBadInput(t *testing.T) {
 	good := skybrightness.ZodiacalGeometry{
 		DifferentialLongitude: angle.Deg(90),
 		EclipticLatitude:      angle.Deg(30),
-		SunDistanceAU:         1,
+		SunDistance:           unit.AU(1),
 	}
 
 	if _, err := skybrightness.ZodiacalRadiance(make(skybrightness.SpectralRadiance, 3), grid, good); !errors.Is(err, unit.ErrGridMismatch) {
@@ -353,7 +353,7 @@ func TestZodiacalLightRejectsBadInput(t *testing.T) {
 
 	for _, au := range []float64{0, -1, math.NaN()} {
 		bad := good
-		bad.SunDistanceAU = au
+		bad.SunDistance = unit.AU(au)
 
 		if _, err := skybrightness.ZodiacalRadiance(dst, grid, bad); !errors.Is(err, skybrightness.ErrZodiacalGeometry) {
 			t.Errorf("%v AU: err = %v, want ErrZodiacalGeometry", au, err)
@@ -373,7 +373,7 @@ func TestZodiacalLightAccumulates(t *testing.T) {
 	geom := skybrightness.ZodiacalGeometry{
 		DifferentialLongitude: angle.Deg(90),
 		EclipticLatitude:      angle.Deg(30),
-		SunDistanceAU:         1,
+		SunDistance:           unit.AU(1),
 	}
 
 	once := skybrightness.NewSpectralRadiance(grid)
@@ -424,7 +424,7 @@ func BenchmarkZodiacalLight(b *testing.B) {
 	geom := skybrightness.ZodiacalGeometry{
 		DifferentialLongitude: angle.Deg(90),
 		EclipticLatitude:      angle.Deg(30),
-		SunDistanceAU:         1,
+		SunDistance:           unit.AU(1),
 	}
 
 	b.ReportAllocs()

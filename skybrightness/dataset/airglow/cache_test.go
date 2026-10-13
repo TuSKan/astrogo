@@ -73,7 +73,7 @@ func TestFetchServesACachedSkytableOffline(t *testing.T) {
 	}
 
 	for i, nm := range lam {
-		if got.LambdaNM[i] != nm {
+		if float64(got.LambdaNM[i]) != nm {
 			t.Errorf("sample %d is at %g nm, want %g", i, got.LambdaNM[i], nm)
 		}
 	}

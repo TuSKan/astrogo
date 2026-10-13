@@ -94,11 +94,11 @@ type Spec struct {
 
 	// MinNM and MaxNM bound the spectrum. Zero means the grid this is being
 	// fetched for, or SkyCalc's 300-2000 nm if there is no grid.
-	MinNM, MaxNM float64
+	MinNM, MaxNM unit.WavelengthNM
 
 	// StepNM is the wavelength sampling. Zero means 0.1 nm, SkyCalc's own
 	// default, which resolves the OH bands.
-	StepNM float64
+	StepNM unit.WavelengthNM
 
 	// Season selects the bimonthly period SkyCalc averages airglow over:
 	// 0 for the whole year, then 1 for December-January through 6 for
@@ -258,7 +258,7 @@ type skycalcResponse struct {
 // Spectrum is a zenith airglow spectrum, in spectral radiance.
 type Spectrum struct {
 	// LambdaNM ascends.
-	LambdaNM []float64
+	LambdaNM []unit.WavelengthNM
 
 	// Radiance is W m^-2 sr^-1 nm^-1 at each wavelength, converted from the
 	// photon-flux-per-square-arcsecond SkyCalc reports.
@@ -496,7 +496,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 	rows := min(len(lambda), min(len(lines), min(len(continuum), len(transmittance))))
 
 	out := &Spectrum{
-		LambdaNM: make([]float64, 0, rows),
+		LambdaNM: make([]unit.WavelengthNM, 0, rows),
 		Radiance: make([]float64, 0, rows),
 	}
 
@@ -544,7 +544,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 
 		perNMPerSr := flux / 1000 / constants.ArcsecondSquaredToSteradian
 
-		out.LambdaNM = append(out.LambdaNM, nm)
+		out.LambdaNM = append(out.LambdaNM, unit.WavelengthNM(nm))
 		out.Radiance = append(out.Radiance, float64(constants.ToEnergy(
 			unit.PhotonSpectralRadiance(perNMPerSr), unit.WavelengthNM(nm))))
 	}
@@ -564,16 +564,16 @@ func Parse(r io.Reader) (*Spectrum, error) {
 // airglow spectrum is a line forest, so holding the last value flat would
 // continue whichever band happened to be at the edge across everything beyond
 // it, which is worse than admitting there is no data.
-func (s *Spectrum) At(lambdaNM float64) float64 {
+func (s *Spectrum) At(lambda unit.WavelengthNM) float64 {
 	n := len(s.LambdaNM)
-	if n == 0 || lambdaNM < s.LambdaNM[0] || lambdaNM > s.LambdaNM[n-1] {
+	if n == 0 || lambda < s.LambdaNM[0] || lambda > s.LambdaNM[n-1] {
 		return 0
 	}
 
 	lo, hi := 0, n-1
 	for hi-lo > 1 {
 		mid := (lo + hi) / 2
-		if s.LambdaNM[mid] <= lambdaNM {
+		if s.LambdaNM[mid] <= lambda {
 			lo = mid
 		} else {
 			hi = mid
@@ -585,7 +585,7 @@ func (s *Spectrum) At(lambdaNM float64) float64 {
 		return s.Radiance[lo]
 	}
 
-	t := (lambdaNM - s.LambdaNM[lo]) / span
+	t := float64((lambda - s.LambdaNM[lo]) / span)
 
 	return s.Radiance[lo] + t*(s.Radiance[hi]-s.Radiance[lo])
 }
@@ -594,7 +594,7 @@ func (s *Spectrum) At(lambdaNM float64) float64 {
 func (s *Spectrum) Resample(grid unit.SpectralGrid) skybrightness.SpectralRadiance {
 	dst := skybrightness.NewSpectralRadiance(grid)
 	for i := range dst {
-		dst[i] = s.At(float64(grid.At(i)))
+		dst[i] = s.At(grid.At(i))
 	}
 
 	return dst
@@ -617,8 +617,8 @@ func NewAirglow(
 	if spec.MinNM == 0 && spec.MaxNM == 0 && grid.Len() > 0 {
 		// Ask for exactly the grid being evaluated, plus a nanometer either
 		// side so the endpoints interpolate rather than fall off.
-		spec.MinNM = float64(grid.At(0)) - 1
-		spec.MaxNM = float64(grid.At(grid.Len()-1)) + 1
+		spec.MinNM = grid.At(0) - 1
+		spec.MaxNM = grid.At(grid.Len()-1) + 1
 	}
 
 	spectrum, err := Fetch(ctx, spec)
@@ -702,10 +702,10 @@ func (s Spec) request() (skycalcRequest, error) {
 	req.InclThermal = "N"
 	req.InclAirglow = "Y"
 
-	req.WMin = minNM
-	req.WMax = maxNM
+	req.WMin = float64(minNM)
+	req.WMax = float64(maxNM)
 	req.WGridMode = "fixed_wavelength_step"
-	req.WDelta = step
+	req.WDelta = float64(step)
 	req.LSFType = "none"
 
 	return req, nil

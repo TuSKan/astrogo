@@ -111,10 +111,10 @@ type ZodiacalGeometry struct {
 	// the same reason.
 	EclipticLatitude angle.Angle
 
-	// SunDistanceAU is the observer's heliocentric distance. Earth's orbital
+	// SunDistance is the observer's heliocentric distance. Earth's orbital
 	// eccentricity moves it by about 3 per cent over a year, and the
 	// brightness with the -2.3 power of it.
-	SunDistanceAU float64
+	SunDistance unit.Length
 
 	// EarthLongitude is the Earth's own ecliptic longitude, which sets where
 	// in its excursion out of the dust plane the observer is.
@@ -364,9 +364,9 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
-	if geom.SunDistanceAU <= 0 || math.IsNaN(geom.SunDistanceAU) {
+	if geom.SunDistance <= 0 || math.IsNaN(float64(geom.SunDistance)) {
 		return 0, fmt.Errorf("%w: heliocentric distance %g AU",
-			ErrZodiacalGeometry, geom.SunDistanceAU)
+			ErrZodiacalGeometry, geom.SunDistance.AU())
 	}
 
 	reference, err := ZodiacalBrightnessAt(geom)
@@ -374,7 +374,7 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 		return 0, err
 	}
 
-	scale := math.Pow(geom.SunDistanceAU, zodiacalHeliocentricExponent) * zodiacalSeasonalFactor(geom)
+	scale := math.Pow(geom.SunDistance.AU(), zodiacalHeliocentricExponent) * zodiacalSeasonalFactor(geom)
 	elongation := ZodiacalElongation(geom)
 
 	var flags Flag
