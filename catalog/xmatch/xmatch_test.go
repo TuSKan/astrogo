@@ -1,6 +1,7 @@
 package xmatch
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -152,5 +153,69 @@ func TestMatch_UnmatchedSingletonsProduceNoPair(t *testing.T) {
 
 	if pairs[0].A.Name != "Alpha" {
 		t.Errorf("matched pair A = %q, want Alpha", pairs[0].A.Name)
+	}
+}
+
+// onDecLine places a Target arcsec east of RA 10°, Dec 20° along the parallel.
+func onDecLine(id string, arcsec float64) resolve.Target {
+	const dec = 20.0
+
+	return star(id, id, nil, 10+arcsec/3600/math.Cos(dec*math.Pi/180), dec, true)
+}
+
+func pairIDs(pairs []Pair) []string {
+	out := make([]string, len(pairs))
+	for i, p := range pairs {
+		out[i] = p.A.ID + "-" + p.B.ID
+	}
+
+	return out
+}
+
+// TestPositionalPassTakesTheClosestPairFirst (#728): a1, b1 and a2 lie 0″,
+// 1.5″ and 1.6″ along one parallel, under the 2″ threshold. b1 is 0.1″ from
+// a2 and 1.5″ from a1, so it pairs with a2 whatever order either slice is in.
+// Until #728 the pass walked the items in order and each took its nearest
+// partner not yet taken: [a1 a2] paired a1–b1, [a2 a1] paired a2–b1, and
+// Match(b, a) paired b1–a2.
+func TestPositionalPassTakesTheClosestPairFirst(t *testing.T) {
+	t.Parallel()
+
+	a1, a2, b1 := onDecLine("a1", 0), onDecLine("a2", 1.6), onDecLine("b1", 1.5)
+
+	for _, c := range []struct {
+		name string
+		a, b []resolve.Target
+		want string
+	}{
+		{"[a1 a2] against [b1]", []resolve.Target{a1, a2}, []resolve.Target{b1}, "a2-b1"},
+		{"[a2 a1] against [b1]", []resolve.Target{a2, a1}, []resolve.Target{b1}, "a2-b1"},
+		{"[b1] against [a1 a2]", []resolve.Target{b1}, []resolve.Target{a1, a2}, "b1-a2"},
+	} {
+		got := pairIDs(Match(c.a, c.b))
+		if len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: %v, want [%s]", c.name, got, c.want)
+		}
+	}
+}
+
+// TestPositionalPassKeepsADuplicatedRow (#728): a row that appears twice in
+// one slice is grouped with its copy by the alias pass, and that group still
+// has no partner in the other slice. Until #728 only groups of one took part
+// in the positional pass, so duplicating a row lost its match: one pair with
+// the row once, none with it twice. Now the group pairs, and like any alias
+// group it yields one Pair per cross-slice combination.
+func TestPositionalPassKeepsADuplicatedRow(t *testing.T) {
+	t.Parallel()
+
+	m := star("HD 1", "HD 1", nil, 10, 20, true)
+	g := star("Gaia 1", "Gaia 1", nil, 10, 20, true)
+
+	if got := Match([]resolve.Target{m}, []resolve.Target{g}); len(got) != 1 {
+		t.Errorf("row once: %d pairs, want 1", len(got))
+	}
+
+	if got := Match([]resolve.Target{m, m}, []resolve.Target{g}); len(got) != 2 {
+		t.Errorf("row twice: %d pairs, want 2, one per copy", len(got))
 	}
 }
