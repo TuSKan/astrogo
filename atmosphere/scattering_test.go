@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/unit"
 )
 
-// Winkler (2022) Eq. 13 at 550 nm and sea level must reproduce the
-// standard sea-level Rayleigh optical depth of ~0.0973-0.098, which is an
-// independently known value rather than one taken from the same paper.
-// This is the Level-1 equation check for the molecular optical depth.
+// At 550 nm and sea level the Rayleigh optical depth is the familiar
+// ~0.097: Hansen & Travis (1974) print 0.0973 at 0.55 µm, an independent
+// formulation from Bodhaine et al.'s (1999) that the function implements.
 func TestRayleighOpticalDepthSeaLevel550(t *testing.T) {
 	t.Parallel()
 
@@ -50,29 +50,84 @@ func TestRayleighOpticalDepthScalesWithPressure(t *testing.T) {
 	}
 }
 
-// Blue light scatters far more than red: the lambda^-4.05 dependence makes
-// 400 nm roughly 5.5x deeper than 700 nm. A sign error or a lost exponent
-// shows up immediately here.
-func TestRayleighOpticalDepthSpectralSlope(t *testing.T) {
+// bodhaineTable3 is rows of Bodhaine et al. (1999) Table 3: the Rayleigh
+// optical depth computed exactly, not fitted, for dry air with 360 ppm CO2,
+// at sea level and 45° (1013.25 mb) and at Mauna Loa (680 mb, 19.533°N,
+// 3400 m), copied from the published table.
+var bodhaineTable3 = []struct {
+	nm, seaLevel, mlo float64
+}{
+	{250, 2.7137, 1.8264},
+	{300, 1.2164, 0.81868},
+	{330, 0.80873, 0.54429},
+	{350, 0.63031, 0.42421},
+	{400, 0.36022, 0.24243},
+	{450, 0.22111, 0.14881},
+	{550, 0.097069, 0.065329},
+	{700, 0.036424, 0.024514},
+	{850, 0.016621, 0.011186},
+	{1000, 0.0086366, 0.0058125},
+}
+
+// TestRayleighOpticalDepthIsBodhainesTable3 is #592. RayleighOpticalDepth was
+// Winkler's (2022) single power law, λ^-4.05, which read 4.2% low at 330 nm
+// because the exponent steepens toward the blue. It is Bodhaine et al.'s
+// (1999) Eq. 30 now, held here to the exact values their Table 3 tabulates,
+// which the fit reproduces to 0.05% from 250 to 1000 nm.
+func TestRayleighOpticalDepthIsBodhainesTable3(t *testing.T) {
 	t.Parallel()
 
-	blue, err := atmosphere.RayleighOpticalDepth(400, atmosphere.StandardPressureHPa)
+	for _, row := range bodhaineTable3 {
+		got, err := atmosphere.RayleighOpticalDepth(unit.WavelengthNM(row.nm), 1013.25)
+		if err != nil {
+			t.Fatalf("RayleighOpticalDepth(%g nm): %v", row.nm, err)
+		}
+
+		if rel := float64(got)/row.seaLevel - 1; math.Abs(rel) > 5e-4 {
+			t.Errorf("tau_R(%g nm, 1013.25 hPa) = %.6g, Bodhaine Table 3 has %.5g (%+.4f%%)",
+				row.nm, float64(got), row.seaLevel, 100*rel)
+		}
+	}
+}
+
+// TestRayleighOpticalDepthPressureScalingAtMaunaLoa: scaling the 45°,
+// sea-level column by pressure leaves gravity at its 45°, sea-level value.
+// Bodhaine's Mauna Loa column, at 19.5°N and 3.4 km where gravity is lower,
+// is 0.29% larger than that scaling, which bounds what it leaves out.
+func TestRayleighOpticalDepthPressureScalingAtMaunaLoa(t *testing.T) {
+	t.Parallel()
+
+	for _, row := range bodhaineTable3 {
+		got, err := atmosphere.RayleighOpticalDepth(unit.WavelengthNM(row.nm), 680)
+		if err != nil {
+			t.Fatalf("RayleighOpticalDepth(%g nm): %v", row.nm, err)
+		}
+
+		if rel := float64(got)/row.mlo - 1; rel > 0 || rel < -0.004 {
+			t.Errorf("tau_R(%g nm, 680 hPa) = %.6g, Bodhaine's Mauna Loa column is %.5g (%+.3f%%), "+
+				"want at most 0.4%% below it", row.nm, float64(got), row.mlo, 100*rel)
+		}
+	}
+}
+
+// TestRayleighOpticalDepthBeyondTheFit: past 1000 nm, where Eq. 30 was not
+// fitted and its rational form drifts from λ^-4, it continues as λ^-4 from
+// its 1000 nm value.
+func TestRayleighOpticalDepthBeyondTheFit(t *testing.T) {
+	t.Parallel()
+
+	at1um, err := atmosphere.RayleighOpticalDepth(1000, 1013.25)
 	if err != nil {
-		t.Fatalf("RayleighOpticalDepth: %v", err)
+		t.Fatal(err)
 	}
 
-	red, err := atmosphere.RayleighOpticalDepth(700, atmosphere.StandardPressureHPa)
+	at2um, err := atmosphere.RayleighOpticalDepth(2000, 1013.25)
 	if err != nil {
-		t.Fatalf("RayleighOpticalDepth: %v", err)
+		t.Fatal(err)
 	}
 
-	if blue <= red {
-		t.Fatalf("blue tau %v must exceed red tau %v", blue, red)
-	}
-
-	want := math.Pow(400.0/700.0, -4.05)
-	if got := float64(blue / red); math.Abs(got-want)/want > 1e-12 {
-		t.Errorf("tau(400)/tau(700) = %v, want %v", got, want)
+	if got := float64(at1um / at2um); math.Abs(got-16) > 1e-9 {
+		t.Errorf("tau(1000 nm)/tau(2000 nm) = %v, want 16", got)
 	}
 }
 
@@ -81,6 +136,12 @@ func TestRayleighOpticalDepthRejectsBadInput(t *testing.T) {
 
 	if _, err := atmosphere.RayleighOpticalDepth(0, 1013.25); !errors.Is(err, atmosphere.ErrWavelength) {
 		t.Errorf("zero wavelength = %v, want ErrWavelength", err)
+	}
+
+	// Below the fit's 250 nm, where its denominator heads for a zero near
+	// 117 nm.
+	if _, err := atmosphere.RayleighOpticalDepth(249, 1013.25); !errors.Is(err, atmosphere.ErrWavelength) {
+		t.Errorf("249 nm = %v, want ErrWavelength", err)
 	}
 
 	if _, err := atmosphere.RayleighOpticalDepth(550, 0); !errors.Is(err, atmosphere.ErrPressure) {

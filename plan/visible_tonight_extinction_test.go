@@ -119,7 +119,7 @@ func TestVisibleTonightDimsThroughTheSitesAir(t *testing.T) {
 // 552.5 nm, within the 0.01 they state for their curve, and VisibleTonight
 // dims Sirius through that air at each site.
 //
-// The figures WithAtmosphere quotes, 0.162 at sea level and 0.132 at Paranal,
+// The figures WithAtmosphere quotes, 0.161 at sea level and 0.131 at Paranal,
 // are held here to the three decimals it prints them to.
 func TestVisibleTonightDefaultAirFollowsTheSite(t *testing.T) {
 	t.Parallel()
@@ -144,12 +144,12 @@ func TestVisibleTonightDefaultAirFollowsTheSite(t *testing.T) {
 	kSea := extinctionV(t, defaultNight(t, seaLevel.Height()))
 	kParanal := extinctionV(t, defaultNight(t, paranal.Height()))
 
-	if math.Abs(kSea-0.162) > 0.0005 {
-		t.Errorf("at sea level the default dims V by %.4f mag per airmass; WithAtmosphere says 0.162", kSea)
+	if math.Abs(kSea-0.161) > 0.0005 {
+		t.Errorf("at sea level the default dims V by %.4f mag per airmass; WithAtmosphere says 0.161", kSea)
 	}
 
-	if math.Abs(kParanal-0.132) > 0.0005 {
-		t.Errorf("at Paranal the default dims V by %.4f mag per airmass; WithAtmosphere says 0.132", kParanal)
+	if math.Abs(kParanal-0.131) > 0.0005 {
+		t.Errorf("at Paranal the default dims V by %.4f mag per airmass; WithAtmosphere says 0.131", kParanal)
 	}
 
 	const patat550 = (0.131 + 0.129) / 2 // Table B.1 at 547.5 and 552.5 nm

@@ -43,7 +43,7 @@ func Example() {
 	// Patat et al. (2011) measured 0.129 to 0.131 there, around 550 nm.
 
 	// Output:
-	// k(V)     0.132 mag/airmass
+	// k(V)     0.131 mag/airmass
 	// airmass  2.900
 	// catalogue -1.46, observed -1.08
 }

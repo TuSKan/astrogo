@@ -244,17 +244,21 @@ func TestCleanMountainAODIsParanalsMedian(t *testing.T) {
 // The bound is 0.01 mag per airmass, the accuracy Patat et al. set out to
 // deliver the curve to. Two sets of rows are left out, and logged rather than
 // asserted. The four LBLRTM rows, because they are a model and not a
-// measurement. And the three rows blueward of 3475 Å: there Patat et al.'s own
-// model departs from their data too, by a systematic trend they could not
-// explain, and RayleighOpticalDepth is 3 to 4% low (#592).
+// measurement. And everything blueward of 4000 Å, because the aerosol term
+// here is Patat et al.'s, fitted as the data minus LBLRTM's Rayleigh and ozone
+// above 4000 Å, below which they report a down-turn the power law does not
+// follow. Asserting there tests their fit's extrapolation, not this model.
+// Until #592 the edge was 3475 Å, and RayleighOpticalDepth's 4% shortfall
+// there happened to cancel that down-turn; with Bodhaine et al.'s Rayleigh the
+// 3475 Å row overshoots the data by 0.024, as Patat et al.'s own model does.
 //
-// Measured: within 0.0097 mag per airmass, worst at 3925 Å.
+// Measured: within 0.0093 mag per airmass, worst at 7060 Å.
 func TestExtinctionReproducesParanal(t *testing.T) {
 	t.Parallel()
 
 	const (
 		bound    = 0.01 // mag per airmass: Patat et al.'s stated accuracy
-		blueEdge = 3475 // Å
+		blueEdge = 4000 // Å: where Patat et al. fitted their aerosol term
 	)
 
 	air := paperAir(t, 743.6, 258, 0.013, 1.38)
