@@ -6,6 +6,7 @@ import (
 	stdtime "time"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // utcAt is a UTC instant, built without going through the leap-second warnings
@@ -154,7 +155,7 @@ func withLeapSecondAt(t *testing.T, year, month int, deltaAT float64) {
 			}
 
 			if len(record) == 0 || math.Abs(got-previous) > 1e-9 {
-				record = append(record, LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: got})
+				record = append(record, LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: unit.Seconds(got)})
 			}
 
 			previous = got
@@ -166,7 +167,7 @@ func withLeapSecondAt(t *testing.T, year, month int, deltaAT float64) {
 	}
 
 	err := RegisterLeapSeconds(append(record,
-		LeapSecond{Year: year, Month: month, Day: 1, DeltaAT: deltaAT},
+		LeapSecond{Year: year, Month: month, Day: 1, DeltaAT: unit.Seconds(deltaAT)},
 	), "test: hypothetical leap second")
 	if err != nil {
 		t.Fatalf("RegisterLeapSeconds: %v", err)

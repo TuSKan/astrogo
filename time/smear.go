@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // smearWindowDays is how far either side of a leap second a host clock may be
@@ -89,7 +90,7 @@ func leapStepAt(y, m int) (LeapSecond, bool) {
 		return LeapSecond{}, false
 	}
 
-	return LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: after}, true
+	return LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: unit.Seconds(after)}, true
 }
 
 // monthStartJD is the Julian Date of midnight beginning (y, m, 1) UTC.

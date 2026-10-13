@@ -69,7 +69,7 @@ func TestDeltaTIsWhatTheConversionsUse(t *testing.T) {
 
 	for _, mjd := range []float64{60000, 60200.3, 60400, 61000, 70000, 41000, 37500} {
 		u := atMJD(mjd)
-		if got, want := time.DeltaT(u), labelsApart(u); math.Abs(got-want) > 1e-6 {
+		if got, want := time.DeltaT(u).Seconds(), labelsApart(u); math.Abs(got-want) > 1e-6 {
 			t.Errorf("MJD %.1f: DeltaT %.6f s, the conversions put %.6f s between TT and UT1", mjd, got, want)
 		}
 	}
@@ -78,7 +78,7 @@ func TestDeltaTIsWhatTheConversionsUse(t *testing.T) {
 	t1, t2 := early.TT().JDParts()
 	u1, u2 := early.JDParts()
 
-	if got, want := time.DeltaT(early), ((t1-u1)+(t2-u2))*86400; math.Abs(got-want) > 1e-6 {
+	if got, want := time.DeltaT(early).Seconds(), ((t1-u1)+(t2-u2))*86400; math.Abs(got-want) > 1e-6 {
 		t.Errorf("1900: DeltaT %.6f s, Time.TT reads the label through %.6f s", got, want)
 	}
 }
@@ -91,10 +91,10 @@ func TestDeltaTIsWhatTheConversionsUse(t *testing.T) {
 func TestDeltaTIsHeldPastTheBulletin(t *testing.T) {
 	withBulletin(t, bulletin2023)
 
-	end := time.DeltaT(atMJD(bulletin2023.last))
+	end := time.DeltaT(atMJD(bulletin2023.last)).Seconds()
 
 	for _, mjd := range []float64{60400.5, 61000, 70000, 88000} {
-		if got := time.DeltaT(atMJD(mjd)); math.Abs(got-end) > 1e-6 {
+		if got := time.DeltaT(atMJD(mjd)).Seconds(); math.Abs(got-end) > 1e-6 {
 			t.Errorf("MJD %.0f: DeltaT %.6f s, want it held at the bulletin's last %.6f s", mjd, got, end)
 		}
 	}
@@ -137,7 +137,7 @@ func TestDeltaTStaysHeldAcrossALeapSecond(t *testing.T) {
 
 	before, after := utc(2029, time.June, 1), utc(2030, time.June, 1)
 
-	if d := time.DeltaT(after) - time.DeltaT(before); math.Abs(d) > 1e-6 {
+	if d := (time.DeltaT(after) - time.DeltaT(before)).Seconds(); math.Abs(d) > 1e-6 {
 		t.Errorf("ΔT moved by %.6f s across a registered leap second; it is held", d)
 	}
 
@@ -165,7 +165,7 @@ func TestDeltaTUncertaintyGrowsFromTheBulletinsEnd(t *testing.T) {
 	prev := 0.0
 
 	for _, years := range []float64{1, 10, 70} {
-		got := time.DeltaTUncertainty(atMJD(bulletin2023.last + years*365.25))
+		got := time.DeltaTUncertainty(atMJD(bulletin2023.last + years*365.25)).Seconds()
 		testutil.AssertNear(t, fmt.Sprintf("σ %g years past the bulletin", years), got, huber(years), 1e-9)
 
 		if got <= prev {
@@ -191,5 +191,5 @@ func TestDeltaTUncertaintyWithNoBulletinStartsAt2005(t *testing.T) {
 	n := at.DecimalYear() - 2005
 	want := 365.25 * n * math.Sqrt(n*0.058/3*(1+n/2500)) / 1000
 
-	testutil.AssertNear(t, "σ in 2027 with no bulletin", time.DeltaTUncertainty(at), want, 1e-9)
+	testutil.AssertNear(t, "σ in 2027 with no bulletin", time.DeltaTUncertainty(at).Seconds(), want, 1e-9)
 }

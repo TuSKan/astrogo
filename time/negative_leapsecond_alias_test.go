@@ -11,6 +11,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/logging"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // builtinRecord reads gofa's own ΔAT table back out as registry entries.
@@ -41,7 +42,7 @@ func builtinRecord(t *testing.T) []LeapSecond {
 			}
 
 			if len(out) == 0 || math.Abs(got-previous) > 1e-9 {
-				out = append(out, LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: got})
+				out = append(out, LeapSecond{Year: y, Month: m, Day: 1, DeltaAT: unit.Seconds(got)})
 			}
 
 			previous = got

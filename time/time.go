@@ -922,7 +922,7 @@ var daysBeforeMonth = [12]int{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 
 // plus, for anything that then asked for UTC, the whole TDB->TT->TAI->UTC
 // chain applied to a value that was already TT.
 func (t Time) ApplyDeltaT() Time {
-	dt := DeltaT(t)
+	dt := DeltaT(t).Seconds()
 
 	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
 }

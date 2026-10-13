@@ -1,9 +1,13 @@
 package time
 
-import "math"
+import (
+	"math"
 
-// DeltaT returns ΔT = TT − UT1 at t, in seconds: the one value of it every
-// conversion in this package uses.
+	"github.com/TuSKan/astrogo/unit"
+)
+
+// DeltaT returns ΔT = TT − UT1 at t: the one value of it every conversion in
+// this package uses.
 //
 // It has three regimes, by where t falls:
 //
@@ -28,16 +32,16 @@ import "math"
 //
 // From 1960 the value comes from the EOP lookup, so it can trigger the same
 // lazy load [Time.EOP] does.
-func DeltaT(t Time) float64 {
+func DeltaT(t Time) unit.Duration {
 	u := t.UTC()
 	if u.jd1+u.jd2 < jd1960 {
-		return deltaTModel(u.DecimalYear())
+		return unit.Seconds(deltaTModel(u.DecimalYear()))
 	}
 
 	tt1, tt2 := u.TT().JDParts()
 	ut1 := u.UT1Using(dut1OrFallback(u.jd1, u.jd2))
 
-	return ((tt1 - ut1.jd1) + (tt2 - ut1.jd2)) * daySeconds
+	return unit.Seconds(((tt1 - ut1.jd1) + (tt2 - ut1.jd2)) * daySeconds)
 }
 
 // deltaTModel is ΔT = TT − UT1 in seconds for a decimal year, by the Espenak &
@@ -185,10 +189,10 @@ func deltaTModel(year float64) float64 {
 //   - Morrison, L. and Stephenson, F. R. (2004).
 //   - Huber, P. J. (2000). "Modeling the Length of Day and Extrapolating
 //     the Rotation of the Earth".
-func DeltaTUncertainty(t Time) float64 {
+func DeltaTUncertainty(t Time) unit.Duration {
 	year := t.UTC().DecimalYear()
 	if year < 1955 {
-		return deltaTUncertaintyHistorical(year)
+		return unit.Seconds(deltaTUncertaintyHistorical(year))
 	}
 
 	// The lookup is what loads a bulletin, if one is to be loaded; Coverage
@@ -197,10 +201,10 @@ func DeltaTUncertainty(t Time) float64 {
 	_, _, _ = lookupEOP(mjd)
 
 	if _, last, ok := Coverage(); ok {
-		return huberSigma((mjd - last) / 365.25)
+		return unit.Seconds(huberSigma((mjd - last) / 365.25))
 	}
 
-	return huberSigma(year - 2005)
+	return unit.Seconds(huberSigma(year - 2005))
 }
 
 // huberSigma is the Huber (2000) random walk's σ of ΔT, in seconds, n years

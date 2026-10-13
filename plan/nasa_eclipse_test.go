@@ -776,7 +776,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 			// for eclipses around 1902, when ΔT crossed zero — and a field
 			// that does not parse was already reported by the parser.
 			for _, ref := range refs {
-				computed := time.DeltaT(eclipseDate(ref))
+				computed := time.DeltaT(eclipseDate(ref)).Seconds()
 				delta := math.Abs(computed - ref.DeltaT)
 
 				count++
