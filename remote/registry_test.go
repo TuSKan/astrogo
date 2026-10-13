@@ -230,7 +230,7 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 		GaiaStarMap:           true,
 		MPIMainzCrossSections: true,
 		SFDDustMap:            true,
-		CVRLLuminosity:        true,
+		CIELuminosity:         true,
 	}
 
 	for _, ep := range Endpoints() {

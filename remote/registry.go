@@ -387,8 +387,8 @@ func constName(id EndpointID) string {
 		return "SFDDustMap"
 	case SVOFilterProfile:
 		return "SVOFilterProfile"
-	case CVRLLuminosity:
-		return "CVRLLuminosity"
+	case CIELuminosity:
+		return "CIELuminosity"
 	case GaiaStarMap:
 		return "GaiaStarMap"
 	case MPIMainzCrossSections:
