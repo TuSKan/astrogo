@@ -14,7 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -30,7 +29,7 @@ import (
 // It asserts almost nothing. Its output is the error budget, and a budget whose
 // entries are asserted is a budget nobody will update when the physics changes.
 func TestGAMBONSGapDecomposition(t *testing.T) {
-	testutil.RequireReachable(t, "irsa.ipac.caltech.edu:443")
+	testutil.RequireReachable(t, sfdHost)
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
@@ -148,11 +147,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 		count, toMag(hi), toMag(lo), toMag(sum/float64(count)))
 
 	// ── the dust the DGL rests on ───────────────────────────────────────────
-	dustMap, err := dust.Fetch(ctx, nil, dust.Direction{L: gal.L(), B: gal.B()})
-	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("dust.Fetch: %v", err)
-	}
+	dustMap := gambonsDust(t)
 
 	i100, err := dustMap.IntensityAt(gal.L(), gal.B())
 	if err != nil {

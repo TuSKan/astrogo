@@ -15,7 +15,6 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -102,7 +101,7 @@ func johnsonVFromTable1() magnitude.Passband {
 // whole circle of declination 40, so the Milky Way and the ecliptic pass
 // through it and out again, and a single night says nothing about the mean.
 func TestAgainstGAMBONSTable2(t *testing.T) {
-	testutil.RequireReachable(t, "irsa.ipac.caltech.edu:443")
+	testutil.RequireReachable(t, sfdHost)
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
@@ -142,37 +141,10 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 	t.Logf("sampling %d epochs across the year, %d directions in a %.0f degree zenith cap",
 		len(epochs), table2CapSamples, table2CapDeg)
 
-	// Every sightline this test will look along, so dust is fetched once.
+	// Every sightline this test will look along.
 	capDirs := zenithCap(table2CapDeg, table2CapSamples)
 
-	dirs := make([]dust.Direction, 0, len(capDirs)*len(epochs))
-
-	for _, when := range epochs {
-		cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
-
-		for _, d := range capDirs {
-			icrs, err := cc.AltAzToICRS(d)
-			if err != nil {
-				t.Fatalf("AltAzToICRS: %v", err)
-			}
-
-			gal := coord.ICRSToGalactic(icrs)
-			dirs = append(dirs, dust.Direction{L: gal.L(), B: gal.B()})
-		}
-	}
-
-	dustMap := dust.NewMap()
-
-	for start := 0; start < len(dirs); start += dustChunk {
-		end := min(start+dustChunk, len(dirs))
-
-		if _, err := dust.Fetch(ctx, dustMap, dirs[start:end]...); err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
-			t.Fatalf("dust.Fetch stopped after %d of %d sightlines: %v", dustMap.Len(), len(dirs), err)
-		}
-	}
-
-	t.Logf("dust: %d distinct cells for %d sightlines", dustMap.Len(), len(dirs))
+	dustMap := gambonsDust(t)
 
 	skyMap, err := starlight.Open(ctx)
 	if err != nil {
