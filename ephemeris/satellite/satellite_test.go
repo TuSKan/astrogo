@@ -158,7 +158,7 @@ func TestOrbitalPeriod(t *testing.T) {
 		t.Fatalf("NewFromTLE failed: %v", err)
 	}
 
-	period := sat.OrbitalPeriod()
+	period := sat.OrbitalPeriod().Minutes()
 	t.Logf("Orbital period: %.2f minutes", period)
 
 	// ISS orbits ~15.5 times/day → ~93 minutes.

@@ -69,7 +69,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 	}
 
 	inst.ReadNoiseElectrons = 3.0
-	inst.DarkCurrentEPerSec = 0.01
+	inst.DarkCurrent = 0.01
 
 	depth, err := sbplan.NewImaging(sbplan.Spec{
 		Sky:            sky,

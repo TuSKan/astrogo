@@ -39,8 +39,8 @@ lambda(nm)   sigma(cm2)
 		t.Errorf("Species = %q, want O3", cs.Species)
 	}
 
-	if cs.WavelengthNM[0] != 400 || cs.SigmaCM2[3] != 4.8e-21 {
-		t.Errorf("first wavelength %v, last sigma %v", cs.WavelengthNM[0], cs.SigmaCM2[3])
+	if cs.WavelengthNM[0] != 400 || cs.Sigma[3] != unit.SquareCentimeters(4.8e-21) {
+		t.Errorf("first wavelength %v, last sigma %v", cs.WavelengthNM[0], cs.Sigma[3])
 	}
 }
 
@@ -67,8 +67,8 @@ func TestParseWavenumbersAreReordered(t *testing.T) {
 
 	// And the cross sections must travel with their wavelengths, not stay
 	// in file order.
-	if cs.SigmaCM2[0] != 1e-23 || cs.SigmaCM2[2] != 3e-23 {
-		t.Errorf("sigmas did not follow the sort: %v", cs.SigmaCM2)
+	if cs.Sigma[0] != unit.SquareCentimeters(1e-23) || cs.Sigma[2] != unit.SquareCentimeters(3e-23) {
+		t.Errorf("sigmas did not follow the sort: %v", cs.Sigma)
 	}
 }
 
@@ -100,8 +100,8 @@ func TestParseClampsNegativeSigma(t *testing.T) {
 		t.Fatalf("Parse: %v", err)
 	}
 
-	if cs.SigmaCM2[0] != 0 {
-		t.Errorf("negative sigma became %v, want 0", cs.SigmaCM2[0])
+	if cs.Sigma[0] != 0 {
+		t.Errorf("negative sigma became %v, want 0", cs.Sigma[0])
 	}
 }
 

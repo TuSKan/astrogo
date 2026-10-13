@@ -140,10 +140,10 @@ func TestPhotonRateAgainstClosedForm(t *testing.T) {
 	}
 
 	inst := optics.Instrument{
-		Name:              "test",
-		CollectingAreaM2:  1,
-		PixelSolidAngleSR: 1,
-		Throughput:        []optics.Throughput{flat("band", 400, 800, 1)},
+		Name:            "test",
+		CollectingArea:  unit.SquareMeters(1),
+		PixelSolidAngle: unit.Steradians(1),
+		Throughput:      []optics.Throughput{flat("band", 400, 800, 1)},
 	}
 
 	got, err := inst.PhotonRate(spectrum, g)
@@ -182,15 +182,15 @@ func TestBackgroundRateScalesWithAreaAndPixel(t *testing.T) {
 	}
 
 	base := optics.Instrument{
-		Name:              "base",
-		CollectingAreaM2:  1,
-		PixelSolidAngleSR: 1e-10,
-		Throughput:        []optics.Throughput{flat("band", 500, 600, 1)},
+		Name:            "base",
+		CollectingArea:  unit.SquareMeters(1),
+		PixelSolidAngle: unit.Steradians(1e-10),
+		Throughput:      []optics.Throughput{flat("band", 500, 600, 1)},
 	}
 
 	scaled := base
-	scaled.CollectingAreaM2 = 4
-	scaled.PixelSolidAngleSR = 3e-10
+	scaled.CollectingArea = unit.SquareMeters(4)
+	scaled.PixelSolidAngle = unit.Steradians(3e-10)
 
 	a, err := base.BackgroundRate(spectrum, g)
 	if err != nil {
@@ -224,14 +224,14 @@ func TestNewInstrumentGeometry(t *testing.T) {
 
 	// Unobstructed area of a 0.2 m diameter aperture.
 	wantArea := math.Pi * 0.1 * 0.1
-	if rel := math.Abs(inst.CollectingAreaM2-wantArea) / wantArea; rel > 1e-12 {
-		t.Errorf("CollectingAreaM2 = %v, want %v", inst.CollectingAreaM2, wantArea)
+	if rel := math.Abs(inst.CollectingArea.SquareMeters()-wantArea) / wantArea; rel > 1e-12 {
+		t.Errorf("CollectingArea = %v, want %v", inst.CollectingArea.SquareMeters(), wantArea)
 	}
 
 	// One square arcsecond in steradians.
-	if rel := math.Abs(inst.PixelSolidAngleSR-constants.ArcsecondSquaredToSteradian) /
+	if rel := math.Abs(inst.PixelSolidAngle.Steradians()-constants.ArcsecondSquaredToSteradian) /
 		constants.ArcsecondSquaredToSteradian; rel > 1e-12 {
-		t.Errorf("PixelSolidAngleSR = %v, want %v", inst.PixelSolidAngleSR, constants.ArcsecondSquaredToSteradian)
+		t.Errorf("PixelSolidAngle = %v, want %v", inst.PixelSolidAngle.Steradians(), constants.ArcsecondSquaredToSteradian)
 	}
 
 	// A central obstruction removes area.
@@ -240,9 +240,9 @@ func TestNewInstrumentGeometry(t *testing.T) {
 		t.Fatalf("NewInstrument (obstructed): %v", err)
 	}
 
-	if rel := math.Abs(obstructed.CollectingAreaM2/inst.CollectingAreaM2 - 0.75); rel > 1e-12 {
+	if rel := math.Abs(obstructed.CollectingArea.SquareMeters()/inst.CollectingArea.SquareMeters() - 0.75); rel > 1e-12 {
 		t.Errorf("25%% obstruction left %v of the area, want 0.75",
-			obstructed.CollectingAreaM2/inst.CollectingAreaM2)
+			obstructed.CollectingArea.SquareMeters()/inst.CollectingArea.SquareMeters())
 	}
 }
 
@@ -271,10 +271,10 @@ func TestBackgroundRateZeroSky(t *testing.T) {
 	g := mustGrid(t, 400, 1, 401)
 
 	inst := optics.Instrument{
-		Name:              "test",
-		CollectingAreaM2:  1,
-		PixelSolidAngleSR: 1e-10,
-		Throughput:        []optics.Throughput{flat("band", 500, 600, 1)},
+		Name:            "test",
+		CollectingArea:  unit.SquareMeters(1),
+		PixelSolidAngle: unit.Steradians(1e-10),
+		Throughput:      []optics.Throughput{flat("band", 500, 600, 1)},
 	}
 
 	got, err := inst.BackgroundRate(make([]float64, g.Len()), g)

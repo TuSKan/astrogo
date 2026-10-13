@@ -113,15 +113,15 @@ func plausibleOzone(xs atmosphere.CrossSection) error {
 		maxPeak      = 1e-19
 	)
 
-	var peak float64
+	var peak unit.Area
 
 	for i, nm := range xs.WavelengthNM {
 		if nm < unit.WavelengthNM(chappuisLoNM) || nm > unit.WavelengthNM(chappuisHiNM) {
 			continue
 		}
 
-		if xs.SigmaCM2[i] > peak {
-			peak = xs.SigmaCM2[i]
+		if xs.Sigma[i] > peak {
+			peak = xs.Sigma[i]
 		}
 	}
 
@@ -130,9 +130,10 @@ func plausibleOzone(xs atmosphere.CrossSection) error {
 			ErrImplausible, float64(chappuisLoNM), float64(chappuisHiNM))
 	}
 
-	if peak < minPeak || peak > maxPeak {
+	// minPeak and maxPeak are cm², the unit every published table uses.
+	if cm2 := peak.SquareCentimeters(); cm2 < minPeak || cm2 > maxPeak {
 		return fmt.Errorf("%w: the Chappuis band peaks at %g cm^2 per molecule, want between %g and %g",
-			ErrImplausible, peak, minPeak, maxPeak)
+			ErrImplausible, cm2, minPeak, maxPeak)
 	}
 
 	return nil

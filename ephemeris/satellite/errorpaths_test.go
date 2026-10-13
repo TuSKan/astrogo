@@ -196,7 +196,7 @@ func TestOrbitalPeriodAndCloseOnAZeroValue(t *testing.T) {
 	}
 
 	// 15.72 revolutions a day is a period near 92 minutes.
-	if got := sat.OrbitalPeriod(); math.Abs(got-91.6) > 0.5 {
+	if got := sat.OrbitalPeriod().Minutes(); math.Abs(got-91.6) > 0.5 {
 		t.Errorf("OrbitalPeriod = %v minutes, want about 91.6", got)
 	}
 

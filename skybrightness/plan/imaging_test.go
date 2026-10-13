@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/optics"
 	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The sky calibrates itself: a source producing exactly the sky's per-pixel
@@ -103,9 +104,9 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 	}
 
 	inst := optics.Instrument{
-		Name:              "test",
-		CollectingAreaM2:  0.03,
-		PixelSolidAngleSR: 1e-11,
+		Name:            "test",
+		CollectingArea:  unit.SquareMeters(0.03),
+		PixelSolidAngle: unit.Steradians(1e-11),
 	}
 
 	base := sbplan.Spec{
@@ -134,7 +135,7 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 		{"zero threshold", "threshold", func(s *sbplan.Spec) { s.SNR = 0 }},
 		{"infinite threshold", "threshold", func(s *sbplan.Spec) { s.SNR = math.Inf(1) }},
 		{"unusable instrument", "collecting area", func(s *sbplan.Spec) {
-			s.Instrument = optics.Instrument{PixelSolidAngleSR: 1e-11}
+			s.Instrument = optics.Instrument{PixelSolidAngle: unit.Steradians(1e-11)}
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {

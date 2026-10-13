@@ -82,7 +82,7 @@ func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {
 	site := transitionSite(t)
 	from := &Block{ID: "from", Target: NewStar("a", angle.Hour(5.5), angle.Deg(-5))}
 	to := &Block{ID: "to", Target: NewStar("b", angle.Hour(8.1), angle.Deg(-40))}
-	model := &BasicTransitionModel{SlewRate: 2}
+	model := &BasicTransitionModel{SlewRate: unit.DegreesPerSec(2)}
 	start := time.Date(2026, time.March, 20, 1, 0, 0, 0, time.LocationUTC)
 
 	ctxAt := movingContext(site.Location(), site.Refraction())
@@ -164,7 +164,7 @@ func BenchmarkGreedyStrategy_10Slew(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
 	site, _ := NewSite("Bench", loc)
 	planner, _ := NewPlanner(site, nil)
-	tm := &BasicTransitionModel{BaseSetup: 0, SlewRate: 2}
+	tm := &BasicTransitionModel{BaseSetup: 0, SlewRate: unit.DegreesPerSec(2)}
 	blocks := makeBlocks(10)
 	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	window := Window{Start: start, End: start.Add(unit.Minutes(150))}

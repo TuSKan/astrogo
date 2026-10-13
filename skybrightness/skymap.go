@@ -42,9 +42,9 @@ type SkyPoint struct {
 	// Estimate is the sky state there.
 	Estimate *Estimate
 
-	// SolidAngleSR is the solid angle this sample represents, used when
+	// SolidAngle is the solid angle this sample represents, used when
 	// integrating the map over the hemisphere.
-	SolidAngleSR float64
+	SolidAngle unit.SolidAngle
 }
 
 // SkyMap evaluates the sky over the visible hemisphere on a ring grid:
@@ -125,7 +125,7 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 			out = append(out, SkyPoint{
 				Direction: coord.NewAltAz(
 					angle.Deg(altDeg), angle.Deg(360*float64(a)/float64(count))),
-				SolidAngleSR: ringSR / float64(count),
+				SolidAngle: unit.Steradians(ringSR / float64(count)),
 			})
 		}
 	}
@@ -194,7 +194,7 @@ func IntegratedHemisphere(points []SkyPoint, grid unit.SpectralGrid) (SpectralRa
 				unit.ErrGridMismatch, p.Estimate.grid, grid)
 		}
 
-		w := p.SolidAngleSR * p.Direction.Alt().Sin()
+		w := p.SolidAngle.Steradians() * p.Direction.Alt().Sin()
 		for i, v := range p.Estimate.total {
 			out[i] += v * w
 		}

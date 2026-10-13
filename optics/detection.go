@@ -135,15 +135,15 @@ func (i Instrument) noiseVariance(
 		return 0, fmt.Errorf("%w: background %g e/pixel/s", ErrExposure, float64(background))
 	}
 
-	if i.ReadNoiseElectrons < 0 || i.DarkCurrentEPerSec < 0 {
+	if i.ReadNoiseElectrons < 0 || i.DarkCurrent < 0 {
 		return 0, fmt.Errorf("%w: read noise %g e, dark current %g e/pixel/s",
-			ErrExposure, i.ReadNoiseElectrons, i.DarkCurrentEPerSec)
+			ErrExposure, i.ReadNoiseElectrons, float64(i.DarkCurrent))
 	}
 
 	// Sky and dark accumulate with time; read noise is charged once per
 	// readout and enters as a variance, which is why it is squared here and
 	// the other two are not.
-	perPixel := (float64(background)+i.DarkCurrentEPerSec)*seconds +
+	perPixel := (float64(background)+float64(i.DarkCurrent))*seconds +
 		i.ReadNoiseElectrons*i.ReadNoiseElectrons
 
 	return pixels * perPixel, nil

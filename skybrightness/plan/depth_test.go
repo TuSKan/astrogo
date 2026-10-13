@@ -175,9 +175,9 @@ func (s *localSky) Band() magnitude.Passband { return s.band }
 // validating and producing a positive electron rate.
 func testInstrument() optics.Instrument {
 	return optics.Instrument{
-		Name:              "test 200mm",
-		CollectingAreaM2:  0.0314,
-		PixelSolidAngleSR: 1e-11,
+		Name:            "test 200mm",
+		CollectingArea:  unit.SquareMeters(0.0314),
+		PixelSolidAngle: unit.Steradians(1e-11),
 		Throughput: []optics.Throughput{{
 			// The filter, matching the sky model's band. Declaring it is what
 			// makes the returned magnitude a filter magnitude rather than a
@@ -189,7 +189,7 @@ func testInstrument() optics.Instrument {
 			Reference:    "synthetic, for tests",
 		}},
 		ReadNoiseElectrons: 5,
-		DarkCurrentEPerSec: 0.01,
+		DarkCurrent:        0.01,
 	}
 }
 

@@ -27,7 +27,7 @@ func main() {
 	// 2. Configure Transition Overheads
 	transition := &plan.BasicTransitionModel{
 		BaseSetup:           1 * time.Minute,
-		SlewRate:            2.0, // degrees per second
+		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
 		FilterChangePenalty: 30 * time.Second,
 	}
 
