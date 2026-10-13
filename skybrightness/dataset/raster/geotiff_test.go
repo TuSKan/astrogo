@@ -38,8 +38,8 @@ type synthTIFF struct {
 // tile, in the order a real TIFF writer does: predict, then compress.
 // rowSamples is the block's row width in samples, which the float predictor
 // needs since it shuffles byte planes per row.
-func packBlock(t *testing.T, raw []byte, s synthTIFF, rowSamples int) []byte {
-	t.Helper()
+func packBlock(tb testing.TB, raw []byte, s synthTIFF, rowSamples int) []byte {
+	tb.Helper()
 
 	if s.floatPredictor {
 		raw = applyFloatPredictor(raw, rowSamples)
@@ -51,11 +51,11 @@ func packBlock(t *testing.T, raw []byte, s synthTIFF, rowSamples int) []byte {
 	case s.deflate:
 		zw := zlib.NewWriter(&buf)
 		if _, err := zw.Write(raw); err != nil {
-			t.Fatalf("zlib write: %v", err)
+			tb.Fatalf("zlib write: %v", err)
 		}
 
 		if err := zw.Close(); err != nil {
-			t.Fatalf("zlib close: %v", err)
+			tb.Fatalf("zlib close: %v", err)
 		}
 	case s.lzw:
 		return tiffLZWEncode(raw)
@@ -193,8 +193,8 @@ func applyFloatPredictor(raw []byte, rowSamples int) []byte {
 
 // blocks encodes the pixel data into strip or tile blocks (little-endian
 // Float32), tiles zero-padded at the image edge.
-func (s synthTIFF) blocks(t *testing.T) [][]byte {
-	t.Helper()
+func (s synthTIFF) blocks(tb testing.TB) [][]byte {
+	tb.Helper()
 
 	le := binary.LittleEndian
 
@@ -225,7 +225,7 @@ func (s synthTIFF) blocks(t *testing.T) [][]byte {
 					}
 				}
 
-				out = append(out, packBlock(t, buf, s, s.tileW))
+				out = append(out, packBlock(tb, buf, s, s.tileW))
 			}
 		}
 
@@ -249,7 +249,7 @@ func (s synthTIFF) blocks(t *testing.T) [][]byte {
 			}
 		}
 
-		out = append(out, packBlock(t, buf, s, s.width))
+		out = append(out, packBlock(tb, buf, s, s.width))
 	}
 
 	return out
@@ -263,8 +263,8 @@ type tentry struct {
 }
 
 // build assembles the synthetic GeoTIFF byte stream.
-func (s synthTIFF) build(t *testing.T) []byte {
-	t.Helper()
+func (s synthTIFF) build(tb testing.TB) []byte {
+	tb.Helper()
 
 	le := binary.LittleEndian
 
@@ -287,7 +287,7 @@ func (s synthTIFF) build(t *testing.T) []byte {
 		return b
 	}
 
-	blocks := s.blocks(t)
+	blocks := s.blocks(tb)
 	n := len(blocks)
 
 	compression := uint16(1)
