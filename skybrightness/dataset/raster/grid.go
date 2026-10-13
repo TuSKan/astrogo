@@ -17,6 +17,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+
+	"github.com/TuSKan/astrogo/angle"
 )
 
 // Sentinel errors for raster decoding and sampling.
@@ -104,20 +106,20 @@ func (g *Grid) At(col, row int) (float64, bool) {
 // SampleBilinear returns the bilinearly interpolated sample at a longitude
 // and latitude, sharing its interpolation and no-data handling with the
 // windowed reader.
-func (g *Grid) SampleBilinear(lonDeg, latDeg float64) (float64, error) {
+func (g *Grid) SampleBilinear(lon, lat angle.Angle) (float64, error) {
 	if !g.Valid() {
 		return 0, fmt.Errorf("%w: %dx%d with %d samples",
 			ErrInvalidGrid, gridWidth(g), gridHeight(g), gridLen(g))
 	}
 
-	return bilinear(g.GT, g.Width, g.Height, lonDeg, latDeg, g.At)
+	return bilinear(g.GT, g.Width, g.Height, lon.Degrees(), lat.Degrees(), g.At)
 }
 
 // LonLat returns the georeferenced center of a pixel.
-func (g *Grid) LonLat(col, row int) (lonDeg, latDeg float64) {
+func (g *Grid) LonLat(col, row int) (lon, lat angle.Angle) {
 	c, r := float64(col)+0.5, float64(row)+0.5
 
-	return g.GT.A + c*g.GT.B + r*g.GT.C, g.GT.D + c*g.GT.E + r*g.GT.F
+	return angle.Deg(g.GT.A + c*g.GT.B + r*g.GT.C), angle.Deg(g.GT.D + c*g.GT.E + r*g.GT.F)
 }
 
 // isNoData reports whether v is a no-data sample. NaN always is, whether or

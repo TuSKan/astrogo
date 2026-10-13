@@ -880,8 +880,8 @@ func gambonsAirglow(ctx context.Context, t *testing.T, grid unit.SpectralGrid) s
 	spectrum, err := airglow.Fetch(ctx, airglow.Spec{
 		Observatory:  airglow.Paranal,
 		SolarFluxSFU: gambonsSolarSF,
-		MinNM:        float64(grid.At(0)) - 1,
-		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		MinNM:        grid.At(0) - 1,
+		MaxNM:        grid.At(grid.Len()-1) + 1,
 		StepNM:       0.1,
 	})
 	if err != nil {
@@ -891,7 +891,7 @@ func gambonsAirglow(ctx context.Context, t *testing.T, grid unit.SpectralGrid) s
 
 	out := skybrightness.NewSpectralRadiance(grid)
 	for i := range out {
-		out[i] = spectrum.At(float64(grid.At(i)))
+		out[i] = spectrum.At(grid.At(i))
 	}
 
 	return out

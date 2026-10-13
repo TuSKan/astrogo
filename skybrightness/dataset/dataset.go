@@ -277,8 +277,8 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 	glow, err := airglow.Fetch(ctx, airglow.Spec{
 		Observatory:  airglow.Observatory(spec.Observatory),
 		SolarFluxSFU: spec.SolarFluxSFU,
-		MinNM:        float64(grid.At(0)) - 1,
-		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		MinNM:        grid.At(0) - 1,
+		MaxNM:        grid.At(grid.Len()-1) + 1,
 		Scale:        spec.AirglowScale,
 	})
 	if err != nil {

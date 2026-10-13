@@ -481,7 +481,7 @@ func (z *ZodiacalLight) AddRadiance(
 	geom := ZodiacalGeometry{
 		DifferentialLongitude: ecliptic.Lon() - frame.sunEcliptic.Lon(),
 		EclipticLatitude:      ecliptic.Lat(),
-		SunDistanceAU:         frame.sunDistanceAU,
+		SunDistance:           unit.AU(frame.sunDistanceAU),
 		// The Earth sits opposite the Sun as seen from the Sun, which is what
 		// the seasonal term's phase is measured against.
 		EarthLongitude: frame.sunEcliptic.Lon() + angle.Deg(180),

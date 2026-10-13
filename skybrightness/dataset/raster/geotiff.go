@@ -10,6 +10,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/TuSKan/astrogo/angle"
 )
 
 // ErrUnsupportedTIFF is returned for a TIFF/GeoTIFF feature this minimal reader
@@ -244,7 +246,7 @@ func (t *Reader) ReadGrid() (*Grid, error) {
 // SampleBilinear interpolates the sample at a
 // longitude/latitude by reading only the strips/tiles covering the four
 // neighbouring pixels — the windowed path that never loads the whole atlas.
-func (t *Reader) SampleBilinear(lonDeg, latDeg float64) (float64, error) {
+func (t *Reader) SampleBilinear(lon, lat angle.Angle) (float64, error) {
 	var ioErr error
 
 	at := func(col, row int) (float64, bool) {
@@ -266,7 +268,7 @@ func (t *Reader) SampleBilinear(lonDeg, latDeg float64) (float64, error) {
 		return v, true
 	}
 
-	v, err := bilinear(t.gt, t.width, t.height, lonDeg, latDeg, at)
+	v, err := bilinear(t.gt, t.width, t.height, lon.Degrees(), lat.Degrees(), at)
 
 	if ioErr != nil {
 		return 0, ioErr

@@ -179,8 +179,8 @@ func TestAgainstGAMBONS(t *testing.T) {
 	glow, err := airglow.NewAirglow(ctx, airglow.Spec{
 		Observatory:  airglow.Paranal,
 		SolarFluxSFU: gambonsSolarSF,
-		MinNM:        float64(grid.At(0)) - 1,
-		MaxNM:        float64(grid.At(grid.Len()-1)) + 1,
+		MinNM:        grid.At(0) - 1,
+		MaxNM:        grid.At(grid.Len()-1) + 1,
 		StepNM:       0.1,
 	}, grid, 87_000)
 	if err != nil {

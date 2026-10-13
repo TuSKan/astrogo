@@ -344,7 +344,7 @@ func TestRadianceAt(t *testing.T) {
 		t.Errorf("Year() = %d, want 2024", r.Year())
 	}
 
-	got, err := r.RadianceAt(-70.4, -24.6)
+	got, err := r.RadianceAt(angle.Deg(-70.4), angle.Deg(-24.6))
 	if err != nil {
 		t.Fatalf("RadianceAt: %v", err)
 	}

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math"
 	"testing"
+
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The service rejects a partial body with a 500 rather than filling the gaps
@@ -109,7 +111,7 @@ func TestSpectrumAt(t *testing.T) {
 	t.Parallel()
 
 	s := &Spectrum{
-		LambdaNM: []float64{500, 501, 502},
+		LambdaNM: []unit.WavelengthNM{500, 501, 502},
 		Radiance: []float64{1e-9, 3e-9, 2e-9},
 	}
 
@@ -122,7 +124,7 @@ func TestSpectrumAt(t *testing.T) {
 		{499.9, 0},      // below
 		{502.1, 0},      // above
 	} {
-		if got := s.At(c.lambda); math.Abs(got-c.want) > 1e-18 {
+		if got := s.At(unit.WavelengthNM(c.lambda)); math.Abs(got-c.want) > 1e-18 {
 			t.Errorf("At(%v) = %v, want %v", c.lambda, got, c.want)
 		}
 	}
