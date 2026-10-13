@@ -6,7 +6,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-	gotime "time"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/time"
@@ -53,15 +52,15 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 
 	const bound = 1e-3 // seconds
 
-	steps := []gotime.Time{
-		gotime.Date(2012, gotime.July, 1, 0, 0, 0, 0, gotime.UTC),
-		gotime.Date(2015, gotime.July, 1, 0, 0, 0, 0, gotime.UTC),
-		gotime.Date(2017, gotime.January, 1, 0, 0, 0, 0, gotime.UTC),
+	steps := []time.GoTime{
+		time.GoDate(2012, time.July, 1, 0, 0, 0, 0, time.LocationUTC),
+		time.GoDate(2015, time.July, 1, 0, 0, 0, 0, time.LocationUTC),
+		time.GoDate(2017, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
 	}
 
-	offsets := []gotime.Duration{
-		-10 * gotime.Minute, -70 * gotime.Second, -69 * gotime.Second, -60 * gotime.Second,
-		-gotime.Second, -gotime.Millisecond, gotime.Millisecond, gotime.Minute,
+	offsets := []time.Duration{
+		-10 * time.Minute, -70 * time.Second, -69 * time.Second, -60 * time.Second,
+		-time.Second, -time.Millisecond, time.Millisecond, time.Minute,
 	}
 
 	checked := 0
@@ -77,10 +76,10 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 		// on the day's 86401st second. Its last 10 µs are below the 40 µs
 		// ULP of a summed Julian Date, which rounds them onto the next
 		// midnight; the lookup compares the two parts to keep them.
-		y, m, d := step.Add(-gotime.Hour).Date()
+		y, m, d := step.Add(-time.Hour).Date()
 
 		for _, us := range []int{0, 500_000, 999_000, 999_990} {
-			leap := time.Date(y, m, d, 23, 59, 60, us*1000, gotime.UTC)
+			leap := time.Date(y, m, d, 23, 59, 60, us*1000, time.LocationUTC)
 			check(t, r, leap, fmt.Sprintf("%d-%02d-%02d 23:59:60.%06d", y, m, d, us), bound)
 
 			checked++
