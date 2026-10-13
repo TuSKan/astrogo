@@ -38,8 +38,12 @@ type SwapOptimizedStrategy struct {
 	// swap and insertion feasibility checks. Default: 1 minute.
 	Step time.Duration
 
-	// TabuTenure is the number of passes a swap pair stays tabu.
-	// Default: 3. Set to 0 to disable tabu search.
+	// TabuTenure is the number of passes a swap pair stays tabu. Zero, the
+	// zero value, means the default of 3; a negative value disables tabu
+	// search.
+	//
+	// Until #733 this said "Set to 0 to disable tabu search", which no value
+	// could do: zero and every negative value both became 3.
 	TabuTenure int
 }
 
@@ -84,12 +88,7 @@ func (s *SwapOptimizedStrategy) schedule(
 	}
 
 	// Initialize tabu list for swap-cycle prevention.
-	tenure := s.TabuTenure
-	if tenure <= 0 {
-		tenure = 3
-	}
-
-	tabu := newTabuList(tenure)
+	tabu := newTabuList(s.tabuTenure())
 
 	// Iterate until convergence: two consecutive passes with no improvement,
 	// or maxPasses reached as a safety cap.
@@ -510,6 +509,23 @@ func scheduleGaps(blocks []ScheduledBlock, window Window) []gapInfo {
 }
 
 // ── Tabu Search ──────────────────────────────────────────────────────────────
+
+// defaultTabuTenure is the tenure a zero TabuTenure stands for.
+const defaultTabuTenure = 3
+
+// tabuTenure resolves TabuTenure to the tenure the tabu list is built with:
+// the default for zero, nothing for a negative value — newTabuList's zero,
+// which isTabu reads as disabled — and the value itself otherwise.
+func (s *SwapOptimizedStrategy) tabuTenure() int {
+	switch {
+	case s.TabuTenure == 0:
+		return defaultTabuTenure
+	case s.TabuTenure < 0:
+		return 0
+	default:
+		return s.TabuTenure
+	}
+}
 
 // tabuKey identifies a pair of blocks that were recently swapped.
 type tabuKey struct{ a, b string }

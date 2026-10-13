@@ -252,3 +252,41 @@ func TestScoreBlockPlacement(t *testing.T) {
 func scheduleBase() time.Time {
 	return time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 }
+
+// TestTabuTenureResolvesEachCase holds TabuTenure to its doc (#733): the zero
+// value is the default, a positive value is itself, and a negative value
+// disables tabu search. Until #733 every value up to and including zero
+// became the default, so the documented way to disable it did nothing.
+func TestTabuTenureResolvesEachCase(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		set  int
+		want int
+	}{
+		{"zero is the default", 0, defaultTabuTenure},
+		{"positive is itself", 5, 5},
+		{"negative disables", -1, 0},
+	} {
+		if got := (&SwapOptimizedStrategy{TabuTenure: c.set}).tabuTenure(); got != c.want {
+			t.Errorf("%s: TabuTenure %d resolves to %d, want %d", c.name, c.set, got, c.want)
+		}
+	}
+
+	// And disabled means disabled: a pair swapped this pass is not tabu on
+	// the next one, where the default would hold it for three.
+	off := newTabuList((&SwapOptimizedStrategy{TabuTenure: -1}).tabuTenure())
+	off.add("A", "B", 0)
+
+	if off.isTabu("A", "B", 1) {
+		t.Error("a disabled tabu list still forbade a swap")
+	}
+
+	on := newTabuList((&SwapOptimizedStrategy{}).tabuTenure())
+	on.add("A", "B", 0)
+
+	if !on.isTabu("A", "B", 1) {
+		t.Error("the default tabu list did not forbid the reverse swap on the next pass")
+	}
+}
