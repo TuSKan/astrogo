@@ -48,12 +48,18 @@ func (t Time) JulianEpochYear() float64 {
 	return 2000.0 + (t.JD()-2451545.0)/365.25
 }
 
-// DayOfYear returns t's fractional day-of-year, with Jan 1 00:00 = 1.0.
+// DayOfYear returns t's fractional day-of-year, with Jan 1 00:00 = 1.0, in
+// the calendar [Time.Year] reads: t's own scale, whatever its display
+// location.
+//
+// It used to measure from Jan 1 midnight in the display location while
+// taking the year from Year, which ignores it, so near the new year the two
+// described different dates: 01:00 UTC on 1 January 2026 shown in São Paulo
+// came out 0.917, and 23:00 UTC on 31 December shown in Tokyo 366.33 in a
+// 365-day year (#760). A caller pairing Year with DayOfYear, as a TLE epoch
+// does, needs both from one date.
 func (t Time) DayOfYear() float64 {
-	jan1 := Date(t.Year(), 1, 1, 0, 0, 0, 0, t.Location())
+	y, m, d, frac := t.Calendar()
 
-	j1a, j1b := jan1.JDParts()
-	ta, tb := t.JDParts()
-
-	return (ta - j1a) + (tb - j1b) + 1.0
+	return float64(mjdOf(y, m, d)-mjdOf(y, 1, 1)) + 1 + frac
 }
