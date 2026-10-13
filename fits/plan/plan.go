@@ -172,8 +172,9 @@ func has(h *fits.Header, key string) bool {
 //   - RA/DEC in ICRS, or in FK5 at J2000, whose 25 mas from ICRS is below
 //     anything a pointing needs. RADESYS and EQUINOX default as the FITS
 //     Standard 4.0 has them: FK4 when EQUINOX is before 1984, FK5 from 1984,
-//     ICRS when EQUINOX is absent. Any other frame or equinox is
-//     [ErrUnsupportedFrame], not a position in the wrong frame.
+//     ICRS when EQUINOX is absent. A header without EQUINOX that gives the
+//     deprecated EPOCH has its equinox read from that. Any other frame or
+//     equinox is [ErrUnsupportedFrame], not a position in the wrong frame.
 //   - GLON/GLAT, converted to ICRS.
 //   - Ecliptic and other celestial axes are [ErrUnsupportedFrame].
 //
@@ -329,11 +330,21 @@ func worldAtCentre(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err 
 
 // checkEquatorialFrame accepts ICRS, and FK5 at J2000, by RADESYS and
 // EQUINOX with the FITS Standard 4.0's defaults.
+//
+// Without EQUINOX, the deprecated EPOCH stands in for it. FITS 4.0 records
+// that EPOCH's value "was previously defined to contain a floating-point
+// number giving the equinox", and until #735 it was ignored: a header saying
+// EPOCH = 1950.0 had no equinox, defaulted to ICRS, and its B1950 position
+// was taken 0.6° from where it points.
 func checkEquatorialFrame(h *fits.Header) error {
 	radesys, errSys := h.GetString("RADESYS")
 	radesys = strings.ToUpper(strings.TrimSpace(radesys))
 
 	equinox, errEq := h.GetFloat("EQUINOX")
+	if errEq != nil && !has(h, "EQUINOX") {
+		equinox, errEq = h.GetFloat("EPOCH")
+	}
+
 	hasEquinox := errEq == nil
 
 	if errSys != nil || radesys == "" {

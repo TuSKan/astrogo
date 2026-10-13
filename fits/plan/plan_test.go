@@ -164,6 +164,14 @@ func TestTargetFromFITSReadsTheWCS(t *testing.T) {
 			83.82208, -5.39111, 0},
 		{"no celestial WCS, RA_DEG", header([2]string{"RA_DEG", "83.82208"}, [2]string{"DEC_DEG", "-5.39111"}),
 			83.82208, -5.39111, 0},
+		// EPOCH standing in for an absent EQUINOX (#735): 2000 is FK5 J2000,
+		// and an EQUINOX that is present wins over it.
+		{"EPOCH 2000 without EQUINOX", header([2]string{"CTYPE1", "'RA---TAN'"}, [2]string{"CTYPE2", "'DEC--TAN'"},
+			[2]string{"EPOCH", "2000.0"}, [2]string{"CRVAL1", "83.82208"}, [2]string{"CRVAL2", "-5.39111"}),
+			83.82208, -5.39111, 0},
+		{"EQUINOX 2000 wins over EPOCH 1950", header([2]string{"CTYPE1", "'RA---TAN'"}, [2]string{"CTYPE2", "'DEC--TAN'"},
+			[2]string{"EQUINOX", "2000.0"}, [2]string{"EPOCH", "1950.0"}, [2]string{"CRVAL1", "83.82208"}, [2]string{"CRVAL2", "-5.39111"}),
+			83.82208, -5.39111, 0},
 	} {
 		target, err := TargetFromFITS(c.h)
 		if err != nil {
@@ -200,6 +208,10 @@ func TestTargetFromFITSRefusesOtherFrames(t *testing.T) {
 		{"RADESYS FK4", [][2]string{{"RADESYS", "'FK4'"}, {"EQUINOX", "1950.0"}}, nil},
 		{"EQUINOX 1950 without RADESYS", [][2]string{{"EQUINOX", "1950.0"}}, nil},
 		{"FK5 at J2015", [][2]string{{"RADESYS", "'FK5'"}, {"EQUINOX", "2015.0"}}, nil},
+		// The deprecated EPOCH gives the equinox when EQUINOX does not (#735);
+		// it was ignored, and this header was read as ICRS, 0.6° off.
+		{"EPOCH 1950 without EQUINOX", [][2]string{{"EPOCH", "1950.0"}}, nil},
+		{"EQUINOX 1950 wins over EPOCH 2000", [][2]string{{"EQUINOX", "1950.0"}, {"EPOCH", "2000.0"}}, nil},
 		{"ecliptic axes", nil, [][2]string{{"CTYPE1", "'ELON-TAN'"}, {"CTYPE2", "'ELAT-TAN'"}, {"CRVAL1", "83.0"}, {"CRVAL2", "-5.0"}}},
 	} {
 		cards := radec
