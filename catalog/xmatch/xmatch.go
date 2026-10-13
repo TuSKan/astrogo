@@ -23,6 +23,8 @@
 package xmatch
 
 import (
+	"sort"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -80,14 +82,16 @@ type item struct {
 //
 //  1. Alias-graph: any Target in a and any Target in b sharing a
 //     resolve.Normalize-d ID or Aliases entry are matched.
-//  2. Positional fallback: any Target left unmatched (a singleton) after
-//     pass 1 (skipped entirely for a Target with !HasCoord or an
-//     all-zero Coord) is compared with every still-unmatched candidate in
-//     the other slice at a common epoch, carrying each Target's own proper
-//     motion: J2000 when both move, the unmoving one's own epoch when only
-//     one does, since a row that publishes no motion cannot be moved, and
-//     as given when neither does. A pair within WithPositionMatchThreshold
-//     is unioned.
+//  2. Positional fallback: any Target whose group has no member in the
+//     other slice after pass 1 (skipped entirely for a Target with
+//     !HasCoord or an all-zero Coord) is compared with every such
+//     candidate in the other slice at a common epoch, carrying each
+//     Target's own proper motion: J2000 when both move, the unmoving one's
+//     own epoch when only one does, since a row that publishes no motion
+//     cannot be moved, and as given when neither does. Pairs within
+//     WithPositionMatchThreshold are accepted closest first, each group
+//     pairing at most once, so the result does not depend on the order of
+//     either slice.
 //
 // A Target matching more than one candidate via the alias pass (e.g. a
 // duplicate row within one input slice) produces one Pair per cross-slice
@@ -155,19 +159,27 @@ func trustworthyCoord(t resolve.Target) bool {
 	return t.HasCoord && !t.Coord.IsZero()
 }
 
-// singletonIndices returns the indices whose union-find group currently
-// has size 1 — the only candidates eligible for positional matching, since
-// anything the alias pass already grouped needs no further check.
-func singletonIndices(items []item, uf *unionFind) []int {
-	counts := make(map[int]int, len(items))
-	for i := range items {
-		counts[uf.find(i)]++
+// unpairedIndices returns the indices whose union-find group has no member
+// from the other slice yet — the only candidates eligible for positional
+// matching, since a group the alias pass already paired needs no further
+// check.
+//
+// Not "groups of one": a row that appears twice in one slice is grouped with
+// its copy by the alias pass and is still unpaired. Until #728 that pair of
+// copies was skipped here, so duplicating a row lost its positional match.
+func unpairedIndices(items []item, uf *unionFind) []int {
+	var origins [2]map[int]bool
+
+	origins[0], origins[1] = make(map[int]bool), make(map[int]bool)
+
+	for i, it := range items {
+		origins[it.origin][uf.find(i)] = true
 	}
 
 	out := make([]int, 0, len(items))
 
 	for i := range items {
-		if counts[uf.find(i)] == 1 {
+		if root := uf.find(i); !origins[0][root] || !origins[1][root] {
 			out = append(out, i)
 		}
 	}
@@ -175,17 +187,22 @@ func singletonIndices(items []item, uf *unionFind) []int {
 	return out
 }
 
-// unionByPosition compares every still-singleton, trustworthy-coord item
-// with each cross-origin one at a common epoch (posmatch.Separation) and
-// unions any pair within threshold — each item is unioned with at most its
-// single nearest cross-origin match.
-// O(M²) over the remaining singletons M: appropriate at the scale this
+// unionByPosition pairs still-unpaired, trustworthy-coord items across the
+// two slices by position, compared at a common epoch (posmatch.Separation),
+// closest pair first: every cross-slice pair within threshold is a
+// candidate, and a candidate is accepted unless either side's group has
+// already been paired. Each group is therefore paired with at most one group
+// from the other slice, and the result does not depend on input order.
+//
+// Until #728 each item in turn took its nearest partner not yet taken, so an
+// early item could claim a partner far closer to a later one, and Match(a, b)
+// and Match(b, a) could pair different rows.
+//
+// O(M² log M) over the remaining items M: appropriate at the scale this
 // package targets (two candidate lists from a handful of catalogs, not a
 // bulk all-sky cross-match), the same reasoning catalog.go's own
 // unionByPosition documents.
 func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
-	singletons := singletonIndices(items, uf)
-
 	// Each position carries its Target's own motion, which providers keep in
 	// the Target's fields rather than in Coord; see posmatch.Coord (#726).
 	type positioned struct {
@@ -194,52 +211,62 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 		epoch time.Time
 	}
 
-	norm := make([]positioned, 0, len(singletons))
+	var side [2][]positioned
 
-	for _, i := range singletons {
+	for _, i := range unpairedIndices(items, uf) {
 		t := items[i].target
 		if !trustworthyCoord(t) {
 			continue
 		}
 
-		norm = append(norm, positioned{idx: i, c: posmatch.Coord(t), epoch: t.Epoch})
+		o := items[i].origin
+		side[o] = append(side[o], positioned{idx: i, c: posmatch.Coord(t), epoch: t.Epoch})
 	}
 
-	matched := make(map[int]bool, len(norm))
+	type candidate struct {
+		a, b int // item indices, origin 0 and origin 1
+		sep  angle.Angle
+	}
 
-	for a := range norm {
-		if matched[norm[a].idx] {
+	var candidates []candidate
+
+	for _, pa := range side[0] {
+		for _, pb := range side[1] {
+			sep, err := posmatch.Separation(pa.c, pa.epoch, pb.c, pb.epoch)
+			if err != nil || sep > threshold {
+				continue
+			}
+
+			candidates = append(candidates, candidate{a: pa.idx, b: pb.idx, sep: sep})
+		}
+	}
+
+	// Closest first; equal separations fall back to input order so the
+	// result is deterministic.
+	sort.Slice(candidates, func(i, j int) bool {
+		ci, cj := candidates[i], candidates[j]
+		if ci.sep != cj.sep {
+			return ci.sep < cj.sep
+		}
+
+		if ci.a != cj.a {
+			return ci.a < cj.a
+		}
+
+		return ci.b < cj.b
+	})
+
+	paired := make(map[int]bool)
+
+	for _, c := range candidates {
+		ra, rb := uf.find(c.a), uf.find(c.b)
+		if paired[ra] || paired[rb] {
 			continue
 		}
 
-		best := -1
-		bestSep := threshold
+		uf.union(c.a, c.b)
 
-		for b := range norm {
-			if a == b || matched[norm[b].idx] {
-				continue
-			}
-
-			if items[norm[a].idx].origin == items[norm[b].idx].origin {
-				continue // only a cross-slice match counts as a Pair
-			}
-
-			sep, err := posmatch.Separation(norm[a].c, norm[a].epoch, norm[b].c, norm[b].epoch)
-			if err != nil {
-				continue
-			}
-
-			if sep <= bestSep {
-				best = b
-				bestSep = sep
-			}
-		}
-
-		if best >= 0 {
-			uf.union(norm[a].idx, norm[best].idx)
-			matched[norm[a].idx] = true
-			matched[norm[best].idx] = true
-		}
+		paired[ra], paired[rb] = true, true
 	}
 }
 
