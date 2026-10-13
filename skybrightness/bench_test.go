@@ -172,9 +172,9 @@ func BenchmarkInstrumentProjection(b *testing.B) {
 	}
 
 	inst := optics.Instrument{
-		Name:              "bench",
-		CollectingAreaM2:  1,
-		PixelSolidAngleSR: 1e-10,
+		Name:            "bench",
+		CollectingArea:  unit.SquareMeters(1),
+		PixelSolidAngle: unit.Steradians(1e-10),
 		Throughput: []optics.Throughput{{
 			Name:         "system",
 			WavelengthNM: []unit.WavelengthNM{300, 1100},

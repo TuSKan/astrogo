@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Configuration represents the setup needed for an observation block.
@@ -147,8 +148,10 @@ type BasicTransitionModel struct {
 	// if there is no previous block.
 	BaseSetup time.Duration
 
-	// SlewRate is the dome/mount slew speed in degrees per second.
-	SlewRate float64
+	// SlewRate is the dome/mount slew speed. A mount's manual quotes it in
+	// degrees per second: write [unit.DegreesPerSec] around that number,
+	// since a bare one is radians per second.
+	SlewRate unit.AngularRate
 
 	// FilterChangePenalty is the time taken to change filters.
 	FilterChangePenalty time.Duration
@@ -189,7 +192,7 @@ func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
 		}
 
 		maxAngularDist := math.Max(dAlt, dAz)
-		slewSeconds := maxAngularDist / m.SlewRate
+		slewSeconds := maxAngularDist / m.SlewRate.DegreesPerSec()
 
 		// Add slew time
 		total += time.Duration(slewSeconds * float64(time.Second))

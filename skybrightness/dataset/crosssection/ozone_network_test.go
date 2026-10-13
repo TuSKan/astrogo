@@ -130,7 +130,7 @@ func TestExtinctionOzoneIsTheDatasetBinned(t *testing.T) {
 
 		for i, nm := range xs.WavelengthNM {
 			if float64(nm) >= node-5 && float64(nm) < node+5 {
-				sum += xs.SigmaCM2[i]
+				sum += xs.Sigma[i].SquareCentimeters()
 				n++
 			}
 		}

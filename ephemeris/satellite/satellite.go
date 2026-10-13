@@ -61,9 +61,10 @@ var ErrMalformedTLE = errors.New("satellite: malformed TLE")
 type Satellite struct {
 	Name string
 
-	// MeanMotion is the element set's own, in revolutions per day. Public
-	// since before this type held a propagator, and kept.
-	MeanMotion float64
+	// MeanMotion is the element set's own, which a TLE carries in
+	// revolutions per day. Public since before this type held a
+	// propagator, and kept.
+	MeanMotion unit.AngularRate
 
 	// prop holds the initialised model. It is immutable, so a *Satellite is
 	// as safe to share across goroutines as the propagator inside it.
@@ -110,7 +111,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 
 	return &Satellite{
 		Name:       el.Name,
-		MeanMotion: el.MeanMotion,
+		MeanMotion: unit.RevolutionsPerDay(el.MeanMotion),
 		prop:       prop,
 		epoch:      el.Epoch,
 	}, nil
@@ -159,13 +160,14 @@ func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 // Close is a no-op for satellite providers (no file handles).
 func (s *Satellite) Close() error { return nil }
 
-// OrbitalPeriod returns the orbital period in minutes, derived from mean motion.
-func (s *Satellite) OrbitalPeriod() float64 {
+// OrbitalPeriod returns the orbital period, one revolution at the mean
+// motion, or zero for a satellite with none.
+func (s *Satellite) OrbitalPeriod() unit.Duration {
 	if s.MeanMotion <= 0 {
 		return 0
 	}
 
-	return 1440.0 / s.MeanMotion // minutes
+	return unit.Days(1 / s.MeanMotion.RevolutionsPerDay())
 }
 
 // Altitude returns the height above the WGS84 ellipsoid at time t.

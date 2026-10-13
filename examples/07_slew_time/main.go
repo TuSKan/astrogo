@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -19,9 +20,9 @@ func main() {
 
 	// 2. Define our Transition Model representing the telescope's physical properties
 	model := &plan.BasicTransitionModel{
-		BaseSetup:           30 * time.Second, // Time to settle and expose
-		SlewRate:            1.5,              // The telescope moves 1.5 degrees per second
-		FilterChangePenalty: 45 * time.Second, // Time to change telescope filter
+		BaseSetup:           30 * time.Second,        // Time to settle and expose
+		SlewRate:            unit.DegreesPerSec(1.5), // The telescope moves 1.5 degrees per second
+		FilterChangePenalty: 45 * time.Second,        // Time to change telescope filter
 	}
 
 	// 3. Define two Observing Blocks

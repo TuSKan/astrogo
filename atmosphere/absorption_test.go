@@ -48,7 +48,7 @@ func TestCrossSectionOpticalDepth(t *testing.T) {
 	cs := atmosphere.CrossSection{
 		Species:      "test",
 		WavelengthNM: []unit.WavelengthNM{400, 700},
-		SigmaCM2:     []float64{sigma, sigma},
+		Sigma:        []unit.Area{unit.SquareCentimeters(sigma), unit.SquareCentimeters(sigma)},
 		TemperatureK: 250,
 		Reference:    "synthetic test fixture, not measured data",
 	}
@@ -80,7 +80,7 @@ func TestCrossSectionZeroOutsideTable(t *testing.T) {
 	cs := atmosphere.CrossSection{
 		Species:      "test",
 		WavelengthNM: []unit.WavelengthNM{500, 600},
-		SigmaCM2:     []float64{1e-20, 1e-20},
+		Sigma:        []unit.Area{unit.SquareCentimeters(1e-20), unit.SquareCentimeters(1e-20)},
 		Reference:    "synthetic test fixture",
 	}
 
@@ -113,7 +113,7 @@ func TestOzoneOpticalDepthMatchesExplicitColumn(t *testing.T) {
 	cs := atmosphere.CrossSection{
 		Species:      "O3",
 		WavelengthNM: []unit.WavelengthNM{400, 700},
-		SigmaCM2:     []float64{5e-21, 5e-21},
+		Sigma:        []unit.Area{unit.SquareCentimeters(5e-21), unit.SquareCentimeters(5e-21)},
 		Reference:    "synthetic test fixture, not Serdyuchenko et al.",
 	}
 
@@ -159,17 +159,17 @@ func TestCrossSectionValidation(t *testing.T) {
 		{"empty", atmosphere.CrossSection{Species: "x"}, atmosphere.ErrCrossSectionShape},
 		{
 			"mismatched",
-			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, 2}, SigmaCM2: []float64{1}},
+			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, 2}, Sigma: []unit.Area{unit.SquareCentimeters(1)}},
 			atmosphere.ErrCrossSectionShape,
 		},
 		{
 			"not increasing",
-			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{2, 1}, SigmaCM2: []float64{1, 1}},
+			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{2, 1}, Sigma: []unit.Area{unit.SquareCentimeters(1), unit.SquareCentimeters(1)}},
 			atmosphere.ErrCrossSectionShape,
 		},
 		{
 			"negative sigma",
-			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, 2}, SigmaCM2: []float64{1, -1}},
+			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, 2}, Sigma: []unit.Area{unit.SquareCentimeters(1), unit.SquareCentimeters(-1)}},
 			atmosphere.ErrCrossSectionValue,
 		},
 	}
@@ -191,7 +191,7 @@ func TestCrossSectionRejectsNegativeColumn(t *testing.T) {
 	cs := atmosphere.CrossSection{
 		Species:      "x",
 		WavelengthNM: []unit.WavelengthNM{400, 700},
-		SigmaCM2:     []float64{1e-20, 1e-20},
+		Sigma:        []unit.Area{unit.SquareCentimeters(1e-20), unit.SquareCentimeters(1e-20)},
 	}
 
 	g := mustGrid(t, 450, 50)

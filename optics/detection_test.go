@@ -16,10 +16,10 @@ import (
 func detectionInstrument() optics.Instrument {
 	return optics.Instrument{
 		Name:               "test ccd",
-		CollectingAreaM2:   0.03,
-		PixelSolidAngleSR:  1e-11,
+		CollectingArea:     unit.SquareMeters(0.03),
+		PixelSolidAngle:    unit.Steradians(1e-11),
 		ReadNoiseElectrons: 3.5,
-		DarkCurrentEPerSec: 0.02,
+		DarkCurrent:        0.02,
 	}
 }
 
@@ -182,10 +182,10 @@ func TestDetectionRefusesImpossibleInputs(t *testing.T) {
 		{"zero aperture", detectionInstrument(), 10, time.Second, 0},
 		{"negative background", detectionInstrument(), -1, time.Second, 25},
 		{"negative read noise", optics.Instrument{
-			CollectingAreaM2: 0.03, PixelSolidAngleSR: 1e-11, ReadNoiseElectrons: -1,
+			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11), ReadNoiseElectrons: -1,
 		}, 10, time.Second, 25},
 		{"negative dark current", optics.Instrument{
-			CollectingAreaM2: 0.03, PixelSolidAngleSR: 1e-11, DarkCurrentEPerSec: -1,
+			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11), DarkCurrent: -1,
 		}, 10, time.Second, 25},
 	} {
 		t.Run(c.name, func(t *testing.T) {

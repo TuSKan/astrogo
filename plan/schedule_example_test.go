@@ -18,7 +18,7 @@ func ExampleScheduler_BuildSchedule() {
 	// Configure transition overheads (slew speeds, filter changes)
 	transition := &BasicTransitionModel{
 		BaseSetup:           1 * time.Minute,
-		SlewRate:            2.0, // degrees per second
+		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
 		FilterChangePenalty: 30 * time.Second,
 	}
 

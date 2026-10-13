@@ -19,7 +19,7 @@ func TestBasicTransitionModel(t *testing.T) {
 
 	tm := &BasicTransitionModel{
 		BaseSetup:           1 * time.Minute,
-		SlewRate:            2.0, // degrees per second
+		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
 		FilterChangePenalty: 30 * time.Second,
 	}
 
@@ -90,7 +90,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	tm := &BasicTransitionModel{SlewRate: 2.0}
+	tm := &BasicTransitionModel{SlewRate: unit.DegreesPerSec(2.0)}
 
 	block1 := &Block{Target: NewStar("Target 1", 0, 0)}
 	block2 := &Block{Target: NewStar("Target 2", 1.57079632679, 0)}

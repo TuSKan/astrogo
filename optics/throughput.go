@@ -118,13 +118,12 @@ func System(dst []float64, grid unit.SpectralGrid, elements ...Throughput) error
 // Instrument describes the radiometric chain. A caller with a Telescope
 // and a Sensor can build the matching Instrument with NewInstrument.
 type Instrument struct {
-	// CollectingAreaM2 is the effective light-collecting area in square
-	// meters, already net of central obstruction.
-	CollectingAreaM2 float64
+	// CollectingArea is the effective light-collecting area, already net
+	// of central obstruction.
+	CollectingArea unit.Area
 
-	// PixelSolidAngleSR is the solid angle one pixel subtends on the sky,
-	// in steradians.
-	PixelSolidAngleSR float64
+	// PixelSolidAngle is the solid angle one pixel subtends on the sky.
+	PixelSolidAngle unit.SolidAngle
 
 	// Throughput is the full system response — every mirror, window,
 	// filter, lens and the detector QE multiplied together.
@@ -137,11 +136,11 @@ type Instrument struct {
 	// zero here means for its answer.
 	ReadNoiseElectrons float64
 
-	// DarkCurrentEPerSec is thermal dark current, in electrons per pixel
-	// per second. Zero is a fair approximation for a cooled sensor over a
+	// DarkCurrent is thermal dark current, per pixel. Zero is a fair
+	// approximation for a cooled sensor over a
 	// short exposure and a poor one for a warm sensor over a long one,
 	// which is the same trade every term in the noise budget makes.
-	DarkCurrentEPerSec float64
+	DarkCurrent unit.ElectronsPerPixelPerSecond
 
 	// Name identifies the instrument.
 	Name string
@@ -176,21 +175,21 @@ func NewInstrument(
 	}
 
 	return Instrument{
-		Name:              name,
-		CollectingAreaM2:  area,
-		PixelSolidAngleSR: w * w,
-		Throughput:        throughput,
+		Name:            name,
+		CollectingArea:  unit.SquareMeters(area),
+		PixelSolidAngle: unit.Steradians(w * w),
+		Throughput:      throughput,
 	}, nil
 }
 
 // Validate reports whether the instrument is usable.
 func (i Instrument) Validate() error {
-	if !positiveFinite(i.CollectingAreaM2) {
-		return fmt.Errorf("%w: collecting area %g m^2", ErrNonPositiveDimension, i.CollectingAreaM2)
+	if !positiveFinite(i.CollectingArea.SquareMeters()) {
+		return fmt.Errorf("%w: collecting area %v", ErrNonPositiveDimension, i.CollectingArea)
 	}
 
-	if !positiveFinite(i.PixelSolidAngleSR) {
-		return fmt.Errorf("%w: pixel solid angle %g sr", ErrNonPositiveDimension, i.PixelSolidAngleSR)
+	if !positiveFinite(i.PixelSolidAngle.Steradians()) {
+		return fmt.Errorf("%w: pixel solid angle %v", ErrNonPositiveDimension, i.PixelSolidAngle)
 	}
 
 	for _, t := range i.Throughput {
@@ -278,5 +277,5 @@ func (i Instrument) BackgroundRate(spectrum []float64, grid unit.SpectralGrid) (
 		return 0, err
 	}
 
-	return unit.ElectronsPerPixelPerSecond(float64(rate) * i.CollectingAreaM2 * i.PixelSolidAngleSR), nil
+	return unit.ElectronsPerPixelPerSecond(float64(rate) * i.CollectingArea.SquareMeters() * i.PixelSolidAngle.Steradians()), nil
 }

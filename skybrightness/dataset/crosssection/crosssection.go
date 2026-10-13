@@ -132,7 +132,7 @@ func Parse(r io.Reader, species string, u WavelengthUnit) (atmosphere.CrossSecti
 	out := atmosphere.CrossSection{
 		Species:      species,
 		WavelengthNM: make([]unit.WavelengthNM, 0, len(rows)),
-		SigmaCM2:     make([]float64, 0, len(rows)),
+		Sigma:        make([]unit.Area, 0, len(rows)),
 	}
 
 	for i, r := range rows {
@@ -141,7 +141,7 @@ func Parse(r io.Reader, species string, u WavelengthUnit) (atmosphere.CrossSecti
 		}
 
 		out.WavelengthNM = append(out.WavelengthNM, unit.WavelengthNM(r.nm))
-		out.SigmaCM2 = append(out.SigmaCM2, r.sigma)
+		out.Sigma = append(out.Sigma, unit.SquareCentimeters(r.sigma))
 	}
 
 	if err := out.Validate(); err != nil {

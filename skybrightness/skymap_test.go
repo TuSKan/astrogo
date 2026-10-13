@@ -30,7 +30,7 @@ func TestSkyMapCoversHemisphere(t *testing.T) {
 
 	var total float64
 	for _, p := range points {
-		total += p.SolidAngleSR
+		total += p.SolidAngle.Steradians()
 	}
 
 	if rel := math.Abs(total-2*math.Pi) / (2 * math.Pi); rel > 1e-9 {

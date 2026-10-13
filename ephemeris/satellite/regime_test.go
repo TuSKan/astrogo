@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestPropagatorExposesTheModelsOwnPredicates covers what replaced
@@ -51,8 +52,8 @@ func TestPropagatorExposesTheModelsOwnPredicates(t *testing.T) {
 
 	// The elements the propagator holds must be the ones the wrapper reports,
 	// or the two can disagree about which orbit they describe.
-	if el := p.Elements(); el.MeanMotion != sat.MeanMotion {
+	if el := p.Elements(); sat.MeanMotion != unit.RevolutionsPerDay(el.MeanMotion) {
 		t.Errorf("Satellite.MeanMotion is %g and the propagator's elements say %g",
-			sat.MeanMotion, el.MeanMotion)
+			sat.MeanMotion.RevolutionsPerDay(), el.MeanMotion)
 	}
 }

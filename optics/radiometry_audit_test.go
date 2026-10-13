@@ -33,9 +33,9 @@ func TestPhotonRateWeightsByWavelengthNotEnergy(t *testing.T) {
 	}
 
 	inst := optics.Instrument{
-		Name:              "flat response",
-		CollectingAreaM2:  1,
-		PixelSolidAngleSR: 1,
+		Name:            "flat response",
+		CollectingArea:  unit.SquareMeters(1),
+		PixelSolidAngle: unit.Steradians(1),
 		Throughput: []optics.Throughput{{
 			Name:         "wide",
 			WavelengthNM: []unit.WavelengthNM{399, 400, 800, 801},

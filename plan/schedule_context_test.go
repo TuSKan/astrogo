@@ -58,7 +58,7 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 		})
 	}
 
-	return planner, window, blocks, &BasicTransitionModel{BaseSetup: time.Minute, SlewRate: 2}
+	return planner, window, blocks, &BasicTransitionModel{BaseSetup: time.Minute, SlewRate: unit.DegreesPerSec(2)}
 }
 
 // TestScheduleThroughTheContextCache holds the greedy and swap-optimized

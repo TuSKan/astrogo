@@ -106,8 +106,9 @@ type CrossSection struct {
 	// WavelengthNM is strictly increasing.
 	WavelengthNM []unit.WavelengthNM
 
-	// SigmaCM2 holds the cross section per molecule, in cm^2.
-	SigmaCM2 []float64
+	// Sigma holds the cross section per molecule. Laboratory tables print
+	// it in cm², and [unit.SquareCentimeters] is how a value from one goes in.
+	Sigma []unit.Area
 
 	// TemperatureK is the temperature the table was measured at. Ozone
 	// cross sections in particular vary by several per cent across
@@ -121,14 +122,14 @@ type CrossSection struct {
 
 // Validate reports whether the table is usable.
 func (c CrossSection) Validate() error {
-	if len(c.WavelengthNM) == 0 || len(c.WavelengthNM) != len(c.SigmaCM2) {
+	if len(c.WavelengthNM) == 0 || len(c.WavelengthNM) != len(c.Sigma) {
 		return fmt.Errorf("%w: %q has %d wavelengths and %d values",
-			ErrCrossSectionShape, c.Species, len(c.WavelengthNM), len(c.SigmaCM2))
+			ErrCrossSectionShape, c.Species, len(c.WavelengthNM), len(c.Sigma))
 	}
 
-	for i, s := range c.SigmaCM2 {
-		if s < 0 || math.IsNaN(s) || math.IsInf(s, 0) {
-			return fmt.Errorf("%w: %q sample %d = %g", ErrCrossSectionValue, c.Species, i, s)
+	for i, a := range c.Sigma {
+		if s := a.SquareCentimeters(); s < 0 || math.IsNaN(s) || math.IsInf(s, 0) {
+			return fmt.Errorf("%w: %q sample %d = %g cm²", ErrCrossSectionValue, c.Species, i, s)
 		}
 
 		if i > 0 && c.WavelengthNM[i] <= c.WavelengthNM[i-1] {
@@ -170,7 +171,13 @@ func (c CrossSection) OpticalDepth(dst []float64, grid unit.SpectralGrid, column
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
-	if err := grid.Resample(dst, c.WavelengthNM, c.SigmaCM2, 0); err != nil {
+	// The column is per cm², so the cross section is read in cm² against it.
+	sigma := make([]float64, len(c.Sigma))
+	for i, a := range c.Sigma {
+		sigma[i] = a.SquareCentimeters()
+	}
+
+	if err := grid.Resample(dst, c.WavelengthNM, sigma, 0); err != nil {
 		return fmt.Errorf("atmosphere: cross section %q: %w", c.Species, err)
 	}
 

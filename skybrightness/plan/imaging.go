@@ -130,7 +130,7 @@ func NewImaging(spec Spec) (*Imaging, error) {
 	// second copy free to disagree with the one the estimate used.
 	return &Imaging{
 		spec:         spec,
-		pixelArcsec2: spec.Instrument.PixelSolidAngleSR / constants.ArcsecondSquaredToSteradian,
+		pixelArcsec2: spec.Instrument.PixelSolidAngle.Steradians() / constants.ArcsecondSquaredToSteradian,
 		bandName:     spec.Sky.Band().Name,
 	}, nil
 }
