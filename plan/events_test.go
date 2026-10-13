@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -166,9 +167,18 @@ func TestMoonEvents(t *testing.T) {
 	events, err := MoonEvents(start, end, site, eph)
 	testutil.AssertNoError(t, err)
 
+	// The upper limb is on the horizon: the center sits the Moon's
+	// semi-diameter at that instant below it. This pinned the center at the
+	// mean-semi-diameter threshold until #693.
+	moon := NewMoon(eph)
+
 	for _, e := range events {
 		if e.Kind == EventRise || e.Kind == EventSet {
-			testutil.AssertNear(t, "moonrise/set altitude", e.GeometricAltitude.Degrees(), site.MoonRiseSetThreshold().Degrees(), 0.01)
+			d, err := AngularDiameter(moon, e.Time, coord.NewContext(e.Time, loc, atmosphere.Refraction{}))
+			testutil.AssertNoError(t, err)
+
+			testutil.AssertNear(t, "moonrise/set upper limb", e.GeometricAltitude.Degrees()+d.Degrees()/2,
+				site.RiseSetThreshold().Degrees(), 0.01)
 		}
 	}
 }

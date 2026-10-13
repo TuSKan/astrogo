@@ -54,16 +54,41 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The release exemption below diffs against the base commit.
+          fetch-depth: 0
 
+      # A release pull request folds every fragment into CHANGELOG.md and
+      # deletes them, so it has none of its own, and one naming it would be
+      # left behind and released next time as an entry about this release.
+      # #707, v0.20.0's, needed the no-changelog label for that. The exemption
+      # is by what the pull request does, not only by its branch name: a
+      # chore/release-vX.Y.Z branch that changes anything other than
+      # CHANGELOG.md and fragment deletions still needs its own fragment.
       - name: Require a changelog fragment naming this pull request
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_HEAD: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [[ ",${PR_LABELS}," == *",no-changelog,"* ]]; then
             echo "Labeled no-changelog — skipping."
             exit 0
+          fi
+
+          if [[ "$PR_HEAD" =~ ^chore/release-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            other=$(git diff --name-status --no-renames "$BASE_SHA" HEAD |
+              grep -vE '^M[[:space:]]+CHANGELOG\.md$|^D[[:space:]]+docs/changelog\.d/[0-9]+-[^/]+\.md$' || true)
+
+            if [[ -z "$other" ]]; then
+              echo "Release pull request: it folds the fragments into CHANGELOG.md and adds none."
+              exit 0
+            fi
+
+            echo "A release branch, but it changes more than CHANGELOG.md and fragment deletions:"
+            echo "$other"
           fi
 
           shopt -s nullglob

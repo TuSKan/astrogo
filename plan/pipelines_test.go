@@ -183,15 +183,22 @@ func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 		}
 
 		// Value keeps its geometric meaning at rise and set: it is the residual
-		// against the threshold the solver actually used. If this moved, the
-		// event times would have moved with it.
+		// against the threshold the solver actually used, which for the Moon
+		// is its upper limb, the geometric altitude raised by its
+		// semi-diameter at that instant, against RiseSetThreshold (#693). If
+		// this moved, the event times would have moved with it.
 		switch e.Kind { //nolint:exhaustive // MoonEvents yields only rise, transit and set
 		case plan.EventTransit:
 			sawTransit++
 		case plan.EventRise, plan.EventSet:
 			sawRiseOrSet++
 
-			residual := e.GeometricAltitude.Degrees() - site.MoonRiseSetThreshold().Degrees()
+			d, err := plan.AngularDiameter(moon, e.Time, geometric)
+			if err != nil {
+				t.Fatalf("%s: AngularDiameter: %v", e.Kind, err)
+			}
+
+			residual := e.GeometricAltitude.Degrees() + d.Degrees()/2 - site.RiseSetThreshold().Degrees()
 			if d := math.Abs(e.Value-residual) * 3600; d > toleranceArcsec {
 				t.Errorf("%s: Value is %.6f but the geometric residual against the "+
 					"threshold is %.6f (%.1f arcsec out). Value must stay geometric, "+

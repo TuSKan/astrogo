@@ -6,6 +6,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestRiseAndSetAtAltitudeAgreeWithSkyfield holds the Sun's and the Moon's
@@ -25,6 +26,13 @@ import (
 // USNO cannot check this: its rise/set service ignores height. Until #621
 // the only check was usno_test.go's, that the events moved at least 3
 // minutes from astrogo's own sea-level times.
+//
+// Skyfield was given a fixed horizon, so for the Moon this compares the
+// center at MoonRiseSetThreshold's mean semi-diameter, through the solver
+// with that threshold. MoonEvents itself puts the upper limb on the horizon
+// with the semi-diameter of the instant (#693), which
+// TestMoonEventsPutTheUpperLimbOnTheHorizon holds; what this test is for is
+// the height.
 func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 	t.Parallel()
 
@@ -71,7 +79,7 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 
 		events := SunEvents
 		if c.body == "Moon" {
-			events = MoonEvents
+			events = moonCenterEvents
 		}
 
 		got, err := events(start, end, site, eph.Default())
@@ -108,4 +116,17 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 			t.Errorf("%s %s %v, Skyfield %v, %.2f s apart", c.body, c.kind, found[0], want, d)
 		}
 	}
+}
+
+// moonCenterEvents is MoonEvents with the Moon's center held to
+// MoonRiseSetThreshold, the fixed horizon a reference computed that way was
+// given, rather than its upper limb to RiseSetThreshold.
+func moonCenterEvents(start, end time.Time, site *Site, prov eph.Provider) ([]Event, error) {
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    NewMoon(prov),
+		Observer:  site,
+		Threshold: site.MoonRiseSetThreshold(),
+	}, start, end)
 }

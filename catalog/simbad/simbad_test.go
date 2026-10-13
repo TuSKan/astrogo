@@ -610,3 +610,28 @@ func TestBuildSearchQueryIsAnchoredAndOrdered(t *testing.T) {
 		t.Errorf("search has no ORDER BY, so its results are not reproducible:\n%s", q)
 	}
 }
+
+// TestNoQueryOrdersByAQualifiedColumn holds every query this package sends to
+// SIMBAD's rule that ORDER BY takes no table.column: its parser answers
+// "Incorrect ADQL query: Encountered '.'" and an HTTP 400. BuildBrightQuery
+// learned that against the live service, and BuildSearchQuery broke it with
+// basic.main_id as a tie-break, which failed every Search (#705). Offline,
+// so it catches the next one without a network.
+func TestNoQueryOrdersByAQualifiedColumn(t *testing.T) {
+	t.Parallel()
+
+	for name, q := range map[string]string{
+		"BuildResolveQuery": BuildResolveQuery(resolve.ObjectRequest{Query: "M42", Limit: 10}),
+		"BuildSearchQuery":  BuildSearchQuery(resolve.ObjectRequest{Query: "M42", Limit: 10}),
+		"BuildBrightQuery":  BuildBrightQuery(resolve.BrightRequest{MaxVMag: 2, Limit: 50}),
+	} {
+		_, orderBy, found := strings.Cut(q, "ORDER BY")
+		if !found {
+			continue
+		}
+
+		if strings.Contains(orderBy, ".") {
+			t.Errorf("%s orders by a qualified column, which SIMBAD rejects: ORDER BY%s", name, orderBy)
+		}
+	}
+}

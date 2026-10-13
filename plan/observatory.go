@@ -546,14 +546,19 @@ func (s *Site) SunRiseSetThreshold() angle.Angle {
 	return angle.Deg(-sunSemiDiameter - s.horizonRefraction() - s.HorizonDip().Degrees())
 }
 
-// MoonRiseSetThreshold returns the rise/set altitude threshold for the Moon.
-// Follows the same convention as SunRiseSetThreshold: the Moon rises when
-// its geometric center reaches:
+// MoonRiseSetThreshold returns the rise/set altitude threshold for the
+// Moon's center at its mean semi-diameter, on the convention of
+// SunRiseSetThreshold:
 //
-//	alt = −(semi-diameter + standard refraction + horizon dip)
+//	alt = −(mean semi-diameter + standard refraction + horizon dip)
 //
-// The Moon's mean semi-diameter is ~15.5' (varies with parallax, handled
-// by the topocentric correction in GeocentricToObserved).
+// It is the mean, 15.5′. The Moon's semi-diameter follows its distance, from
+// 14.7′ to 16.8′, which the topocentric correction in GeocentricToObserved
+// does not change: that moves the Moon's center by its parallax. So the
+// threshold is off by up to 1.3′, and a moonrise against it by up to 28 s
+// at 60°N. [MoonEvents] uses [Site.RiseSetThreshold] with
+// [EventSpec.UpperLimb], which takes the semi-diameter at each instant;
+// this is for a check at one instant that can carry that error (#693).
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
 	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
 

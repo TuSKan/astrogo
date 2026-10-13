@@ -41,8 +41,8 @@ const maxEpisodeSearchSteps = 10
 // almanac horizon plan.RiseSetThreshold documents, the one VisibilityEvents
 // uses: 34′ of refraction plus the site's dip. Neither adds a semi-diameter
 // the way SunEvents/MoonEvents do for their specific bodies; a caller
-// wanting that runs its own solver with site.SunRiseSetThreshold() or
-// MoonRiseSetThreshold() instead.
+// wanting that runs its own solver with site.SunRiseSetThreshold(), or for
+// the Moon with RiseSetThreshold() and EventSpec.UpperLimb.
 func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Event, error) {
 	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
 		Family:    EventFamilyVisibility,

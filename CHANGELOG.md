@@ -7,6 +7,1940 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-10-09
+
+### Added
+- **A tripwire for astrogo's two leap-second sources.**
+`TestLeapSecondSourcesAgree` compares NAIF's kernel against the table compiled
+into gofa in both directions — every kernel entry, plus an independent
+1972–2035 sweep that is the half able to see an entry beyond gofa's last one.
+They agree today; when they stop, the pinned table is stale (#143).
+- **The leap-second table is now validated, not just cross-checked.**
+The complete 28-entry published ΔAT record is pinned and asserted against
+gofa's table, including the half-open boundary convention at every step. A new
+`validation`-tagged suite re-verifies it against the IERS timescale service —
+the one reference that does not share ancestry with gofa, NAIF and finals2000A. (#148)
+- **A guard that makes the LSK prove its own coverage.** Every assignment in the
+kernel's data block must be one the parser models, and every constant the
+parser claims must be non-zero — so an unrecognized keyword in a future kernel
+revision fails a test instead of being silently dropped, which is how the
+relativistic constants went unread for a release. (#148)
+- **Tests for the catalog error contract.** `resolve.Drain` is covered, and the
+Resolver's semantics are pinned directly: a provider failure is never reported
+as `ErrNotFound`, a canceled context is caught before any provider is
+consulted, `ErrUnsupported` is an answer rather than an incident, and one
+broken provider neither denies an answer another gave nor suppresses partial
+`Search` results. (#151)
+- **A guard that compiles the README's Go blocks.** `docsguard` proved a cited
+name is *declared*; it could not prove a program *builds* — which is how
+`coord.NewContext(epoch, observer, atmosphere.Atmosphere{})` survived a release
+under the sentence claiming every sample was compiled and run. All 17 blocks
+are now type-checked, and four broken samples are fixed. (#155)
+- **The third altitude pipeline is now compared against the other two.** A
+satellite joins the constraint-versus-details guard — the body class with the
+most parallax of all — and the events pipeline is pinned against its own
+convention, which turned out to differ by event kind: `Event.Altitude` is
+geometric at rise and set and refracted at transit (#156).
+- **A ΔAT table can now be registered, so a new leap second no longer needs a
+release.** `time.RegisterLeapSeconds` installs a published table process-wide;
+`LeapSecondSource`/`ResetLeapSeconds` mirror the EOP registry. Registration is
+superset-only — a table that contradicts the built-in record below its last
+step is refused, which is what makes registering late safe. `jpl.NewProvider`
+registers its kernel's `DELTA_AT` block, so `time`'s scale conversions and the
+ET the SPK is evaluated at follow one source (#143).
+- **A `logging` package replaces the three production writes to the global `log`
+package**, whose output went wherever `log.SetOutput` last pointed. It is the
+only package in astrogo that imports `log/slog`; everything else calls
+`logging.Info`/`logging.Warn`, which name no slog type. Progress lines are
+`Info` and discarded by default; the EOP-unavailable message is `Warn` and
+still emitted, because `Time.EOP` has no error return and that line is the only
+notice a caller gets that topocentric accuracy silently dropped, by up to 13.5 arcsec.
+`logging.Set(nil)` restores the default, `slog.DiscardHandler` silences
+everything (#108).
+- **CI now re-checks every open pull request when `main` moves.** A PR's own
+checks test it merged into its base, but nothing re-runs them when the base
+advances — so a PR can sit green while the branch it would merge into changes
+underneath it. #169 did exactly that: it merged with no textual conflict and
+did not compile, because #165 had meanwhile rewritten the function it touched.
+The new job trial-merges each open PR into the pushed commit and builds the
+result (#169).
+- **SGP4 is now verified against Vallado's reference vectors** (AIAA 2006-6753),
+checked in and run by the `validation` tier: 588 states over 30 element sets,
+reported as a distribution. 22 cases agree to p50 35 m / max 289 m; 8 diverge by
+0.6–3440 km, asserted from both sides so neither a regression nor a fix passes unnoticed. (#181)
+- A guard keeps the six hand-written `go-version` pins in the CI workflows on the same
+minor version as `go.mod`. They are deliberately decoupled from `go-version-file`
+(#109), which is safe but invisible: the day `go.mod` moves past 1.25, every job would
+silently start downloading a toolchain again while CI stayed green. (#183)
+- A guard holds `time`'s exported package-level vars to a documented inventory of eight,
+each recording why Go leaves no alternative — six error sentinels, `LocationUTC` (which
+wraps the standard library's own mutable `time.UTC`) and `J2000` (#113).
+- **Every parser that reads bytes astrogo did not produce is now fuzzed** — `fits`
+(3 targets), `ephemeris/satellite` (2), `catalog/norad`, `internal/votable` and
+`time/internal/iers`, joining the existing SPK targets. Seeds are literals, so the
+corpora run in ordinary CI; two crashers they found are checked in as regressions (#139).
+- Tests for four exported symbols that had no reference anywhere in the module — not a
+caller, not a test, not an example: `plan.EventAnyPhase` (a documented four-phase
+wildcard nothing had ever passed), `plan.NewEarth`, `plan.WithStep` and
+`time.FileEOPLoader` (no longer exists; `time.FSEOPLoader` replaced it in #509), the recommended no-dependencies EOP path (#106).
+- Runnable `Example` functions for `time`, `coord`, `ephemeris`, `atmosphere`, `magnitude`
+and `catalog` — the task each package exists for, on pkg.go.dev's front page. All but
+`catalog`'s carry an `// Output:` comment, so they are executed and diffed by every
+`go test` rather than merely compiled (#141).
+- **`time.GPST` — GPS system time, the scale a satellite user most often actually holds.**
+A receiver timestamp had no way to say what it was; calling it UTC is 18 s wrong today,
+which is 138 km of ISS track. GPST is TAI − 19 s exactly, so the conversion is arithmetic
+and cannot fail. Galileo shares it; BeiDou and GLONASS do not (#145).
+- Tests for a **negative** leap second — permitted since 1972, never yet observed, and
+projected for about 2030. They cover ΔAT stepping *down* through both the TAI and TT
+branches, UTC↔TAI staying inverse across it, and that widening the record check from
+"+1" to "|step| = 1" did not widen it into nothing (#147).
+- Offline tests for `skybrightness/dataset/solar`'s CALSPEC parse path, taking it from 22.9%
+to 71.4% — the unit conversion (Å→nm, erg s⁻¹ cm⁻² Å⁻¹→W m⁻² nm⁻¹, derived independently),
+the row filters, the negative-flux clamp, both float widths, and the padded column names a
+real CALSPEC file actually carries (#122).
+- **`remote.RetryPolicy` — the extension point `remote.ErrRetriable` had been documenting for
+months without it existing.** A per-client `func(remote.Attempt) bool`, with
+`remote.DefaultRetryPolicy` exported so a custom one can defer to it rather than restate the
+429 / 5xx-except-501 / no-response rule. (#195)
+- Offline tests for `skybrightness/dataset/dust`'s I/O paths, taking it from 37.5%
+to 96.5% — the IRSA fetch and its cache (a second session asks nothing, a cell is
+asked once, a run cut off keeps what it paid for, a corrupt line costs one
+sightline) and every reason `SFD.Open` refuses a hemisphere, against synthetic
+SFD-shaped FITS built in the test (#122).
+- `time.Date` reports a `23:59:59` that a registered ΔAT record says was removed
+by a negative leap second — the mirror of the `23:59:60` warning, on the same
+terms. None has ever been announced, which is why it is written now: Levine,
+Tavella & Milton (2023) project one by about 2030 and warn that never having
+happened is what makes errors near-certain when it does (#147).
+- `time.Time.LeapSmearWindow` reports whether an epoch falls within a day of a
+leap second and names the step. An NTP-disciplined host may be deliberately
+wrong by up to 0.5 s for up to 24 hours around one — 3.8 km of ISS ground track
+— and no library can detect it, so this says where the question arises rather
+than answering it (#146).
+- `time.BDT`, the BeiDou system time scale, and `Time.BDT()`. TAI − 33 s exactly,
+so BDT − UTC is 4 s today and BDT − GPST a permanent 14 s. Four seconds reads as
+a rounding difference and is 30 km of ISS ground track, which is the argument
+for a name rather than an offset the caller subtracts. GPST and BDT also join
+the scale round-trip matrix, which covered neither (#145).
+- CI runs `apidiff` between a pull request's head and its base, and fails when the
+exported API changes incompatibly with no fragment declaring it. Nineteen minor
+releases in eight weeks is fine pre-1.0 only if the breaking diff is
+machine-reported rather than found by a downstream build (#121).
+- Offline tests for `catalog/fink`'s SSOFT bulk-table path, taking the package
+from 30.7% to 87.0% — the parquet load and the fit/status filter on it, the four
+ways the download is not the table, the JSON coercions the single-object
+endpoint needs, and absence against failure in `Search` and `ResolveObject`
+(#122).
+- Offline tests for `skybrightness/plan`, 39.4% to 90.9% — the request reaching
+the model, each failing step naming itself, the band being the sky's own, and
+depth deepening with exposure, all against a sky assembled from synthetic inputs
+through the real `skybrightness.Model` (#122).
+- Four `plan` constraints: `SunSep` (the companion to `MoonSep` for the other
+bright source), `GalacticLatitude` (distance from the plane, unsigned so it
+serves both the surveys that avoid it and those that want it), `TimeWindow` (a
+coordination window or a deadline, the constraint with nothing to do with the
+sky), and `Horizon`, which is the first consumer of `WithHorizonProfile` — the
+per-azimuth terrain limit `Altitude` cannot express (#129).
+- `plan.NewMPCSite(ctx, code)` and `plan.MPCObservatories(ctx)` resolve the IAU
+Minor Planet Center's ~2,700 observatory codes to a `*Site`, recovering each
+position from the published parallax constants. `MPCObservatory.ResolutionM`
+reports how finely a row was published — from ±3 m to ±3.2 km — because the
+register mixes both and a recovered height does not say which it is. New
+`remote.MPCObsCodes` endpoint, download-gated like every other bulk fetch
+(#125).
+- `catalog/mpcorb` reads the Minor Planet Center's own orbital-element files —
+`MPCORB.DAT` and its NEA/Distant/PHA/Unusual cuts — as a streaming
+`iter.Seq2[resolve.Target, error]`, at the full published precision SBDB
+rounds to three significant figures. gzip is detected from the stream, the
+packed epoch is decoded through the exported `ParseEpoch`, and a Target feeds
+`plan.FromCatalog` unchanged. New `remote.MPCORB` endpoint (#128).
+- `coord.FK4`, `coord.FK4ToICRS` and `coord.ICRSToFK4` read and write B1950
+positions, so a catalogue built on the Palomar or ESO/SERC surveys can be
+pointed at — treating one as J2000 misses by about 0.7°. Two constructors,
+because "the catalogue recorded no proper motion" and "the proper motion is
+zero" convert to places 0.04″–0.25″ apart: FK4's equinox drifts, so a star at
+rest in it is moving in FK5 (#126).
+- `internal/leakcheck` fails a package's tests when Go 1.27's `goroutineleak`
+profile proves a goroutine leaked, naming each survivor and where it started.
+Installed in the two packages that fan out — `internal/parallel` and `catalog`
+— both of which measure clean, including against the live services (#234).
+- Allocation contracts for `coord`, `time` and `atmosphere`'s hot paths, as
+ordinary tests that fail a build — `allocs/op` is deterministic where `ns/op`
+on a shared runner is not. The Benchmarks CI job now reports a `benchstat`
+delta in its job summary instead of uploading numbers nothing reads (#249).
+- A guard reporting exported symbols in `internal/` packages that nothing in the
+module names — narrow on purpose: the broad version #106 proposed reports 173
+of 581 exported functions, almost all of them public API (#252).
+- `ephemeris.AstrometricState` returns the astrometric place — the target
+retarded by light time with the observer left where it is — which is the
+quantity JPL Horizons publishes as quantity 1 and the one a consumer applying
+its own aberration needs (#254).
+- The topocentric cross-track bias is localised to Earth rotation. Against USNO —
+an independent NOVAS implementation — geocentric apparent declination has a
+signed mean of −0.027″ while GHA has +0.662″, and declination cannot see Earth
+rotation, so the apparent-place chain is clean and 0.66″ is 44 ms of UT1 (#254).
+- A geocentric astrometric comparison against Horizons, with no Earth Orientation
+Parameter in the path: agreement is zero to the ~3.6 µas Horizons prints, which
+places the ~0.52″ topocentric cross-track bias downstream of the ephemeris and
+the light-time solution rather than in them (#254).
+- An offline tier that isolates the Earth-orientation *coupling* from the
+Earth-orientation *data*: varying UT1 and the pole by known amounts and
+asserting astrogo responds by the amount physics requires. Modeled on
+Skyfield's pinned-input NOVAS comparison, but checked against the sidereal
+rate rather than a second implementation (#254).
+- `core.ID` and `jpl.NAIFFor` now document which bodies are system barycenters
+rather than planets — the giant planets are, and the gap is 0.03–0.05″ against
+a reference that defaults to the body center. A test pins the numbers and the
+center-versus-barycenter split (#258).
+- `docsguard` now catches a dependency bumped in the root module but not mirrored
+into `examples/`. The examples module carries the library's dependencies as
+indirect requirements, and a stale copy makes `go build ./...` inside it refuse
+outright — previously visible only after a push, from CI (#259).
+- Every geocentric stage of the observed-place pipeline is now excluded by
+measurement — ephemeris, light time, apparent RA and Dec, Earth rotation, polar
+motion, all within 0.05″ of Horizons — leaving the topocentric step itself as
+the sole remaining suspect for the ~0.5″ azimuth residual (#260).
+- `coord/sofareference_test.go` pins astrogo's topocentric reduction against
+SOFA's `iauAtco13` over 210 site/direction/epoch combinations, offline, at a
+measured maximum of 0.000″ against a 1 µas contract. It is what excludes the
+last stage of the observed-place pipeline as the source of the ~0.5″ azimuth
+residual (#260).
+- Offline tests for the apparent-place failure paths #263 added: each of the four
+provider fetches is made to fail on its own and asserted to report *which* one
+did, and the three degenerate deflection geometries are pinned as returning the
+place undeflected rather than NaN (#265).
+- `coord.Reduction`'s fields now say what they are and how they relate. Two are
+positions and two are directions, and since #262 put diurnal aberration on the
+direction path, rotating `Topocentric` by hand no longer reproduces `Geometric`
+— they differ by up to 0.32″, which is now measured by a test rather than left
+to be discovered (#267).
+- **`fits.WCS.CUnit` exposes the axis units the header declares**, which astrogo
+did not read at all. `PixelToWorld` returns CRVAL plus a linear offset for any
+non-celestial axis, so its value was correct in a unit no part of the API could
+name — meters or Angstrom for a spectral axis, seconds or days for a time one.
+Both transforms now also document what they return: degrees for celestial axes,
+each other axis in its own `CUNITi` (#178).
+- **GCS, Azure Blob Storage and SFTP join S3 as opt-in bucket backends** —
+`remote/file/{gcs,azure,sftp}`, each a blank import with zero exported symbols registering
+`gs://`, `azblob://` and `sftp://`. Every connection detail rides in the endpoint URL, so
+`remote.SetDataDir("gs://my-bucket")` is the whole configuration. Verified: each pulls only
+its own SDK, and a build that opens none links none of them. (#274)
+- **`remote.Client` scopes I/O policy to a component instead of a process.** Offline mode,
+download consent, endpoint URLs and the cache location are now a value: `remote.NewClient()`,
+configure it, hand it to the component that owns it. An HTTP handler can be offline-only
+while a background prefetcher downloads, in one binary. The package-level functions operate
+on `remote.Default()` — the `http.DefaultClient` analogue — so nothing changes for a program
+with a single policy. Closes #114. (#274)
+- **`remote.HTTPError` is reachable again**, along with `RetryPolicy`, `Attempt`,
+`DefaultRetryPolicy` and `ErrRetriable`. #195 removed the old `remote.HTTPError` because
+it was a second, identically shaped type and `errors.As` against the wrong one failed
+silently; these are aliases for the subpackage's own types, so there is one type with two
+names and nothing to pick wrongly. (#274)
+- **The FITS conventions real files use, in both directions.** HIERARCH keywords and CONTINUE
+long strings (previously mangled and truncated on *read*, not merely unwritten); unsigned
+images through BZERO; DATASUM and CHECKSUM on every HDU, satisfying the sum-to-all-ones test
+cfitsio and astropy apply; TNULL and NaN so a missing table value stays missing; vector
+columns, which used to decode as nulls and discard every value; and ASCII tables, whose
+reader consumed the payload without decoding it (#127).
+- **`fits.Write` — the package writes FITS as well as reading it.** Images at every BITPIX
+(uint8, int16/32/64, float32/64) and binary tables built from an Arrow batch, to any
+`io.Writer`. Structural keywords are derived from the data rather than copied from the
+stored header, so a filtered table or a replaced image cannot produce a file whose header
+describes something it does not contain. A card that will not fit the 80-byte record is an
+error rather than a truncation, since an over-long card shifts every card after it. The primary header carries `EXTEND` when extensions follow, and a non-finite `BSCALE`/`BZERO` is refused rather than written as text no reader can parse (#127).
+- **`time.TCG` and `time.TCB` — the two coordinate time scales.** TCG is the geocentric
+frame's coordinate time (TT rescaled by L_G, 22 ms/year) and TCB the barycentric frame's
+(TDB rescaled by L_B, 0.49 s/year), which is what relativistic geodesy, orbit integration
+and pulsar timing are quoted in. Both convert to and from every other scale and are exact
+in both directions; verified against SOFA's own published values for `iauTttcg`,
+`iauTcgtt`, `iauTdbtcb` and `iauTcbtdb` (#126).
+- `coord.FK5`, `coord.FK5ToICRS` and `coord.ICRSToFK5` read and write FK5 J2000
+positions, and `coord.FK4ToFK5`/`coord.FK5ToFK4` expose the classic B1950 ↔
+J2000 conversion that was previously buried inside `FK4ToICRS`. A catalogue
+that says "J2000" is usually FK5, not ICRS, and the two differ by the ~20 mas
+frame bias plus an epoch-dependent spin — so, like FK4, each direction has a
+position-only route and a six-element one (#126).
+- `coord.SkyOffset` is a frame centered on a target, so positions near it can be
+given as offsets — dither and mosaic patterns, offset guide stars, slit
+layouts, finder charts. It is a rotation of the sphere rather than a projection
+onto a plane, which is the difference between it and subtracting coordinates: a
+point one degree due east of a target at δ = 80° differs from it by 5.7° of
+right ascension and by three arcminutes of declination (#126).
+- `coord.LSRCorrection` refers a barycentric radial velocity to the Local
+Standard of Rest, which is the frame Galactic work is quoted in — the Sun's own
+18 km/s through its neighbourhood otherwise sits in every measurement. It takes
+an `LSRKind` rather than choosing: Schönrich, Binney & Dehnen (2010) and
+Delhaye (1965) disagree by 2.1 km/s, so a v_LSR quoted without naming its
+convention carries that much ambiguity. `coord.LSRApex` reports the direction
+and speed each one implies (#126).
+- `coord.Context.ICRSToITRS` and `ITRSToICRS` expose the rotation between the
+celestial frame and the rotating Earth — station coordinates, ground tracks,
+anything Earth-fixed. The matrix was already built and cached for every horizon
+transform, so this is a matrix multiply rather than a second implementation,
+and a test now pins the cached factored form as bit-identical to SOFA's
+one-call `C2t06a` (#126).
+- `coord.TETE` is the apparent place referred to the true equator and true
+equinox of date — what almanacs and most telescope control systems mean by
+"apparent RA and Dec". `coord.Context.CIRSToTETE` converts to it from
+`coord.CIRS`, which measures right ascension from the Celestial Intermediate
+Origin instead. The two are apart by the equation of the
+origins: **20.3 arcminutes in 2026**, growing by 46 arcseconds a year (#126).
+- `coord.Supergalactic` puts the flattened sheet of nearby bright galaxies on the
+equator — the Local Supercluster, with the Virgo cluster near its center — the
+way Galactic coordinates do for the Milky Way's disc. `ICRSToSupergalactic` and
+`SupergalacticToICRS` convert. The de Vaucouleurs pole at Galactic l = 47.37°,
+b = +6.32° is only 6.32° off the Galactic plane, so the two planes are nearly
+perpendicular: the supercluster is cut in half by the zone of avoidance (#126).
+- `coord.SunBarycentric`, `BarycentricToHeliocentric` and
+`HeliocentricToBarycentric` move a position between the solar system
+barycenter and the center of the Sun — the HCRS frame, which keeps the ICRS
+axes and shifts only the origin. That shift reaches 0.009 AU, nearly two solar
+radii, so it is half a degree seen from one AU and nine milliarcseconds seen
+from a parsec. Unlike every other frame here it is a translation rather than a
+rotation, so it takes a position vector rather than a direction (#126).
+- `docs/sgp4.md` — the design for a from-scratch SGP4 at
+`ephemeris/satellite/sgp4`, and the measurement behind it: the divergences
+astrogo's Vallado suite has been reporting are one transcription error in the
+current dependency, `128.0` where the algorithm says `120.0` in the s⁴ drag
+coefficient. [#309] (#310)
+- `constants.WGS72` — the World Geodetic System 1972 realization that every
+two-line element set is expressed in, as its own `Set` alongside `WGS84`.
+`WGS84Set` also gains the `GeocentricGravitationalConstant` its own comment
+named as the fourth defining parameter without carrying it, so the two sets
+can be compared member for member. (#311)
+- `spk.ErrHorizonsInternalFault` and `spk.TransientHorizonsFault` separate a JPL
+Horizons outage from a Horizons refusal. Both arrive as HTTP 200 with a
+well-formed body and mean opposite things: one resolves itself, the other never
+will. Retry logic and astrogo's own live-network tests now branch on the
+difference instead of treating every refusal alike. [#312] (#313)
+- `ephemeris/satellite/sgp4` — a public SGP4 package written from Vallado's
+published algorithm, starting with its element-set layer: `Elements`,
+`ParseTLE`/`ParseTLEName`, `VerifyTLEChecksums` and the `Gravity` models.
+Checksum verification is a separate call from parsing, which is what makes
+Vallado's three deliberately-bad-checksum cases readable and takes astrogo's
+coverage of its own reference suite from 30 of 33 to 33 of 33. No propagation
+yet — see `docs/sgp4.md`. [#310] (#316)
+- `ephemeris/satellite/sgp4` gains the near-Earth propagator: `New`, `At`
+(minutes from epoch as a float), `AtTime`, and the model's own branch
+predicates. Measured against Vallado's reference states it agrees to a maximum
+of **9 nanometers** across 158 states — and the three near-Earth cases the
+current dependency misses by up to 3438 km agree to 6 nanometers, confirming
+the diagnosis in [#309]. Deep space (SDP4) is next. [#310] (#317)
+- `ephemeris/satellite/sgp4` gains the deep-space (SDP4) path — lunisolar
+periodics, geopotential resonance, and the Lyddane formulation. All **33** of
+Vallado's reference cases now run, 666 states, agreeing to a maximum of 4.1e-06
+km. Every one of the seven divergences astrogo has been reporting against the
+current dependency is gone, including the one [#309] predicted would survive.
+Vallado's three error-return cases are exercised for the first time. [#310] (#319)
+- `docs/storage.md` — the design for replacing `gocloud.dev/blob` with the
+standard library's `io/fs`, plus three small interfaces for the things `io/fs`
+lacks (streaming writes, delete, and a context). The measurement behind it:
+importing `astrogo/plan` links 433 packages, 107 of them gRPC, protobuf and
+OpenTelemetry that `gocloud.dev/blob` pulls in unconditionally so it can emit
+traces nobody consumes. `time`, `coord` and `ephemeris` link none. (#321)
+- `remote/file` gains an `io/fs`-based storage core: `File` (`fs.File` +
+`io.ReaderAt` + `io.Seeker`), the `CreateFS`/`RemoveFS`/`ContextFS` extension
+interfaces, a scheme registry, and a `file://` backend. It sits alongside the
+gocloud path for now. The new backend fixes [#315]: staging is named from the
+process id and an atomic counter rather than a clock that does not advance on
+Windows, and happens inside the tree so the rename cannot cross a volume. (#322)
+- `remote/file`'s `io/fs` core gains `http`/`https` and `mem://` backends. The
+HTTP one is read-only by design — no astrogo source accepts a write — and keeps
+one body open across sequential reads while each `ReadAt` takes its own range.
+`mem://` exists for the write path that `fstest.MapFS` cannot cover, keyed by
+URL host so two opens can share a store or deliberately not. (#324)
+- **Round-trip tests over all six elements, for every conversion between the
+frames that carry kinematics.** ICRS, FK5 and FK4 give six directed
+conversions; each is now exercised over a grid of eight sky positions crossed
+with five kinematic profiles — 240 cases — asserting position, both proper
+motion components, parallax and radial velocity. The existing tests compared
+positions, which is how [#278] shipped: the proper motion was wrong by
+0.6–0.9 mas/yr while the position closed to 19 µas. The matrix also turned up
+[#331], where a conversion silently needs a non-zero parallax. (#332)
+- `coord.LSRKinematic` is the kinematic Local Standard of Rest — what radio
+spectroscopy means by "LSR", and what a spectral line's velocity is quoted
+against unless a paper says otherwise. It joins the two dynamical kinds in
+`LSRCorrection` and `LSRApex`. Unlike them it is published as an apex rather
+than as Galactic components — 20 km/s toward RA 270°, Dec +30°, **B1900
+equinox** (Gordon 1975) — so astrogo derives the ICRS vector from that
+statement rather than copying a converted one. The B1900→B1950 step uses IAU
+1976 precession where Newcomb's is correct, which is measured rather than
+assumed: 0.55″ of direction and 5.4 cm/s against Astropy's independent
+realization of the same definition. Closes [#295]. (#333)
+- `coord.Galactocentric` and `coord.GalactocentricFrame` express a position in
+the right-handed Cartesian frame centered on the Galactic center, in parsecs —
+the frame a rotation curve, a disc scale height or a stellar stream is actually
+written in. `GalactocentricFrame.FromICRS` takes the distance as an explicit
+argument rather than reading `ICRS.Dist`, whose unit depends on the subsystem
+that filled it in, and `coord.ParallaxDistance` converts a catalogue parallax
+into the parsecs it wants. Measured parameters are arguments (R₀ = 8178 pc,
+GRAVITY Collaboration 2019; z☉ = 20.8 pc, Bennett & Bovy 2019); the orientation
+is not, so the axes come from the IAU Galactic frame this package already
+implements rather than from a second definition that could drift from it.
+Verified against Astropy's independent parameterisation of the same frame,
+which astrogo never writes down: 0.33″ in the Galactic-center direction and
+0.12″ in the roll, both of which are Astropy's rounding of the shared
+convention. Positions only — astrogo has no space-velocity type, so a
+Galactocentric *velocity* is not yet expressible. This was the last frame on
+the [#126] checklist; the general transform graph on it remains open. (#334)
+- `coord.SpaceVelocity` returns a target's velocity with respect to the solar
+system barycenter in km/s, as Cartesian components on the ICRS axes, and
+`coord.SpaceSpeed` its magnitude. Proper motion is an angular rate and radial
+velocity is a linear one, so neither can be compared with the other; this is the
+combination that Galactic UVW velocities, cluster membership tests and orbit
+integrations all start from, and astrogo had no way to compute it. Validated
+against Barnard's Star at 142.5 km/s, a figure published independently of this
+library, and internally against the classical v = 4.74047·μ·d identity. Both
+report a bool rather than a velocity when the target records no kinematics or no
+usable parallax: unlike a frame conversion, where the distance divides out and
+#331's fix exploits that, turning an angular rate into km/s genuinely needs the
+distance — the same 150 mas/yr is 7 km/s at 10 pc and 700 at a kiloparsec — so
+there is nothing to return rather than a plausible figure built on a distance
+nobody supplied. This is the first of the three pieces [#335] needs before
+`Galactocentric` can carry velocities; the frame-specific parts follow
+separately. (#343)
+- `coord.Galactocentric` now carries a velocity as well as a position.
+`GalactocentricFrame.FromICRS` attaches one in km/s whenever the target's
+kinematics can supply it, `Galactocentric.Velocity` reports whether it did, and
+`ToICRS` reconstructs catalogue proper motion, parallax and radial velocity on
+the way back, so the pair is a real inverse rather than one that silently drops
+half the state. The Sun's velocity is a third measured frame parameter beside R₀
+and z☉, and `coord.SolarVelocityFromSgrA` derives it rather than copying a
+triple: the rotational component is the Sun's distance times the apparent proper
+motion of Sgr A* (6.379 ± 0.024 mas/yr, Reid & Brunthaler 2004), which is the
+reflex of the Sun's own orbit, while the radial and vertical components are its
+peculiar motion with respect to the LSR (Schönrich, Binney & Dehnen 2010, already
+cited here for `LSRDynamical`). Deriving it means the rotational component tracks
+whatever R₀ the frame was built with, so a frame cannot mix one paper's distance
+with another's velocity — and it reconstructs Astropy's own number exactly:
+evaluated at their R₀ of 8122 pc it gives 245.6049 km/s against their published
+245.6, because their V *is* R₀ × μ. Closes [#335]. (#344)
+- `remote.ErrNotServingData` lets a caller tell "the archive is down" from "the
+archive sent nonsense". Archives serve their own failures — a maintenance
+notice, a load shedder, a login wall — as an HTML page with a **200**, so
+nothing before the parser can tell, and both cases used to arrive as an opaque
+error string. They want opposite handling: a web page should be retried later, a
+malformed payload should not be retried at all, and without the distinction the
+honest options were to retry everything or to retry nothing. `catalog/gaia`,
+`catalog/simbad`, `catalog/vizier` and `skybrightness/dataset/starlight` now
+report it, and `remote.LooksLikeHTML` is the shared leading-bytes check they use
+— deliberately not a content-type sniffer, since a VOTable is XML too and
+telling those apart is the whole point. The sentinel lives in `remote` rather
+than beside a parser because the condition is a statement about what the
+endpoint did, not about the payload, and because `skybrightness` cannot import
+`catalog` without inverting the layering — a sentinel on `catalog/resolve` would
+have served the providers and forced the dataset tier to invent a second name
+for the same thing. Detection stays with the parsers, which are the only code
+that knows what the payload should have looked like. Closes [#300]. (#347)
+- `unit.Length` and `unit.Velocity` are named `float64` types carrying meters and
+meters per second, with constructors and accessors for every unit astrogo
+speaks — `unit.AU`, `Km`, `Pc`, `Meters`, `KmPerSec`, `AUPerDay` and the
+readers that match. They are the pattern `angle.Angle` already uses, extended
+to the two dimensions the API was passing as bare `float64`. Measured, a named
+`float64` is indistinguishable from the `float64` it replaces (1.88 ns against
+1.88 ns scalar; 1887 ns against 1888 ns over a 1000-element batch; 8 bytes
+either way), while `unit.Quantity` is 56 bytes and 14.3× slower over that batch
+— neither allocates, so the difference is width and cache pressure rather than
+the heap. New allocation contracts in `unit` hold that claim. The constructors
+read their scale factors from this package's own `Unit` table rather than from
+constants of their own, so a `Length` and a `Quantity` cannot come to disagree
+about how long an astronomical unit is; `Length.Quantity` and `unit.LengthFrom`
+bridge the two when a value has to compose dimensionally. (#353)
+- **`unit.Duration`**, an elapsed time stored in seconds, with `Seconds`,
+`Minutes`, `Hours`, `Days` and `JulianYears` constructors and matching
+accessors. `unit.JulianYear` joins the unit table as 365.25 days exactly.
+It is the third named scalar after `Length` and `Velocity`, and the one they
+implied: `Velocity` is declared as `Meter.Div(Second)`, so the package has been
+doing time arithmetic since it was written without a type for it.
+`time.ToGoDuration` and `time.FromGoDuration` convert to and from the standard
+library's `time.Duration`, which remains what a timeout, a ticker or a sleep is
+measured in. `ToGoDuration` reports whether the value fit, since an int64
+nanosecond count stops just past ±292 years. (#363)
+- `Time.UT1Using(dut1)` converts to UT1 with a UT1−UTC the caller already holds,
+for code that caches Earth orientation parameters; `Time.UT1` is built on it. Adding
+DUT1 to a UTC Julian Date by hand is wrong by up to a second on a day that ends
+in a leap second, and only `time` knows which days those are. (#381)
+- **Every planet's magnitude is pinned to JPL Horizons.**
+`TestPlanetMagnitudesAgreeWithHorizons` holds Mercury, Venus, Jupiter, Uranus
+and Neptune to 0.02 mag at 29 dates across their phase ranges (measured: 0.007
+at worst). Mars is held to 0.1 mag, because the rotation and orbital-longitude
+corrections of Mallama & Hilton (2018) are not yet applied (#389).
+- **Comets on open orbits propagate from the catalogs.** `resolve.Target` carries
+the comet form of its elements (`PerihelionDistance`, `PerihelionTime`), SBDB
+decodes it, and `plan.FromCatalog` builds an orbit with e >= 1 from it instead
+of dropping it to the kernel path. `mpcorb.Read` and `mpcorb.Open` read the
+MPC's `CometEls.txt` too, all 959 comets, 118 of them on open orbits (#374).
+- **Parabolic and hyperbolic orbits in `ephemeris/kepler`.**
+`kepler.FromPerihelion` (and `eph.ElementsFromPerihelion`) builds elements
+from perihelion time, distance and eccentricity, the MPC's comet form, for
+any e >= 0, and propagates them by universal variables. It agrees with
+Horizons' own conversion of 1I, 2I, 2P and C/2023 A3 to 1e-11 AU.
+`Elements.PerihelionDistance` reports q for either form (#374).
+- **`magnitude.PlutoCharonApparent`**: V magnitudes of Pluto, Charon and the
+pair from Buie et al.'s (2010) Hubble light curves — rotation, nonlinear Hapke
+phase curves, fluxes combined — reproducing the paper's 2002–2003 photometry to
+0.005 mag on average. A calibration of that epoch: in the 2020s it runs
+0.16–0.36 mag fainter than `PlanetApparent`'s historical law, and which is
+nearer is not yet established (#410).
+- **`plan.EclipseEvent` carries the eclipse's `Kind`** — penumbral, partial,
+total, annular or hybrid — **and its `Magnitude`** (and, for the Moon,
+`PenumbralMagnitude`), decided as NASA's Five Millennium Canons decide them:
+every kind agrees over six centuries of the canon, hybrids included, and
+magnitudes are within 0.0004. Callers no longer have to guess the kind from
+ecliptic latitude, which called the partial eclipse of 2026-08-28 total (#405).
+- **`plan.CrescentVisibility`** evaluates a young crescent on one evening from a
+real sunset, moonset and best time, giving each criterion the quantities its
+author defined: geocentric for Yallop, topocentric for Odeh (#496).
+- **`CrescentParams.AlrefayOpticalAid`**, Alrefay et al.'s (2018) criterion for
+optically aided sighting, beside their naked-eye one (#503).
+- **Civil twilight is now checked against USNO.** The USNO comparison fetched
+Begin and End Civil Twilight with every response and discarded them. All 18
+events across three sites and dates agree within 0.5 min, USNO's own rounding. (#534)
+- **Greatest elongations are now checked against Skyfield.** All seven of 2026 on DE440s agree within 0.58 s and to four decimals in elongation, with the east/west side right each time. (#559)
+- **Satellite passes are now checked against Skyfield.** Six ISS passes over two days agree in rise and set within 0.38 s, culmination within 0.49 s and highest elevation within 0.005°. (#561)
+- **Nautical and astronomical twilight are now checked against Skyfield.** 30 crossings agree within 0.26 s, at La Silla and on solstice nights at 48.56°N whose darkness, as short as 5.6 minutes, falls wholly between the solver's 15-minute samples. (#567)
+- **Constellation lookup is now checked against Roman (1987)'s boundary table.** 199,999 of 200,000 random positions agree, and a test holds the 64 lying within about 22″ of a boundary. astropy's `get_constellation` is not used as the reference, because it carries 18–22″ of annual aberration into the lookup. (#571)
+- **Appulses are now checked against Skyfield.** On DE440s, four pairs agree on the instant of minimum separation within 0.44 s and on the separation to 10⁻⁶°. (#580)
+- **The η-Aquariids and Orionids are now checked against observed returns.** Against Egal et al.'s (2020) re-analysis of IMO's visual data for 2001–2019, each shower's maximum falls 0.10° from the median return, its rate is within twice the returns' scatter, and its activity profile is within ×1.8 of the observed average down to a tenth of the maximum. (#587)
+- **`plan.WithHorizonRefraction` refracts a site's rise and set horizon through the air it names**, in place of the almanacs' fixed 34′: 33.85′ at 10 °C and 1010 hPa, 38.6′ at −20 °C and 1030 hPa. The default stays 34′. No model predicts a real rise or set better than about 2 minutes, and the docs say so. (#590)
+- **`atmosphere.Atmosphere.Extinction` gives a site's extinction coefficient from its own air**: Rayleigh scattering from the surface pressure, ozone from its column, and aerosol from its optical depth. It reproduces Paranal's measured extinction curve within 0.01 mag/airmass, and Mauna Kea's published decomposition term by term. (#593)
+- **`plan.WithAtmosphere` names the air `VisibleTonight` dims every object through**, such as tonight's measured aerosol and ozone, in place of the default clean night at the site's height. (#594)
+- `atmosphere.Atmosphere.OzoneOpticalDepth`, the vertical optical depth of an air's ozone column, and `atmosphere.OzoneAirmass`, the airmass of the ozone layer 20 km up: the two terms `Atmosphere.ExtinctionToward` already used for ozone. (#649)
+- **A release every week, and a GitHub Release for every tag.** `docs/RELEASING.md` sets the cadence (every Monday when anything merged; security fixes and regressions within a day), reads the version off the changelog fragments, and routes the release commit through a pull request. A tag push now publishes a GitHub Release with that version's changelog section as its notes. (#657)
+- **`coord.HEALPix`'s NESTED indexing is held to an independent implementation.** `TestHEALPixMatchesAstropyHEALPix` checks `PixelOf` against astropy-healpix 2.0.1 at 32 directions across all twelve base faces, at nside 256 and 4096. The existing tests were self-consistency checks, which a scheme with its x and y bits interleaved the other way passes in full. (#664)
+- **Sidereal time is held to USNO's.** `TestUSNO_SiderealTime` compares `Time.GAST` and `Site.LocalSiderealTime` with USNO's sidereal-time service (NOVAS) at six epochs from 1990 to 2049, east and west of Greenwich, to 0.2 ms; every residual is within USNO's own 0.05 ms rounding. Before, nothing held sidereal time tighter than 0.5°, and the test of that name checked only that the result lay in [0°, 360°). (#673)
+- `plan.EventSpec.UpperLimb` applies `Threshold` to a moving body's upper limb, raising its altitude by half its `AngularDiameter` at every instant the solver evaluates; `Validate` returns `plan.ErrUpperLimbNeedsBody` for a target that is not a `MovingBody`. (#703)
+
+### Changed — BREAKING
+- **`resolve.Provider` returns errors instead of a bool.** `Resolve` is now
+`(Target, error)` and `Search` is `([]Target, error)`, so a transport failure,
+a canceled context or an unreachable service is no longer reported as
+"target not found". `errors.Is(err, context.Canceled)` works through the
+catalog layer for the first time. Adds `resolve.ErrUnsupported` for
+cone-search-only providers, and `catalog/fink` and `catalog/fits` now take a
+`context.Context`. (#151)
+- `skybrightness/plan.Spec.Sky` is now the four-method `plan.Sky` interface rather
+than `*dataset.Sky`. A `*dataset.Sky` satisfies it, so every caller is unchanged
+— what it buys is that `LimitingMagnitudeAt` can be evaluated without a network
+and 145 MB of reference data, which is why it went uncovered on every commit
+(#122).
+- **`ephemeris`'s kernel sources now need one blank import.** `import _
+"github.com/TuSKan/astrogo/ephemeris/jpl"` registers the backend `Planets`,
+`SmallBody`, `Asteroids`, `Comets` and `Moons` use; without it they return an
+error naming it. Asking SOFA where Mars is went from 13.9 MB and 424 packages to
+4.7 MB and 224, with gRPC, OpenTelemetry, protobuf and `gocloud.dev` at zero —
+64 packages of gRPC were arriving for an error-code enum. `eph.JPL` is removed;
+name `jpl.Provider` (#112).
+- `fits.WCS`'s getters lose their `Get` prefix (`GetCRVAL` is now `CRVAL`), and the
+five setters with a length invariant return `error` — a short CRPIX was a panic
+reachable from `PixelToWorld` and a long one a silent disagreement about axis
+count, both accepted without a word. New `NAxis` reports the invariant (#178).
+- `Observable.GetDetails` takes a `plan.DetailOverrides` struct instead of
+`props ...string` read two at a time. That form had three silent failures: an
+odd count dropped the last argument, a misspelled key landed in `ExtraProps`
+while the field it meant to override kept its computed value, and a key and
+value could be swapped with nothing to notice (#116).
+- `plan.ScoreObservable` no longer exists; scoring is `plan.Scorer{...}.Score(obj, t)`.
+It took six parameters, two of them nilable pointers that were nil at nearly
+every call site including the README's — and two adjacent nils of different
+types can be transposed without the compiler noticing (#116).
+- **`remote.APIClient` no longer exists; `remote.Client` carries the request methods.** `Get`, `GetJSON`,
+`PostForm` and `PostJSON` are methods on the policy that decides whether the request may happen
+at all, so a caller holds one object instead of two that each answered half the question.
+`remote.Default()` is the process-wide one; a component wanting its own timeout, pacing or token
+takes `remote.Default().Clone()` and calls `SetAPIOptions`. Transports are built per endpoint with
+that endpoint's registered `Timeout`, which fixes a latent defect: one client used for two
+endpoints previously applied whichever timeout was named at construction to both. (#274)
+- **IERS Earth-orientation data now needs `import _ "github.com/TuSKan/astrogo/remote/eop"`.**
+The loader moved out of `remote` because it needs `remote.GetFile` and so cannot live in
+the package that would have to import it back. Without the blank import, `Time.EOP`/`.UTC`/
+`.UT1` report zero DUT1 and polar motion and log one warning — costing about an arcsecond
+of topocentric position, measured on the Horizons corpus as a p50 of 1.4 arcsec becoming a
+max of 8.8 arcsec. (#274)
+- **`remote/file` and `remote/api` are internal to `remote`.** Everything they do is
+reachable from `remote` itself — `Bucket` (an alias for `blob.Bucket`), `OpenBucket`,
+`Save`, `ReaderAt`/`NewReaderAt`/`WithChunkSize`/`WithCachedChunks`, `APIClient`/
+`NewAPIClient` with the `With*` options, `HTTPError`, `RetryPolicy`/`Attempt`/
+`DefaultRetryPolicy`, `DefaultAPITimeout` — and importing either package from outside
+`remote/` now fails `TestSubpackagesAreNotImportedDirectly`. Going around the front door
+skipped the endpoint registry, offline mode and the consent gate for that one call site,
+silently. (#274)
+- **`remote/s3` moved to `remote/file/s3`.** S3 is a file backend, so the opt-in blank
+import now sits where the file code does: `import _ "github.com/TuSKan/astrogo/remote/file/s3"`.
+Still four lines and zero exported symbols, and still the module's only importer of the
+AWS SDK. (#274)
+- Two exported symbols are gone, and neither appeared in a tagged release, so
+**no released version is affected**.
+`Satellite.Verified` no longer exists: there is no longer a regime for it to
+flag. Use `Satellite.Propagator` with `sgp4.Propagator`'s `SimplifiedDrag`,
+`DeepSpace` and `PerigeeAltitude`, which describe the orbit rather than
+astrogo's coverage.
+`sgp4.ErrDeepSpace` no longer exists either — it was scaffolding while SDP4 was
+being written, and deep space propagates now, so nothing raises it and the
+branch handling it can go.
+Recorded because a caller pinned to a `main` commit between those changes gets a
+compile error, which is the one audience a release-to-release note would miss.
+[#310] (#320)
+- **`remote` is built on `io/fs`, and `gocloud.dev` is gone.** A storage container
+is now an `fs.FS` and an open object a `remote.File` (`fs.File` + `io.ReaderAt` +
+`io.Seeker`). `remote.Bucket` no longer exists: it is `remote.FS` now, with
+`OpenBucket` → `OpenFS`, `NewReaderAt` → `Open`, `Save` → `WriteFile`, and
+`IsNotFound` deleted in favour of `errors.Is(err, fs.ErrNotExist)`. Linked packages for a consumer of
+`remote` fall from 406 to 219, with gRPC and OpenTelemetry — 98 packages
+astrogo never configured — going to zero. (#325)
+- **`coord.Apparent` no longer exists — it is `coord.CIRS` now, with its
+transforms.** The name said the one thing the type is not: "apparent place" has meant the equinox-based
+place — true equator, true equinox of date — for two centuries, and this is the
+CIRS place, which measures right ascension from the Celestial Intermediate
+Origin. They are apart by the equation of the origins: **20.3 arcminutes in
+2026**, growing 46 arcseconds a year, in right ascension only — so a caller
+comparing against an almanac sees a pure RA offset and reaches for a
+sidereal-time bug. `coord.TETE` is the equinox-based place and keeps the word
+everyone else means by it.
+Migration is mechanical: `Apparent` → `CIRS`, `NewApparent` → `NewCIRS`,
+`AstrometricToApparent` → `AstrometricToCIRS`, `ApparentToObserved` →
+`CIRSToObserved`, `ApparentToTETE` → `CIRSToTETE`, `TETEToApparent` →
+`TETEToCIRS`. `Name()` now returns `"CIRS"` and `String()` is prefixed `CIRS`.
+A program that stays inside the pipeline is otherwise unaffected — the numbers
+do not change. Closes [#298]. (#328)
+- **`coord.NewGalactocentricFrame` takes the Sun's velocity as a third argument.**
+It is a measured frame parameter beside R₀ and z☉ — the frame cannot place a
+target's velocity without knowing its own — so it is supplied the same way they
+are rather than being a hidden default. A caller passes
+`coord.SolarVelocityFromSgrA(sunDistance)` for the derived value, the same
+distance as the first argument so the two stay consistent, or their own
+`vector.Vec3` in km/s to reproduce another frame:
+```go
+// before
+f := coord.NewGalactocentricFrame(8178, 20.8)
+// after
+f := coord.NewGalactocentricFrame(8178, 20.8, coord.SolarVelocityFromSgrA(8178))
+```
+`coord.DefaultGalactocentricFrame` is unchanged and already does this, so code
+using it needs no edit. The function being reshaped was added in [#334] and has
+not appeared in a release. (#344)
+- **`time.J2000` is now a function, `time.J2000()`.** It was the last symbol
+astrogo itself exported as a mutable package-level variable, so any package
+anywhere in the import graph could reassign the standard epoch and change every
+epoch calculation in the process — a supply-chain footgun in the package that
+underpins the rest of the library. Go cannot declare a struct value immutable,
+so a function returning a copy of an unexported one is the only construction
+that removes it; the value is computed once and the call costs a struct copy.
+Callers write `time.J2000()` wherever they wrote `time.J2000`, and the compiler
+finds every site. `time.LocationUTC` remains a var and is now the only one that
+is not a sentinel error: the standard library declares `var UTC *Location`, so
+wrapping it would hand back the same reassignable pointer and remove nothing.
+README's claim is corrected to say that rather than to imply nothing is
+reassignable at all, and `internal/docsguard`'s inventory of remaining vars
+records why each survives. Closes [#113]. (#346)
+- **The `Dimension` type and its seventeen values move from `unit` into a new
+`unit/dim` package**, so they are now `dim.Dimension`, `dim.Length`,
+`dim.Velocity` and so on. `unit.Unit` keeps its `Dimension` field, retyped to
+`dim.Dimension`.
+The names collided: the dimension of a length held the name a caller wants for
+the *quantity* a signature carries, which is what `unit.Length` and
+`unit.Velocity` now are. Prefixing the dimensions instead would have read as
+`DimVolume.Div(DimMass).Div(DimTime.PowInt(2))` at the places that actually use
+them — `constants/units.go` composes six units that way — and the dimensionless
+one stuttered. A package is how Go namespaces, so those lines now say
+`dim.Volume.Div(dim.Mass).Div(dim.Time.PowInt(2))`.
+Dimensions are also the more primitive idea: a unit is a scale on a dimension,
+so `unit` imports `dim` and not the reverse. Fifteen call sites outside `unit`
+were affected, all in `constants`. (#353)
+- **`coord`'s distances and speeds are now `unit.Length` and `unit.Velocity`
+instead of `float64`.** Every signature that carried a length or a speed changed:
+`ICRS`/`AltAz`/`Galactic`/`Ecliptic`'s `Dist`/`SetDist`, `Astrometric.RV`/`SetRV`,
+`NewICRSWithKinematics`, `NewFK4WithProperMotion`, `NewFK5WithProperMotion` and
+`FK4.RV`/`FK5.RV`, `Geodetic.Height`/`NewGeodetic`/`MustGeodetic`, `Ellipsoid.A`,
+`NewObserversLocation`/`SetHeight`, `GroundDistance`, `Offset`,
+`ParallaxDistance`, `SpaceSpeed`, `LSRCorrection`, `LSRApex`, the
+`GalactocentricFrame` parameters and `FromICRS`/`ToICRS`, `Galactocentric`'s
+`X`/`Y`/`Z`/`Distance`/`Radius` and its two constructors, and `Context`'s five
+radial-velocity methods. `ephemeris/satellite.Satellite.Altitude` follows, since
+it returns a `Geodetic` height.
+`ICRS.Dist` is the reason: it held astronomical units on an ephemeris path and
+kilometers on a satellite one, and nothing in the signature said which. Callers
+read the unit they want — `d.Km()`, `d.AU()`, `d.Pc()` — and write the unit they
+mean — `unit.KmPerSec(-7.6)`. Named `float64`s, so this costs nothing: measured
+at 1.88 ns and zero allocations against the same for a bare `float64`.
+`NewEarthLocation` deliberately keeps plain `float64` degrees and meters, since
+its whole purpose is to accept numbers copied off a GPS or a map service.
+Part of #130; `plan`, `ephemeris`, `atmosphere`, `magnitude` and `optics` still
+take bare `float64` and convert at the `coord` boundary. (#355)
+- **`plan`'s distances and speeds are now `unit.Length` and `unit.Velocity`**,
+following `coord` in #355. Two optional-capability interfaces changed, so a
+target type outside this repo that implements either needs its signature
+updated: `MeasuredRadialVelocity() (unit.Velocity, bool)` and
+`PhysicalRadius() (unit.Length, bool)`.
+Also retyped: `WithRadialVelocity`, `WithDSORadialVelocity`, `WithDiameter`,
+`RadialVelocity`, `BodyEquatorialRadius`, `TargetDetails.Distance`,
+`ApsisEvent.Distance`, `PassEvent.Range` and `MeteorShower.VelocityKmS` — the
+last renamed to `Velocity`, since the unit is no longer part of the name.
+`Site.Height` is new and returns a `unit.Length`. It replaces
+`Site.HeightMeters`, which #533 removed.
+`TargetDetails` is the one worth reading about. Its `Distance float64` meant
+parsecs for a star, au for a planet and kilometers for a satellite, and the
+neighbouring `DistanceUnit string` was the only record of which — so a caller
+reading `Distance` without reading `DistanceUnit` alongside it got a number
+three different scales could produce. `Distance` now carries its own unit and
+`DistanceUnit` only decides which one `String` prints.
+`NewSiteEarthLocation` deliberately keeps plain `float64` degrees and meters,
+for the reason `coord.NewEarthLocation` does. (#357)
+- **`atmosphere`'s heights and scale heights are now `unit.Length`**, following
+`coord` in #355 and `plan` in #357. Retyped: `AtAltitude`, `HorizonDip`,
+`StandardDefault`, `Builder.SurfaceAtAltitude`, `Builder.AerosolScaleHeight`,
+`VanRhijn`, `MolecularScaleHeight`'s return, `ExtendedSourceOpticalDepth`'s
+observer height, `ExponentialExtinction`/`ExponentialDepth`, the eight OPAC
+aerosol preset constructors, and `CloudLayer.BaseAlt`/`TopAlt` and
+`Aerosol.ScaleHeight`. In `skybrightness`: `AirglowRadiance`, `NewAirglow`,
+`OpticalParameterT` and `dataset.AerosolPreset`.
+`ContinentalScaleHeightM`, `DesertScaleHeightM`, `MaritimeScaleHeightM` and
+`AirglowLayerHeightM` lose the `M` and become typed `unit.Length` constants,
+since the unit is no longer part of the name.
+`skybrightness.OpticalParameterT` declared its two scale heights as
+`unit.OpticalDepth`. They are lengths, as its own arithmetic shows: it divides
+an optical depth by one to get an extinction per unit length. The numbers were
+right and the type was a lie; both scale heights and the separation are now
+`unit.Length`, and no computed value changes.
+`MolecularScaleHeightM` and `AerosolScaleHeightM` in `transfer.go` keep their
+names and stay `float64`: they appear only inside
+`ExtendedSourceOpticalDepth`'s own arithmetic and are named after the symbols
+in Masana et al. (2021), rather than crossing the API the way the preset scale
+heights do. (#358)
+- **`optics` and `magnitude` now carry lengths as `unit.Length`**, finishing the
+mechanical half of #130 after `coord` (#355), `plan` (#357) and `atmosphere`
+(#358).
+`optics` loses its `MM` suffixes: `NewTelescope`, `NewEyepiece` and
+`WithFieldStop` take `unit.Length`; `Telescope.ApertureMM`/`FocalLengthMM`
+become `Aperture`/`FocalLength`, `Eyepiece.FocalLengthMM`/`FieldStopMM` become
+`FocalLength`/`FieldStop`, `Telescope.ExitPupil` returns a `unit.Length`, and
+`Sensor`'s `WidthMM`/`HeightMM`/`PixelMicrons` become `Width`/`Height`/
+`PixelPitch`.
+`magnitude.SatelliteApparent` takes an `observerRange unit.Length` in place of
+`rangeKm`, and `ROLOIrradiance` takes typed sun and moon distances.
+`ROLOStandardDistanceKM` becomes `ROLOStandardDistance`, a typed constant.
+**`Telescope.PixelScale` moves by 9.4e-7 of itself.** It computed
+`206265·pixelPitch(µm)/focalLength(mm)`, where the constant is a rounded
+radian-to-arcsecond conversion (206264.806…) and the 1000 reconciled microns
+against millimeters. Between two `unit.Length` values the small-angle relation
+is the ratio itself and `angle.Angle` converts exactly, so both factors are
+gone. For a 3.76 µm pixel at 1000 mm that is 0.7755557″ against the previous
+0.7755564″ — below any plate solve's precision, and the only computed value in
+this change that moves at all. (#361)
+- **The orbital semi-major axis and three `catalog/resolve.Target` fields are now
+typed**, closing the part of #130 that spans `ephemeris/kepler` and `catalog`
+together.
+`kepler.NewElements` takes a `unit.Length` semi-major axis and
+`Elements.SemiMajorAxis` returns one; `ephemeris.NewElements` follows, since it
+re-exports it. The element set was already half-typed — `Inclination`,
+`AscendingNode`, `ArgPeriapsis` and `MeanAnomaly` are `angle.Angle` — and the
+semi-major axis was the one member still carrying its unit in a doc comment.
+`resolve.Target.SemiMajorAxis` and `.Diameter` become `unit.Length`, and
+`.RadialVelocity` becomes `unit.Velocity`. The providers name the unit where
+they decode it: SBDB's `phys_par` diameter in kilometers, SIMBAD's
+`rvz_radvel` in km/s, MPCORB's semi-major axis in astronomical units.
+`Elements.WithPeriod`/`Period` stay `float64` days: a duration, and `unit` has
+no type for one. (#362)
+- **`Time.Add` and `Time.Sub` take and return a `unit.Duration`**, replacing four
+methods with two: `Add(time.Duration)`/`AddDays(float64)` and
+`Sub() time.Duration`/`SubDays() float64` are gone.
+**`Sub` no longer has a ceiling.** It returned an int64 nanosecond count, which
+saturates just past ±292 years — well inside the range this library supports —
+and `SubDays` existed alongside it solely because a saturated maximum is not an
+answer. A float64 second count has neither problem, so there is one method.
+Two consequences worth knowing:
+- `Sub` no longer quantises to whole nanoseconds. A scale round trip leaves a
+  few picoseconds of residue that integer rounding used to absorb; that
+  rounding was an artifact of the type, not a measurement. Tests asserting
+  exact equality on a round trip need a tolerance.
+- Durations render as `1 s` and `60 min` rather than `1s` and `1h0m0s`, since
+  `unit` puts a space before the symbol. A value a hair under a threshold shows
+  in the smaller unit — an interval a few picoseconds under an hour is
+  `60 min`, because `String` picks its unit from the value it holds rather than
+  the one it rounds to.
+Solver parameters follow the same type, because they are search intervals over
+an ephemeris that meet an epoch directly: `Solver.Tolerance`,
+`EventSolver.Step`, `NewEventSolver`, `ObservableWindows`' step and
+`plan.WithStep`.
+Scheduling and observing quantities keep `time.Duration` — `Block.Duration`,
+`SetupTime`, `FilterChangePenalty`, `Cadence.MinInterval`,
+`SatellitePass.Duration`, `Window.Duration` — since they are sub-day, written
+as `30*time.Second`, and formatted by the standard library. (#363)
+- **Five exported names lose their British spelling**, which is the whole
+exported surface that had one:
+| package | before | after |
+| --- | --- | --- |
+| `ephemeris`, `ephemeris/core` | `CenterGeocentre` | `CenterGeocenter` |
+| `ephemeris`, `ephemeris/core` | `CenterBarycentre` | `CenterBarycenter` |
+| `ephemeris`, `ephemeris/core` | `CenterHeliocentre` | `CenterHeliocenter` |
+| `magnitude` | `JohnsonCousinsColourTerm` | `JohnsonCousinsColorTerm` |
+| `skybrightness` | `ZodiacalColourCorrection` | `ZodiacalColorCorrection` |
+The three `Center` constants spelled it both ways inside one identifier — an
+American prefix on a British suffix. astrogo's convention is American and is
+already stated in code: `unit/units.go` declares `Name: "meter"`.
+`Center.String()` follows, so it now returns `"geocenter"`, `"barycenter"` and
+`"heliocenter"`. A caller matching on those strings needs updating; nothing in
+this repository parses them. (#364)
+- **Five more exported names lose their British spelling** — the ones #364 missed,
+because the scan it relied on looked for `Metre` only at the start of a word:
+| package | before | after |
+| --- | --- | --- |
+| `unit` | `Nanometre` | `Nanometer` |
+| `skybrightness/dataset/crosssection` | `Nanometre` | `Nanometer` |
+| `skybrightness/dataset/starlight` | `ColourTerm` | `ColorTerm` |
+| `skybrightness/dataset/starlight` | `BrightStarCatalogueRadius` | `BrightStarCatalogRadius` |
+| `atmosphere` | `SourceRef.Licence` | `SourceRef.License` |
+The nanometer unit's printed name follows, from "nanometre" to "nanometer". (#383)
+- **`remote/file.AcquireLock` takes a `staleAfter` duration**, the age past which
+a lock is taken for a crashed holder's; zero keeps the 30-minute default.
+`remote/file` is internal to `remote` — docsguard rejects importing it from
+anywhere else — so only `remote` itself calls it (#445).
+- **`remote/file.ResumePoint` returns an error** beside the offset, for a partial
+whose sidecar or size cannot be read. `remote/file` is internal to `remote` —
+docsguard rejects importing it from anywhere else — so only `remote` itself
+calls it (#452).
+- **`plan.CrescentResult` carries every criterion's answer with the quantities it
+read** (`CrescentVerdict`, `CrescentZone.Params`). `EvaluateAll`, the shared
+`Params`, `Fatoohi` and `Gautschy` are gone, the last two having no traceable
+source; `Schaefer` is `Fatoohi1998` and `Ilyas1984` is `Ilyas1983` (#503).
+- **`time.FileEOPLoader`, which took an OS path, no longer exists; it is replaced by
+`time.FSEOPLoader{FS, Name}`.** Write `time.FSEOPLoader{FS: os.DirFS(dir),
+Name: "finals2000A.data"}` where you wrote the old loader with a path. A
+bulletin that is there but unreadable is now reported as itself rather than as
+`time.ErrNoEOPData`. (#519)
+- **`magnitude.GaiaGToJohnsonV`, `GaiaGToJohnsonB`, `GaiaGToJohnsonR` and
+`GaiaGToCousinsI` now return `(mag, ok)`**, with `ok` false outside the BP−RP
+interval each relation was fitted over. `catalog/gaia` reports no V outside it
+instead of an extrapolation — an L dwarf at BP−RP = 6 came back at V = 16.6 for
+G = 12. Callers that used the single value take the first result and check `ok`. (#531)
+- **`magnitude.CometNuclearApparent` now takes the phase coefficient and phase angle**, `(M2, k2, pc, r, delta, phase)`, and `plan.WithNuclearMagnitude` takes `pc`.
+JPL's nuclear magnitude includes PC·β, which was missing and made 13P/Olbers's nucleus 0.21 mag bright against Horizons; SBDB's `PC` is now parsed into `resolve.Target.PC`.
+Callers pass SBDB's PC, or zero where it publishes none. (#552)
+- **A star rises and sets on the almanac horizon.** `Site.RiseSetThreshold` is −(34′ + dip), not the dip alone, so `VisibilityEvents`, `DayEvents`, `Episode`, `IsCircumpolar` and `IsNeverUp` agree with USNO and Skyfield, which put a star's horizon 34′ down; rises were 2.4 to 7 minutes late. `plan.WithRefraction` no longer exists, since `IsCircumpolar`'s default now includes the refraction it added; `WithHorizonAltitude(0)` gives the geometric horizon. (#576)
+- **`atmosphere.StandardRefraction` and `kepler.PlutoElements` are functions.** As exported vars, one assignment anywhere changed them for every caller in the process; call them as `atmosphere.StandardRefraction()` and `kepler.PlutoElements()`. The `unit` and `dim` vars stay, documented read-only rather than immutable, and a module-wide guard requires a stated reason for any exported var that is not a sentinel error. (#577)
+- **`atmosphere.CleanMountainAOD550` is 0.027, Paranal's measured median aerosol (Patat et al. 2011)**, in place of an unsourced 0.03 whose comment placed Mauna Kea inside a range its own median (0.016) falls below. Anything built on it carries 10% less aerosol; pass 0.03 explicitly to keep the old value. (#593)
+- **`magnitude.StarApparent` takes the extinction coefficient as a required argument**: `StarApparent(catMag, airmass, k)`. Its hidden default of 0.20 mag/airmass is gone; pass `air.Extinction(λ)` for the band the magnitude is in. (#594)
+- **`coord.Context.SetTime` replaces `AtTime` and `Clone`**: it moves a Context in place without allocating, and rebuilds it an hour from its epoch, so its error stays ≲0.1″ for every caller. `AtTime` copied 704 bytes per instant, 72% of what plan's event solver allocated. A copy is `c := *ctx`. `plan.TransitionContext`, since renamed `plan.Transition`, carries both targets' observed alt/az instead of `ContextAt`; `plan.NewTransition` builds one (#675).
+- **`time.DeltaT` and `time.DeltaTUncertainty` take a `time.Time`, and ΔT is one value everywhere**: the Espenak & Meeus model before 1960, the IERS bulletin's measured value where it covers, and that value held past its end, where the conversions used to pin UT1 to UTC. `DeltaT` followed the model at every epoch, 6.2 s from the conversions in 2026. Past the bulletin, `Time.UT1` answers instead of failing, and the uncertainty grows from the bulletin's end (#696).
+
+### Changed
+- **CI selects Go by minor version instead of reading go.mod.** The `go 1.25.8`
+directive — inherited from gocloud-ext, not needed by astrogo (#109) — made
+`setup-go` demand that exact patch and download a toolchain before every job,
+which hung for 25 minutes on one run. `go-version: '1.25'` resolves to whatever
+1.25.x the runner already has. (#152)
+- **The SOFA/DE440 planet comparison samples 1800–2100 again**, the interval
+SOFA's own table is quoted over. It was restricted to 1972+ to dodge a
+pre-1972 timekeeping term; that term is gone, and the guard at the boundary
+now asserts its absence rather than its presence. (#158)
+- **The astronomical unit was written out in four production files and the
+light-time constant in two**, all agreeing with `constants` and with each other
+— which is the problem, since a future revision in `constants` would leave five
+copies silently behind. All now derive from `constants`.
+`jpl.KMPerAU` no longer exists: it was exported, letting a downstream caller
+pin the stale value, and nothing outside its own file referenced it.
+`TestCanonicalConstantsAreNotWrittenOut` scans the module so the literals
+cannot come back (#137).
+- **`docs/VALIDATION.md` and the `satellite` package doc now state that SGP4 is wrong
+for low-perigee, deep-space and decaying orbits**, measured for the first time by the
+suite above. Ordinary orbits are unaffected; `Satellite.Verified` says which side a
+given element set falls on. (#181)
+- **The `time` package doc and `docs/VALIDATION.md` now record that an epoch read from a
+smeared host clock is not UTC.** Around a leap second, NTP providers spread the step over
+as much as 24 hours — each differently, none announcing which — so `NowUTC` can be off by
+0.5 s with nothing to detect it: 0.3″ of lunar motion, 3.8 km of ISS track (#146).
+- **The `±0.9 s` bound on UT1−UTC is now stated as borrowed rather than intrinsic.** It
+holds only because leap seconds keep it there, and CGPM Resolution 4 (2022) ends them by
+2035 — after which the zero-EOP degradation grows without bound. The `time` package doc
+and the EOP warning both say so; the data path is unaffected (#147).
+- **`openngc.New` no longer fetches the catalog.** It did about 7 MB of I/O under
+`context.Background()`, so `catalog.NewResolver(SIMBAD, OpenNGC)` blocked for two
+seconds against a warm cache with nothing above it able to cancel. The load now
+happens on the first query, under that caller's context, and a failed load is
+retried rather than replayed for the life of the provider. (#197)
+- **`plan.SatellitePasses` is about twice as fast** — 201 ms to 96 ms over a
+six-hour window at 30 s sampling. It rebuilt a full `coord.Context` per sample,
+which was 61% of each one; it now derives them with `Context.AtTime` from a base
+rebuilt hourly, costing ≲0.1″ against SGP4's own kilometer-scale error. (#201)
+- **`catalog.Resolver` queries its providers concurrently.** `Resolve` and `Search`
+looped over them one at a time, so a resolver over SIMBAD and OpenNGC cost a CDS
+round-trip *plus* a local lookup per query instead of the slower of the two.
+Provider-registration order, merging and error reporting are unchanged. (#202)
+- The README's "Implementation Status" table is now a "Package Map" without the
+Status column. It marked all twenty-two packages "Stable" while the CHANGELOG
+carried twelve `Changed — BREAKING` sections across twenty-six pre-1.0 releases,
+so the one column that claimed to say something said the same false thing on
+every row (#119).
+- The `network` tier now runs nightly rather than weekly, in its own job; the
+`validation` and `integration` tiers stay weekly. Only the network tier notices
+a SIMBAD schema change or a Horizons format change — `go vet -tags` cannot, the
+code still compiles — and a week is a long time to be wrong about that. Still
+off the PR path (#123).
+- The README is 749 lines, down from 1,068. The 361-line dump of Quick Start and
+five inline demos is a table linking to the runnable `examples/` they were
+copied from, "Astropy-level capabilities" is replaced by what astrogo actually
+is and an honest list of what it is not, and the `atime` import alias is stated
+before the first code block rather than discovered at a compile error (#124).
+- `examples/` is now its own Go module, so its 32 demo programs no longer appear
+in astrogo's package listing — they were 32 of 84 rows. Run one with
+`go -C examples run ./<name>`; a `replace ../` keeps them building against the
+working tree, and CI compiles and lints them separately (#124).
+- `ephemeris.ApparentState` iterates light time to convergence instead of a flat
+five passes — measured, nothing in the solar system needs more than three, and
+the Moon settles in one. That halves the cost of the apparent-place path this
+release puts on the scheduler's hot path (#117).
+- astrogo now requires Go 1.27. The module directive is `go 1.27` — a minor
+version, not the patch-level `1.25.8` it inherited from a dependency — so the
+forced per-job toolchain download that cost PR #151 twenty-five minutes cannot
+recur from our own go.mod (#109).
+- Five `sync.WaitGroup.Add`/`Done` pairs become `wg.Go`, removing the class of
+bug where the two get out of step, and eleven `sort.Strings`/`Float64s` calls
+plus the data-driven `sort.Slice` sites become `slices.Sort`/`SortFunc` —
+measured 1.7× faster with no allocation. `Planner.RankObservable` also stops
+mis-ordering a ranking that contains a non-finite score. (#232)
+- Every JSON API response now decodes through `encoding/json/v2` — measured on an
+SBDB-shaped body at 24.5 µs against 37.4 µs, 12.1 KB against 28.8 KB, and 9
+allocations against 20. A response repeating an object name is now an error
+rather than silently taking the last occurrence; case-insensitive field
+matching and tolerance of invalid UTF-8 are deliberately kept, because exact
+matching would leave a renamed coordinate at RA 0, Dec 0 (#126-adjacent, see
+`plan.ErrNoCoordinates`). (#233)
+- `resty.dev/v3` moves to `rc.4`, and `go.mod` now records why `gocloud.dev`
+cannot leave its pseudo-version: `gocloud-ext`'s httpblob driver implements
+`blob/driver.DeleteOptions`, which was added after v0.46.0 (#259).
+- **An API client no longer resolves endpoints; `remote` does, per request.** The client
+underneath takes the base URL its request goes to, and `remote.Client` resolves `id`
+through its own `URL(id)` immediately before each call. That removed the import cycle that
+kept `remote` from fronting its own API client, and makes `SetOffline`, `Disable` and
+`SetURL` apply to a client that already exists rather than to the next one built. (#274)
+- **Only `remote/file` names the storage library now.** `remote.IsNotFound` no longer exists.
+It replaced `gcerrors.Code(err) == gcerrors.NotFound` at its three call sites and
+`internal/testutil.BucketKeys` takes an `fs.FS`, so `gocloud.dev` appears in no import
+outside `remote/file` — enforced by `TestGocloudStaysInsideRemoteFile`, since deleted
+along with the library it guarded. The driver has
+been swapped once already; what made that expensive was every package that had an opinion
+about it. (#274)
+- **Dependencies.** Update Apache Arrow Go to v18.8.0, HDF5 to v0.14.1, and `golang.org/x/sync` to v0.23.0 in the library and examples modules, retaining the previously merged security updates. (#292)
+- `ephemeris/satellite` reads its gravity constants from `constants.WGS72` instead
+of holding a private copy — the copy is how the package came to use WGS-84's
+values while the propagator was handed WGS-72's. `constants.WGS72` gains `J2`,
+one of that standard's four defining parameters, which its own doc comment
+already named. (#314)
+- `ephemeris/satellite` propagates through astrogo's own
+`ephemeris/satellite/sgp4` instead of `github.com/joshuaferrara/go-satellite`,
+which is **removed from `go.mod`**. Measured end to end through the public
+wrapper against Vallado's reference states: 588 states, worst **4.1e-06 km**,
+against 0.0031 km before — and the seven cases astrogo could not reproduce at
+all, by up to 3438 km, now agree to nanometers. [#310] (#320)
+- `satellite.ValidateTLE` accepts trailing whitespace and anything appended past
+column 69, where it used to require exactly 69 characters. Feeds emit CRLF and
+padding constantly and neither loses data; a line *shorter* than 69 does, and is
+still refused. The old behavior was a side effect of a length equality check
+rather than a decision. [#310] (#320)
+- `docs/VALIDATION.md`'s generated accuracy table is regenerated from a full
+`validation` + `network` collection. It was dated 2026-08-30 and had drifted in
+three ways: ten suites had grown their corpora (the seven SOFA planets from
+N=516 to 1204, the two time-scale round trips from 120 to 432 and 180 to 540),
+four suites were being measured and never published, and the Horizons-referenced
+rows had moved. `coord.topocentric.vs_sofa.stepwise` and `.collapsed` now appear
+at 0.000″ across all four statistics over 210 combinations, and
+`ephemeris.astrometric.geocentric` and `.apparent.geocentric` are cited by suite
+name rather than by test file. Every row is still ✅ verified and inside its
+contract. The status table's claim that the two SOFA-comparison suites were "not
+yet in the generated table" is no longer true and is corrected. (#351)
+- **`testutil.SkipOnUpstreamFailure` now answers the whole question**, consulting
+`Unreachable` for the cases it did not cover — a DNS failure, a refused or
+unroutable dial. A test no longer has to call both to find out whether a failure
+was somebody else's, which is friction that helped make a skip-on-any-error the
+convenient thing to write. A caller's own canceled context still does not skip. (#372)
+- **The Horizons reference corpus is refreshed**, after establishing what moved and
+why: Horizons changed something below its own emission resolution, and 94 of 300
+values sat near enough to a rounding boundary to tip. Every change is one unit in
+the last digit Horizons prints — 1e-06 deg for azimuth and elevation, 1e-14 AU at
+Jupiter and 1e-13 at Saturn for range — while RA/Dec and the geocentric vectors
+did not move at all. Two new tests keep the question answerable: one asks
+Horizons the same query twice to tell a recomputation from a re-rounding, and one
+checks the manifest's record of the query against what the code would ask today,
+since a moved observatory reports as changed values rather than a changed query.
+The generator's diff summary now groups by field instead of reporting a single
+maximum. (#373)
+- **American English throughout.** Doc comments, test names, and the text of a
+few error and log messages now spell "meter", "center", "color", "behavior",
+"labeled" and the -ize forms, matching the exported names #364 and #383
+already renamed. Sentinel errors are unchanged, so `errors.Is` still matches;
+only the message text differs (#382, #384, #385, #386, #387, #356).
+- **`plan.Oppositions` samples once a day rather than every 6 hours**: it finds
+the same instants, to a second, at a quarter of the cost (#432).
+- **`coord.NewContext` is 34% faster** (138 → 91 µs), with bit-identical
+results: it reuses the precession-nutation matrix `Apco13` already built
+instead of evaluating the series again (#473).
+- **`plan.SatellitePasses` does half the precession-nutation work**, with
+identical results: each satellite state evaluates the series once instead of
+twice, and culminations are sampled through the pass search's Context cache
+rather than a full Context per sample (#476).
+- **`VisibleIntervals`, `TransitEstimate`, `ObservableWindows` and `Find` are
+6–40× faster**: they built a full `coord.Context` per sample, and now derive
+each from an hourly one as the event solver does (≲0.1″; #480). (#482)
+- **`plan`'s test suite runs its 26 slowest serial tests in parallel**, cutting
+the package's race-detector run from 261 s to 174 s locally, against CI's
+600 s timeout (#490).
+- **Network tests no longer fail on a degraded VizieR**, which answers every
+query with a 400: a 4xx now skips only when the service also rejects a
+control query that cannot be wrong, so a genuinely bad query still fails
+(#492).
+- **A slewing schedule runs 6.6× faster**: `BasicTransitionModel` built a full
+SOFA Context per instant of every slew, and the built-in strategies now observe
+both ends through the Context they evaluate constraints with (#485).
+- **UTC from 1960 to 1971 is read as SOFA reads it**: TT through SOFA's TAI−UTC
+rather than ΔT, and the days UTC jumped by a fraction of a second stretched as
+iauDtf2d stretches them. `TT()` and `TAI().TT()` now agree there (#479).
+Also fixes a UTC label an ulp below a leap-second midnight converting to TAI a
+second early (#499).
+- **`satellite.Satellite.Altitude` is about 85 times faster** (50 µs to 0.6 µs)
+and no longer looks up UT1 or loads EOP. It turned the position Earth-fixed by
+GAST, the wrong sidereal time for TEME, to take a height no rotation about the
+axis changes. Heights are unchanged. (#514)
+
+### Removed
+- **`fits.Write` no longer exists — it always returned `ErrUnimplemented`.** An
+exported function that only ever fails, in a package the README marked Stable,
+is a runtime surprise for anyone who type-checks against it; an absent one is a
+compile error at the call site, which is the honest signal. Its signature could
+not have been implemented as written either — a filename and a flat
+`[]float64`, with no dimensions or header. `ErrUnimplemented` goes with it, and
+the README now labels `fits` read-only, pointing at #127 for the real writer.
+Nothing in the module called it (#135).
+- **42 `//nolint:gochecknoglobals` directives suppressed a linter `.golangci.yml`
+disables** — 29% of every suppression in the tree, each carrying a documented
+reason for silencing nothing, which is what made the live suppressions hard to
+pick out. All removed. `TestNoNolintForADisabledLinter` now cross-checks every
+directive against the config, since a dead one is invisible to golangci-lint
+itself: `nolintlint` reports an *unused* directive, but one naming a disabled
+linter is simply skipped (#136).
+- `remote.WorldAtlas` no longer exists, and neither does `remote.LightPollution`;
+both were deprecated in 0.15.0 and are past the two minor releases the policy
+requires. Nothing read either: one was a non-commercially-licensed model output
+that cannot validate `skybrightness` and must not be served as its answer, the
+other read satellite radiance as sky brightness, which is on that module's
+prohibited list (#119).
+- **The `s3://`, `gs://`, `azblob://` and `sftp://` schemes no longer resolve.**
+They were gocloud.dev drivers and went with it; replacements were built,
+measured and dropped — `docs/storage.md` §10 records the two silent-wrong-answer
+defects found in the obvious library and why writing one directly is not worth
+it for a single optional endpoint. `remote.CopernicusEODATA` is that endpoint:
+it stays registered and now fails early, naming the schemes that are registered,
+and `cams.RegistrationAdvice` says so rather than naming a package that does not
+exist. (#326)
+- **`unit.AltitudeM` no longer exists.** Use `unit.Length`, which stores meters,
+so every value that type held is already correct: a conversion becomes
+`unit.Meters(2635)` and a declaration changes type name only.
+It named one quantity in one unit, which is the pattern `unit.Length` exists
+to replace — a caller holding one could not ask for it in kilometers, and a
+length crossing into `coord` or `plan` needed a cast at every boundary.
+`atmosphere` was the only package using it. (#358)
+- **`NewCrescentParams` is gone from `plan`**: use `CrescentVisibility`, which
+finds the evening's sunset and moonset itself. `NewCrescentParams` gave every
+criterion one set of parameters, with a constant lunar semi-diameter and a lag
+estimated from the Moon's altitude (#496).
+- **`ephemeris.Altitude` no longer exists.** It returned geocentric distance less
+a 6371 km mean radius, as a `float64` in km: 6 to 7 km off the WGS84 height
+for the ISS, and for a planet not an altitude at all. A satellite provider is a
+`*satellite.Satellite`, whose `Altitude` returns the WGS84 height as a
+`unit.Length`; for any other geocentric state,
+`coord.FromECEF(ctx.ICRSToITRS(pos), coord.WGS84())` with a `coord.Context` at
+the epoch. (#517)
+- **The last `Deprecated` symbols are gone.** The mutable maps
+`plan.KnownSites` and `plan.MeteorShowers` (since removed; use `KnownSiteNames`/`NewKnownSite`, `MeteorShowerNames`/`NewMeteorShower`),
+`plan.TwilightThresholds` and `jpl.BodyIDToNAIF` (since removed; use `TwilightThreshold`, `NAIFFor`/`NAIFBodies`),
+and the sentinel `plan.ErrNotCoordObject`, which nothing returned (since removed). (#536)
+- **`ephemeris`'s `Body`, `Kind` and body table are gone** (since removed: `core.Body`, `core.Kind` and its constants, `core.SunBody` … `core.NeptuneBody`, `core.Bodies`, and their `ephemeris` re-exports).
+Nothing took or returned a `Body`; use `core.ID`, whose `String` gives the name.
+Eleven of them were reassignable globals, so one importer could redefine the Sun for the whole process. (#539)
+- **`remote/file.StagingSuffixes` (since removed) is unexported**; `IsStagingName` is how a caller recognizes a staging object.
+The guard against exported package-level maps now covers slices and arrays too, which any importer could also edit in place, and this was one it found. (#544)
+- **`atmosphere.RefractionApproximate` no longer exists, and neither does `atmosphere.RefractionRigorous`.** They were the same two formulas, Saemundsson's and Bennett's, and "Rigorous" integrated nothing. `atmosphere.RefractionBennett` replaces both: Bennett's formula as refitted to the Nautical Almanac's tables, which it reproduces within 0.12′, inverted for the forward direction so the round trip is exact. (#589)
+- **`magnitude.ExtinctionV`, `ExtinctionB`, `ExtinctionU`, `ExtinctionR` and `ExtinctionI` were since removed, and `magnitude.ExtinctionAtAltitude` no longer exists.** The coefficients had no source, and the altitude scaling thinned ozone and aerosol as if they were air molecules. Use `atmosphere.Atmosphere.Extinction` for a site's own air at the band's wavelength. (#594)
+
+### Fixed
+- **The JPL tests still hung when NAIF stalled.** #95's skip could never fire,
+because `remote.NAIFSPK` allows a 30-minute download and the test binary dies
+at ten. The fetch is now bounded and attempted once per package, so a stalled
+NAIF skips in seconds instead of failing the build. (#99)
+- **The JPL provider computes ET from the kernel again, and now completely.**
+`lsk.Reader` parses the Moyer (1981) constants it previously ignored
+(`DELTA_T_A`, `K`, `EB`, `M`), so the conversion applies the full relativistic
+model the LSK defines rather than a leap-second offset alone — matching the
+convention Horizons uses, while keeping the scale normalization that fixed the
+69.184 s reinterpretation. (#148)
+- **A truncated leap-second kernel parsed into a short table.** `lsk.NewReader`
+never checked `scanner.Err()`, so a read that failed part-way kept the entries
+seen so far and returned successfully — the same shape as the dropped-2017-entry
+bug, reached by a short download instead of a parsing slip. (#148)
+- **The kernel-driven ET no longer swallows historical ΔT.** The kernel-driven conversion now
+delegates to `time` for epochs before the `DELTA_AT` table's first entry
+(1972-01-01), where leap seconds do not apply and the offset is the Espenak &
+Meeus (2006) ΔT instead — worth 175 minutes at year 1, which surfaced as ~180
+minute errors across the AstroPixels year-0001 lunar phases. (#148)
+- **Two ephemeris providers silently reinterpreted the caller's time scale.**
+SGP4 read the calendar fields raw, putting the ISS 530 km out for a TT input;
+the JPL provider treated anything but TDB as UTC, worth 40 arcsec of lunar
+motion. Both now normalize at the entry point, and a new contract test asserts
+every provider returns the same state however the instant is labeled. (#148)
+- **The kernel-driven conversion returned TT, not TDB.** Its formula omitted the TDB−TT
+periodic term (~1.7 ms amplitude — 1.7 m of lunar motion, 85 m for Mars). The
+conversion is now delegated to `time.Time.TDB`, which owns leap seconds for the
+library; the function's `*lsk.Reader` parameter is retained for compatibility
+and is no longer read. (#148)
+- **Corrected the stated cost of the UTC-for-UT1 fallback.** `Time.GAST()` and
+`satellite.subSatellitePoint` both described it as "a few hundred ms of error
+at worst"; it is bounded by the leap-second system at 0.9 s — about 13.5
+arcsec, or 420 m of sub-satellite ground position — and that bound disappears
+when leap seconds end in 2035. (#148)
+- **`coord.Context.GeocentricToObserved` returned altitudes of thousands of
+degrees near the horizon.** Its refraction branch wrote out
+`Refa·tan(z) + Refb·tan³(z)` with no clamp, so the series diverged just below
+the horizon (+7028° at −0.076°) and canceled to zero just above it (0.000°
+where the stellar path applied 0.16°); it also omitted the Newton-Raphson
+correction. It now reproduces SOFA's `Atioq` exactly, so the two pipelines
+agree to milliarcseconds. (#153)
+- **The scheduler treated the Moon as a star at infinity.** Every constraint,
+score and visibility check called `ICRSToAltAz` on a geocentric position,
+discarding the observer's offset from the geocenter — up to **0.95°** for the
+Moon, so an `Altitude{Threshold: 0}` constraint reported it up about four
+minutes before `MoonEvents` said it rose. Crescent visibility was affected
+worst, its own comment claiming "topocentric" while the code was not. (#154)
+- **ET was quantised to ~40 microseconds.** The Julian-date conversion pair
+summed the two-part Julian Date before subtracting J2000, and one ULP at a
+modern Julian Date is 40 µs — 4 cm of lunar motion, at the level of the 33 mm
+claimed against Horizons. The new `lsk.UTCToET` removes the epoch first and
+resolves **0.128 µs**, a 256-fold improvement. `UTCToTDB` and `TDBToET` are
+removed: they held the same value in a container that could not represent it,
+and nothing in production called them. (#158)
+- **`Time.Sub` between two UTC epochs was short by every leap second between
+them** — 27 s across 1972-2026, or 207 km of ISS track. It unified scales only
+when they *differed*, so mixing scales gave the right answer and being
+consistent gave the wrong one. Both operands now go through TT unless they
+share a uniform scale (TAI/TT/TDB), where label arithmetic already is elapsed
+time. `Sub` also saturates instead of wrapping past ±292 years — year 1 to 2026
+used to return a negative duration — and rounds to the nearest nanosecond
+rather than truncating (#149).
+- **Following the documented `RefractionModel` API panicked.** Every constructor
+leaves `Refraction.Model` nil, so `env.Model.RefractFromTrue(...)` was a nil
+dereference. `Refraction` now answers for itself via `RefractFromTrue`,
+`RefractFromApparent` and `EffectiveModel`, which resolve nil to the new
+`RefractionSOFA` when a pressure is set and to `RefractionNone` otherwise —
+moving the "nil means SOFA" convention out of `coord` and into the package that
+owns the type. `coord.Reducer.Disperse` consequently stops reporting zero
+dispersion for an environment `Reduce` had just refracted through (#118).
+- **`RefractionRigorous` and `RefractionApproximate` returned negative refraction
+near the zenith** — −0.114″ and −0.080″, crossing zero at 89.89° and 89.92°,
+because the term that stabilises each fit near the horizon carries its tangent
+argument past 90° at the top. Both now return zero above the crossing, which is
+the physical limit and costs at most 0.001″ against a fit quoting 6″. The
+known-values test also stops taking `math.Abs` before comparing, which had made
+its bracket blind to the sign of every row, not just the zenith one (#162).
+- **`plan.LookAngle` discarded the `coord.Context` it was handed** and had
+`coord.Reducer` build a second one, repeating the Apco13 solve the first
+already held. Measured: 242 → 95 µs per call, and `SatellitePasses` 318 → 200
+ms over a six-hour window, since it paid the solve twice per 30-second sample.
+Everything the Reducer computed is already on `Context`, so nothing is rebuilt.
+Using the given Context is also what the signature promised — one derived by
+`Context.AtTime` used to be silently replaced with a full rebuild (#111).
+- **`Event.Altitude` was geometric at rise/set and refracted at transit**, with
+nothing in the type saying so, and `Event.GeometricAltitude` was assigned the
+identical value at both construction sites — so one field told a caller nothing
+the other did, and comparing a rise altitude against a transit altitude
+compared two different quantities. `Altitude` is now the refracted altitude at
+every event kind, matching `IsObservable` and `GetDetails`; `GeometricAltitude`
+is the unrefracted one. `Value` stays geometric at rise/set, so event times are
+unchanged (#156).
+- **`plan.Episode` searched up to 366 days to discover a target never rises.**
+For a fixed target that answer is two arcsines — declination does not change,
+so upper and lower culmination bound the whole window — and `IsNeverUp` /
+`IsCircumpolar` already computed it while having no caller in the library.
+Measured: 2.84 s → 67 ns for the never-rises case, and the `plan` package
+18.6 s → 12.7 s. A one-degree margin keeps anything refraction or parallax
+could decide on the search path, and moving bodies always search (#110).
+- **Six test files asserted astronomical results at whatever instant the suite
+happened to run.** A test at `time.NowUTC()` drifts across the IERS
+measured/predicted EOP boundary — which moves every week — and eventually off
+the end of the file, failing on a future date with no code change. Those now
+use a fixed past epoch, which is final and cannot drift.
+`TestNoUndeclaredWallClockTests` scans the module and requires any remaining
+wall-clock test to declare why the present is its subject; twelve do, and a
+stale declaration fails too (#142).
+- **Three places reported a real failure as a legitimate absence.** The CAMS
+HDF5 reader treated *any* `ReadAttribute` error as "attribute missing", so a
+corrupt file reported every attribute as absent and the reader carried on with
+defaults; it now asks which attributes exist first, which separates absence
+from an unreadable header. `IntegratedStarlight` read `err != nil || value <= 0`
+and reported a map that could not answer — a band it does not carry — as an
+uncovered direction; the two are now distinguished by the new
+`skybrightness.ErrNoCoverage` (#172).
+- **Seven predicates could not report a failure, so an error read as "the answer
+is no".** The scheduler's and visibility solver's bisection predicates returned
+a bare `false` for a constraint that *could not be evaluated*, so a target
+silently vanished from a schedule; `ObservableWindows` swallowed a failure
+during refinement, moving a rise/set boundary rather than dropping it; and
+`DiffuseGalacticLight.capFactor` treated a star map that could not answer as a
+sightline with no starlight, quietly dropping the Toller cap. All now
+propagate (#177).
+**`plan.VisibleTonight` reports an incomplete result instead of only logging
+it.** It still skips a candidate it cannot evaluate rather than failing the
+night, but now returns its results alongside an error wrapping the new
+`plan.ErrIncomplete`, naming every catalogue source, target, small body, moon
+kernel and candidate that was dropped and why. A caller who ignores that error
+gets the previous behavior; one who checks it can finally tell a quiet sky
+from an unreachable JPL (#177).
+**`satellite.ValidateTLE` now checks that every numeric field is numeric, which
+prevents the SGP4 backend from calling `os.Exit` on the caller's process.**
+`joshuaferrara/go-satellite` parses the twelve numeric TLE fields through
+helpers that `log.Fatal` on a parse error — no error, no panic, nothing to
+recover. A TLE's modulo-10 checksum cannot catch this, since letters and spaces
+contribute nothing to the sum, so a field replaced by text can still check out.
+`NewFromTLE` now refuses such a set with `ErrMalformedTLE` naming the field, and
+`Satellite.MeanMotion` comes from that same parse rather than a separate one
+that returned a silent `0`.
+**`cams.isDimensionScale` reported an unreadable object header as "not a
+dimension scale".** A corrupt file then filed its axes as data variables, so
+the reader indexed a shape the file does not have and the failure surfaced much
+later as a missing dimension on a variable whose dimensions are all present. It
+was the one attribute reader #172 left behind. (#180)
+- **Satellite positions carried up to a second of orbital motion of error — 5.94 km
+for Vallado's reference case, worst at the element epoch where it should be exact.**
+The SGP4 backend truncates the element epoch to a whole second as well as the query,
+so the sub-second correction must be `frac(t) - frac(epoch)`, not `frac(t)`. (#181)
+- **`time` re-exported fifteen standard-library functions as reassignable package-level
+`var`s, and its six layout strings as a `var` block.** Any package in the import graph
+could reassign `time.Parse`, `time.Now` or `time.RFC3339` process-wide, in the package
+every epoch calculation goes through. They are functions and constants now — identical
+at every call site, so nothing outside had to change (#113).
+- **A TLE with a day-of-year past the end of the year panicked inside the SGP4 backend**,
+reachable from `satellite.NewFromTLE` with an element set that is 69 columns,
+checksum-valid and numeric in every field. `days2mdhms` guards a twelve-element month
+array with `i < 22`. `ValidateTLE` now range-checks the epoch day (#139).
+- **`votable.Read` returned rows for a document declaring no columns**, so a response that
+was not a VOTable at all became an empty result set with a nil error — indistinguishable
+from a query that matched nothing. It now returns the new `ErrNoFields` (#139).
+- **Four places where the documentation contradicted the code** (#119): the ROADMAP said
+`LimitingMagnitudeConstraint` was removed while a differently-shaped one exists;
+`plan/events.go` credited SOFA for a rise/set threshold that hardcodes the conventional
+34′; `.golangci.yml` still described a go-cloud fork `replace` that `go.mod` has not
+carried since the remote rebuild; and the `cams`, `kepler` and `xmatch` package synopses
+were paragraphs, so pkg.go.dev rendered their directory listings as walls. The ROADMAP also still listed limiting magnitude as unbuilt while `skybrightness/plan.Imaging` implements it. (#188)
+- **`catalog.ErrNotFound` was a different error value from `resolve.ErrNotFound`, with
+identical text.** `catalog.Provider` is an alias for `resolve.Provider`, whose contract is
+written in terms of the latter — so a caller following it and testing
+`errors.Is(err, resolve.ErrNotFound)` got false for an object that simply does not exist,
+and fell into their "the service is down" branch. Both are now the same value (#141).
+- **`remote.ErrRetriable` was produced by nothing.** A 503 that survived every retry and a
+404 were the same error, so a caller could not tell "the service was busy and we gave up"
+from "you asked for something that is not there". `APIClient.Get` now wraps the final
+`*remote.HTTPError` with it whenever the retry policy would have retried that status. (#195)
+- **`openngc.Provider.SearchBright` reported an unreachable catalog as an empty
+sky.** It was the one query that never consulted the recorded load failure, so a
+denied download or a dead endpoint came back as "no objects brighter than that"
+rather than as an error. It now yields the failure through the iterator. (#197)
+- **A leap second passed to `time.Date` was aliased silently.** `23:59:60` has no
+representation in a two-part JD whose day is 86400 seconds long, so it collapsed
+onto the following midnight — one second away, and converted with the wrong ΔAT
+(37 rather than 36). It still does; it now says so through `logging` at WARN,
+distinguishing a real leap second from a second that never existed. See #144 for
+the representation question, which stays open. (#198)
+- **`fits.ReadHeader` allocated about five times the file it was reading.** Its
+failsafe bounded blocks read, not cards retained, so 10,000 blocks of distinct
+keywords was 360,000 retained cards — measured at 144.1 MB from a 28.8 MB input.
+A second bound on retained cards holds it at 8.5 MB and, more to the point, flat
+as the input grows. (#199)
+- **Five network tests failed the build on somebody else's outage and discarded
+the error while doing it** — `Failed to resolve ISS` was the whole diagnostic
+when CI throttled. They now route through `testutil.SkipOnUpstreamFailure` and
+carry the error, and an `internal/docsguard` guard keeps the next one from
+reintroducing it. (#204)
+- **A 403 failed the build instead of skipping the test.** CelesTrak answers a
+burst of requests with "Forbidden: Access is denied" and serves the same query
+normally a minute later, which `testutil.SkipOnUpstreamFailure` classified as
+astrogo sending a bad request. To a caller that sent no credential there is
+nothing to correct, so it now skips; 401 still fails, and a new registry test
+keeps the invariant that argument rests on (#206).
+- **`catalog/fink` reported an asteroid it had never heard of as an outage.** FINK
+answers an unknown identifier with a `RemoteException`, which read as a failure
+and was joined into the returned error, so `Resolve` never produced
+`ErrNotFound` — #102's inversion. The bulk SSOFT table loading and not holding
+the object now settles it, and the exception's own message is carried instead of
+discarded (#122).
+- CLAUDE.md's fuzz throughput figures were unsupported and one was wrong by two
+orders of magnitude: `fits.Read`'s "~4 exec/s" was the default 60 s minimize
+time, not the parser, which measures ~800. Replaced with a corpus-controlled
+table, the run-to-run spread that makes a single run not a measurement, and the
+160× that `-fuzzminimizetime` alone decides (#200).
+- **`fits.WCS` could be rewritten without going through a setter, in both
+directions.** The getters returned the internal slice and the setters kept the
+caller's, so reading `CRVAL` to inspect it, or holding the slice you passed in,
+let you move an image on the sky at a distance. Both now copy, including the SIP
+and TPV coefficient maps (#178).
+- **Planets, asteroids, comets and generic bodies were placed geometrically, not
+apparently.** Neither light time nor annual aberration reached the scheduler's
+alt/az: measured at Paranal across 2026, Mars was out by up to 38.7″, Venus
+44.8″ and the Sun 20.5″. All four target types now return the apparent place
+(#117).
+- **A kernel that could not be read was deleted as corrupt.** "Access is denied"
+and a checksum mismatch shared one branch, so a process losing a race to a file
+lock deleted the shared 32 MB kernel out from under every other process — the
+observed cause of intermittent Windows CI failures. Only a proven content
+failure is destructive now; an I/O failure leaves the file for the next open to
+retry (#227).
+- **The USNO comparison suite had been silently skipping.** A single-shot TCP
+probe cached its failure in a `sync.Once`, so one dropped packet retired all
+fourteen `TestUSNO_*` functions for the rest of the binary — as SKIP, which
+reads as a pass. The probe now goes through `testutil.Reachable` (which retries
+over IPv4) and remembers only success; a new docsguard check stops the next
+hand-rolled probe (#225).
+- `ephemeris/jpl` no longer rejects every comet fetched by its Horizons SPK-ID as
+a substituted body. Those IDs sit outside NAIF's numbered-asteroid block, where
+`core.SmallBodyID` reports 0, and the substitution guard was comparing the
+loaded bodies against that zero rather than against the comet (#237).
+- `plan`'s tests no longer revoke the download consent their own `TestMain`
+grants: the four blanket `remote.Reset` cleanups are now scoped
+`remote.Capture(...).Restore`, and a new guard in `internal/docsguard` fails
+any consent-granting package that reintroduces one (#240).
+- `plan`'s `network` and `validation` test tiers run on their own again: the
+`TestMain` registering the kernel backend and granting download consent was
+gated to `integration`, so `go test -tags=network ./plan/` reported "this build
+has no kernel backend" for 24 checks. A guard now requires a `TestMain` to
+cover every tier its package has tests in (#243).
+- An EOP lookup outside the IERS bulletin's coverage no longer re-reads and
+re-parses the whole file on every call — 71 ns for a covered epoch against
+11 ms and 15.6 MB for one just outside. Scheduling more than a year ahead and
+historical work before 1973 were both on that path (#247).
+- `remote`'s download lock is now genuinely exclusive within a process. It relied
+on `fileblob`'s `IfNotExist` being mutex-guarded, which the pinned driver does
+not do — measured, 8 goroutines on one bucket produced 51 rounds in 200 with
+two or more simultaneous holders (#250).
+- `ephemeris/jpl/spk`'s Horizons status sentinels now wrap the HTTP error rather
+than replacing it, so a 503 is recognizable as upstream downtime by anything
+matching `HTTPStatus() int` — previously a service outage was indistinguishable
+from a bad request (#251).
+- The Horizons state comparison no longer claims both sides evaluate the same JPL
+integration. Horizons serves DE441 and astrogo reads DE440, and the two differ
+by 2.42 m at the Moon — most of that test's measured residual is the kernel gap
+rather than astrogo, which the tolerance's derivation now accounts for (#257).
+- **`Context.GeocentricToObserved` omitted diurnal aberration**, so the vector
+reduction route and the stellar route disagreed by up to 0.32″ for the same
+target — 0.3150″ at the equator, 0.1966″ at Greenwich — while applying
+refraction, the other half of what "observed" means. `Reducer.Reduce`,
+`ReduceBatch` and every `plan` caller shared the defect (#261).
+- **`ApparentState` applied no gravitational light deflection**, so the apparent
+place was short by a term that reached 0.62″ for Jupiter near conjunction.
+Against Horizons over 2026 the worst case per body drops from 0.08–0.67″ to a
+flat 0.05–0.06″, and the new `ephemeris.apparent.geocentric` suite pins it
+(#263).
+- **Concurrent cache writes of one object name collided on Windows.** `fileblob`
+stages every write through a temp file named from a clock that does not advance
+there — 2000 consecutive `UnixNano` reads returned one distinct value — and puts
+it in `os.TempDir`, so writers renamed each other's staging file away, 59 times
+in 320. Cache buckets now stage inside themselves, which also avoids re-copying
+a multi-gigabyte kernel across volumes, and `remote.Save` (since renamed) serialises
+writers of one key (#241).
+- `docs/VALIDATION.md` said a smeared clock was untracked when
+`time.Time.LeapSmearWindow` already handled it, and carried an SGP4 limitation
+whose shape had changed. A document that tells readers a safety signal does not
+exist while shipping it is worse than one that says nothing (#268).
+- **Staging inside the cache bucket broke concurrent processes on Windows**, which
+#266 shipped and CI then failed on: two `go test` binaries sharing one cache
+collided on a staging path they could not retry past, failing every test in
+`ephemeris/jpl` for three minutes. The parameter is gone. The in-process write
+lock is keyed on the key's basename instead — the collision domain the staging
+path actually has — which covers the separate-bucket case the parameter was
+added for (#241).
+- **A body id above `MaxInt32` was converted rather than refused.** `core.ID` is
+unsigned and a NAIF id is signed 32-bit, so the top half of the range wrapped to
+a *negative* id — which is meaningful, since that is how NAIF numbers
+spacecraft. `core.ID(0xFFFFFFFF)` was looked up as −1 and answered for a body
+the caller never named. `jpl.Provider.State` now returns `ErrBodyIDOutOfRange`,
+and `plan`'s designation parser bounds to 31 bits (#273).
+- **A cache fetch that lost a cross-process race failed instead of returning the object.**
+The download lock is exclusive within a process and only mostly so across them, so two
+`go test` binaries fetching one kernel could both reach the download; the loser died on
+`Access is denied` renaming its staging file while the winner wrote a complete kernel.
+`GetFile` now re-runs its freshness check before reporting a fetch failure, so the caller
+gets what they asked for when someone else has just produced it (#241).
+- **A null table value read as 0.0.** `fits.BintableHDU`'s float-column accessor — and a
+second copy of the same logic in `skybrightness/dataset/solar` — returned zero for an absent
+value, so a missing flux became a flux of nothing and a missing magnitude became magnitude 0,
+which is a very bright star. Nulls read as NaN now, which is what every consumer already
+screens for. (#275)
+- **Download staging on Windows.** Serialize staging writes with other writes sharing the same basename, preventing temporary-file collisions across cache keys and buckets. (#292)
+- **Documentation: the CIRS place says so.** The type now called `coord.CIRS`
+had a doc comment saying only "the true geocentric position of an object",
+which reads as the equinox-based apparent place it is not. A caller comparing
+its `RA()` against an almanac's apparent right ascension was 20 arcminutes out
+with nothing in the type saying why. The comment now names the system and
+points at `TETE` (#126). It was renamed from `Apparent` in the same release
+(#298), which is the other half of the same fix. (#299)
+- **An archive's error page no longer reads as a corrupt result set.** When a TAP
+service answers a query with HTML and a 200 — a maintenance notice, a load
+shedder, a login wall — the VOTable reader now reports that rather than
+surfacing whatever the page eventually fails to parse on. ESA's Gaia archive did
+this during a tagged run and the suite failed on `XML syntax error on line 161:
+unexpected end element </div>`, which sends the reader looking for a parser bug
+instead of at somebody else's outage; `TestArchivesAgree` now skips, as it
+already did when a front end accepts a connection and stops answering. (#301)
+- **The FINK validation test now says why it could not compare.** "No valid
+r-band observations" covered two conditions that want opposite outcomes — FINK
+holding no r-band photometry for the object right now, which is absence, and
+FINK renaming a column, which is a schema change astrogo must notice. The test
+now skips for the first and fails for the second, naming the columns and the
+counts either way. (#302)
+- **`coord`'s package documentation reads in a sensible order again.** Six frame
+sections landed in six separate pull requests, each inserted wherever it would
+not collide with the others, so the result was ordered by merge mechanics rather
+than by topic — and the `Reducer` paragraph ended up orphaned inside the Local
+Standard of Rest section, where it has nothing to do with anything around it.
+Frames are now grouped, the two mechanism sections sit at the end, and the
+`Reducer` paragraph is back under Transformations. No text changed. (#305)
+- **The README's frame list was three frames out of date.** It named ITRS, TETE
+and LSR as missing while all three were on `main`, which is the worst kind of
+stale documentation — the honest-limitations paragraph is the one a reader
+trusts most. It now lists what arrived and what did not, and says why LSRK has
+not: its apex is published in the B1900 equinox that `coord.FK4` cannot express.
+The `coord` row of the package map enumerates the frames the way the `time` row
+already enumerates its scales. (#305)
+- **Proper motions from SIMBAD and Gaia were applied short by a factor of
+cos(dec).** Both catalogues publish μα\* — the on-sky rate — and every consumer
+in `coord` handed it to SOFA, which wants dRA/dt. A star propagated twenty years
+moved 20·cos δ arcseconds instead of 20: 30% short at δ = 45° and 83% short at
+δ = 80°, putting Kapteyn's Star 49″ from where it is. `coord` now converts at
+the one boundary where SOFA is called, so a catalogue row travels to a position
+unchanged at every layer between (#281).
+- **The cross-process download lock collided in its own staging.** `AcquireLock`
+creates its lock object through the same `fileblob` writer everything else
+uses, and that writer stages through a temporary file named from a clock which
+does not advance on Windows — so two writers of one lock key picked the same
+staging path, and the loser's rename found its source already gone.
+`TestStagingAndPartialWritesAcrossBuckets` failed on every run because of it (since renamed).
+The write is now serialised within the process the way `Save` already was, and
+the `NotFound` that a losing writer raises across processes is recognized as
+contention rather than returned as an error (#241).
+- **Satellite positions were 93× further from the reference than they needed to
+be.** A TLE carries mean elements fitted by Space-Track *through SGP4 with
+WGS-72 constants*, so feeding them back through a propagator configured for
+WGS-84 asks a different model to interpret numbers this one produced.
+Measured against Vallado's own verification suite, that single constant moved
+the agreement from p50 0.0346 / max 0.2889 km to **p50 0.0000 / max 0.0031 km**.
+Both sets passed the 1 km contract; the regression detector at 0.4 km had ten
+times more slack than the fault it was watching for, and is now 0.01 km. (#308)
+- **The cross-process download lock is now exact.** It was gocloud's
+`WriterOptions.IfNotExist`, which under `fileblob` was a Stat followed by a
+Rename and could admit a second holder ([#241]). It is `O_CREATE|O_EXCL` inside
+an `os.Root`, which the kernel makes indivisible, so a losing writer has exactly
+one way to lose and it is `fs.ErrExist` — the three-code classifier and the
+staging lock the lock needed around its own write are both gone. (#325)
+- **A directory listing's entry metadata now matches a stat of the same name.**
+On Windows a directory entry's cached `LastWriteTime` lags the child's own,
+so an `fs.FS` returning those entries while serving `Stat` from a real stat
+disagreed with itself — measured at 15 failures in 40 for `os.DirFS` as well,
+so it is the standard library's behavior there rather than astrogo's.
+`remote/file`'s local backend reads each entry's metadata when it is asked for
+instead, which `fs.DirEntry.Info` explicitly contemplates, and now passes
+`fstest.TestFS` unfiltered: 0 failures in 40. Closes [#323]. (#327)
+- **JPL being unreachable no longer turns a build red.** `TestSmallBodyEros` and
+`TestSmallBodyMultiMatch` are untagged and hit the live network, and their own
+doc comment said they must not fail for somebody else's downtime — but they
+recognized only the two ways Horizons answers 200 and still cannot serve a
+kernel. A CI run timed out dialling NAIF's file server, which is a different
+host, and the build failed. `internal/testutil.Unreachable` is the predicate
+they were missing: a timeout, a DNS failure or a dial that never reached a
+service, distinguished from any status a server actually returned. (#327)
+- **`ICRSToFK4` no longer invents proper motion for a star declared at rest.**
+It chose its conversion route by testing every kinematic field for zero, which
+cannot tell "no proper motion recorded" from "measured as zero" — different
+claims about a star that convert differently — and answered the first when
+asked the second. A star declared at rest in ICRS came back from
+`ICRS → FK4 → ICRS` carrying **0.6 to 0.9 mas/yr** it never had, while its
+position closed to 19 µas, which is what kept it invisible. `coord.ICRS` now
+records whether kinematics were supplied, as `coord.FK4` has always done
+through its two constructors, so both routes are chosen rather than inferred
+and both round trips close. `ICRSToFK5` gets the same treatment. Closes [#278]. (#329)
+- **The six-element frame conversions no longer need a parallax.** `ICRSToFK5`,
+`FK5ToICRS`, `ICRSToFK4` and `FK4ToICRS` route through SOFA's `iauH2fk5` /
+`iauFk52h`, which build a space-motion pv-vector and therefore need a distance.
+A parallax below `PXMIN` was replaced by one putting the star at 10 Mpc, where
+any real proper motion exceeds `VMAX = 0.5c` and the space velocity is set to
+**zero** — and because those SOFA routines are `void`, the status saying so was
+discarded before astrogo could see it. A star with 150 mas/yr and no recorded
+parallax — most of any pre-Hipparcos catalogue — came back from a round trip
+with no motion at all, and a star declared *at rest* in FK4 came back with
+2.4 mas/yr in each component and 0.34 km/s it never had. `internal/gofaext` now
+dispatches on `iauStarpv`'s own status and falls back to a formulation in which
+the distance cancels exactly: the transformation is linear in velocity and
+orthogonal in position, so dividing through by the distance leaves the proper
+motion transforming on its own, with parallax and radial velocity untouched.
+That is the exact limit rather than an approximation, and SOFA's route is still
+taken whenever it can answer, since it carries relativistic and light-time terms
+that no distance-free formulation can. Verified against SOFA in the overlapping
+regime: the two agree to 8.9e-17 mas/yr for a star at rest and diverge only with
+radial velocity, reaching 5.6e-05 mas/yr at 20 km/s. Closes [#331]. (#338)
+- **The six-element frame conversions no longer label their output with an epoch
+it is not at.** `ICRSToFK4` and `FK5ToFK4` answer at B1950.0 through SOFA's
+`Fk524`, and `ICRSToFK5` answers at J2000.0 through `H2fk5`; none of those SOFA
+routines takes an epoch, by design, because a star with a recorded proper motion
+has its state stated at the catalogue equinox and moving it is a separate
+operation. The conversions nonetheless stored the caller's epoch in the returned
+struct, so `ICRSToFK4(star, 1975)` returned B1950 numbers reporting
+`Epoch() == 1975` — the numbers right and the label wrong, which is the worse
+way round, since a wrong epoch propagates into `FK4ToFK5`'s position-only route
+and into anything reading `FK4.Epoch`. They now report `B1950` and `J2000Epoch`,
+and the doc comments say plainly that the argument applies to the position-only
+route only, why propagating instead would mean inventing a convention SOFA
+declines to define (the E-terms of aberration would be evaluated at a different
+epoch on each branch), and that `PropagateEpoch` is the rigorous way to move a
+star to another epoch. The same defect was present in `ICRSToFK5`, which [#330]
+recorded only for FK4. Closes [#330]. (#340)
+- **FK4 and FK5 round trips no longer drift away from the catalogue equinox.** A
+star with no recorded proper motion still moves in both frames, because each
+drifts against the inertial one, and `ICRSToFK4`, `FK5ToFK4` and `ICRSToFK5`
+hand that fictitious motion back rather than pretending the star is at rest.
+They marked it as a *recorded* motion, which sent the inverse down the
+six-element branch — SOFA's `Fk425` for FK4, `Fk52h` for FK5 — and both of those
+take no epoch and assume the catalogue equinox, while the position they were
+handed is at the caller's epoch. The error was linear in the distance from the
+equinox and exactly zero at it, which is why every existing round-trip test
+missed it: `ICRS → FK4 → ICRS` lost 0.474″ at B2050 and `ICRS → FK5 → ICRS`
+0.096″ at J2100, at 4.7 and 0.96 mas per year respectively. `FK4` and `FK5` now
+record whether a motion was measured or supplied by the frame — the same
+distinction #278 gave `ICRS` — and dispatch on it. Both round trips close at
+every epoch, the FK4 one to the 0.000023″ floor SOFA's own E-term iteration
+leaves and the FK5 one exactly; `TestAstrogoMatchesRawSOFAAtEveryEpoch` now pins
+astrogo to within a nanoarcsecond of the raw `Fk54z` → `Fk45z` pair, which always
+closed and so localised the defect to astrogo's dispatch rather than to SOFA.
+Closes [#341]. (#342)
+- **A network failure is no longer swallowed by the deadline it caused.**
+`internal/testutil.Unreachable` excluded `context.Canceled` and
+`context.DeadlineExceeded` before every other check, so an unreachable host
+reported as reachable whenever the endpoint's own download timeout fired
+alongside the dial failure — which is how `ephemeris/jpl`'s kernel tests went
+red on NAIF's downtime with their skip guard in place and not firing. The
+exclusion now sits ahead of the check that genuinely cannot tell a network
+timeout from a caller's deadline, and behind the three that can: a DNS failure,
+a failed dial and `ECONNREFUSED` are not things a context error produces, so a
+deadline alongside them decides nothing. Four `plan` tests that fetch a DE44x
+kernel before testing AstroPixels, NASA or USNO gained the guard they never had,
+and `newEph` now skips rather than substituting the analytic ephemeris when NAIF
+is unreachable — that substitution made `TestUSNODecomposesTheTopocentricBias`
+report a −0.456″ declination bias as evidence of a precession-nutation defect
+that does not exist. Closes [#348]. (#349)
+- **`coord`'s au-per-Julian-year constant was wrong in its ninth digit.** It
+shipped as the literal `4.740470446`, a decimal repeated widely in the
+literature, while its own doc comment described it as "the au divided by the
+Julian year" — which is `4.740470463533`, from 149597870700 m over
+365.25 × 86400 s, both exact by definition since IAU 2012 Resolution B2. The
+constant is now computed from the au in `constants` rather than
+written down, so it cannot drift from the au again. The error was 3.7e-09
+relative and nothing observable moved — the Sun's rotational velocity in
+`SolarVelocityFromSgrA` shifts by 9.2e-07 km/s — but a constant whose
+documentation describes a different number than it holds is a trap for the next
+reader. `coord/spacevelocity_test.go` held the same wrong decimal, which is why
+no test caught it; it now asserts the value independently. (#354)
+- **A network test no longer fails when the service's own TLS certificate does.**
+An expired certificate, or one signed by an untrusted authority, now skips like
+any other upstream outage — it passed the TCP pre-check and matched no network
+predicate, so `api.open-elevation.com`'s lapsed renewal made a permanent red
+build. A certificate valid for a *different* name stays fatal: that means
+astrogo asked for the wrong host, which is the defect these tests exist to
+catch. (#365)
+- **Ten network-tagged test suites no longer fail when a service is merely having
+a bad day.** They checked a socket was open and then treated any answer as a
+verdict on astrogo, so a Horizons 503 saying *temporary overload/maintenance*
+failed the build. `ephemeris/kepler`'s Horizons fetch also now reports a non-200
+as a status rather than as an unparseable body, which is what made its outages
+invisible to the classifier. (#368)
+- **37 tests that skipped on any error, and so could never fail, now identify it
+first.** Each named a cause the code had not established — "SkyCalc did not
+answer", "(network issue?)" — and three were not about a service at all: one
+skipped when IMCCE's document failed to decode into a struct declared in this
+repository, so a schema change would have read green indefinitely. A new
+`docsguard` check fails any skip that is the first statement inside a bare
+`err != nil` guard, with an allowlist for genuine environment preconditions. (#369)
+- **The last eight tests that skipped on an unidentified error now name the
+condition they mean**, and the allowlist that exempted them is gone — each was
+the same defect one level down. The symlink pair shows why no list: Windows
+returns `ERROR_PRIVILEGE_NOT_HELD`, which does *not* satisfy
+`errors.Is(err, fs.ErrPermission)`, so the natural predicate would have skipped
+on every symlink failure while appearing to check for one. Two tests that
+skipped when a loopback listener could not be bound are now fatal, including the
+only test that exercises `Unreachable` against a socket the OS really refused. (#370)
+- **FK4 conversions no longer invent a radial velocity for a star whose parallax
+describes no distance.** A star declared at rest came back from
+`FK4 → ICRS → FK4` with a velocity proportional to 1/parallax — 38.9 km/s at
+1e-9 arcsec. `iauFk524` builds its pv-vector with a radius of 1.0, so the
+geometry never needed the distance: measured, the direction and proper motion
+are bit-identical across nine decades of parallax, and only the final
+`rv = rd/(px·VF)` division was at fault. The same change closes a band where
+`iauFk52h` reported complete success while implying a star moving at 0.43c.
+Where the parallax is real, SOFA's answer is kept unchanged. (#376)
+- **UT1 is no longer up to a second wrong on the day before a leap second.** The
+IERS series was interpolated straight across the whole-second jump in UT1−UTC,
+so on each such day it ramped from one side of the step to the other: measured
+on 2016-12-31, half a second out at noon and a full second — 15 arcsec of Earth
+rotation — just before midnight, on every leap-second day from 1973 to 2016. The
+step is now removed before interpolating. (#378)
+- **Horizons outages no longer fail the validation suite.** The Horizons fetchers
+did not read the HTTP status, so the 503 JPL serves under load reached callers
+as a sentinel no classifier could see; the corpus generator also turned a
+partial fetch into a reported "corpus would change". Each fetcher now surfaces
+the status, the generator skips on an outage instead of diffing half a fetch,
+and four unclassified kernel fetches were found by auditing per call site
+rather than per file. (#379)
+- **Six more tests that could not fail now can.** The skip guard caught a skip only
+when it was the first statement after `if err != nil` and spelled `Skip`, so a
+skip left after a classifier, and `metrology.NotVerified` — which skips after
+recording — both got past it. Four accuracy suites recorded NOT VERIFIED on any
+provider error, so a regression that broke the provider would have been
+published as an outage. The guard now judges a skip by its enclosing block,
+counts skipping helpers as skips, and flags a helper that swallows the error it
+is handed; `testutil.UpstreamFailure` is exported so a suite can record before
+it stops. (#380)
+- **A leap second is now an instant of its own.** `Date(2016, 12, 31, 23, 59, 60, …)`
+used to land on the following midnight and convert with ΔAT 37, where the inserted
+second carries 36 — a full second wrong. UTC Julian Dates now follow SOFA's
+convention, the fraction of a day ending in a leap second being of 86401 seconds,
+restated against astrogo's own leap-second table so a registered one is honoured.
+Ordinary days are unchanged to the bit. **Do not subtract two UTC Julian Dates
+across such a day**: the difference is neither the labels nor the elapsed time;
+use `Time.Sub`, or `ToGo` for labels. Four places in this repository did, and are
+fixed: UT1 in `coord.Context`, SGP4's `AtTime` and epoch, and `lsk.UTCToET`. (#381)
+- **Saturn is no longer too faint when the south face of its rings is lit.**
+`magnitude.PlanetApparent` gave the ring inclination a sign, so the ring terms
+dimmed Saturn instead of brightening it: 1.9 mag too faint at the 2002
+opposition, 0.49 mag at 2026's. It now agrees with JPL Horizons to 0.001 mag
+on both faces (#375).
+- **SBDB's bright-object query returns elements at full precision.** It rounded
+them to four significant figures, as the single-object lookup rounded to three
+before it asked for `full-prec`: C/1937 C1's e = 1.000162271 came back as
+1.0002, and its perihelion time to a hundredth of a day. (#392)
+- **SBDB values written in E-notation are read whole.** The decoder kept the
+digits before the `E`, so a mean anomaly of `-2.593805408851336E-5` degrees
+was read as −2.59°: every element set near perihelion was off by orders of
+magnitude. (#392)
+- **`kepler.NewElements` reports a comet's open orbit as `ErrUnsupportedOrbit`.**
+Given a = q/(1−e), which is negative or infinite for e >= 1, it used to return
+`ErrInvalidElements`, indistinguishable from bad data (#374).
+- **The API Diff check judges a pull request by its own changes.** It compared
+the pull request merged into today's main with main as it was when the pull
+request was opened, so every break merged in between was blamed on it: #392,
+which only adds symbols, was told to declare #383's renames (#394).
+- **49 test loops that moved on from any error now say which error they expect,
+or fail.** A `continue` past whatever an iteration returned could not fail on
+it, and passed outright when every iteration errored: an airmass audit passed a
+function that errored on every input, and the NASA and AstroPixels comparisons
+logged solver errors as skips. `TestLoopsDoNotPassOverAnUnidentifiedError`
+enforces it, with no exemption list (#393).
+- **Kepler positions are no longer tilted 0.042″ about the equinox.**
+`ephemeris/kepler` rotated J2000-ecliptic elements into the equator by the
+IAU 2006 obliquity, where JPL defines their ecliptic with IAU 1976's: 33 km
+for C/2023 A3 at 2.5 AU. 433 Eros now matches Horizons to 0.000″ at its epoch
+of osculation, where it read 0.04″ (#391).
+- **Mars's magnitude now includes Mallama & Hilton's rotation and seasonal
+corrections**, which Skyfield omits and JPL Horizons applies. It was up to
+0.076 mag from Horizons; it now agrees at 11 dates 2003–2026 to 0.0005 mag and
+reproduces the authors' own test data (#389).
+- **The NASA eclipse validation compares every catalog row.** It had dropped 78
+eclipses whose type codes its parser did not list; with them, solar is
+1433/1433 and lunar 1451/1452, and the ΔT cross-validation now asserts a bound
+instead of logging (#398). The lunar miss and 173 over-reported eclipses are
+#401. (#402)
+- **`plan.LunarEclipses` and `plan.SolarEclipses` decide an eclipse by the
+shadow, not a fixed 1.58° latitude.** Over six centuries of NASA's Five
+Millennium Canons they reported 173 eclipses that do not happen and missed one
+that does; they now agree on every eclipse, with greatest eclipse 0.16 minutes
+from the canon's on average instead of 0.8. `Gamma` is measured against the
+real limit, and a provider error mid-search is returned (#401).
+- **`constants.IAU2015.SunEquatorialRadius` is IAU 2015 B3's 695,700 km, not
+696,000 km**, so `plan.AngularDiameter` agrees with JPL Horizons for the Sun
+instead of running 0.85″ large. `MeanEarthRadius` keeps its 6,371 km but no
+longer cites B3, which defines no mean radius, or claims to be exact (#403).
+- **`magnitude.PlanetApparent` computes Pluto**, which it listed as supported
+and refused: the Explanatory Supplement's historical law for Pluto and Charon
+together, V(1,0) = −1.01 and 0.041 mag/°, documented as an approximation that
+can be tenths of a magnitude off, not a prediction. `plan.VisibleTonight`,
+which dropped that error and so never listed Pluto at any limit, now reports a
+body or planetary moon it cannot evaluate through `ErrIncomplete` (#407).
+- **`fits` reads the D exponent the FITS standard allows** (`1.5D-05`), and a
+keyword that is present but does not parse is an error, never its default.
+Before, `ExtractWCS` silently read such a header as reference point (0, 0),
+unit scale and no distortion, and `ReadImage` dropped a `BZERO = 3.2768D+04`,
+leaving 16-bit unsigned pixels 32768 low. Adds `fits.ErrWCSMalformedKeyword`
+(#409).
+- **`plan.MoonPhases` samples to the end of its window**, so a phase — and an
+eclipse at that syzygy, through `LunarEclipses` and `SolarEclipses` — in the
+window's last partial six-hour step is no longer lost, and a refinement that
+fails is returned instead of silently dropping the phase (#419).
+- **A search interval that ends before it starts is `plan.ErrReversedInterval`**
+from every interval search — `EventSolver.Find` and the helpers on it,
+`MoonPhases`, the eclipse searches, `SatellitePasses`, `TransitEstimate`,
+`Episode` and `Find` — where it used to panic inside a sampler (#418).
+- **`plan.EventOpposition` — and `Oppositions` and `FullMoonOppositions` with
+it — is solved on geocentric ecliptic longitude**, as oppositions are defined,
+instead of right ascension, which put the oppositions of Mars up to 51 hours
+late and Full Moons up to 3.25 hours off; they now agree with JPL Horizons to
+a minute with DE440s (#413).
+- **`plan.Seasons` includes nutation in longitude**, which SOFA's `Eqec06` does
+not apply, and takes the Sun's apparent place from the ephemeris: equinoxes and
+solstices that were up to 8.5 minutes off now agree with Skyfield to under a
+second and with USNO to its rounding (#414).
+- **`plan.MeteorShower`'s `IsActive` and `RadiantAt` compare IMO's solar longitudes
+with the Sun's longitude for the equinox J2000.0**, as IMO tabulates them, not the
+longitude of date: windows and peaks were about nine hours early in 2026, and
+drifting 20 minutes further each year (#415).
+- **`plan.MoonIllumination` returns the Moon's phase angle**, the Sun–Moon–Earth
+angle, where it returned the elongation, and the fraction (1 + cos i)/2, up to
+0.0014 closer to Skyfield's. Lunar-phase events carry that fraction as their
+`Value`, so a quarter Moon is 50.13% lit, not exactly half (#416).
+- **`EventSolver` finds a meridian transit wherever the hour angle rises through
+zero**, not only beside a sampled altitude maximum: transits at high latitude,
+in a window's first step, or with a fine step are no longer dropped, and the
+Sun's are no longer 1.3 s early from aberration applied twice (#417).
+- **`time.Time.ToGo` keeps the nanosecond**: it summed both Julian-date parts
+into one float64 count of seconds since 1970 and lost up to 119 ns, so
+`FromGo(t).ToGo()` was not the identity for most instants (#420).
+- **A `plan.Window` whose End is before its Start is empty**: it overlaps
+nothing, and `Union`, `Intersect`, `Subtract` and `TotalDuration` leave it
+out, where `Subtract` returned it whole from under a window covering it,
+`TotalDuration` counted it as negative time, and `Union` returned it beside a
+window it overlapped (#421).
+- **`plan.Episode` probes the horizon in the same geometric atmosphere as its
+solver**: with refraction the probe called a target up just before a rise or
+just after a set, and `Episode` returned the episode that had already ended
+(#422).
+- **TDB − TT is the leading 37 terms of Fairhead & Bretagnon (1990)**, within
+0.8 µs of SOFA's `iauDtdb` over 1900–2100, where five terms of which only one
+was FB90's were 54 µs off against a documented ±1 µs (#423).
+- **`remote.Client.Reset`'s doc says what it restores**: endpoints, consent,
+offline mode and policy, leaving the data directory and API options, where it
+promised all of `NewClient`'s state. A `catalog/mpcorb` test that trusted it
+broke the tagged suite, and a docsguard check now catches the pattern (#443).
+- **`remote.GetFile` checks download consent before waiting for another
+process's download lock**: a caller who could never download was held by the
+lock for up to half an hour, and with it every lazy EOP lookup in the process
+(#424).
+- **`EventSolver` refines a crossing from the two samples that found it**, rather
+than evaluating the ends again: a sample within 1e-7° of the threshold could
+read differently the second time, and the whole search failed with
+`ErrBracketingViolated` instead of returning its events (#425).
+- **Rise/set and twilight helpers find a crossing pair that falls between two
+samples**: when a body's daily extreme only just passes the threshold — the
+Sun at Mawson in midwinter, a short astronomical night at Paris — both
+crossings fit in one 15-minute step, and the helpers returned nothing (#426).
+- **`time.Time.FormatJulian` rounds to the nearest second**, and
+`DateJulianCal` keeps its day and time of day as separate Julian-date parts:
+half of all whole-second Julian-calendar times printed a second early, and
+`Format` did the same for years outside 0–9999 (#439).
+- **`plan.MoonPhases` measures the elongation between the apparent Sun and
+Moon**, as published phases are defined: geometric longitudes put every phase
+about 40 s late, and up to 43 s from `FullMoonOppositions` (#430).
+- **`EventSolver` returns provider and root-finder failures it used to drop**:
+a rise, set, transit or lunar phase went missing, and a greatest elongation's
+side was decided from a zero position, each with a nil error (#437).
+- **A download lock left by a crashed process goes stale after twice the
+download timeout** rather than always 30 minutes: a minute for the IERS
+bulletin, whose lazy load, with consent, held every EOP lookup behind the
+wait (#445).
+- **`plan.Seasons` returns a failed refinement** rather than skipping that
+season, which left a year missing an equinox or solstice with a nil error
+(#453).
+- **A partial download is no longer thrown away when its ETag sidecar cannot be
+read** — a virus scanner holding the fresh file open on Windows read as no
+ETag — and the read is retried before it is given up on (#452).
+- **`plan.SatellitePasses` returns propagation failures** rather than dropping
+the pass, leaving out its culmination, or filling a pass event with zeros,
+each of which it did with a nil error (#454).
+- **`fits.Read` rejects unusable structural keywords** instead of trusting
+them: a missing or malformed `NAXIS2` no longer reads as an empty table, and a
+negative axis, an overflowing axis product or `NAXIS` above 999 is an error
+rather than a panic or an empty image (#460).
+- **The scheduler returns a transition overhead it cannot compute** instead of
+skipping the candidate, so a block no longer goes unplaced with no reason, or
+placed with no setup time when greedy's refined estimate failed (#454).
+- **CLAUDE.md's table of fuzz targets left out `ephemeris/satellite/sgp4`**, so
+its two targets were outside the extended-fuzzing step. `internal/docsguard`
+now holds the table to the code in both directions, and the package count
+above it too. (#465)
+- **`fits.Read` allocates the data that arrives, not the size a header claims.**
+A 2880-byte file declaring a 400 MB image allocated all of it before reaching
+EOF; it now costs what it holds and ends in `io.ErrUnexpectedEOF` (#461).
+- **`skybrightness.ZodiacalColorCorrection` gives one direction one answer**:
+an elongation written as 340° took the 90° slope while −20°, the same
+direction, took the 30° one (#467).
+- **`fits.WCS` works at and near the celestial poles.** `WorldToPixel` failed
+for most pixels in frames centered above 89°, a pixel at the pole deprojected
+to NaN, and the pole itself could not be located (#469).
+- **A slow NAIF skips `plan`'s integration tests instead of timing out the
+package.** Their kernel fetches are bounded by the test binary's own deadline
+and an exhausted budget is read as the upstream's failure (#471).
+- **A `coord.Context` before 1972 rotated stars and the Moon by different
+Earths**, up to 11.8″ apart on the days SOFA stretches for a TAI−UTC step:
+its astrometry used SOFA's TT and UT1, the rest astrogo's. Every part of a
+Context now uses astrogo's, unchanged from 1972 on (#474).
+- **`Planner.RankObservable` scored the Moon and satellites as stars at
+infinity**: its adapter dropped `GeocentricVec`, so the Moon ranked up to 0.78°
+high and the ISS at 64° while below the horizon (#483).
+- **The scheduler scored a block with the Earth turned to the nearest
+constraint step**, not to the block's midpoint, whenever the block was not an
+even number of steps long. It also now evaluates through one hourly `Context`,
+which makes the built-in strategies 13–59× faster (#481).
+- **An endpoint or data dir reached through `?prefix=` or `?key=` could never
+download**: both wrappers hid the backend's write, lock and cancel interfaces.
+They now carry them, and `OpenFS` refuses a backend whose capabilities a
+wrapper cannot keep (#487).
+- **A `coord.Context` stepped across a leap second was 13″ off**: it reused the
+base Context's DUT1, which jumps by a second there. Each instant now takes its
+own DUT1, as `NewContext` does (#489), and `coord.Context.SetTime` keeps it. (#491)
+- **`Satellite.GetDetails` reported every satellite at 0 km**: it read the
+distance from `coord.Context.GeocentricToObserved`, which set none. The
+transform now carries the topocentric distance, and the details keep the range
+they computed (#495).
+- **`CrescentParams.MABIMS1995` dropped the criterion's 8-hour age alternative**
+("2-3-8"). It now reads the new `Age` field (#496).
+- **The crescent criteria read their own publications**: Fotheringham's
+`12 − 0.008·DAZ²` was linear, Maunder's DAZ coefficient ten times too small,
+Qureshi's cubic added rather than subtracted, Bruin's and Ilyas's curves and
+Caldwell & Laney's lines were not theirs, and each now reads its author's
+frame and instant (#503).
+- **A network test failed instead of skipping when the server dropped the
+connection before answering**: `Unreachable` now counts an `EOF` from
+`http.Client.Do`, and a reset on Windows, where `WSAECONNRESET` never matched
+`syscall.ECONNRESET`. A body cut short by a server that answered still fails
+(#505).
+- **59 Go doc links rendered as plain text**, most behind a removed or renamed
+symbol, and `remote`'s and `ephemeris/satellite`'s package docs described APIs
+that no longer exist. Both docs are rewritten, and `internal/docsguard` now
+fails on a doc link that does not resolve. (#510)
+- **`coord.SubPoint`, and with it `plan.SubsolarPoint`, `SublunarPoint` and
+`Terminator`, ignored precession and nutation.** A GCRS direction was rotated
+by GAST alone, putting the subsolar point 0.38° (42 km) off in 2026 and
+growing 50″ a year. It now uses the full IAU 2006/2000A celestial-to-terrestrial
+matrix, and the plan functions pass the apparent place. (#513)
+- **The EOP-unavailable warning's remedy now names `remote/eop`**, without which
+`remote.EnableDownloads` changes nothing, and docs that still described the
+gocloud storage layer — `s3://` and `sftp://` cache examples, a `no_tmp_dir`
+parameter the `file://` backend ignores, binary sizes measured against gocloud —
+describe the current one. (#516)
+- **A degraded VizieR could still fail the network tests instead of skipping
+them.** The control query that tells a service outage from an astrogo bug
+named no column, so it passed while VizieR refused column names as
+"unresolved identifiers"; it now selects a column the table has always carried. (#521)
+- **`time.FromGoDuration` no longer claims to be exact in every case.** A
+`unit.Duration` is float64 seconds, which keeps the nanosecond up to about 48.5
+days and rounds by up to 4 ns at a year. `Weekday`, `JulianCalendar`, `AddDate`
+and `FromGoDuration` are now tested against dates of record. (#522)
+- **A rotated `CDi_j` matrix with ordinary sky parity was read rotated the wrong
+way.** `fits.ExtractWCS` split CD into CDELT and PC by columns, which flips the
+cross terms whenever the axes have opposite signs: 324″ out at 900 pixels for a
+30° turn. It now splits by rows, and the WCS is held to WCSLIB through a
+checked-in Astropy fixture, to 4e-10″. (#525)
+- **`coord.FromECEF` lost height accuracy with altitude** — 1.5 mm at the ISS, 31
+cm at geostationary orbit — because Bowring's single step is exact only near
+the ground. It now uses SOFA's `iauGc2gde`, which holds 2e-8 m at
+geostationary orbit, and is twice as fast. `coord.ErrInvalidEllipsoid` reports an
+ellipsoid SOFA refuses instead of returning NaNs. (#528)
+- **`atmosphere.RefractionRigorous` (since removed, #588) dispersed light 16 times too little**, through
+an unsourced 0.005/µm wavelength factor: 0.155″ between 0.40 and 0.70 µm at 30°
+where SOFA gives 2.47″. `StandardRefraction` uses this model, so
+`coord.Reducer.Disperse` inherited it. It now scales by the IAG (1999) dry-air
+refractivity SOFA's `iauRefco` uses, and disperses like SOFA's model to 0.1%. (#529)
+- **`angle.ParseDMS` and `ParseHMS` no longer return the opposite sign for a typeset minus.**
+A U+2212 minus, as journals and SIMBAD print negative declinations, was skipped like a separator, so a southern declination parsed as northern.
+It is now a sign; text the parsers do not recognize, such as a hemisphere letter, is `ErrSeparator`, and a fourth field is `ErrTooManyFields`. (#541)
+- **`plan.TransitEstimate` and `MaxAltitudeInWindow` missed a peak on the window's edge.**
+The window's end was never sampled unless it was a whole number of 10-minute steps, so a target still rising at the end was reported up to 10 min early and 1.45° low.
+`RankObservable` and `VisibleTonight` inherit the fix. (#543)
+- **`plan.Conjunctions` now finds conjunctions in right ascension of date**, as the almanacs define them.
+It compared right ascension along the J2000 equator, which put conjunctions up to 2.5 min off; all four checked against Skyfield on DE440s now agree within a second. (#546)
+- **`plan.SwapOptimizedStrategy` could schedule a block before the slew to it had finished.**
+Its swap and gap-insertion moves checked the transition into the block they moved but not the one out of it, and left stale `SetupTime`s; every move is now re-timed against its real neighbours. (#549)
+- **`plan.VisibleTonight` no longer fails the whole night over a target that peaks just below 0°.**
+From an elevated site its windows reach the dipped horizon, below the astronomical one, where airmass is undefined; such a peak now takes the horizon's airmass, a lower bound on its extinction. (#553)
+- **`plan.VisibleIntervals`, `Find` and `ObservableWindows` now sample the end of their range.**
+They stopped at the last whole step before it, so a target setting after that step was reported up until the end, and one rising after it had no final window at all. (#555)
+- **`plan.Scorer`'s urgency no longer makes a rising target look about to set.**
+The hours until set were interpolated from now rather than from the last probe the target was up at, so a star 15 minutes after rising came out 1.6 h from setting against a true 7.1 h. (#556)
+- **Satellite standard magnitudes now reproduce themselves.** `magnitude.SatelliteApparent` measured both conventions' phase correction from 90° and converted Molczan magnitudes to McCants ones, so a McCants magnitude came out up to 1.24 mag too bright and a Molczan one 1.45 mag too bright at their own reference geometry. Each convention is now applied at its own reference phase, full phase for McCants and 90° for Molczan, and a Molczan-based prediction stays about 0.7 mag fainter, as the convention's definition says. (#563)
+- **A satellite in Earth's shadow no longer gets a magnitude.** `Satellite.ApparentMagnitudeCtx` returns the new `plan.ErrSatelliteEclipsed` instead; it gave the ISS −3.9 on a pass spent entirely in the shadow. `LimitingMagnitudeConstraint` rejects an eclipsed satellite rather than falling back to its standard magnitude. Shadow entries and exits agree with Skyfield within 0.35 ms. (#564)
+- **The horizon dip is documented as what it is.** `Site.HorizonDip` returns the apparent dip, 1.76′√h with terrestrial refraction (0.82° at 786 m), but its doc called it geometric and quoted the geometric 0.90°. Seven other places used the same label, and `VisibilityEvents` claimed 34′ of refraction its threshold does not add. A test now pins the dip to its doc. (#569)
+- **The meteor shower table follows IMO's 2027 Working List.** The Southern δ-Aquariids peaked three days early (λ☉ 125° instead of 128°), several ZHRs, population indices and radiants were out of date, every maximum was rounded to the whole degree (17 h for the Ursids), and activity windows were short of IMO's dates. Every value now comes from the IMO Meteor Shower Calendar 2027, and each activity window is the Sun's J2000 longitude on IMO's dates. (#574)
+- **`MeteorShower.ObservedRate` follows the date.** It applied the peak ZHR on every night of the year, predicting 97 Perseids an hour on 1 March. The new `MeteorShower.ZHRAt` gives the rate at a time: IMO's maximum shaped by a new `plan.ActivityProfile`, Jenniskens (1994)'s fit to each stream, and zero outside the activity window. A full-turn window, [0°, 360°], no longer collapses to a single instant. (#575)
+- **`plan.SublunarPoint` puts the Moon at the zenith.** `coord.SubPoint` took the point whose ellipsoid normal is parallel to a body's direction, which treats the Moon as infinitely far: the Moon sat up to 11.7″ from the zenith there, and the sublunar latitude was 4.3″ from Skyfield's. It now takes the foot of the normal through the body's position, which also gives a satellite's sub-satellite point; the Sun and planets are unchanged. (#581)
+- **`fits/plan` reads the FITS standard's keywords.** `SiteFromFITS` takes the standard's `OBSGEO-X/Y/Z` and `OBSGEO-B/L/H`, and sexagesimal `SITELAT`/`SITELONG`, all of which it reported as missing. `TargetFromFITS` evaluates the header's own WCS at the frame centre, honouring `CTYPE` and `RADESYS`. It had returned `CRVAL` as RA/Dec, 0.57° off for a corner reference pixel and the Galactic Centre as RA 0, Dec 0. A frame it does not convert is the new `ErrUnsupportedFrame`. (#583)
+- **Zero EOP no longer arrives in silence.** With nothing loaded, as in a program that never imported `remote/eop`, `Time.EOP`, the UT1↔UTC fallback and `Time.UT1` now emit the one-time EOP warning, with its cause. Before, they returned zero DUT1 and polar motion without it. `RegisterModel(ZeroModel{})` stays silent. `Time.UT1` still returns no error there, and its doc no longer promises one. (#584)
+- **The FINK integration tests no longer fail on FINK's bad moments.** A 200 holding nothing usable is retried, and then checked against a control query: an empty control skips the test as a degraded service, and a live one fails it as wrong data. Each distinct query is fetched once per run, two requests where there were five. (#585)
+- **The default refraction now reaches the horizon.** `atmosphere.RefractionSOFA`, which every `Site` uses, was SOFA's series clamped at 2.87°: 10.3′ on the horizon against the almanacs' 34′. It hands over to Bennett-NA below 10°, within 13″ of Hohenkerk & Sinclair's ray tracing on the horizon, and is unchanged above. A line of sight more than about 4° below the horizon is no longer refracted. (#589)
+- **`atmosphere.Builder.Ozone` accepted a negative or non-finite column**, which would make ozone emit rather than absorb. `Build` now refuses one. (#593)
+- **`plan.VisibleTonight` applied 0.20 mag/airmass of V extinction at every site**, about twice what Mauna Kea measures. It now uses the site's own air at V's pivot, 547.8 nm. By default that is a clean night at the site's height: 0.162 at sea level and 0.132 at Paranal, where 0.129–0.131 was measured. (#594)
+- **`catalog/gaia`'s `TestArchivesAgree` failed on ESA's own query timeout** (HTTP 408, "Job timeout/aborted"). It now skips on every upstream failure `testutil.SkipOnUpstreamFailure` recognizes, as the other network tests do. (#597)
+- **`catalog/fink` read every asteroid number in FINK's SSOFT bulk table as 0**, because the table stores `sso_number` as a string. The index held one entry, `Count()` returned 1, and whenever the single-object endpoint failed, `Resolve` reported a numbered asteroid as not found. All 148,922 usable rows are indexed now. (#598)
+- **`catalog/openngc` dropped OpenNGC's associations of stars and emission nebulae**, 72 rows whose type codes (`*Ass`, `EmN`) its parser did not know, M24 and Brocchi's Cluster among them. Every type OpenNGC defines is now mapped or deliberately skipped. (#600)
+- **`catalog/simbad` classified objects by string-matching their type codes**, so candidate stars (Aldebaran among them), most galaxies (M33, M77) and most nebulae came back as `KindOther`, and open and globular clusters as a generic cluster. Kinds now follow SIMBAD's own type hierarchy, its `otypedef` table. (#602)
+- **`plan.VisibleTonight` only ever considered SIMBAD's 100 brightest objects**, down to V 2.46, whatever its magnitude limit, because `simbad`'s `SearchBright` took `TOP 100` for a request with no limit. It now returns every object, up to SIMBAD's 50,000-row default. Past that it reports the new `resolve.ErrTruncated` rather than a short list. At Paranal, at limit 4.5, that is 632 objects where it was 86. (#604)
+- **`catalog/gaia` and `catalog/vizier` cone searches returned an arbitrary subset of a crowded cone**, since `TOP n` came with no ordering. Now a capped result is the `n` sources nearest the center, nearest first. TOP 5 of a 5° cone around the Trapezium had returned stars 4.6° to 5° out. (#606)
+- **Four `plan` Skyfield integration tests failed the build when NAIF was slow to deliver DE440s**, where every other kernel-backed test skips. They now skip through `requireKernel` on an upstream failure and stay fatal on anything else. (#608)
+- **`catalog/norad`'s `GP.ToTLE` lost the last digit of eccentricity and B\* to floating-point scaling**, and wrote a zero exponent as `-0` where CelesTrak writes `+0`. It now writes these fields from the GP value's decimal digits, and reproduces CelesTrak's published TLE for 11,345 of 11,357 satellites on line 1 and all of them on line 2. (#610)
+- **Gaia DR3's reference epoch J2016.0 was written as JD 2457388.5**, half a day early, in `catalog/gaia` and `catalog/vizier`. SIMBAD's J2000 was built on the UTC scale. Both now match their definitions; the effect on any propagated position is under 0.015″. (#614)
+- **`catalog/mast` stored the name of the service it relayed a lookup to ("SIMBAD", "NED") as an alias**, so `xmatch` and `catalog.Resolver` matched unrelated MAST results as one object (M31 with M33 and Vega). The name is no longer recorded. (#615)
+- **`catalog.Resolver` never matched one provider's ID against another provider's alias**, though its alias match is documented to. It indexed IDs and aliases in separate namespaces, so MAST's `"M  31"` and SIMBAD's M31, whose aliases include `"M 31"`, came back from `Search` as two objects when neither had a position. IDs and aliases now share one normalized key, as in `catalog/xmatch`. (#617)
+- **`catalog/jpl` resolved common names to the wrong body, or to none**: ISS to Larissa, Moon to the Earth-Moon barycenter, Voyager 1 to the ID `"spacecraft"`, and Halley to nothing. `Search` now ranks Horizons' whole answer by name before capping it, both match tables are read by their columns, a single match's ID is its last parenthetical (or a comet's record number), and a DASTCOM record number is no longer stored as `SPKID`. (#619)
+- **`catalog/sbdb` and `catalog/norad` reported "no such object" as a failure**, so a `catalog.Resolver` with either could never return `ErrNotFound`. SBDB's "specified object was not found" is now `resolve.ErrNotFound`, and a name several objects match is `resolve.ErrAmbiguous` unless one of them has the query as its designation. CelesTrak's 404 "No GP data found" is now an empty result. (#622)
+- **`docs/VALIDATION.md` claimed ±1 min for rise and set at 8849 m against "internal consistency"**, for a test that checked only that the events moved at least 3 minutes from sea level. The Sun's and Moon's rises and sets on Everest's summit are now held to Skyfield on the site's own threshold, within 0.09 s and 0.31 s, and the row says the dip is the almanac's sea-horizon convention. (#624)
+- **`docs/VALIDATION.md` claimed 1e-4 for `atmosphere.Airmass` against "analytical"**, for a test that bounded the horizon value between 35 and 42. It is now held to Pickering's published formula and to pvlib's independent implementation to 1e-12, and its doc says it is the molecular airmass. (#626)
+- **`catalog.Resolver` never applied proper motion when cross-matching by position**, so a star faster than about 0.125″/yr never matched its own Gaia row: HD 189733, tau Cet and Barnard's star took nothing from Gaia. Positions now move by the Target's own kinematics, and `resolve.ConeRequest` gains `Epoch` so Gaia and VizieR search around the center moved to their own catalog's epoch. (#629)
+- **`plan.VisibleTonight` charged ozone the molecular airmass**, three times the airmass of its thin shell 20 km up at the horizon, so a low target was dimmed 0.63 mag too much at 0° and 0.34 at 1° on the default air. New `atmosphere.Atmosphere.ExtinctionToward` dims each term of the air through its own airmass, and VisibleTonight uses it at each target's peak. (#631)
+- **`remote.SetOffline` made `remote.GetFile` refuse even an object already in the cache**, so the README's air-gapped recipe failed: with DE440s pre-seeded, `eph.NewProvider` worked online and returned "offline mode enabled" offline. In offline mode a cached object is now served, Mutable or not, and only a miss fails with `ErrOffline`. (#637)
+- **`plan.FromCatalog` ignored a catalog star's epoch**, so a star whose position was given at another epoch (Gaia DR3's J2016.0, a VizieR table's own) was moved as if from J2000. Barnard's star built from Gaia's row was 166″ from the same star built from SIMBAD's. `FromCatalog` now moves the position to J2000 with the star's own proper motion, parallax and radial velocity first, and the two rows agree within 0.5″. (#639)
+- **`plan.MoonSep` measured separation from the Moon's geocentric position**, which the site sees up to 0.95° away. A star the observer saw 30.005° from the Moon passed a 30.5° threshold at 30.757°. `MoonSep`, the `Scorer`'s Moon merit and `VisibleTonight`'s Moon advisory now measure from the site, and agree with Skyfield within 0.005°. (#641)
+- **`plan.FromCatalog` read `catalog/jpl`'s NAIF IDs as astrogo body IDs**, which number the bodies differently: the JPL Sun (NAIF 10) became astrogo's body 10, the Moon, and the Moon (301) and Mars (499) failed. A NAIF major body now becomes the planet, Sun or Moon it names, and one astrogo cannot place is `ErrNoCoordinates`. (#643)
+- **`plan.NewConstellation` named Eridanus "Fornax" and Serpens "Ophiuchus"**, the constellations their boundary centroids fall in. A target is now named for the constellation asked for. `constellation`'s centroid round-trip test no longer skips Ursa Minor, whose centroid round-trips, and it now checks its exceptions too. (#645)
+- **Five functions carried another function's doc comment**, among them `plan`'s `raOfDateDifference`, which opened with `wrap180`'s, and `skybrightness/dataset/starlight`'s `parquetRows.Has`, documented as reading a column as a float. Each doc is back on its own function, and docsguard's `TestNoFuncDocOpensWithAnotherFunc` fails when a function's doc opens with the name of another function in the same file. (#647)
+- **No `skybrightness` component applied ozone absorption**, and the scene's ozone column was read by nothing. Starlight, zodiacal and diffuse galactic light, the extragalactic background and airglow now cross the ozone layer along the line of sight, and moonlight along the Moon's beam; artificial skyglow, made below the layer, is unchanged. At Paranal with 258 DU a dark sky's V is 0.022 mag fainter at the zenith and 0.083 mag at 10°. (#649)
+- **`skybrightness.ScatteredMoonlight` placed the Moon from the Earth's center**, up to its horizontal parallax, about 0.95°, above where the site sees it: a Moon Skyfield puts at 9.43° was taken at 10.39° and charged too little air, and one just below the site's horizon lit the sky. It now places the Moon, and takes its phase angle, as the site sees it. Observatory's moonlight moves by 0.7 to 1.9 per cent. (#651)
+- **`catalog.Resolver` dropped FINK's H, G1, G2, spin and oblateness**, even from a result FINK alone found, so `plan.FromCatalog` had no H to build an asteroid from. The physical-parameter cluster now takes SBDB's V-band photometry first and FINK's whole sHG1G2 fit where SBDB has none, never mixing the two. (#652)
+- **Four planetary moons' absolute magnitudes had drifted from the Horizons `V(1,0)` `plan/moons.go` cites**: Enceladus, Tethys, Titan and Hyperion, by up to 0.17 mag, so `VisibleTonight` filtered each as fainter than it is. They are Horizons' values again, and `TestMoonAbsoluteMagnitudesAreHorizons` (network) holds every moon the table sources from Horizons to its live `V(1,0)`. (#653)
+- **`catalog/vizier` stamped every 2MASS row J2000**, though each position is where its source was on the night 2MASS observed it, between 1997 and 2001. Each row now carries its own observation date from the table's `JD` column, so `catalog.Resolver` can match a fast star's 2MASS row; and a merged Target's `Epoch` now comes with its `Coord`, from the provider whose position won. (#655)
+- **`catalog/jpl` resolved "Eros" to Pluto's moon Kerberos**, "Hebe" to Jupiter's Thebe and "Iris" to OSIRIS-REx, because Horizons searches its major bodies first and matches a name inside another. When no target carries the query as a whole word, `Search` now asks Horizons' small bodies with a trailing semicolon, and keeps that answer when it has one. (#656)
+- **The documented sky-brightness figures were not what the tests measure.** CLAUDE.md, the README, the design document and VALIDATION.md quoted a near-full Moon at 18.9 mag/arcsec², the single-scattering figure from before Winkler's multiple-scattering factor; `TestScatteredMoonlightFullMoonSkyBrightness` measures 18.6. CLAUDE.md's full-sky Paranal figure, 21.5, predates integrated starlight; the scene now comes out at 21.3. The VALIDATION row now cites the test that produces its figure. (#658)
+- **The SFD dust map could not be downloaded**, and the nightly network tier failed on it from late September. Dataverse now redirects to a pre-signed S3 URL that refuses the HEAD `remote`'s file probe made; a 403 there now falls back to a ranged GET. Behind it, `remote.SFDDustMap`'s and `remote.OpenNGC`'s `ApproxSize` were below their real files, so a grant of `ApproxSize` was refused; both are now measured, and a network test holds every listed file to its endpoint's budget. (#661)
+- **The weekly validation tier had timed out in the GAMBONS comparisons every week since 31 August**, so it reported nothing. The `skybrightness` package spent 22.5 minutes asking IRSA, two seconds apart, for the same few hundred dust values every run, because a runner starts with an empty cache. The run now seeds that cache with IRSA's own answers, kept in the repository, and stays within its 15 minutes. `TestSFDMatchesIRSA`, which reads the same cache and had skipped in CI on every run, now runs. (#662)
+- **The README said the natural sky was validated to 0.05 mag against GAMBONS**, and `VALIDATION.md` gave three rows a tolerance that nothing asserts: 0.05 mag beside a suite held to 1 mag, 1e-7 deg beside Horizons at 3 arcsec, and 1e-12 d beside round trips at 1e-6 s and 5 s. Each row now states the bound its suites assert, the README states what is measured (up to 0.28 mag per altitude band with airglow included), and `internal/docsguard` holds every row to its cited suite's contract. (#667)
+- **`docs/skybrightness.md`'s whole-sky GAMBONS comparison described a model gone since 22 August.** Its table, and the two mechanisms it blamed (unextinguished airglow, no scattered-in light), predated slant extinction for airglow and the `GAMBONSWeb` preset's κ. The all-sky test printed the same account weekly beside numbers contradicting it. The section now carries the current measurement: the airglow-free sky agrees to 0.04 mag, and the residual is the airglow normalization. The test prints only what it computes, and the airglow provenance no longer says scattered-in light is ignored. (#669)
+- **`atmosphere.HorizonDip`'s doc misstated the refraction its formula carries.** The Nautical Almanac's 1.76′√h is 8.6 per cent below the geometric dip of 1.926′√h, a refraction coefficient of 0.165; the doc said 0.13 and a reduction of a seventh. The computed dip is unchanged. (#671)
+- **`coord.ICRSToEcliptic` and `EclipticToICRS` read the caller's time scale as TT.** A UTC instant was taken 69 seconds early, about 3e-8 degrees; both now convert to TT. The Galactic and ecliptic transforms are also anchored to their defining constants, the Hipparcos frame angles to 1e-9 degrees and the IAU 2006 obliquity to 0.05″, where the anchors had been held to 0.01 degrees. (#676)
+- **`VALIDATION.md` ticked CAMS aerosol optical depth as validated, but every test behind it skips.** The orientation test needs an `s3://` backend, which astrogo has not had since gocloud.dev's removal, and the ground-truth tests need licensed files absent from CI. The row now says it is not run and dates its figures, and the skip message no longer says the backend is being rebuilt. (#683)
+- **Rise, set and transit are now held to 1 minute of USNO**, for the Sun and the Moon at every site from the poles to Everest: USNO's half-minute rounding plus half a minute. Rise and set were held to 2 minutes for the Sun and 3 for the Moon, 5 near the poles, loose enough that the Moon rising on its center instead of its upper limb passed; the worst measured is 0.65 min. A USNO event astrogo misses, or one it reports that USNO does not list, now fails. Three `VALIDATION.md` rows that gave a measurement as their tolerance, the two rise and set rows and ΔT, now state the asserted bound. (#684)
+- **The USNO celestial-navigation tests compared refracted with airless altitudes and counted the Sun's aberration twice**, inside tolerances of 0.1° to 1.5°, so the "0.002°" quoted for Sirius was its refraction at 83°. `TestUSNO_CelNav` is now an offline fixture asking astrogo USNO's own question: airless and geocentric, at UT1. The Sun and Sirius agree within 0.67″ at five places, held to 2″. The library was right; only the test was not. (#686)
+- **The nightly network tier failed on `TestGenerateCorpus` from 2026-10-09**: JPL Horizons' answers moved by one printed digit in 76 of the corpus's 300 entries (ranges by up to 1.5 cm, five angles by 1e-6°). The corpus takes the new values; nothing astrogo computes changed. (#687)
+- **The README said every magnitude model was "validated 100% within 0.025 mag against the FINK/ZTF production pipeline"**, which FINK/ZTF validates for sHG1G2 alone. The capability table now names each model's reference, planets and comets to JPL Horizons, and points to `VALIDATION.md`. (#688)
+- **The missing-EOP warning said topocentric accuracy drops to ~1 arcsec**, beside a UT1 error of 0.9 s that is 13.5 arcsec of Earth rotation (8.8 measured on the Horizons corpus). It now states that bound. The README's EOP table had the same understatement, and claimed <0.01 arcsec with EOP where astrogo measures 0.4 (p50) and 2.1 (max) against Horizons. (#691)
+- **Three README figures predated the work that changed them**: seasons "2–4 min vs USNO" (now within 0.74 min since #414), TDB−TT "single-term … ±3 µs" (37 terms, within 0.79 µs over 1900–2100 since #423), and horizon refraction "within 13″" (13.4″ at worst). Each now matches `VALIDATION.md` and its test. (#692)
+- **`Time.DecimalYear` ran backward within a month**: it added the day's fraction as if it were the month's and dropped the day of the month, so 2026-03-01 23:59 read later in the year than 2026-03-31. It now gives the fraction of the year elapsed, and ΔT before 1960 is no longer read up to half a month off (#697).
+- **The FINK residual tests called FINK's ephemeris outages wrong data and failed**: when FINK's ephemeris service fails inside a request, FINK returns every residual null, or a 400 naming Miriade, and the control query could not see either. They now skip, naming the condition; an absent residual column still fails (#700).
+- **Moonrise and moonset now put the Moon's upper limb on the horizon at its semi-diameter at that instant**, not a fixed mean of 15.5′. The Moon's runs from 14.7′ to 16.8′, which put events up to 12 s off at London and 28 s at 60°N, and at high latitude reported a set and rise the limb never made: at Alta on 2026-06-18, a twelve-minute set that does not happen. (#703)
+- **`simbad.Provider.Search` answered HTTP 400 on every call** since v0.19.0: its query ordered by a qualified column, which SIMBAD's TAP parser rejects. It now orders by `main_id`, and a live test runs `Search`, which none did. (#706)
+
+### Security
+- **SIMBAD and VizieR are now addressed over HTTPS.** Both were registered as
+cleartext `http://`, shipping catalogue queries and the positions they return
+where anything on the path could read or rewrite them. Verified against the
+live services first: both answer HTTPS byte-identically to HTTP. `www.cvrl.org`
+stays HTTP because it runs no TLS listener at all — port 443 refuses the
+connection — and now says so in a new `Endpoint.InsecureReason`, which
+`TestNoUndeclaredCleartextEndpoints` requires of any cleartext URL in the
+registry (#107).
+- **Dependency security updates.** Update Apache Thrift, gRPC, and YAML v2 to the versions selected by Dependabot, and synchronize dependency checksums in both Go modules. (#280)
+- **SFTP dependency security update.** Upgrade `golang.org/x/crypto` to v0.56.0,
+fixing SSH channel deadlock denial-of-service vulnerabilities GO-2026-6354 and
+GO-2026-6355 reachable through the SFTP blob driver. (#293)
+- **`golang.org/x/net` v0.60.0, for five HTTP/2 advisories published 2026-10-08**: GO-2026-6617, -6612, -6611, -6610 and -6603 (CVE-2026-97032, -78663, -78669, -78660, -78659), covering an HPACK encoder race, flow-control and window-update abuse, malformed framing headers and Trailer memory exhaustion. `govulncheck` found them reachable from astrogo's HTTP clients. (#682)
+
 ## [0.19.0] — 2026-09-02
 
 ### Added
@@ -1041,7 +2975,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/TuSKan/astrogo/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/TuSKan/astrogo/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/TuSKan/astrogo/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/TuSKan/astrogo/compare/v0.16.0...v0.17.0

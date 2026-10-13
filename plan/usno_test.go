@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -475,14 +476,14 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					}
 				}
 
-				compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, tz)
+				compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, sunUp(site), start, tz)
 
 				moonEvents, err := plan.MoonEvents(start, end, site, prov)
 				if err != nil {
 					t.Fatalf("MoonEvents failed: %v", err)
 				}
 
-				compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, site.MoonRiseSetThreshold(), start, tz)
+				compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, moonUp(t, site, prov), start, tz)
 			})
 		}
 	}
@@ -921,7 +922,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
 
-			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, time.LocationUTC)
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, sunUp(site), start, time.LocationUTC)
 		})
 	}
 }
@@ -1008,8 +1009,8 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			// ── Part 1: Sea-level astrogo vs USNO, within usnoTolerance ──
 			t.Log("── Sea-level comparison (astrogo 0m vs USNO) ──")
 
-			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents0, site0.SunRiseSetThreshold(), start, tz)
-			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents0, site0.MoonRiseSetThreshold(), start, tz)
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents0, sunUp(site0), start, tz)
+			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents0, moonUp(t, site0, eph), start, tz)
 
 			// ── Part 2: Altitude correction (astrogo 8849m vs 0m) ──
 			t.Log("── Altitude correction (8849m vs 0m) ──")
@@ -1125,7 +1126,7 @@ func TestUSNO_Equator(t *testing.T) {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
 
-			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, site.SunRiseSetThreshold(), start, time.LocationUTC)
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, sunUp(site), start, time.LocationUTC)
 
 			// At the equator, day length should always be ~12h (± 10 minutes)
 			var (
@@ -1242,7 +1243,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			// rises is a day with no "Rise" entry.
 			// The test used to look for the null, so an astrogo moonrise on such a
 			// day could not fail it. compareUSNOEvents holds the counts both ways.
-			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, site.MoonRiseSetThreshold(), start, tz)
+			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents, moonUp(t, site, eph), start, tz)
 		})
 	}
 }
@@ -1353,7 +1354,8 @@ var usnoEventKinds = map[string]plan.EventKind{
 // compareUSNOEvents holds every rise, set and upper transit USNO lists for
 // one day to astrogo's, within usnoTolerance. day is that day's local
 // midnight in tz, the zone USNO was asked for; astro is astrogo's events over
-// the same day; horizon is the body's rise/set altitude.
+// the same day; up says whether the body is above its rise/set horizon at
+// one of astrogo's events, on the definition its rise and set use.
 //
 // Each USNO event is paired with the astrogo event of its kind nearest to it,
 // not the first of its kind, which is another event whenever astrogo reports
@@ -1366,14 +1368,14 @@ var usnoEventKinds = map[string]plan.EventKind{
 // culmination, as [plan.EventTransit] says, so the transits held here are the
 // ones above horizon.
 func compareUSNOEvents(
-	t *testing.T, body string, usno []usnoPhenomenon, astro []plan.Event, horizon angle.Angle, day time.Time, tz *time.Location,
+	t *testing.T, body string, usno []usnoPhenomenon, astro []plan.Event, up func(plan.Event) bool, day time.Time, tz *time.Location,
 ) {
 	t.Helper()
 
 	var listable []plan.Event
 
 	for _, ev := range astro {
-		if ev.Kind != plan.EventTransit || ev.GeometricAltitude > horizon {
+		if ev.Kind != plan.EventTransit || up(ev) {
 			listable = append(listable, ev)
 		}
 	}
@@ -1437,6 +1439,36 @@ func compareUSNOEvents(
 		if found != listed[kind] {
 			t.Errorf("%s %s: astrogo found %d, USNO lists %d", body, phen, found, listed[kind])
 		}
+	}
+}
+
+// sunUp is SunEvents' horizon: the Sun's center above SunRiseSetThreshold.
+func sunUp(site *plan.Site) func(plan.Event) bool {
+	horizon := site.SunRiseSetThreshold()
+
+	return func(ev plan.Event) bool { return ev.GeometricAltitude > horizon }
+}
+
+// moonUp is MoonEvents' horizon: the Moon's upper limb, its center raised by
+// its semi-diameter at that instant, above RiseSetThreshold (#693). The mean
+// semi-diameter of MoonRiseSetThreshold is up to 1.3′ off, so it would call a
+// transit that close to the horizon up while the limb is down, or the
+// reverse.
+func moonUp(t *testing.T, site *plan.Site, prov eph.Provider) func(plan.Event) bool {
+	t.Helper()
+
+	moon := plan.NewMoon(prov)
+	horizon := site.RiseSetThreshold().Degrees()
+
+	return func(ev plan.Event) bool {
+		ctx := coord.NewContext(ev.Time, site.Location(), atmosphere.Refraction{})
+
+		d, err := plan.AngularDiameter(moon, ev.Time, ctx)
+		if err != nil {
+			t.Fatalf("Moon at %v: AngularDiameter: %v", ev.Time, err)
+		}
+
+		return ev.GeometricAltitude.Degrees()+d.Degrees()/2 > horizon
 	}
 }
 
