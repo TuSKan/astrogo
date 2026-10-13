@@ -680,8 +680,8 @@ which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`.
 derived from SAAO Sutherland multifilter photometry across a wide range of sky directions,
 lunar phases and lunar positions. Rayleigh phase function per Bucholtz (1995); Mie via
 **Henyey–Greenstein**, explicitly replacing the exponential angular relationship used by
-earlier work including KS91. Eq. 13 gives the Rayleigh optical depth
-`τ_R = P·(1.229×10¹⁰)·λ^−4.05`. Deviations attributable to multiple scattering and airglow
+earlier work including KS91. Its Eq. 13 gives the Rayleigh optical depth as a power law,
+`τ_R = (P/P₀)·1.229×10¹⁰·λ^−4.05`; astrogo uses Bodhaine et al. (1999) instead (§11.5). Deviations attributable to multiple scattering and airglow
 are quantified in the paper and become error-budget entries here.
 
 **KS91.** Retained only as `LegacyKS91` for regression and comparison — the comparison
@@ -691,17 +691,18 @@ Winkler's own paper motivates. It is never the production path and never a silen
 
 **Implemented (Phase 1), in `atmosphere`.**
 
-**Rayleigh choice, now settled.** Winkler (2022) is adopted over Bodhaine et al. (1999).
-The reason is consistency rather than preference: the lunar scattering model derives its
-own published results with these expressions, and the artificial model (Kocifaj et al.
-2022) uses the same Henyey–Greenstein aerosol phase function, so one shared implementation
-keeps the two components from silently disagreeing about the atmosphere they propagate
-through. A future switch to Bodhaine must be made for both at once, with its own
-validation.
+**Rayleigh choice.** The phase function and depolarisation are Winkler's (2022) Bucholtz
+lineage, shared with the artificial model (Kocifaj et al. 2022), so the two components
+propagate through one atmosphere. The optical depth is Bodhaine et al. (1999) Eq. 30, for
+both at once (#592). Winkler's Eq. 13, a single λ^−4.05 power law after Dutton et al.
+(1994), read 4.2% low at 330 nm, where the exponent steepens, and its coefficient sits
+0.8% below the Dutton value Bodhaine quotes. Bodhaine's fit reproduces their exactly
+computed Table 3 within 0.05% from 250 to 1000 nm, and agrees with Hansen & Travis (1974),
+an independent formulation, within 0.4% at 320 nm (Buton et al. 2013, Table 6).
 
 | Paper | Content | Go function | Validation test |
 | :--- | :--- | :--- | :--- |
-| Winkler Eq. 13 | `τ_R = (P/P₀)·1.229×10¹⁰·λ^−4.05`, P₀ = 1013.5 hPa, λ in nm (after Dutton et al. 1994) | `atmosphere.RayleighOpticalDepth` | `TestRayleighOpticalDepthSeaLevel550` (≈0.098 at 550 nm, an independently known value), `…ScalesWithPressure`, `…SpectralSlope` |
+| Bodhaine Eq. 30 | `τ_R = (P/1013.25)·0.0021520·(1.0455996 − 341.29061λ⁻² − 0.90230850λ²)/(1 + 0.0027059889λ⁻² − 85.968563λ²)`, λ in µm | `atmosphere.RayleighOpticalDepth` | `TestRayleighOpticalDepthIsBodhainesTable3` (Table 3 within 0.05%), `…PressureScalingAtMaunaLoa`, `…BeyondTheFit`, `…SeaLevel550`, `…ScalesWithPressure` |
 | Winkler Eq. 9 | `p_R(Θ) = 3(1−ρ)/(16π(1+2ρ))·[(1+3ρ)/(1−ρ) + cos²Θ]` (after Bucholtz 1995) | `atmosphere.RayleighPhaseFunction` | `TestRayleighPhaseFunctionNormalization` (integrates to 1 over the sphere), `…Symmetry` |
 | — | `ρ = 0.0148`, giving `(1+3ρ)/(1−ρ) = 1.06` | `atmosphere.RayleighDepolarisation` | `TestRayleighDepolarisationMatchesKS91Coefficient` |
 | Winkler Eq. 10 | `p_M(Θ) = (1−g²)/(4π(1+g²−2g·cosΘ)^{3/2})` (Henyey & Greenstein 1941) | `atmosphere.HenyeyGreensteinPhaseFunction` | `TestHenyeyGreensteinNormalization`, `…Limits` |

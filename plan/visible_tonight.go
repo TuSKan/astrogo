@@ -158,8 +158,8 @@ func WithPlanetaryMoons() VisibleTonightOption {
 // Without it, VisibleTonight assumes a clean night at the site's height: the
 // standard atmosphere's pressure there, 258 DU of ozone, and Paranal's median
 // aerosol, [atmosphere.CleanMountainAOD550] under OPAC's continental clean
-// type. That is a clear night at a good site, which gives 0.162 mag per
-// airmass in V at sea level and 0.132 at Paranal, where Patat et al. (2011)
+// type. That is a clear night at a good site, which gives 0.161 mag per
+// airmass in V at sea level and 0.131 at Paranal, where Patat et al. (2011)
 // measured 0.129 to 0.131. A low or hazy site has more aerosol than that. A
 // caller who knows tonight's air should name it, for instance from
 // [github.com/TuSKan/astrogo/atmosphere/dataset/cams.AOD550], which reads the

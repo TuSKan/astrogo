@@ -48,25 +48,27 @@ var (
 //     scattering model for the moonlit sky brightness profile based on
 //     photometry at SAAO", MNRAS 514, 208-226, doi:10.1093/mnras/stac1387.
 //   - Secondary: Bucholtz, A. (1995), Appl. Opt. 34, 2765 (Rayleigh phase
-//     function and depolarisation); Dutton, E. G. et al. (1994) (Rayleigh
-//     optical depth); Henyey, L. G. & Greenstein, J. L. (1941), ApJ 93, 70.
-//   - Equations implemented: Winkler (2022) Eq. 9, 10, 12, 13.
+//     function and depolarisation); Bodhaine, B. A., Wood, N. B., Dutton,
+//     E. G. & Slusser, J. R. (1999), J. Atmos. Oceanic Technol. 16, 1854
+//     (Rayleigh optical depth); Henyey, L. G. & Greenstein, J. L. (1941),
+//     ApJ 93, 70.
+//   - Equations implemented: Winkler (2022) Eq. 9, 10, 12; Bodhaine et al.
+//     (1999) Eq. 30.
 //   - Units: optical depth dimensionless; phase functions sr^-1.
 //   - Validity: optical wavelengths; see each function.
 //
-// This is deliberately the Bucholtz lineage rather than Bodhaine et al.
-// (1999), which is the other standard Rayleigh formulation. The reason is
-// consistency, not preference: the lunar scattering model this repository
-// adopts (Winkler 2022) derives its own results with these expressions,
-// and the artificial-skyglow model (Kocifaj, Bara & Falchi 2022) uses the
-// same Henyey-Greenstein aerosol phase function. Sharing one
-// implementation keeps those two components from silently disagreeing
-// about the atmosphere they propagate through. A future switch to Bodhaine
-// would have to be made for both at once, with its own validation.
+// The phase function and depolarisation are the Bucholtz lineage Winkler
+// (2022) uses, shared with the artificial-skyglow model (Kocifaj, Bara &
+// Falchi 2022), so the two components propagate through one atmosphere.
+// The Rayleigh optical depth is Bodhaine et al. (1999), for both at once:
+// Winkler's own Eq. 13, a single power law after Dutton et al. (1994), read
+// 4.2% low at 330 nm (#592).
 const (
-	// StandardPressureHPa is sea-level standard pressure as used by
-	// Winkler (2022) Eq. 13, in hectopascals (equivalently millibars).
-	StandardPressureHPa = 1013.5
+	// StandardPressureHPa is the sea-level pressure Bodhaine et al. (1999)
+	// normalize the Rayleigh optical depth to, the standard atmosphere's
+	// 1013.25 hPa (equivalently millibars). It was Winkler's (2022)
+	// 1013.5 until #592.
+	StandardPressureHPa = 1013.25
 
 	// RayleighDepolarisation is the air depolarisation factor rho adopted
 	// by Winkler (2022) after Bucholtz (1995), whose tabulated values span
@@ -75,39 +77,57 @@ const (
 	// coefficient Krisciunas & Schaefer (1991) had fitted empirically.
 	RayleighDepolarisation = 0.0148
 
-	// rayleighCoefficient and rayleighExponent are Winkler (2022) Eq. 13's
-	// constants for the Rayleigh optical depth as a function of wavelength
-	// in nanometers, attributed there to Dutton et al. (1994).
-	rayleighCoefficient = 1.229e10
-	rayleighExponent    = -4.05
+	// rayleighMinNM and rayleighFitMaxNM bound the wavelengths Bodhaine et
+	// al. (1999) fitted Eq. 30 over, 250 to 1000 nm.
+	rayleighMinNM    = 250
+	rayleighFitMaxNM = 1000
 )
 
 // RayleighOpticalDepth returns the vertical molecular optical depth at
-// wavelength lambda for a site at pressure pressureHPa.
+// wavelength lambda for a site at pressure pressureHPa: Bodhaine et al.
+// (1999) Eq. 30, for dry air with 360 ppm CO2 at sea level and 45°
+// latitude, scaled by the site's pressure,
 //
-// Winkler (2022) Eq. 13:
+//	tau_R = (P / 1013.25) * 0.0021520 * (1.0455996 - 341.29061 L^-2 - 0.90230850 L^2)
+//	                                 / (1 + 0.0027059889 L^-2 - 85.968563 L^2)
 //
-//	tau_R = (P / P0) * 1.229e10 * lambda^-4.05
+// with L the wavelength in micrometers. The fit reproduces their exactly
+// computed Table 3 to better than 0.05% from 250 to 1000 nm. Its local
+// exponent steepens toward the blue as the refractive index and the
+// depolarisation of air both change with wavelength, which no single power
+// law follows. Winkler's (2022) Eq. 13, (P/1013.5)·1.229e10·λ^−4.05 after
+// Dutton et al. (1994), read 4.2% low at 330 nm, and its coefficient sits
+// 0.8% below the 0.00877 µm^4.05 Bodhaine quotes from Dutton (#592).
 //
-// with P0 = 1013.5 hPa and lambda in nanometers. The pressure ratio scales
-// the molecular column with the mass of air actually above the site, which
-// is why a high observatory has a thinner Rayleigh atmosphere.
+// The pressure ratio scales the column with the mass of air above the site,
+// at the gravity of 45° and sea level. Bodhaine's own Mauna Loa column,
+// 19.5°N and 3.4 km up at 680 mb, is 0.29% larger than that scaling gives,
+// which is the size of what holding gravity fixed leaves out.
 //
-// The exponent is -4.05 rather than the textbook -4 because the refractive
-// index of air is itself weakly wavelength-dependent; using -4 would
-// misstate the blue end by several per cent.
+// Beyond 1000 nm, where the fit was not made and its rational form drifts
+// from λ^-4, it continues as λ^-4 from its 1000 nm value: the dispersion
+// that steepens the law in the blue is a 1% correction there and shrinks as
+// λ^-2. Below 250 nm it refuses with [ErrWavelength]; the fit's
+// denominator vanishes near 117 nm.
 func RayleighOpticalDepth(lambda unit.WavelengthNM, pressureHPa float64) (unit.OpticalDepth, error) {
-	if !positiveFinite(float64(lambda)) {
-		return 0, fmt.Errorf("%w: got %g nm", ErrWavelength, float64(lambda))
+	if !positiveFinite(float64(lambda)) || lambda < rayleighMinNM {
+		return 0, fmt.Errorf("%w: got %g nm, want %d nm or more", ErrWavelength, float64(lambda), rayleighMinNM)
 	}
 
 	if !positiveFinite(pressureHPa) {
 		return 0, fmt.Errorf("%w: got %g hPa", ErrPressure, pressureHPa)
 	}
 
-	tau := (pressureHPa / StandardPressureHPa) * rayleighCoefficient * math.Pow(float64(lambda), rayleighExponent)
+	scale := 1.0
+	if lambda > rayleighFitMaxNM {
+		scale = math.Pow(rayleighFitMaxNM/float64(lambda), 4)
+		lambda = rayleighFitMaxNM
+	}
 
-	return unit.OpticalDepth(tau), nil
+	l2 := (float64(lambda) / 1000) * (float64(lambda) / 1000)
+	seaLevel := 0.0021520 * (1.0455996 - 341.29061/l2 - 0.90230850*l2) / (1 + 0.0027059889/l2 - 85.968563*l2)
+
+	return unit.OpticalDepth(pressureHPa / StandardPressureHPa * seaLevel * scale), nil
 }
 
 // RayleighPhaseFunction returns the normalized molecular scattering phase
