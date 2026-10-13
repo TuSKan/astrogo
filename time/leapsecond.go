@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // LeapSecond is one step in the published ΔAT (TAI−UTC) record: the instant a
@@ -19,8 +20,8 @@ type LeapSecond struct {
 	// Year, Month and Day are the UTC calendar date the value takes effect.
 	Year, Month, Day int
 
-	// DeltaAT is TAI−UTC in seconds from that instant until the next entry.
-	DeltaAT float64
+	// DeltaAT is TAI−UTC from that instant until the next entry.
+	DeltaAT unit.Duration
 }
 
 // Errors returned by [RegisterLeapSeconds].
@@ -185,7 +186,7 @@ func deltaATIn(table []LeapSecond, y, m, d int, fd float64) float64 {
 			break
 		}
 
-		value, found = e.DeltaAT, true
+		value, found = e.DeltaAT.Seconds(), true
 	}
 
 	if !found {
@@ -222,7 +223,7 @@ func validateLeapTable(table []LeapSecond) error {
 		// that has ever occurred, but the ITU-R has permitted a negative one
 		// since 1972 and it is no longer considered unlikely — so a table
 		// carrying the first one must not be rejected for carrying it.
-		if step := e.DeltaAT - prev.DeltaAT; math.Abs(step) != 1 {
+		if step := (e.DeltaAT - prev.DeltaAT).Seconds(); math.Abs(step) != 1 {
 			return fmt.Errorf("%w: %04d-%02d-%02d steps by %g, but a leap second is "+
 				"exactly one second, inserted or skipped",
 				ErrLeapSecondOrder, e.Year, e.Month, e.Day, step)
@@ -258,11 +259,11 @@ func checkAgainstBuiltin(table []LeapSecond) error {
 			continue // outside gofa's supported range entirely
 		}
 
-		if math.Abs(got-e.DeltaAT) > 1e-9 {
+		if math.Abs(got-e.DeltaAT.Seconds()) > 1e-9 {
 			return fmt.Errorf("%w: at %04d-%02d-%02d the table says %g and the built-in "+
 				"record says %g. A registration may extend the record, never restate it "+
 				"differently — one of the two is stale",
-				ErrLeapSecondConflict, e.Year, e.Month, e.Day, e.DeltaAT, got)
+				ErrLeapSecondConflict, e.Year, e.Month, e.Day, e.DeltaAT.Seconds(), got)
 		}
 	}
 

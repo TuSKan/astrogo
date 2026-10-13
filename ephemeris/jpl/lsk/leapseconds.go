@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // RegisterLeapSeconds installs the kernel's DELTA_AT block as the process-wide
@@ -68,7 +69,7 @@ func leapTable(r *Reader) ([]time.LeapSecond, error) {
 				"representable calendar range", ErrInvalidDate, d.JD)
 		}
 
-		table = append(table, time.LeapSecond{Year: y, Month: m, Day: day, DeltaAT: d.N})
+		table = append(table, time.LeapSecond{Year: y, Month: m, Day: day, DeltaAT: unit.Seconds(d.N)})
 	}
 
 	return table, nil

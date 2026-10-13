@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // A negative leap second has never happened, and that is the reason to test it.
@@ -136,7 +137,7 @@ func TestRegistryStillRefusesAStepThatIsNotOneSecond(t *testing.T) {
 		{"a fractional step", 37.5},
 	} {
 		err := time.RegisterLeapSeconds(
-			extended(time.LeapSecond{Year: 2030, Month: 1, Day: 1, DeltaAT: tc.deltaAT}),
+			extended(time.LeapSecond{Year: 2030, Month: 1, Day: 1, DeltaAT: unit.Seconds(tc.deltaAT)}),
 			"malformed",
 		)
 
