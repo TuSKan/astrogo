@@ -15,6 +15,12 @@ func positiveFinite(v float64) bool {
 	return v > 0 && !math.IsInf(v, 0) && !math.IsNaN(v)
 }
 
+// nonNegativeFinite is positiveFinite admitting zero: a rate or a noise term
+// may be absent, but never NaN, negative or infinite.
+func nonNegativeFinite(v float64) bool {
+	return v >= 0 && !math.IsInf(v, 0)
+}
+
 // ── Telescope ─────────────────────────────────────────────────────────────────
 
 // Telescope describes an optical system's aperture and focal length —

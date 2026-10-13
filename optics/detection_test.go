@@ -187,6 +187,19 @@ func TestDetectionRefusesImpossibleInputs(t *testing.T) {
 		{"negative dark current", optics.Instrument{
 			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11), DarkCurrent: -1,
 		}, 10, time.Second, 25},
+		// NaN fails every comparison, so "< 0" let it through to an answer of
+		// NaN with no error, and +Inf to one of 0 or +Inf, until #748.
+		{"NaN read noise", optics.Instrument{
+			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11), ReadNoiseElectrons: math.NaN(),
+		}, 10, time.Second, 25},
+		{"infinite read noise", optics.Instrument{
+			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11), ReadNoiseElectrons: math.Inf(1),
+		}, 10, time.Second, 25},
+		{"NaN dark current", optics.Instrument{
+			CollectingArea: unit.SquareMeters(0.03), PixelSolidAngle: unit.Steradians(1e-11),
+			DarkCurrent: unit.ElectronsPerPixelPerSecond(math.NaN()),
+		}, 10, time.Second, 25},
+		{"infinite background", detectionInstrument(), unit.ElectronsPerPixelPerSecond(math.Inf(1)), time.Second, 25},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -215,6 +228,21 @@ func TestLimitingSignalRefusesANonPositiveThreshold(t *testing.T) {
 	for _, snr := range []float64{0, -1, math.NaN(), math.Inf(1)} {
 		if _, err := inst.LimitingSignal(10, time.Second, 25, snr); !errors.Is(err, optics.ErrExposure) {
 			t.Errorf("a threshold of %g was accepted: %v", snr, err)
+		}
+	}
+}
+
+// TestSNRRefusesASignalThatIsNotAFiniteRate (#748): an infinite source rate
+// made SNR divide infinity by infinity and answer NaN with no error, and a NaN
+// one was refused only because it was checked by name.
+func TestSNRRefusesASignalThatIsNotAFiniteRate(t *testing.T) {
+	t.Parallel()
+
+	inst := detectionInstrument()
+
+	for _, s := range []float64{math.Inf(1), math.NaN(), -1} {
+		if _, err := inst.SNR(unit.ElectronsPerSecond(s), 10, time.Second, 25); !errors.Is(err, optics.ErrExposure) {
+			t.Errorf("a signal of %g e/s was accepted: %v", s, err)
 		}
 	}
 }
