@@ -21,14 +21,14 @@ import (
 // is why a red rear light fades and a blue one does not as dusk falls. A
 // truncated download, a swapped pair of files or a column read in the wrong
 // order all move that peak; a checksum would catch the first and none of the
-// rest, and would need updating whenever CVRL touched a byte.
+// rest, and would need updating whenever CIE touched a byte.
 //
 // It also checks the two files are not the same file, which is the specific
 // failure a copy-paste in the endpoint's Files list would produce.
 func TestCurvesPeakWhereVisionDoes(t *testing.T) {
-	testutil.RequireReachable(t, "www.cvrl.org:80")
+	testutil.RequireReachable(t, "files.cie.co.at:443")
 
-	ids, size := []remote.EndpointID{remote.CVRLLuminosity}, int64(1<<20)
+	ids, size := []remote.EndpointID{remote.CIELuminosity}, int64(1<<20)
 	remote.EnableDownloads(size, ids...)
 
 	peak := func(v luminosity.Vision) float64 {

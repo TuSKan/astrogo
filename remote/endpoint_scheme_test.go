@@ -60,7 +60,8 @@ func TestNoUndeclaredCleartextEndpoints(t *testing.T) {
 				"  Switch it to https, or set InsecureReason saying what was "+
 				"checked and when. Verify with a real request, not a HEAD: "+
 				"SIMBAD and VizieR both answered https identically to http, "+
-				"while www.cvrl.org refuses port 443 outright.", id, ep.URL)
+				"and a host that refuses 443 outright, as CVRL's did, usually "+
+				"has an https source elsewhere (#739).", id, ep.URL)
 		}
 	}
 
@@ -72,13 +73,15 @@ func TestNoUndeclaredCleartextEndpoints(t *testing.T) {
 	t.Logf("%d endpoints checked", checked)
 }
 
-// TestCVRLIsTheOnlyDeclaredCleartextEndpoint pins the current exemption set, so
-// adding a second one is a deliberate act that shows up in a diff rather than
-// a quiet addition to a growing list.
+// TestNoEndpointIsDeclaredCleartext pins the exemption set at empty, so
+// adding one is a deliberate act that shows up in a diff rather than a quiet
+// addition to a growing list.
 //
-// If an endpoint legitimately needs to join it, extend this test in the same
-// change and say why in the commit.
-func TestCVRLIsTheOnlyDeclaredCleartextEndpoint(t *testing.T) {
+// Its one member until #739 was the CVRL mirror of the CIE luminosity
+// tables, which served no TLS; CIE serves the same tables over https itself.
+// If an endpoint legitimately needs an exemption, extend this test in the
+// same change and say why in the commit.
+func TestNoEndpointIsDeclaredCleartext(t *testing.T) {
 	t.Parallel()
 
 	var exempt []remote.EndpointID
@@ -89,10 +92,9 @@ func TestCVRLIsTheOnlyDeclaredCleartextEndpoint(t *testing.T) {
 		}
 	}
 
-	if len(exempt) != 1 || exempt[0] != remote.CVRLLuminosity {
-		t.Errorf("cleartext exemptions are %v, want exactly [%v].\n"+
+	if len(exempt) != 0 {
+		t.Errorf("cleartext exemptions are %v, want none.\n"+
 			"  Every addition here ships astrogo's traffic in the clear for "+
-			"another service; it needs to be visible in review.",
-			exempt, remote.CVRLLuminosity)
+			"another service; it needs to be visible in review.", exempt)
 	}
 }
