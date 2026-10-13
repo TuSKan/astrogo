@@ -25,8 +25,19 @@ import (
 // USNO's rounding and so invisible to the USNO tests. The year is checked to
 // span most of that range, so the test cannot pass on a month of Moons near
 // the mean.
+//
+// Under -short it covers two months rather than twelve (#763). Only the race
+// job passes -short, and there a year at two sites was 151 s on an idle
+// machine and the test CI timed out in; the Lint and Test jobs run the whole
+// year on every OS. Two months from 1 January still hold a perigee and an
+// apogee, so the semi-diameter range is checked there too.
 func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 	t.Parallel()
+
+	span, minEvents := unit.Days(365), 600
+	if testing.Short() {
+		span, minEvents = unit.Days(60), 90
+	}
 
 	prov := eph.Default()
 	moon := plan.NewMoon(prov)
@@ -47,7 +58,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 
 		start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-		events, err := plan.MoonEvents(start, start.Add(unit.Days(365)), site, prov)
+		events, err := plan.MoonEvents(start, start.Add(span), site, prov)
 		if err != nil {
 			t.Fatalf("%s: MoonEvents: %v", s.name, err)
 		}
@@ -93,14 +104,16 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 			minSD, maxSD, n = min(minSD, sd), max(maxSD, sd), n+1
 		}
 
-		if n < 600 {
-			t.Fatalf("%s: %d rises and sets over the year; the fixture no longer covers it", s.name, n)
+		if n < minEvents {
+			t.Fatalf("%s: %d rises and sets over %v; the fixture no longer covers it", s.name, n, span)
 		}
 
 		if maxSD-minSD < 1.5 {
-			t.Errorf("%s: semi-diameters %.2f′–%.2f′ over the year; the test needs the Moon near perigee "+
-				"and apogee to tell a fixed semi-diameter from the real one", s.name, minSD, maxSD)
+			t.Errorf("%s: semi-diameters %.2f′–%.2f′ over %v; the test needs the Moon near perigee "+
+				"and apogee to tell a fixed semi-diameter from the real one", s.name, minSD, maxSD, span)
 		}
+
+		t.Logf("%s: %d rises and sets over %v, semi-diameters %.2f′–%.2f′", s.name, n, span, minSD, maxSD)
 	}
 }
 
