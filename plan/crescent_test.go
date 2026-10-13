@@ -4,6 +4,9 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // threshold is the value of the quantity set by at where visible turns from
@@ -51,10 +54,10 @@ func lineTest(t *testing.T, name string, xs, ys []float64, tol float64,
 	}
 }
 
-func setDAZ(p *CrescentParams, v float64)  { p.DAZ = v }
-func setMAlt(p *CrescentParams, v float64) { p.MAlt = v }
-func setArcV(p *CrescentParams, v float64) { p.ArcV = v }
-func setW(p *CrescentParams, v float64)    { p.W = v }
+func setDAZ(p *CrescentParams, v float64)  { p.DAZ = angle.Deg(v) }
+func setMAlt(p *CrescentParams, v float64) { p.MAlt = angle.Deg(v) }
+func setArcV(p *CrescentParams, v float64) { p.ArcV = angle.Deg(v) }
+func setW(p *CrescentParams, v float64)    { p.W = angle.Arcmin(v) }
 
 // Fotheringham (1910), p. 531: "Minimum Altitude = 12°·0 − 0°·008 Z²". The
 // linear 12.0 − 0.008·DAZ this package had asked 11.84° at DAZ 20° where
@@ -165,7 +168,7 @@ func TestQureshiReproducesHisTable5(t *testing.T) {
 		{257, 7.61, 8.73, -0.33, -0.21, "E"},
 		{79, 10.7, 24.7, 0.135, 0.215, "A"},
 	} {
-		p := CrescentParams{ArcV: o.arcv, W: o.widthSec / 60}
+		p := CrescentParams{ArcV: angle.Deg(o.arcv), W: angle.Arcmin(o.widthSec / 60)}
 
 		z := p.Qureshi()
 		if math.Abs(z.Value-o.s) > 0.006 || z.Code != o.zone {
@@ -181,7 +184,7 @@ func TestQureshiReproducesHisTable5(t *testing.T) {
 func TestElongationLimits(t *testing.T) {
 	t.Parallel()
 
-	setArcL := func(p *CrescentParams, v float64) { p.ArcL = v }
+	setArcL := func(p *CrescentParams, v float64) { p.ArcL = angle.Deg(v) }
 	none := func(*CrescentParams, float64) {}
 
 	for _, c := range []struct {
@@ -206,15 +209,15 @@ func TestCalendricalCriteria(t *testing.T) {
 		p         CrescentParams
 		want      bool
 	}{
-		{"MABIMS 2021", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 3, ArcL: 6.4}, true},
-		{"MABIMS 2021 low", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 2.9, ArcL: 10}, false},
-		{"MABIMS 2021 close", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: 10, ArcL: 6.3}, false},
-		{"MABIMS 1995 elongation", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 3.5, Age: 6}, true},
-		{"MABIMS 1995 age", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 8}, true},
-		{"MABIMS 1995 neither", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 2.5, ArcL: 2.5, Age: 7.9}, false},
-		{"MABIMS 1995 too low", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: 1.9, ArcL: 10, Age: 30}, false},
-		{"Istanbul 2016", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: 5, ArcL: 8}, true},
-		{"Istanbul 2016 low", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: 4.9, ArcL: 12}, false},
+		{"MABIMS 2021", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: angle.Deg(3), ArcL: angle.Deg(6.4)}, true},
+		{"MABIMS 2021 low", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: angle.Deg(2.9), ArcL: angle.Deg(10)}, false},
+		{"MABIMS 2021 close", (*CrescentParams).MABIMS2021, CrescentParams{MAlt: angle.Deg(10), ArcL: angle.Deg(6.3)}, false},
+		{"MABIMS 1995 elongation", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: angle.Deg(2.5), ArcL: angle.Deg(3.5), Age: unit.Hours(6)}, true},
+		{"MABIMS 1995 age", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: angle.Deg(2.5), ArcL: angle.Deg(2.5), Age: unit.Hours(8)}, true},
+		{"MABIMS 1995 neither", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: angle.Deg(2.5), ArcL: angle.Deg(2.5), Age: unit.Hours(7.9)}, false},
+		{"MABIMS 1995 too low", (*CrescentParams).MABIMS1995, CrescentParams{MAlt: angle.Deg(1.9), ArcL: angle.Deg(10), Age: unit.Hours(30)}, false},
+		{"Istanbul 2016", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: angle.Deg(5), ArcL: angle.Deg(8)}, true},
+		{"Istanbul 2016 low", (*CrescentParams).Istanbul2016, CrescentParams{MAlt: angle.Deg(4.9), ArcL: angle.Deg(12)}, false},
 	} {
 		p := c.p
 		if got := c.criterion(&p); got != c.want {
@@ -254,12 +257,12 @@ func TestYallop(t *testing.T) {
 		wantCode string
 		p        CrescentParams
 	}{
-		{"zone A easily visible", "A", CrescentParams{ArcV: 15, W: 0}},
-		{"zone B", "B", CrescentParams{ArcV: 13.0, W: 0}},
-		{"zone C", "C", CrescentParams{ArcV: 11.0, W: 0}},
-		{"zone D", "D", CrescentParams{ArcV: 10.0, W: 0}},
-		{"zone E", "E", CrescentParams{ArcV: 9.2, W: 0}},
-		{"zone F below Danjon", "F", CrescentParams{ArcV: 2, W: 0}},
+		{"zone A easily visible", "A", CrescentParams{ArcV: angle.Deg(15), W: 0}},
+		{"zone B", "B", CrescentParams{ArcV: angle.Deg(13.0), W: 0}},
+		{"zone C", "C", CrescentParams{ArcV: angle.Deg(11.0), W: 0}},
+		{"zone D", "D", CrescentParams{ArcV: angle.Deg(10.0), W: 0}},
+		{"zone E", "E", CrescentParams{ArcV: angle.Deg(9.2), W: 0}},
+		{"zone F below Danjon", "F", CrescentParams{ArcV: angle.Deg(2), W: 0}},
 	}
 	for _, tt := range tests {
 		got := tt.p.Yallop()
@@ -286,11 +289,11 @@ func TestOdeh(t *testing.T) {
 		wantCode string
 		p        CrescentParams
 	}{
-		{"naked eye", "Naked Eye", CrescentParams{ArcV: 15, W: 0}},
-		{"optical/naked", "Optical/Naked", CrescentParams{ArcV: 10, W: 0}},
-		{"just below naked eye", "Optical/Naked", CrescentParams{ArcV: 12.81, W: 0}},
-		{"optical only", "Optical Only", CrescentParams{ArcV: 7, W: 0}},
-		{"not visible", "Not Visible", CrescentParams{ArcV: 2, W: 0}},
+		{"naked eye", "Naked Eye", CrescentParams{ArcV: angle.Deg(15), W: 0}},
+		{"optical/naked", "Optical/Naked", CrescentParams{ArcV: angle.Deg(10), W: 0}},
+		{"just below naked eye", "Optical/Naked", CrescentParams{ArcV: angle.Deg(12.81), W: 0}},
+		{"optical only", "Optical Only", CrescentParams{ArcV: angle.Deg(7), W: 0}},
+		{"not visible", "Not Visible", CrescentParams{ArcV: angle.Deg(2), W: 0}},
 	}
 	for _, tt := range tests {
 		got := tt.p.Odeh()

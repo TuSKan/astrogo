@@ -96,10 +96,10 @@ func main() {
 			MoonWeight:     0.0,
 		}, "Altitude-only"},
 		{&plan.ScoreConfig{
-			AltitudeWeight:     0.2,
-			UrgencyWeight:      0.7,
-			MoonWeight:         0.1,
-			MoonFullPenaltyDeg: 30.0,
+			AltitudeWeight:  0.2,
+			UrgencyWeight:   0.7,
+			MoonWeight:      0.1,
+			MoonFullPenalty: angle.Deg(30),
 		}, "Urgency-heavy"},
 	}
 
@@ -155,6 +155,6 @@ func main() {
 	cfg := plan.DefaultScoreConfig()
 	fmt.Printf("  Altitude:  %.0f%%  (alt/90°, lower airmass = better)\n", cfg.AltitudeWeight*100)
 	fmt.Printf("  Urgency:   %.0f%%  (1/hours_until_set, about-to-set = urgent)\n", cfg.UrgencyWeight*100)
-	fmt.Printf("  Moon sep:  %.0f%%  (sep/%.0f°, farther from Moon = better)\n", cfg.MoonWeight*100, cfg.MoonFullPenaltyDeg)
+	fmt.Printf("  Moon sep:  %.0f%%  (sep/%.0f°, farther from Moon = better)\n", cfg.MoonWeight*100, cfg.MoonFullPenalty.Degrees())
 	fmt.Println("\n  Score = (w₁·alt + w₂·urgency + w₃·moon) × 90 × priority")
 }

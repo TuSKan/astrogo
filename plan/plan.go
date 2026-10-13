@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/parallel"
@@ -253,23 +254,24 @@ type ScoreConfig struct {
 
 	// MoonWeight controls the contribution of lunar separation.
 	// Targets far from the Moon score higher. The term ramps linearly
-	// from 0 at 0° separation to 1.0 at MoonFullPenaltyDeg.
+	// from 0 at 0° separation to 1.0 at MoonFullPenalty.
 	// Default: 0.2
 	MoonWeight float64
 
-	// MoonFullPenaltyDeg is the separation (degrees) at which the Moon
-	// penalty reaches zero. Below this angle, the penalty is proportional.
-	// Default: 30.0
-	MoonFullPenaltyDeg float64
+	// MoonFullPenalty is the separation at which the Moon penalty reaches
+	// zero. Below this angle, the penalty is proportional. Zero or less
+	// means the default.
+	// Default: 30°
+	MoonFullPenalty angle.Angle
 }
 
 // DefaultScoreConfig returns the default scoring weights.
 func DefaultScoreConfig() ScoreConfig {
 	return ScoreConfig{
-		AltitudeWeight:     0.5,
-		UrgencyWeight:      0.3,
-		MoonWeight:         0.2,
-		MoonFullPenaltyDeg: 30.0,
+		AltitudeWeight:  0.5,
+		UrgencyWeight:   0.3,
+		MoonWeight:      0.2,
+		MoonFullPenalty: angle.Deg(30),
 	}
 }
 
@@ -526,14 +528,14 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 				pos = eval.Position
 			}
 
-			sep := coord.Separation(pos, topocentricDirection(moonVec, ctx)).Degrees()
+			sep := coord.Separation(pos, topocentricDirection(moonVec, ctx))
 
-			threshold := sc.MoonFullPenaltyDeg
+			threshold := sc.MoonFullPenalty
 			if threshold <= 0 {
-				threshold = 30.0
+				threshold = angle.Deg(30)
 			}
 
-			moonMerit = math.Min(sep/threshold, 1.0)
+			moonMerit = math.Min(sep.Radians()/threshold.Radians(), 1.0)
 		}
 	}
 

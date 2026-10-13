@@ -5,7 +5,9 @@ import (
 	"math"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Lunar Crescent Visibility Criteria ───────────────────────────────────────
@@ -51,29 +53,29 @@ import (
 // criterion: each method's doc says, and CrescentVisibility fills one set per
 // criterion, which CrescentVerdict and CrescentZone carry back.
 type CrescentParams struct {
-	// ArcV is the arc of vision, ARCV: the Moon's altitude minus the Sun's,
-	// in degrees.
-	ArcV float64
+	// ArcV is the arc of vision, ARCV: the Moon's altitude minus the Sun's.
+	ArcV angle.Angle
 
 	// ArcL is the arc of light, ARCL: the elongation of the Moon from the
-	// Sun, center to center, in degrees.
-	ArcL float64
+	// Sun, center to center.
+	ArcL angle.Angle
 
-	// DAZ is the difference in azimuth between the Sun and the Moon, in
-	// degrees, unsigned.
-	DAZ float64
+	// DAZ is the difference in azimuth between the Sun and the Moon,
+	// unsigned.
+	DAZ angle.Angle
 
-	// MAlt is the Moon's altitude, in degrees.
-	MAlt float64
+	// MAlt is the Moon's altitude.
+	MAlt angle.Angle
 
-	// W is the width of the crescent, in arcminutes.
-	W float64
+	// W is the width of the crescent. The criteria are published with it in
+	// arcminutes, and each converts it there.
+	W angle.Angle
 
-	// LT is the lag: moonset minus sunset, in minutes.
-	LT float64
+	// LT is the lag: moonset minus sunset.
+	LT unit.Duration
 
-	// Age is the Moon's age, the time since the last new moon, in hours.
-	Age float64
+	// Age is the Moon's age, the time since the last new moon.
+	Age unit.Duration
 }
 
 // ── Multi-Zone Classification ────────────────────────────────────────────────
@@ -128,7 +130,9 @@ type CrescentVerdict struct {
 // He calls the formula a rough approximation of the table on his p. 530,
 // which runs only to DAZ 23°.
 func (p *CrescentParams) Fotheringham() bool {
-	return p.MAlt >= 12.0-0.008*p.DAZ*p.DAZ
+	daz := p.DAZ.Degrees()
+
+	return p.MAlt.Degrees() >= 12.0-0.008*daz*daz
 }
 
 // Maunder evaluates Maunder's (1911) criterion: the Moon must stand at least
@@ -140,9 +144,9 @@ func (p *CrescentParams) Fotheringham() bool {
 // Table 1 and eq. 3.1; Krauss 2012). The quantities are Fotheringham's: the
 // Moon's geocentric altitude at geometric sunset. Reads MAlt and DAZ.
 func (p *CrescentParams) Maunder() bool {
-	d := math.Abs(p.DAZ)
+	d := math.Abs(p.DAZ.Degrees())
 
-	return p.MAlt >= 11.0-d/20-d*d/100
+	return p.MAlt.Degrees() >= 11.0-d/20-d*d/100
 }
 
 // ilyas1988Form is the curve of Ilyas (1988), A&A 206, 133, Fig. 5 (Form B):
@@ -167,7 +171,7 @@ var ilyas1988Form = []float64{
 // not restate it. Reads MAlt and DAZ. Beyond DAZ 60°, the end of his curve,
 // its last value holds.
 func (p *CrescentParams) Ilyas1988() bool {
-	return p.MAlt >= interpolateUniform(ilyas1988Form, 2.5, math.Abs(p.DAZ))
+	return p.MAlt.Degrees() >= interpolateUniform(ilyas1988Form, 2.5, math.Abs(p.DAZ.Degrees()))
 }
 
 // krauss2012Athens and krauss2012AthensDAZ are the Athenian column of Krauss
@@ -192,7 +196,7 @@ var (
 // altitude is 0°, as Krauss defines it after Fotheringham. Reads MAlt and DAZ.
 // Beyond DAZ 22°, the end of the table, its last value holds.
 func (p *CrescentParams) KraussAthenian() bool {
-	return p.MAlt >= interpolateTable(krauss2012AthensDAZ, krauss2012Athens, math.Abs(p.DAZ))
+	return p.MAlt.Degrees() >= interpolateTable(krauss2012AthensDAZ, krauss2012Athens, math.Abs(p.DAZ.Degrees()))
 }
 
 // ── Elongation limits ───────────────────────────────────────────────────────
@@ -206,7 +210,7 @@ func (p *CrescentParams) KraussAthenian() bool {
 // by Fatoohi, Stephenson & Al-Dargazelli 1998, Observatory 118, 65). Schaefer
 // (1991, QJRAS 32, 265) confirms the 7°. Read at sunset. Reads ArcL.
 func (p *CrescentParams) Danjon() bool {
-	return p.ArcL >= 7.0
+	return p.ArcL.Degrees() >= 7.0
 }
 
 // Fatoohi1998 evaluates the limit of Fatoohi, Stephenson & Al-Dargazelli
@@ -216,7 +220,7 @@ func (p *CrescentParams) Danjon() bool {
 // computed at sunset "allowing for parallax" (their Table I) — topocentric.
 // Reads ArcL.
 func (p *CrescentParams) Fatoohi1998() bool {
-	return p.ArcL >= 7.5
+	return p.ArcL.Degrees() >= 7.5
 }
 
 // Ilyas1983 evaluates the limit of Ilyas (1983, JRASC 77, 214): no crescent
@@ -226,7 +230,7 @@ func (p *CrescentParams) Fatoohi1998() bool {
 // sunset, read in their geocentric convention at geometric sunset. Ilyas
 // offers it as a general guide only. Reads ArcL.
 func (p *CrescentParams) Ilyas1983() bool {
-	return p.ArcL >= 10.5
+	return p.ArcL.Degrees() >= 10.5
 }
 
 // ── Calendrical criteria: altitude and elongation at sunset ─────────────────
@@ -238,7 +242,7 @@ func (p *CrescentParams) Ilyas1983() bool {
 // MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
 // both at sunset. Superseded by MABIMS2021.
 func (p *CrescentParams) MABIMS1995() bool {
-	return p.MAlt >= 2.0 && (p.ArcL >= 3.0 || p.Age >= 8.0)
+	return p.MAlt.Degrees() >= 2.0 && (p.ArcL.Degrees() >= 3.0 || p.Age.Hours() >= 8.0)
 }
 
 // MABIMS2021 evaluates the revised MABIMS (2021) criterion: ArcL ≥ 6.4° AND
@@ -247,7 +251,7 @@ func (p *CrescentParams) MABIMS1995() bool {
 // MAlt is the Moon's topocentric altitude and ArcL its geocentric elongation,
 // both at sunset.
 func (p *CrescentParams) MABIMS2021() bool {
-	return p.ArcL >= 6.4 && p.MAlt >= 3.0
+	return p.ArcL.Degrees() >= 6.4 && p.MAlt.Degrees() >= 3.0
 }
 
 // Istanbul2016 evaluates the rule of the Istanbul congress of 2016 on a
@@ -259,7 +263,7 @@ func (p *CrescentParams) MABIMS2021() bool {
 // geocentric or topocentric, so they are read as MABIMS reads them:
 // topocentric altitude, geocentric elongation.
 func (p *CrescentParams) Istanbul2016() bool {
-	return p.ArcL >= 8.0 && p.MAlt >= 5.0
+	return p.ArcL.Degrees() >= 8.0 && p.MAlt.Degrees() >= 5.0
 }
 
 // ── Arc of vision against the crescent's width ──────────────────────────────
@@ -275,9 +279,9 @@ func (p *CrescentParams) Istanbul2016() bool {
 // the minimum of each curve, which Yallop's best time Ts + (4/9)·Lag
 // reproduces (eq. 4.1). Reads ArcV and W.
 func (p *CrescentParams) Bruin() bool {
-	w := p.W
+	w := p.W.Arcminutes()
 
-	return p.ArcV >= 12.4023-9.4878*w+3.9512*w*w-0.5632*w*w*w
+	return p.ArcV.Degrees() >= 12.4023-9.4878*w+3.9512*w*w-0.5632*w*w*w
 }
 
 // AlrefayNakedEye evaluates the naked-eye criterion of Alrefay et al. (2018):
@@ -290,18 +294,18 @@ func (p *CrescentParams) Bruin() bool {
 // ones to 0.15° and miss geocentric ones by most of a degree
 // (TestAlrefayTableIIsTopocentricAtSunset). Read at sunset. Reads ArcV and W.
 func (p *CrescentParams) AlrefayNakedEye() bool {
-	w := p.W
+	w := p.W.Arcminutes()
 
-	return p.ArcV > 9.34-4.51*w+3.3*w*w-1.01*w*w*w
+	return p.ArcV.Degrees() > 9.34-4.51*w+3.3*w*w-1.01*w*w*w
 }
 
 // AlrefayOpticalAid evaluates the aided-eye criterion of Alrefay et al.
 // (2018), eq. 9: ARCV > 7.83 − 4.35W + 3.22W² − 1.02W³, in the convention of
 // AlrefayNakedEye.
 func (p *CrescentParams) AlrefayOpticalAid() bool {
-	w := p.W
+	w := p.W.Arcminutes()
 
-	return p.ArcV > 7.83-4.35*w+3.22*w*w-1.02*w*w*w
+	return p.ArcV.Degrees() > 7.83-4.35*w+3.22*w*w-1.02*w*w*w
 }
 
 // Yallop evaluates the Yallop (1997) multi-zone criterion.
@@ -324,8 +328,8 @@ func (p *CrescentParams) AlrefayOpticalAid() bool {
 // Yallop defined ArcV as geocentric and airless, and W as his W′ from the
 // geocentric elongation, at his best time (NAO TN 69, 1997).
 func (p *CrescentParams) Yallop() CrescentZone {
-	w := p.W
-	q := (p.ArcV - 11.8371 + 6.3226*w - 0.7319*w*w + 0.1018*w*w*w) / 10.0
+	w := p.W.Arcminutes()
+	q := (p.ArcV.Degrees() - 11.8371 + 6.3226*w - 0.7319*w*w + 0.1018*w*w*w) / 10.0
 
 	switch {
 	case q > 0.216:
@@ -361,8 +365,8 @@ func (p *CrescentParams) Yallop() CrescentZone {
 // Odeh's ArcV and W are topocentric and airless, at Yallop's best time
 // (Exp. Astron. 18, 39, 2004).
 func (p *CrescentParams) Odeh() CrescentZone {
-	w := p.W
-	v := p.ArcV - (-0.1018*w*w*w + 0.7319*w*w - 6.3226*w + 7.1651)
+	w := p.W.Arcminutes()
+	v := p.ArcV.Degrees() - (-0.1018*w*w*w + 0.7319*w*w - 6.3226*w + 7.1651)
 
 	switch {
 	case v >= 5.65:
@@ -396,8 +400,8 @@ func (p *CrescentParams) Odeh() CrescentZone {
 //	D: Require optical aid           (−0.06 ≥ s > −0.16)
 //	E: Not visible with optical aid  (s ≤ −0.16)
 func (p *CrescentParams) Qureshi() CrescentZone {
-	w := p.W
-	s := (p.ArcV - (10.43418 - 5.422643*w + 2.222075*w*w - 0.351964*w*w*w)) / 10.0
+	w := p.W.Arcminutes()
+	s := (p.ArcV.Degrees() - (10.43418 - 5.422643*w + 2.222075*w*w - 0.351964*w*w*w)) / 10.0
 
 	switch {
 	case s > 0.15:
@@ -443,14 +447,14 @@ var caldwell2001Aided = []float64{
 // meant to be optimistic. Beyond DAZ 21°, the end of the table, its last
 // value holds. Reads MAlt and DAZ.
 func (p *CrescentParams) CaldwellNakedEye() bool {
-	return p.MAlt >= interpolateUniform(caldwell2001NakedEye, 0.5, math.Abs(p.DAZ))
+	return p.MAlt.Degrees() >= interpolateUniform(caldwell2001NakedEye, 0.5, math.Abs(p.DAZ.Degrees()))
 }
 
 // CaldwellOptical evaluates the SAAO criterion of Caldwell & Laney (2001)
 // with optical aid: the Moon's lower limb must reach their lower line, in
 // the convention of CaldwellNakedEye.
 func (p *CrescentParams) CaldwellOptical() bool {
-	return p.MAlt >= interpolateUniform(caldwell2001Aided, 0.5, math.Abs(p.DAZ))
+	return p.MAlt.Degrees() >= interpolateUniform(caldwell2001Aided, 0.5, math.Abs(p.DAZ.Degrees()))
 }
 
 // ── Tables ──────────────────────────────────────────────────────────────────
@@ -542,12 +546,13 @@ func (r CrescentResult) String() string {
 		}
 
 		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° ARCL %6.2f° DAZ %6.2f° alt %6.2f° W %5.2f′\n",
-			name, yn, v.Params.ArcV, v.Params.ArcL, v.Params.DAZ, v.Params.MAlt, v.Params.W)
+			name, yn, v.Params.ArcV.Degrees(), v.Params.ArcL.Degrees(), v.Params.DAZ.Degrees(),
+			v.Params.MAlt.Degrees(), v.Params.W.Arcminutes())
 	}
 
 	zone := func(name string, z CrescentZone) {
 		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° W %5.2f′  %s\n",
-			name, z.Code, z.Params.ArcV, z.Params.W, z.String())
+			name, z.Code, z.Params.ArcV.Degrees(), z.Params.W.Arcminutes(), z.String())
 	}
 
 	verdict("Fotheringham (1910)", r.Fotheringham)
