@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
+	"errors"
 	"math"
 	"sort"
 	"strconv"
@@ -29,9 +30,11 @@ type synthTIFF struct {
 	// shuffle + differencing a real writer would before compressing.
 	floatPredictor bool
 	noData         *float64
-	originLon      float64
-	originLat      float64
-	pxSize         float64
+	// geoKeys, when set, is written as the GeoKey directory (tag 34735).
+	geoKeys   []uint16
+	originLon float64
+	originLat float64
+	pxSize    float64
 }
 
 // packBlock applies the configured predictor and compression to one strip or
@@ -343,6 +346,15 @@ func (s synthTIFF) build(t *testing.T) []byte {
 		)
 	}
 
+	if s.geoKeys != nil {
+		b := make([]byte, 2*len(s.geoKeys))
+		for i, k := range s.geoKeys {
+			le.PutUint16(b[i*2:], k)
+		}
+
+		entries = append(entries, tentry{tag: tagGeoKeyDirectory, typ: typeShort, count: uint32(len(s.geoKeys)), data: b})
+	}
+
 	if s.noData != nil {
 		asc := append([]byte(formatFloat(*s.noData)), 0)
 		entries = append(entries, tentry{tag: tagGDALNoData, typ: typeASCII, count: uint32(len(asc)), data: asc})
@@ -599,5 +611,91 @@ func TestGeoTIFFUnsupported(t *testing.T) {
 
 	if _, err := Open(bytes.NewReader(raw), nil); err == nil {
 		t.Fatal("expected ErrUnsupportedTIFF for integer sample format, got nil")
+	}
+}
+
+// viirs2024GeoKeys is the GeoKey directory of viirs_2024_raw.tif, the VIIRS
+// annual composite the viirs package reads, as read from the file on
+// 2026-10-13 (#742): geographic, PixelIsArea, EPSG:4326, degrees, and two
+// keys stored in other tags, which the reader skips.
+var viirs2024GeoKeys = []uint16{
+	1, 1, 0, 7,
+	1024, 0, 1, 2,
+	1025, 0, 1, 1,
+	2048, 0, 1, 4326,
+	2049, 34737, 7, 0,
+	2054, 0, 1, 9102,
+	2057, 34736, 1, 1,
+	2059, 34736, 1, 0,
+}
+
+// TestGeoKeysOfAnAreaRasterChangeNothing: a file declaring what the reader
+// always assumed — geographic, in degrees, pixels as areas — reads exactly as
+// one with no GeoKeys at all. VIIRS's own directory is that file.
+func TestGeoKeysOfAnAreaRasterChangeNothing(t *testing.T) {
+	t.Parallel()
+
+	readPixelCenters(t, synthTIFF{
+		width: 4, height: 3, pixels: rampPixels(4, 3, 5),
+		originLon: -10, originLat: 40, pxSize: 0.5, geoKeys: viirs2024GeoKeys,
+	})
+}
+
+// TestGeoKeysPixelIsPointNamesPixelCenters: with GTRasterTypeGeoKey = 2 the
+// tiepoint is pixel (0,0)'s center, not its corner, so pixel (col,row) is
+// centered at origin + (col, −row)·size. GDAL moves such a transform back
+// half a pixel; until #742 this reader did not, and read every sample half a
+// pixel off.
+func TestGeoKeysPixelIsPointNamesPixelCenters(t *testing.T) {
+	t.Parallel()
+
+	s := synthTIFF{
+		width: 4, height: 3, pixels: rampPixels(4, 3, 5),
+		originLon: -10, originLat: 40, pxSize: 0.5,
+		geoKeys: []uint16{1, 1, 0, 2, 1024, 0, 1, 2, 1025, 0, 1, 2},
+	}
+
+	r, err := Open(bytes.NewReader(s.build(t)), nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	for row := range s.height {
+		for col := range s.width {
+			lon := s.originLon + float64(col)*s.pxSize
+			lat := s.originLat - float64(row)*s.pxSize
+
+			got, err := r.SampleBilinear(angle.Deg(lon), angle.Deg(lat))
+			if err != nil {
+				t.Fatalf("SampleBilinear(%d,%d): %v", col, row, err)
+			}
+
+			testutil.AssertNear(t, "pixel", got, float64(s.pixels[row*s.width+col]), 1e-4)
+		}
+	}
+}
+
+// TestGeoKeysRefuseWhatIsNotLongitudeAndLatitude: a projected model reads its
+// meters as degrees, and radians are not degrees; either would place every
+// sample somewhere else without an error, so both are refused (#742).
+func TestGeoKeysRefuseWhatIsNotLongitudeAndLatitude(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		keys []uint16
+	}{
+		{"projected model", []uint16{1, 1, 0, 1, 1024, 0, 1, 1}},
+		{"geocentric model", []uint16{1, 1, 0, 1, 1024, 0, 1, 3}},
+		{"radians", []uint16{1, 1, 0, 2, 1024, 0, 1, 2, 2054, 0, 1, 9101}},
+	} {
+		raw := synthTIFF{
+			width: 2, height: 2, pixels: rampPixels(2, 2, 1),
+			originLon: 0, originLat: 0, pxSize: 1, geoKeys: c.keys,
+		}.build(t)
+
+		if _, err := Open(bytes.NewReader(raw), nil); !errors.Is(err, ErrUnsupportedTIFF) {
+			t.Errorf("%s: %v, want ErrUnsupportedTIFF", c.name, err)
+		}
 	}
 }
