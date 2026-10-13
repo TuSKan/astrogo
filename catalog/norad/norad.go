@@ -58,7 +58,26 @@ func (gp GP) EpochTime() (time.Time, error) {
 // ToTLE generates a TLE line pair from the GP data.
 // This is useful for passing to SGP4 propagators that expect TLE format.
 // The output strictly follows the fixed-column format of Spacetrack Report #3.
+//
+// # Catalog numbers past 99999
+//
+// Five columns hold the catalog number, and CelesTrak ran out of five-digit
+// numbers on 2026-07-11: every object catalogued since has six. Those up to
+// 339999 are written in Alpha-5, the extension python-sgp4 reads and
+// [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4.ParseTLE] reads too —
+// a letter for the tens of thousands, A for 10 through Z for 33 without I and
+// O, so 100690 is "A0690". Beyond 339999 no TLE can name the object, and both
+// lines come back empty rather than naming another one; CelesTrak serves those
+// as GP data only.
+//
+// Until #737 the number was clamped to 99999, so every object catalogued since
+// July claimed to be the same one.
 func (gp GP) ToTLE() (line1, line2 string) {
+	catID, ok := catalogField(gp.NoradCatID)
+	if !ok {
+		return "", ""
+	}
+
 	// Compute epoch in TLE format: 2-digit year + day-of-year with fraction.
 	epochYr := 0
 	epochDay := 0.0
@@ -73,8 +92,6 @@ func (gp GP) ToTLE() (line1, line2 string) {
 		class = "U"
 	}
 
-	catID := min(gp.NoradCatID, 99999)
-
 	// Convert international designator from yyyy-nnnp to TLE format (yynnnp, 8 chars).
 	intdes := formatIntDes(gp.ObjectID)
 
@@ -88,7 +105,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 
 	// Line 1: columns are fixed-width, total 69 chars including checksum.
 	//   1 NNNNNC NNNNNAAA NNNNN.NNNNNNNN +.NNNNNNNN +NNNNN-N +NNNNN-N N NNNNN
-	line1 = fmt.Sprintf("1 %05d%s %-8s %02d%012.8f %s %s %s %d %4d",
+	line1 = fmt.Sprintf("1 %s%s %-8s %02d%012.8f %s %s %s %d %4d",
 		catID, class, intdes, epochYr, epochDay,
 		ndotStr, nddotStr, bstarStr,
 		gp.EphemerisType, gp.ElementSetNo)
@@ -96,7 +113,7 @@ func (gp GP) ToTLE() (line1, line2 string) {
 	line1 += strconv.Itoa(checksumTLE(line1))
 
 	// Line 2
-	line2 = fmt.Sprintf("2 %05d %8.4f %8.4f %s %8.4f %8.4f %11.8f%5d",
+	line2 = fmt.Sprintf("2 %s %8.4f %8.4f %s %8.4f %8.4f %11.8f%5d",
 		catID, gp.Inclination, gp.RAOfAscNode,
 		eccentricityField(gp.Eccentricity), gp.ArgOfPericenter,
 		gp.MeanAnomaly, gp.MeanMotion, gp.RevAtEpoch)
@@ -105,6 +122,24 @@ func (gp GP) ToTLE() (line1, line2 string) {
 
 	return line1, line2
 }
+
+// catalogField writes a catalog number into the TLE's five columns: digits up
+// to 99999, Alpha-5 from 100000 to 339999, and nothing beyond — see
+// [GP.ToTLE]. A negative number is not one, and is refused with them.
+func catalogField(n int) (string, bool) {
+	switch {
+	case n < 0 || n > 339999:
+		return "", false
+	case n <= 99999:
+		return fmt.Sprintf("%05d", n), true
+	default:
+		return fmt.Sprintf("%c%04d", alpha5Letters[n/10000-10], n%10000), true
+	}
+}
+
+// alpha5Letters are Alpha-5's leading letters in order, A standing for 10:
+// the alphabet without I and O, which read as 1 and 0.
+const alpha5Letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 // formatIntDes converts an international designator from OMM format (yyyy-nnnp)
 // to TLE format (yynnnp, padded to 8 chars).

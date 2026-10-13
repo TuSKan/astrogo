@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
@@ -392,5 +393,77 @@ func TestIsCatalogNumber(t *testing.T) {
 		if got := isCatalogNumber(tc.in); got != tc.want {
 			t.Errorf("isCatalogNumber(%q) = %v, want %v", tc.in, got, tc.want)
 		}
+	}
+}
+
+// TestCatalogFieldWritesAlpha5 holds the catalog columns to the scheme (#737):
+// digits to 99999, Alpha-5 to 339999 — A for 10 through Z for 33, without I
+// and O — and nothing past it, where no TLE can name the object.
+func TestCatalogFieldWritesAlpha5(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		n    int
+		want string
+		ok   bool
+	}{
+		{25544, "25544", true},
+		{99999, "99999", true},
+		{100000, "A0000", true},
+		{100690, "A0690", true},
+		{148493, "E8493", true}, // python-sgp4's own example
+		{179999, "H9999", true},
+		{180000, "J0000", true}, // I is skipped
+		{339999, "Z9999", true},
+		{340000, "", false},
+		{-1, "", false},
+	} {
+		got, ok := catalogField(c.n)
+		if got != c.want || ok != c.ok {
+			t.Errorf("%d: (%q, %v), want (%q, %v)", c.n, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+// TestToTLENamesASixDigitObject: CelesTrak ran out of five-digit catalog
+// numbers on 2026-07-11, and on 2026-10-13 its last-30-days group held 225
+// objects numbered 100686 to 100982, SENTINEL-3C among them at 100690. Until
+// #737 ToTLE clamped every one to 99999. The lines it writes now carry the
+// object's own number back through the SGP4 parser, and a number no TLE can
+// hold gets no lines rather than another object's.
+func TestToTLENamesASixDigitObject(t *testing.T) {
+	t.Parallel()
+
+	var gps []GP
+	if err := json.Unmarshal([]byte(issFixture), &gps); err != nil {
+		t.Fatalf("Failed to parse: %v", err)
+	}
+
+	for _, n := range []int{25544, 99999, 100690, 339999} {
+		gp := gps[0]
+		gp.NoradCatID = n
+
+		line1, line2 := gp.ToTLE()
+		if err := satellite.ValidateTLE(line1, line2); err != nil {
+			t.Errorf("%d: %v\n%s\n%s", n, err, line1, line2)
+
+			continue
+		}
+
+		el, err := sgp4.ParseTLE(line1, line2)
+		if err != nil {
+			t.Fatalf("%d: %v", n, err)
+		}
+
+		if el.NORAD != n {
+			t.Errorf("%d: the TLE names satellite %d", n, el.NORAD)
+		}
+	}
+
+	gp := gps[0]
+	gp.NoradCatID = 340000
+
+	if line1, line2 := gp.ToTLE(); line1 != "" || line2 != "" {
+		t.Errorf("340000 has no TLE form, got\n%s\n%s", line1, line2)
 	}
 }

@@ -474,3 +474,53 @@ func loadValladoTLEs(t *testing.T) []valladoSet {
 
 	return out
 }
+
+// withCatalogField puts field in a line's catalog-number columns and
+// recomputes its check digit, which counts a letter for nothing.
+func withCatalogField(line, field string) string {
+	l := line[:2] + field + line[7:68]
+
+	return l + string(rune('0'+sgp4.Checksum(l)))
+}
+
+// TestParseTLEReadsAlpha5CatalogNumbers: catalog numbers passed 99999 on
+// 2026-07-11 (#737), and five columns hold them only in Alpha-5, a letter for
+// the tens of thousands, A for 10 through Z for 33 without I and O.
+// python-sgp4's own example is "E8493", satellite 148493; A0000 and Z9999 are
+// the scheme's ends, and J follows H because I is skipped.
+func TestParseTLEReadsAlpha5CatalogNumbers(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		field string
+		want  int
+	}{
+		{"E8493", 148493},
+		{"A0000", 100000},
+		{"A0690", 100690},
+		{"H9999", 179999},
+		{"J0000", 180000},
+		{"Z9999", 339999},
+		{"25544", 25544},
+	} {
+		el, err := sgp4.ParseTLE(withCatalogField(issLine1, c.field), withCatalogField(issLine2, c.field))
+		if err != nil {
+			t.Errorf("%s: %v", c.field, err)
+
+			continue
+		}
+
+		if el.NORAD != c.want {
+			t.Errorf("%s: NORAD %d, want %d", c.field, el.NORAD, c.want)
+		}
+	}
+
+	// Letters the scheme does not use, lowercase, and a sign where a digit
+	// belongs are not Alpha-5, and are refused rather than guessed at.
+	for _, field := range []string{"I0000", "O0000", "e8493", "A+123", "A12 3"} {
+		_, err := sgp4.ParseTLE(withCatalogField(issLine1, field), withCatalogField(issLine2, field))
+		if !errors.Is(err, sgp4.ErrMalformedTLE) {
+			t.Errorf("%q: %v, want ErrMalformedTLE", field, err)
+		}
+	}
+}

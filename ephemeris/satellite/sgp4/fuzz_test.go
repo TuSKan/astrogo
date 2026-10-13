@@ -43,6 +43,10 @@ func FuzzParseTLE(f *testing.F) {
 		issLine2,
 	)
 
+	// An Alpha-5 catalog number (#737), so the letter branch is in the corpus
+	// from the start rather than left for the fuzzer to stumble on.
+	f.Add(withCatalogField(issLine1, "E8493"), withCatalogField(issLine2, "E8493"))
+
 	f.Fuzz(func(t *testing.T, line1, line2 string) {
 		el, err := sgp4.ParseTLE(line1, line2)
 		if err != nil {
