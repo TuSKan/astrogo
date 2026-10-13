@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/gaia"
+	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/jpl"
 	"github.com/TuSKan/astrogo/catalog/mast"
 	"github.com/TuSKan/astrogo/catalog/norad"
@@ -549,7 +550,7 @@ func singletonIndices(candidates []candidate, uf *unionFind) []int {
 
 // unionByPosition unions every pair of still-singleton, trustworthy-coord
 // candidates whose positions, compared at a common epoch (see
-// separationAtCommonEpoch), lie within threshold. O(M²) over the
+// posmatch.Separation), lie within threshold. O(M²) over the
 // remaining singletons M, which is bounded by provider count (not catalog
 // size) at this point in the pipeline — appropriate at this scale; see
 // catalog/doc.go for the fuller justification against a spatial index.
@@ -569,64 +570,14 @@ func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angl
 				continue
 			}
 
-			sep, err := separationAtCommonEpoch(
-				kinematicCoord(candidates[i].target), candidates[i].target.Epoch,
-				kinematicCoord(candidates[j].target), candidates[j].target.Epoch)
+			sep, err := posmatch.Separation(
+				posmatch.Coord(candidates[i].target), candidates[i].target.Epoch,
+				posmatch.Coord(candidates[j].target), candidates[j].target.Epoch)
 			if err == nil && sep <= threshold {
 				uf.union(i, j)
 			}
 		}
 	}
-}
-
-// kinematicCoord returns t's position carrying t's own proper motion,
-// parallax and radial velocity. Every provider keeps those in the Target's
-// fields and builds Coord from RA and Dec alone, and coord.PropagateEpoch
-// reads them from the ICRS value, so propagating Coord itself moves nothing:
-// until #627 no position here was ever moved, and a star faster than about
-// 0.125″/yr never matched its own Gaia row, 16 years from SIMBAD's J2000.
-func kinematicCoord(t Target) coord.ICRS {
-	if t.PmRA == 0 && t.PmDec == 0 && t.Parallax == 0 && t.RadialVelocity == 0 {
-		return t.Coord
-	}
-
-	return coord.NewICRSWithKinematics(t.Coord.RA(), t.Coord.Dec(), t.PmRA, t.PmDec, t.Parallax, t.RadialVelocity)
-}
-
-// moving reports whether c carries a proper motion to propagate it by.
-func moving(c coord.ICRS) bool {
-	return c.PmRA() != 0 || c.PmDec() != 0
-}
-
-// separationAtCommonEpoch returns the angle between a, given at aEpoch, and
-// b, given at bEpoch, with both at one epoch. When both carry a proper
-// motion that epoch is J2000. When only one does, it is the other's own
-// epoch, since a position without a motion cannot be moved: a catalog row
-// that publishes none is compared where the star was when it was measured.
-// When neither does, the positions are compared as given.
-func separationAtCommonEpoch(a coord.ICRS, aEpoch time.Time, b coord.ICRS, bEpoch time.Time) (angle.Angle, error) {
-	var err error
-
-	switch {
-	case moving(a) && moving(b):
-		if a, err = coord.PropagateEpoch(a, aEpoch, time.J2000()); err != nil {
-			return 0, fmt.Errorf("catalog: %w", err)
-		}
-
-		if b, err = coord.PropagateEpoch(b, bEpoch, time.J2000()); err != nil {
-			return 0, fmt.Errorf("catalog: %w", err)
-		}
-	case moving(a):
-		if a, err = coord.PropagateEpoch(a, aEpoch, bEpoch); err != nil {
-			return 0, fmt.Errorf("catalog: %w", err)
-		}
-	case moving(b):
-		if b, err = coord.PropagateEpoch(b, bEpoch, aEpoch); err != nil {
-			return 0, fmt.Errorf("catalog: %w", err)
-		}
-	}
-
-	return coord.Separation(a, b), nil
 }
 
 // groupCandidates assembles union-find groups, preserving first-seen-root
@@ -670,7 +621,7 @@ func anchorCoord(g group) (coord.ICRS, bool) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(kinematicCoord(c.target), c.target.Epoch, time.J2000())
+		propagated, err := coord.PropagateEpoch(posmatch.Coord(c.target), c.target.Epoch, time.J2000())
 		if err != nil {
 			continue
 		}
@@ -770,7 +721,7 @@ func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.A
 			continue
 		}
 
-		sep, err := separationAtCommonEpoch(anchor, time.J2000(), kinematicCoord(nc.target), nc.target.Epoch)
+		sep, err := posmatch.Separation(anchor, time.J2000(), posmatch.Coord(nc.target), nc.target.Epoch)
 		if err != nil {
 			continue
 		}

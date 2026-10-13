@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
@@ -67,13 +68,13 @@ func TestSeparationAtCommonEpoch(t *testing.T) {
 	}{
 		{
 			name: "both moving: SIMBAD at J2000, Gaia at J2016",
-			a:    kinematicCoord(simbadBarnard), aEpoch: simbadBarnard.Epoch,
-			b: kinematicCoord(gaiaBarnard), bEpoch: gaiaBarnard.Epoch,
+			a:    posmatch.Coord(simbadBarnard), aEpoch: simbadBarnard.Epoch,
+			b: posmatch.Coord(gaiaBarnard), bEpoch: gaiaBarnard.Epoch,
 			maxArcsec: 0.01, whyMeasure: "166″ apart as published",
 		},
 		{
 			name: "one moving: SIMBAD moved to the night 2MASS observed",
-			a:    kinematicCoord(simbadBarnard), aEpoch: simbadBarnard.Epoch,
+			a:    posmatch.Coord(simbadBarnard), aEpoch: simbadBarnard.Epoch,
 			b: twoMASS, bEpoch: twoMASSEpoch,
 			maxArcsec: 0.5, whyMeasure: "4.4″ apart as published",
 		},
@@ -84,7 +85,7 @@ func TestSeparationAtCommonEpoch(t *testing.T) {
 			minArcsec: 4.4, maxArcsec: 4.5, whyMeasure: "nothing to move",
 		},
 	} {
-		sep, err := separationAtCommonEpoch(c.a, c.aEpoch, c.b, c.bEpoch)
+		sep, err := posmatch.Separation(c.a, c.aEpoch, c.b, c.bEpoch)
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}

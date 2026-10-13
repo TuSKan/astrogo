@@ -16,12 +16,15 @@
 // going through a Resolver at all. It deliberately does not merge fields:
 // Pair reports which Targets matched and leaves field reconciliation (and
 // any epoch propagation a caller wants for its own purposes) to the
-// caller — coord.PropagateEpoch composes directly with Pair's Targets for
-// that.
+// caller. A caller propagating a Pair's Target has to attach the Target's
+// own PmRA, PmDec, Parallax and RadialVelocity to its Coord first, as
+// coord.NewICRSWithKinematics does: providers keep the motion in those
+// fields, and coord.PropagateEpoch on a bare Coord moves nothing (#726).
 package xmatch
 
 import (
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
@@ -46,9 +49,9 @@ type Option func(*config)
 // against typical inter-object separation in dense fields.
 const defaultPositionMatchThresholdArcsec = 2.0
 
-// WithPositionMatchThreshold sets the maximum angular separation (after
-// epoch normalization to time.J2000() via coord.PropagateEpoch) at which two
-// Targets sharing no alias or ID are still considered the same object.
+// WithPositionMatchThreshold sets the maximum angular separation, at a
+// common epoch, at which two Targets sharing no alias or ID are still
+// considered the same object. See Match for which epoch that is.
 // Default: 2 arcsec.
 func WithPositionMatchThreshold(threshold angle.Angle) Option {
 	return func(c *config) { c.positionMatchThreshold = threshold }
@@ -78,10 +81,13 @@ type item struct {
 //  1. Alias-graph: any Target in a and any Target in b sharing a
 //     resolve.Normalize-d ID or Aliases entry are matched.
 //  2. Positional fallback: any Target left unmatched (a singleton) after
-//     pass 1 is epoch-normalized (via coord.PropagateEpoch to time.J2000();
-//     skipped entirely for a Target with !HasCoord or an all-zero Coord)
-//     and unioned with any still-unmatched candidate in the other slice
-//     within WithPositionMatchThreshold.
+//     pass 1 (skipped entirely for a Target with !HasCoord or an
+//     all-zero Coord) is compared with every still-unmatched candidate in
+//     the other slice at a common epoch, carrying each Target's own proper
+//     motion: J2000 when both move, the unmoving one's own epoch when only
+//     one does, since a row that publishes no motion cannot be moved, and
+//     as given when neither does. A pair within WithPositionMatchThreshold
+//     is unioned.
 //
 // A Target matching more than one candidate via the alias pass (e.g. a
 // duplicate row within one input slice) produces one Pair per cross-slice
@@ -169,9 +175,10 @@ func singletonIndices(items []item, uf *unionFind) []int {
 	return out
 }
 
-// unionByPosition epoch-normalizes every still-singleton, trustworthy-coord
-// item to time.J2000() and unions any cross-origin pair within threshold —
-// each item is unioned with at most its single nearest cross-origin match.
+// unionByPosition compares every still-singleton, trustworthy-coord item
+// with each cross-origin one at a common epoch (posmatch.Separation) and
+// unions any pair within threshold — each item is unioned with at most its
+// single nearest cross-origin match.
 // O(M²) over the remaining singletons M: appropriate at the scale this
 // package targets (two candidate lists from a handful of catalogs, not a
 // bulk all-sky cross-match), the same reasoning catalog.go's own
@@ -179,12 +186,15 @@ func singletonIndices(items []item, uf *unionFind) []int {
 func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 	singletons := singletonIndices(items, uf)
 
-	type normalized struct {
-		idx int
-		c   coord.ICRS
+	// Each position carries its Target's own motion, which providers keep in
+	// the Target's fields rather than in Coord; see posmatch.Coord (#726).
+	type positioned struct {
+		idx   int
+		c     coord.ICRS
+		epoch time.Time
 	}
 
-	norm := make([]normalized, 0, len(singletons))
+	norm := make([]positioned, 0, len(singletons))
 
 	for _, i := range singletons {
 		t := items[i].target
@@ -192,12 +202,7 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(t.Coord, t.Epoch, time.J2000())
-		if err != nil {
-			continue
-		}
-
-		norm = append(norm, normalized{idx: i, c: propagated})
+		norm = append(norm, positioned{idx: i, c: posmatch.Coord(t), epoch: t.Epoch})
 	}
 
 	matched := make(map[int]bool, len(norm))
@@ -219,7 +224,11 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 				continue // only a cross-slice match counts as a Pair
 			}
 
-			sep := coord.Separation(norm[a].c, norm[b].c)
+			sep, err := posmatch.Separation(norm[a].c, norm[a].epoch, norm[b].c, norm[b].epoch)
+			if err != nil {
+				continue
+			}
+
 			if sep <= bestSep {
 				best = b
 				bestSep = sep
