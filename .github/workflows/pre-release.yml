@@ -94,19 +94,19 @@ jobs:
       - name: Prepare output directory
         run: mkdir -p "$ASTROGO_METROLOGY_OUT"
 
-      # The GAMBONS comparisons need the 100 micron dust intensity along a few
-      # hundred fixed sightlines, and the dust package caches what IRSA returns
-      # because a sightline's dust never changes. A runner starts with an empty
-      # cache, so until #660 every weekly run asked IRSA the same few hundred
-      # questions again, two seconds apart: 22.5 minutes, against a 15-minute
-      # timeout that failed every run from 31 August to 5 October.
+      # TestSFDMatchesIRSA holds the local SFD dust map to IRSA's own answers,
+      # and compares only the answers the dust package's cache holds. A runner
+      # starts with an empty cache, so until #662 it skipped here on every run.
       #
-      # This seeds the cache with IRSA's own answers, kept in the repository,
-      # which is the pre-seeding the README describes for EOP data. A sightline
-      # missing from the seed is still fetched live and costs only itself, and
-      # the live service is exercised nightly by the dust package's network
-      # test. TestSFDMatchesIRSA reads the same cache, and until the seed it
-      # skipped here on every run for want of it.
+      # This seeds the cache with IRSA's answers, kept in the repository, which
+      # is the pre-seeding the README describes for EOP data. The live service
+      # is exercised nightly by the dust package's network test.
+      #
+      # The GAMBONS comparisons used to ask IRSA for their few hundred
+      # sightlines one query at a time, two seconds apart: 22.5 minutes, against
+      # a 15-minute timeout that failed every run from 31 August to 5 October
+      # (#660). They read the SFD map directly since #663, the same map
+      # TestSFDMatchesIRSA downloads, and do not consult this cache.
       - name: Seed the IRSA dust cache
         shell: bash
         run: |

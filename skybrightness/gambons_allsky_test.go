@@ -18,7 +18,6 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -65,14 +64,14 @@ const (
 	gambonsIrradianceNoAirglow   = 0.678
 )
 
-// samplesPerBand fixes the cost of this test and its precision together, and
-// the binding constraint is courtesy rather than time.
+// samplesPerBand fixes the cost of this test and its precision together.
 //
-// Diffuse galactic light comes from IRSA one sightline at a time, paced, at
-// about 1.8 seconds each. IRSA is a shared facility, so the sample count is
-// chosen to keep this run to a few minutes of light traffic rather than to
-// whatever would make the medians prettiest: a few hundred requests is an
-// ordinary user, a few thousand is something a service is entitled to refuse.
+// It was set when diffuse galactic light came from IRSA one sightline at a
+// time, paced at about 1.8 seconds each, where courtesy to a shared facility
+// capped the run at a few hundred requests. Dust is read from the local SFD
+// map since #663, so the count is now a choice of precision against run time
+// alone, left where it was so the figures stay comparable with the runs
+// recorded before.
 //
 // It cannot be recovered by sampling dust more coarsely than the sky. Measured
 // against IRSA directly, the 100 micron intensity moves 20 to 40 per cent over
@@ -92,14 +91,6 @@ const (
 // against differences this comparison reports in tenths. That is the honest
 // resolution of this test and it is stated rather than implied.
 const samplesPerBand = 24
-
-// dustChunk is how many sightlines are requested from IRSA before pausing to
-// report progress.
-//
-// Chunked so that being cut off costs the run its remaining sightlines rather
-// than all of them, and so that a service which has started refusing is
-// noticed within seconds instead of minutes.
-const dustChunk = 25
 
 // bandSolidAngle is the steradians a band between two altitudes covers.
 func bandSolidAngle(loAlt, hiAlt float64) float64 {
@@ -188,13 +179,9 @@ type allSkySample struct {
 // the dust cache warm this is seconds rather than minutes, so running it
 // twice costs less than threading one set of results through two tests would
 // cost in clarity.
-// irsaHost serves the SFD dust map every all-sky run needs. Named so the
-// reachability probe and the NOT VERIFIED record below cannot drift apart.
-const irsaHost = "irsa.ipac.caltech.edu:443"
-
 func runAllSky(t *testing.T) allSkyRun {
 	t.Helper()
-	testutil.RequireReachable(t, irsaHost)
+	testutil.RequireReachable(t, sfdHost)
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
@@ -252,38 +239,8 @@ func runAllSky(t *testing.T) allSkyRun {
 	t.Logf("sampling %d directions, %d per band, over %d bands",
 		len(samples), samplesPerBand, len(gambonsAltitudeBands))
 
-	// Dust for every sightline, at its own direction. See samplesPerBand.
-	dirs := make([]dust.Direction, 0, len(samples))
-	for _, s := range samples {
-		dirs = append(dirs, dust.Direction{L: s.galactic.L(), B: s.galactic.B()})
-	}
-
-	fetchStart := time.Now()
-
-	dustMap := dust.NewMap()
-
-	for start := 0; start < len(dirs); start += dustChunk {
-		end := min(start+dustChunk, len(dirs))
-
-		if _, err := dust.Fetch(ctx, dustMap, dirs[start:end]...); err != nil {
-			// Stop asking either way. A service that has begun refusing is not
-			// helped by being asked the remaining several hundred times, and a
-			// partial sky would silently bias every band it did not finish.
-			//
-			// Which of the two it is decides whether this counts as evidence.
-			// IRSA rate-limiting a long run is its business; a malformed
-			// request or a moved endpoint is ours, and used to skip here
-			// exactly like an outage.
-			testutil.SkipOnUpstreamFailure(t, err)
-			t.Fatalf("dust.Fetch stopped after %d of %d sightlines in %v: %v",
-				dustMap.Len(), len(dirs), time.Since(fetchStart).Round(time.Second), err)
-		}
-
-		t.Logf("  dust: %d of %d sightlines (%v)", end, len(dirs),
-			time.Since(fetchStart).Round(time.Second))
-	}
-
-	t.Logf("fetched %d dust cells in %v", dustMap.Len(), time.Since(fetchStart).Round(time.Second))
+	// Dust for every sightline, at its own direction, from the SFD map.
+	dustMap := gambonsDust(t)
 
 	// Built from the preset rather than assembled here.
 	//
@@ -430,8 +387,8 @@ func TestAgainstGAMBONSAllSky(t *testing.T) {
 	// added to prevent, in a suite that had been retrofitted onto it.
 	bandSuite := gambonsBandSuite()
 
-	if !testutil.Reachable(irsaHost) {
-		metrology.NotVerified(t, irsaHost+" is unreachable", bandSuite)
+	if !testutil.Reachable(sfdHost) {
+		metrology.NotVerified(t, sfdHost+" is unreachable", bandSuite)
 	}
 
 	run := runAllSky(t)

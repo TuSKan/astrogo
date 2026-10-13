@@ -5,6 +5,7 @@ package skybrightness_test
 import (
 	"context"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -52,6 +53,46 @@ func enableStarMapDownload(tb testing.TB) {
 	}
 
 	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
+}
+
+// sfdHost serves the Schlegel, Finkbeiner & Davis (1998) 100 µm map the GAMBONS
+// comparisons read dust from. Named so the reachability probes and the NOT
+// VERIFIED record cannot drift apart.
+const sfdHost = "dataverse.harvard.edu:443"
+
+// gambonsSFD is the map, opened once for the test binary.
+var gambonsSFD struct {
+	once sync.Once
+	sfd  *dust.SFD
+	err  error
+}
+
+// gambonsDust returns the SFD 100 µm map the comparisons read dust from: the
+// path [dataset.Open] gives a user, two hemispheres fetched once and cached.
+//
+// They used to ask IRSA for each cell instead, one query every 2.7 s, which
+// spent 22.5 of the weekly validation run's minutes on dust and tested a data
+// path no user takes (#663). The two read the same map: TestSFDMatchesIRSA in
+// dataset/dust holds the local reader to IRSA's answers.
+func gambonsDust(t *testing.T) *dust.SFD {
+	t.Helper()
+
+	gambonsSFD.once.Do(func() {
+		// Two hemispheres of 64 MB, consent-gated like every other bulk fetch.
+		remote.EnableDownloads(160<<20, remote.SFDDustMap)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+
+		gambonsSFD.sfd, gambonsSFD.err = dust.Open(ctx)
+	})
+
+	if err := gambonsSFD.err; err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("dust.Open: %v", err)
+	}
+
+	return gambonsSFD.sfd
 }
 
 // gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
@@ -114,15 +155,15 @@ const solarLikeTemperatureK = 5500
 // The end-to-end comparison against GAMBONS.
 //
 // Every other check in this repository is either internal or checks one link.
-// This runs the whole chain — the published star map, dust from IRSA, zodiacal
+// This runs the whole chain — the published star map, SFD dust, zodiacal
 // light, airglow from ESO SkyCalc, the extragalactic background, and
 // atmospheric transport — against an independent model of the same sky, in the
 // same band, for the same site, epoch and atmosphere.
 //
-// It compares at the zenith rather than all-sky because diffuse galactic light
-// is fetched per direction from IRSA at one request each: a whole sky would be
-// tens of thousands of requests to a shared service to answer a question the
-// zenith already answers.
+// It compares at the zenith, where GAMBONS publishes its headline figures;
+// TestAgainstGAMBONSAllSky covers the rest of the sky. It stayed at the zenith
+// first because diffuse galactic light was fetched per direction from IRSA,
+// one request each, until #663 moved it to the local SFD map.
 //
 // The bound is deliberately loose. Two independent implementations of a
 // six-term radiative model agreeing to a few tenths of a magnitude is a
@@ -131,7 +172,7 @@ const solarLikeTemperatureK = 5500
 // already shipped once — a factor, a sign, a unit — which lands whole
 // magnitudes away, not tenths.
 func TestAgainstGAMBONS(t *testing.T) {
-	testutil.RequireReachable(t, "irsa.ipac.caltech.edu:443")
+	testutil.RequireReachable(t, sfdHost)
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 	testutil.RequireReachable(t, "github.com:443")
 
@@ -162,15 +203,9 @@ func TestAgainstGAMBONS(t *testing.T) {
 		t.Fatalf("NewIntegratedStarlight: %v", err)
 	}
 
-	// Diffuse galactic light needs the 100 micron intensity along every
+	// Diffuse galactic light reads the 100 micron intensity along every
 	// sightline the cap average will use, not just the zenith.
-	dustMap, err := dust.Fetch(ctx, nil, capDustDirections(t, scene, gambonsCapDeg, gambonsCapSamples)...)
-	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("dust.Fetch: %v", err)
-	}
-
-	dgl, err := skybrightness.NewDiffuseGalacticLight(dustMap, stars, band)
+	dgl, err := skybrightness.NewDiffuseGalacticLight(gambonsDust(t), stars, band)
 	if err != nil {
 		t.Fatalf("NewDiffuseGalacticLight: %v", err)
 	}
@@ -370,30 +405,6 @@ func zenithCap(capDeg float64, samples int) []coord.AltAz {
 			angle.Deg(90-zenithAngle),
 			angle.Deg(math.Mod(float64(k)*goldenAngleDeg, 360)),
 		))
-	}
-
-	return out
-}
-
-// capDustDirections carries the cap's sightlines to galactic coordinates, which
-// is what the dust provider is indexed by.
-func capDustDirections(t *testing.T, scene *skybrightness.Scene, capDeg float64, samples int) []dust.Direction {
-	t.Helper()
-
-	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
-		scene.Atmosphere.Refraction())
-
-	dirs := zenithCap(capDeg, samples)
-	out := make([]dust.Direction, 0, len(dirs))
-
-	for _, d := range dirs {
-		icrs, err := cc.AltAzToICRS(d)
-		if err != nil {
-			t.Fatalf("AltAzToICRS: %v", err)
-		}
-
-		gal := coord.ICRSToGalactic(icrs)
-		out = append(out, dust.Direction{L: gal.L(), B: gal.B()})
 	}
 
 	return out
