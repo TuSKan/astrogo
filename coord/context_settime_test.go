@@ -103,8 +103,17 @@ func TestSetTime_WithinTheHourIsTheCheapPath(t *testing.T) {
 			t.Errorf("Δt=%gh: SetTime is %g″ from NewContext, want <= %g″ (documented bound)", hours, d, bound)
 		}
 
-		if d == 0 {
-			t.Errorf("Δt=%gh: SetTime matches NewContext exactly, so it rebuilt inside the hour", hours)
+		// A floor, not an exact zero (#731). A rebuild through SetTime's own
+		// decomposition differs from NewContext by up to the 1e-12° that
+		// TestSetTime_ZeroDeltaMatchesNewContext allows (3.6e-9″), not by 0,
+		// and would pass `d == 0`. The cheap path measures 9.3 mas at a
+		// quarter hour, so a microarcsecond separates the two by four orders
+		// either side.
+		const cheapPathFloorArcsec = 1e-6
+
+		if d < cheapPathFloorArcsec {
+			t.Errorf("Δt=%gh: SetTime is %g″ from NewContext, under %g″, so it rebuilt inside the hour",
+				hours, d, cheapPathFloorArcsec)
 		}
 	}
 }
