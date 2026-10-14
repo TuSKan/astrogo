@@ -645,8 +645,14 @@ func julianCalendar(jd1, jd2 float64) (year, month, day int, dayFrac float64) {
 // The time is rounded to the nearest second, not truncated: an instant held a
 // few microseconds short of 12:30:00 prints as 12:30:00, and one a few short
 // of midnight as the next day's 00:00:00 (#439).
+//
+// The clock is UTC's, whatever scale t holds, as [Time.Format]'s is: the two
+// differ only in calendar. It used to be t's own scale's, so the same instant
+// held as TT printed 5h06m later in 585 BC, and 1 min 9 s later in 2026, than
+// it did held as UTC or through Format (#766). MST reads "UTC".
 func (t Time) FormatJulian(format string) string {
-	y, m, d, frac := julianCalendar(t.jd1, t.jd2+halfSecondDays)
+	jd1, jd2 := t.clockParts()
+	y, m, d, frac := julianCalendar(jd1, jd2+halfSecondDays)
 	hour, minute, second := clockOf(frac)
 
 	yearStr := fmt.Sprintf("%04d", y)
@@ -662,7 +668,7 @@ func (t Time) FormatJulian(format string) string {
 		"15", fmt.Sprintf("%02d", hour),
 		"04", fmt.Sprintf("%02d", minute),
 		"05", fmt.Sprintf("%02d", second),
-		"MST", t.scale.String(),
+		"MST", UTC.String(),
 	)
 
 	return r.Replace(format)
@@ -949,15 +955,23 @@ func (t Time) In(loc *time.Location) Time {
 // For dates within Go's time.Time range (~year 0 to 9999), this delegates
 // to the standard library. For dates outside that range (e.g., negative years),
 // it formats manually using the SOFA-derived calendar components.
+//
+// Either way the clock is UTC's, whatever scale t holds, as [Time.ToGo]
+// explains. The manual path used to read t's own scale instead, so one TT
+// instant printed its UTC clock in 2026 and its TT clock in 585 BC, 5h06m
+// apart (#766); MST there reads "UTC". The display location applies only
+// within the standard library's years.
 func (t Time) Format(format string) string {
-	y, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	jd1, jd2 := t.clockParts()
+
+	y, _, _, _, _ := gofaext.JdToDate(jd1, jd2)
 	// If year is within Go's time.Time range, delegate to standard formatting
 	if y >= 0 && y <= 9999 {
 		return t.ToGo().Format(format)
 	}
 
 	// Rounded to the nearest second, as FormatJulian is.
-	y, m, d, frac, _ := gofaext.JdToDate(t.jd1, t.jd2+halfSecondDays)
+	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2+halfSecondDays)
 	hour, minute, second := clockOf(frac)
 	// Manual formatting for out-of-range dates.
 	// Uses strings.NewReplacer for single-pass replacement to avoid
@@ -972,7 +986,7 @@ func (t Time) Format(format string) string {
 		"15", fmt.Sprintf("%02d", hour),
 		"04", fmt.Sprintf("%02d", minute),
 		"05", fmt.Sprintf("%02d", second),
-		"MST", t.scale.String(),
+		"MST", UTC.String(),
 	)
 
 	return r.Replace(format)
@@ -1610,6 +1624,15 @@ func (t *Time) normalize() {
 	extraDays = math.Floor(t.jd2)
 	t.jd1 += extraDays
 	t.jd2 -= extraDays
+}
+
+// clockParts returns the two-part Julian Date the formatters read a calendar
+// and a clock from: t on the UTC timeline, as [Time.ToGo] reads it, with a
+// leap-second day's fraction stretched back to 86400 seconds.
+func (t Time) clockParts() (jd1, jd2 float64) {
+	u := t.UTC()
+
+	return utcToLabel(u.jd1, u.jd2)
 }
 
 // subDays returns the physical time elapsed from other to t, in days of 86400
