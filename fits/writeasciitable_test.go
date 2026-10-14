@@ -189,3 +189,65 @@ func TestASCIITablePadsWithSpaces(t *testing.T) {
 		t.Errorf("data block = %q, want the single value padded with blanks", trimmed)
 	}
 }
+
+// TestASCIITableDeclaresItsNulls: a column holding a null is written with
+// an empty TNULLn so the blank field it writes is declared undefined, and an
+// integer column's null reads back as null rather than as the 0 FITS 4.0
+// §7.2.5 makes of an undeclared blank (#771). Before, nothing was declared,
+// so any reader keeping to the standard read the null as a zero.
+func TestASCIITableDeclaresItsNulls(t *testing.T) {
+	t.Parallel()
+
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "HIP", Type: arrow.PrimitiveTypes.Int32, Nullable: true},
+		{Name: "FULL", Type: arrow.PrimitiveTypes.Int32, Nullable: true},
+	}, nil)
+
+	rb := array.NewRecordBuilder(memory.NewGoAllocator(), schema)
+	defer rb.Release()
+
+	builderAs[*array.Int32Builder](t, rb, 0).AppendValues([]int32{91262, 0}, []bool{true, false})
+	builderAs[*array.Int32Builder](t, rb, 1).AppendValues([]int32{1, 2}, nil)
+
+	batch := rb.NewRecordBatch()
+	defer batch.Release()
+
+	var buf bytes.Buffer
+
+	if err := fits.Write(&buf, &fits.File{HDUs: []fits.HDU{
+		&fits.ImageHDU{}, &fits.ASCIITableHDU{Batch: batch},
+	}}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	got, err := fits.Read(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("Read back: %v", err)
+	}
+
+	out, ok := got.HDUs[1].(*fits.ASCIITableHDU)
+	if !ok {
+		t.Fatalf("extension is %T, want *fits.ASCIITableHDU", got.HDUs[1])
+	}
+
+	if v, err := out.Header().GetString("TNULL1"); err != nil || v != "" {
+		t.Errorf("TNULL1 = %q, %v; want the blank string declared for a column with a null", v, err)
+	}
+
+	if _, err := out.Header().Get("TNULL2"); err == nil {
+		t.Error("TNULL2 declared for a column with no null")
+	}
+
+	hip, ok := out.Batch.Column(0).(*array.Float64)
+	if !ok {
+		t.Fatalf("HIP is %T", out.Batch.Column(0))
+	}
+
+	if hip.IsNull(0) || hip.Value(0) != 91262 {
+		t.Errorf("HIP row 0 = %v (null %v), want 91262", hip.Value(0), hip.IsNull(0))
+	}
+
+	if !hip.IsNull(1) {
+		t.Errorf("HIP row 1 = %v, want null — a written null must not read back as 0", hip.Value(1))
+	}
+}

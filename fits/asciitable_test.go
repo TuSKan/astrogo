@@ -115,12 +115,11 @@ func TestReadASCIITableDecodesItsColumns(t *testing.T) {
 	}
 }
 
-// TestASCIIBlankFieldIsNullNotZero covers the format's own way of saying "no
-// value".
-//
-// There is no TNULL in an ASCII table: a field of all blanks is undefined. A
-// reader that parses it as zero turns a missing measurement into a real one,
-// which is the same failure the binary table's TNULL handling exists to avoid.
+// TestASCIIBlankFieldIsNullNotZero covers a blank real field, which FITS 4.0
+// §7.2.5 gives no value. A reader that parses it as zero turns a missing
+// measurement into a real one. A blank integer field is different, 0 by the
+// standard's own words, and so is a declared TNULLn; see
+// TestASCIITableReadsTheStandardsForms.
 func TestASCIIBlankFieldIsNullNotZero(t *testing.T) {
 	t.Parallel()
 
@@ -130,7 +129,7 @@ func TestASCIIBlankFieldIsNullNotZero(t *testing.T) {
 	)
 
 	// Eight columns of name, a gap, nine of flux. The second row's flux field
-	// is blank, which is how the format says the value is undefined.
+	// is blank, which a real field leaves without a value.
 	rows := "Vega    " + " " + "    1.234" +
 		"Unknown " + " " + "         "
 
@@ -197,4 +196,60 @@ func blankPayload(rows string) []byte {
 	copy(payload, rows)
 
 	return payload
+}
+
+// TestASCIITableReadsTheStandardsForms holds the reader to FITS 4.0 §7.2
+// (#771): a field equal to the column's TNULLn is undefined (§7.2.2); a blank
+// integer field is 0 (§7.2.5, "A blank field has value 0"); a real field
+// with no decimal point has one implied before its rightmost d digits; and an
+// exponent may be introduced by a bare sign. Before, a non-numeric TNULLn sank
+// the whole read, a numeric one became a real value, 12345 in F8.2 read as
+// 12345, "1.5-3" sank the read, and a blank integer was null.
+func TestASCIITableReadsTheStandardsForms(t *testing.T) {
+	t.Parallel()
+
+	const null = -1e300 // stands for an undefined cell in want
+
+	for _, c := range []struct {
+		name, tform, tnull string
+		fields             [2]string
+		want               [2]float64
+	}{
+		{"TNULLn as text", "F8.2", "'*****'", [2]string{"    1.50", "   *****"}, [2]float64{1.5, null}},
+		{"TNULLn as a number", "F8.2", "'-999.00'", [2]string{"    1.50", " -999.00"}, [2]float64{1.5, null}},
+		{"TNULLn unquoted", "I8", "-999", [2]string{"      42", "    -999"}, [2]float64{42, null}},
+		{"implied decimal", "F8.2", "", [2]string{"   12345", "      -5"}, [2]float64{123.45, -0.05}},
+		{"sign-introduced exponent", "E8.2", "", [2]string{"  1.5-3 ", " 25D-1  "}, [2]float64{0.0015, 0.025}},
+		{"blank integer", "I8", "", [2]string{"      42", "        "}, [2]float64{42, 0}},
+		{"blank integer declared null", "I8", "''", [2]string{"      42", "        "}, [2]float64{42, null}},
+		{"blank real", "F8.2", "", [2]string{"    2.50", "        "}, [2]float64{2.5, null}},
+	} {
+		h := asciiTableHeader(8, [3]string{"X", "1", c.tform})
+		if c.tnull != "" {
+			h.Append(Card{Keyword: "TNULL1", Value: c.tnull})
+		}
+
+		hdu, err := ReadASCIITable(h, bytes.NewReader(blankPayload(c.fields[0]+c.fields[1])))
+		if err != nil {
+			t.Errorf("%s: ReadASCIITable: %v", c.name, err)
+
+			continue
+		}
+
+		col, ok := hdu.Batch.Column(0).(*array.Float64)
+		if !ok {
+			t.Fatalf("%s: column is %T, want *array.Float64", c.name, hdu.Batch.Column(0))
+		}
+
+		for i, want := range c.want {
+			switch {
+			case want == null && !col.IsNull(i):
+				t.Errorf("%s: row %d = %v, want null", c.name, i, col.Value(i))
+			case want != null && col.IsNull(i):
+				t.Errorf("%s: row %d is null, want %v", c.name, i, want)
+			case want != null && math.Abs(col.Value(i)-want) > 1e-12:
+				t.Errorf("%s: row %d = %v, want %v", c.name, i, col.Value(i), want)
+			}
+		}
+	}
 }

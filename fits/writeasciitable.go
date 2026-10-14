@@ -25,6 +25,7 @@ func encodeASCIITable(h *ASCIITableHDU) (*Header, []byte, error) {
 
 	forms := make([]asciiForm, cols)
 	starts := make([]int, cols)
+	nulls := make([]bool, cols)
 
 	// One blank column between fields, which is what makes a written table
 	// readable as text and is what every writer does.
@@ -38,12 +39,13 @@ func encodeASCIITable(h *ASCIITableHDU) (*Header, []byte, error) {
 
 		forms[i] = form
 		starts[i] = offset
+		nulls[i] = h.Batch.Column(i).NullN() > 0
 		offset += form.width + 1
 	}
 
 	rowSize := max(offset-1, 0)
 
-	header := orderedHeader(h.Header(), asciiTableKeywords(schema, forms, starts, rows, rowSize))
+	header := orderedHeader(h.Header(), asciiTableKeywords(schema, forms, starts, nulls, rows, rowSize))
 
 	payload, err := asciiPayload(h.Batch, forms, starts, rowSize, rows)
 	if err != nil {
@@ -55,8 +57,14 @@ func encodeASCIITable(h *ASCIITableHDU) (*Header, []byte, error) {
 
 // asciiTableKeywords builds the structural cards, including the TBCOLn that
 // say where each field begins.
-func asciiTableKeywords(schema *arrow.Schema, forms []asciiForm, starts []int, rows, rowSize int) []Card {
-	cards := make([]Card, 0, 8+3*len(forms))
+//
+// A column holding a null also gets a TNULLn of the empty string, declaring
+// the blank field it is written as undefined. Without that declaration a blank integer field is
+// 0 by FITS 4.0 §7.2.5, so every null this wrote into an integer column read
+// back elsewhere as a zero measurement (#771). It also replaces any TNULLn the
+// table carried in, which no longer describes what is written.
+func asciiTableKeywords(schema *arrow.Schema, forms []asciiForm, starts []int, nulls []bool, rows, rowSize int) []Card {
+	cards := make([]Card, 0, 8+4*len(forms))
 	cards = append(cards,
 		Card{Keyword: "XTENSION", Value: "'TABLE   '", Comment: "ASCII table extension"},
 		Card{Keyword: "BITPIX", Value: strconv.Itoa(BitpixUint8), Comment: "8-bit bytes"},
@@ -79,6 +87,10 @@ func asciiTableKeywords(schema *arrow.Schema, forms []asciiForm, starts []int, r
 			Card{Keyword: "TBCOL" + n, Value: strconv.Itoa(starts[i] + 1), Comment: "beginning column of field " + n},
 			Card{Keyword: "TFORM" + n, Value: quote(form.String()), Comment: "format of field " + n},
 		)
+
+		if nulls[i] {
+			cards = append(cards, Card{Keyword: "TNULL" + n, Value: quote(""), Comment: "a blank field " + n + " is undefined"})
+		}
 	}
 
 	return cards
@@ -158,8 +170,8 @@ func asciiPayload(batch arrow.RecordBatch, forms []asciiForm, starts []int, rowS
 // asciiCellText renders one value into its field.
 func asciiCellText(col arrow.Array, form asciiForm, row int) (string, error) {
 	if row >= col.Len() || col.IsNull(row) {
-		// A blank field is how this format says the value is undefined; there
-		// is no TNULL here.
+		// Written blank, and declared undefined by the column's TNULLn = ''
+		// (see asciiTableKeywords).
 		return form.formatCell(0, "", true)
 	}
 

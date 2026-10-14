@@ -31,9 +31,10 @@ type ASCIITableHDU struct {
 
 // ReadASCIITable decodes an ASCII TABLE extension into an Arrow record batch.
 //
-// Numeric columns become float64 and character columns become strings. A field
-// of all blanks is undefined — the format's own way of saying "no value", with
-// no TNULL involved — and becomes a null rather than a zero.
+// Numeric columns become float64 and character columns become strings, read by
+// FITS 4.0 §7.2.5. A field matching the column's TNULLn is null; so is a blank
+// real or character field, which the standard gives no value. A blank integer
+// field is 0, as §7.2.5 says.
 func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 	tfields, err := h.GetInt("TFIELDS")
 	if err != nil {
@@ -77,6 +78,8 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 		return nil, err
 	}
 
+	tnulls, hasNull := asciiNulls(h, tfields)
+
 	payload, err := readDeclared(r, size)
 	if err != nil {
 		return nil, fmt.Errorf("fits: failed reading asciitable payload: %w", err)
@@ -96,7 +99,7 @@ func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
 				continue
 			}
 
-			if err := appendASCIICell(bldr.Field(i), form, string(line[starts[i]:end])); err != nil {
+			if err := appendASCIICell(bldr.Field(i), form, string(line[starts[i]:end]), tnulls[i], hasNull[i]); err != nil {
 				return nil, fmt.Errorf("fits: row %d column %d: %w", row+1, i+1, err)
 			}
 		}
@@ -164,14 +167,31 @@ func (f asciiForm) arrowType() arrow.DataType {
 	return arrow.PrimitiveTypes.Float64
 }
 
+// asciiNulls reads each column's TNULLn: the string, implicitly space filled
+// to the field's width, that stands for an undefined value (§7.2.2).
+//
+// Read as text, and taken as written when a writer left it unquoted, as some
+// write a numeric null such as -999.
+func asciiNulls(h *Header, tfields int) (tnulls []string, hasNull []bool) {
+	tnulls, hasNull = make([]string, tfields), make([]bool, tfields)
+
+	for i := range tfields {
+		if v, err := h.GetString("TNULL" + strconv.Itoa(i+1)); err == nil {
+			tnulls[i], hasNull[i] = v, true
+		}
+	}
+
+	return tnulls, hasNull
+}
+
 // appendASCIICell decodes one field and appends it.
-func appendASCIICell(bldr array.Builder, form asciiForm, text string) error {
-	value, str, blank, err := form.parseCell(text)
+func appendASCIICell(bldr array.Builder, form asciiForm, text, tnull string, hasNull bool) error {
+	value, str, null, err := form.parseCell(text, tnull, hasNull)
 	if err != nil {
 		return err
 	}
 
-	if blank {
+	if null {
 		bldr.AppendNull()
 
 		return nil
