@@ -300,14 +300,22 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 	req := resolve.ConeRequest{Center: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), Radius: angle.Deg(0.2), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
 
-	for _, want := range []string{
-		"DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', 83.822100, -5.391100)) AS dist",
-		"ORDER BY dist ASC",
-		"TOP 5 ",
-	} {
+	for _, want := range []string{"ORDER BY dist ASC", "TOP 5 "} {
 		if !strings.Contains(adql, want) {
 			t.Errorf("the cone query lacks %q:\n%s", want, adql)
 		}
+	}
+
+	m := regexp.MustCompile(`DISTANCE\(POINT\('ICRS', ra, dec\), POINT\('ICRS', ([-0-9.]+), ([-0-9.]+)\)\) AS dist`).FindStringSubmatch(adql)
+	if m == nil {
+		t.Fatalf("the cone query measures no distance from its center:\n%s", adql)
+	}
+
+	ra, errRA := strconv.ParseFloat(m[1], 64)
+	dec, errDec := strconv.ParseFloat(m[2], 64)
+
+	if errRA != nil || errDec != nil || math.Abs(ra-83.8221) > 1e-9 || math.Abs(dec+5.3911) > 1e-9 {
+		t.Errorf("distance measured from (%s, %s), want (83.8221, -5.3911)", m[1], m[2])
 	}
 }
 
