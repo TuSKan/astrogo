@@ -241,8 +241,9 @@ func (f tformField) storedInt(row []byte) (int64, bool) {
 // Scaling keywords (TSCALn, TZEROn) and variable-length arrays (the P and Q
 // descriptors) are not applied; a column declaring them decodes to its raw
 // stored values. Columns whose TFORM has a repeat count above one are vectors
-// per row and are kept as null columns rather than being flattened, so a
-// caller never receives one column's numbers under another column's name.
+// per row and decode to fixed-size lists rather than being flattened, so a
+// caller never receives one column's numbers under another column's name; the
+// scalar getters refuse them with [ErrColumnType].
 func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	tfields, err := h.GetInt("TFIELDS")
 	if err != nil {
@@ -380,6 +381,12 @@ func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 	}
 
 	arr := hdu.Batch.Column(idx)
+
+	value, ok := stringReader(arr)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s holds %s", ErrColumnType, colName, arr.DataType())
+	}
+
 	rows := int(hdu.Batch.NumRows())
 	res := make([]string, rows)
 
@@ -388,21 +395,49 @@ func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 			continue
 		}
 
-		switch a := arr.(type) {
-		case *array.String:
-			res[i] = a.Value(i)
-		case *array.Int32:
-			res[i] = strconv.FormatInt(int64(a.Value(i)), 10)
-		case *array.Int64:
-			res[i] = strconv.FormatInt(a.Value(i), 10)
-		case *array.Float32:
-			res[i] = strconv.FormatFloat(float64(a.Value(i)), 'f', -1, 32)
-		case *array.Float64:
-			res[i] = strconv.FormatFloat(a.Value(i), 'f', -1, 64)
-		}
+		res[i] = value(i)
 	}
 
 	return res, nil
+}
+
+// stringReader returns how to render one row of arr as a string, or false for
+// a column that holds no single value per row.
+//
+// Every scalar type the decoder produces is here. Int16 and Uint8, TFORM I
+// and B, used to fall through a switch with no default, so a column of them
+// came back as blanks with no error (#769); a logical column is written as
+// FITS writes it, T or F.
+func stringReader(arr arrow.Array) (func(int) string, bool) {
+	switch a := arr.(type) {
+	case *array.String:
+		return a.Value, true
+	case *array.Boolean:
+		return func(i int) string {
+			if a.Value(i) {
+				return "T"
+			}
+
+			return "F"
+		}, true
+	case *array.Uint8:
+		return func(i int) string { return strconv.FormatUint(uint64(a.Value(i)), 10) }, true
+	case *array.Int16:
+		return func(i int) string { return strconv.FormatInt(int64(a.Value(i)), 10) }, true
+	case *array.Int32:
+		return func(i int) string { return strconv.FormatInt(int64(a.Value(i)), 10) }, true
+	case *array.Int64:
+		return func(i int) string { return strconv.FormatInt(a.Value(i), 10) }, true
+	case *array.Float32:
+		return func(i int) string { return strconv.FormatFloat(float64(a.Value(i)), 'f', -1, 32) }, true
+	case *array.Float64:
+		return func(i int) string { return strconv.FormatFloat(a.Value(i), 'f', -1, 64) }, true
+	case *array.Null:
+		// A column the decoder could not read is null in every row.
+		return func(int) string { return "" }, true
+	default:
+		return nil, false
+	}
 }
 
 // GetFloatColumn extracts a FITS binary table column safely into a standard Go float64 slice.
@@ -426,6 +461,12 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 	}
 
 	arr := hdu.Batch.Column(idx)
+
+	value, ok := floatReader(arr)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s holds %s", ErrColumnType, colName, arr.DataType())
+	}
+
 	rows := int(hdu.Batch.NumRows())
 	res := make([]float64, rows)
 
@@ -442,27 +483,47 @@ func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 			continue
 		}
 
-		switch a := arr.(type) {
-		case *array.Float64:
-			res[i] = a.Value(i)
-		case *array.Float32:
-			res[i] = float64(a.Value(i))
-		case *array.Int32:
-			res[i] = float64(a.Value(i))
-		case *array.Int64:
-			res[i] = float64(a.Value(i))
-		case *array.String:
-			if val, err := strconv.ParseFloat(a.Value(i), 64); err == nil {
-				res[i] = val
-			} else {
-				res[i] = math.NaN()
-			}
-		default:
-			res[i] = math.NaN()
-		}
+		res[i] = value(i)
 	}
 
 	return res, nil
+}
+
+// floatReader returns how to read one row of arr as a float64, or false for a
+// column that holds no single number per row: a logical one, or a vector.
+//
+// Int16 and Uint8, TFORM I and B, used to fall to a default that wrote NaN,
+// so every row of an ordinary integer column read as missing with no error
+// (#769). A column this cannot convert is now refused rather than read as
+// NaN throughout.
+func floatReader(arr arrow.Array) (func(int) float64, bool) {
+	switch a := arr.(type) {
+	case *array.Float64:
+		return a.Value, true
+	case *array.Float32:
+		return func(i int) float64 { return float64(a.Value(i)) }, true
+	case *array.Uint8:
+		return func(i int) float64 { return float64(a.Value(i)) }, true
+	case *array.Int16:
+		return func(i int) float64 { return float64(a.Value(i)) }, true
+	case *array.Int32:
+		return func(i int) float64 { return float64(a.Value(i)) }, true
+	case *array.Int64:
+		return func(i int) float64 { return float64(a.Value(i)) }, true
+	case *array.String:
+		return func(i int) float64 {
+			if v, err := strconv.ParseFloat(a.Value(i), 64); err == nil {
+				return v
+			}
+
+			return math.NaN()
+		}, true
+	case *array.Null:
+		// A column the decoder could not read is null in every row.
+		return func(int) float64 { return math.NaN() }, true
+	default:
+		return nil, false
+	}
 }
 
 // Type reports that this is a binary table HDU. See [ImageHDU.Type] for why it
