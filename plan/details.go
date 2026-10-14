@@ -3,7 +3,6 @@ package plan
 import (
 	"fmt"
 	"maps"
-	"math"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -232,8 +231,8 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	// Topocentric ICRS RA/Dec (astrometric, corrected for diurnal parallax
 	// but not for precession-nutation or aberration — matches J2000 star
 	// charts, Stellarium default, and GoTo mount coordinate systems).
-	d.RA = angle.Rad(math.Atan2(topoVec.Y, topoVec.X)).Wrap360()
-	d.Dec = angle.Rad(math.Asin(topoVec.Z / topoDist))
+	ra, dec := topoVec.ToSpherical()
+	d.RA, d.Dec = angle.Rad(ra), angle.Rad(dec)
 
 	// AltAz via the full Context pipeline (includes refraction).
 	altaz := ctx.GeocentricToObserved(vec)
@@ -263,11 +262,8 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	// Elongation from the Sun (topocentric).
 	sunVec, err := eph.Position(mb.Provider(), eph.Sun, t)
 	if err == nil {
-		sunTopo := sunVec.Sub(ctx.ObsVec())
-		sunPos := coord.NewICRS(
-			angle.Rad(math.Atan2(sunTopo.Y, sunTopo.X)),
-			angle.Rad(math.Asin(sunTopo.Z/sunTopo.Norm())),
-		)
+		sunRA, sunDec := sunVec.Sub(ctx.ObsVec()).ToSpherical()
+		sunPos := coord.NewICRS(angle.Rad(sunRA), angle.Rad(sunDec))
 		bodyPos := coord.NewICRS(d.RA, d.Dec)
 		d.Elongation = coord.Separation(bodyPos, sunPos)
 	}

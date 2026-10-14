@@ -108,17 +108,28 @@ func FromSpherical(lon, lat float64) Vec3 {
 //
 // For the zero vector, (0, 0) is returned.
 // At the poles (X == Y == 0), lon is defined as 0.
+//
+// The latitude is atan2(Z, √(X²+Y²)), as SOFA's iauC2s computes it, not
+// asin(Z/|v|): asin's slope is unbounded as its argument nears 1, so one ulp
+// in Z/|v| became up to 2.7 mas of latitude within 0.2″ of a pole, an error
+// as large as the distance from the pole itself (#754).
 func (v Vec3) ToSpherical() (lon, lat float64) {
-	n := v.Norm()
-	if n == 0 {
+	if v.X == 0 && v.Y == 0 && v.Z == 0 {
 		return 0, 0
 	}
 
-	lat = math.Asin(v.Z / n)
+	lat = math.Atan2(v.Z, math.Sqrt(v.X*v.X+v.Y*v.Y))
 
 	lon = math.Atan2(v.Y, v.X)
 	if lon < 0 {
 		lon += 2 * math.Pi
+
+		// A longitude less than half an ulp of 2π below zero has no sum
+		// but 2π itself, which the range above excludes: (1, -1e-20, 0)
+		// returned exactly 2π. angle.Wrap2Pi guards the same rounding.
+		if lon >= 2*math.Pi {
+			lon = 0
+		}
 	}
 
 	return lon, lat

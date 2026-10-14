@@ -601,10 +601,9 @@ func ToICRS(pos vector.Vec3) (coord.ICRS, error) {
 		return coord.ICRS{}, ErrZeroVector
 	}
 
-	ra := math.Atan2(pos.Y, pos.X)
-	dec := math.Asin(pos.Z / r)
+	ra, dec := pos.ToSpherical()
 
-	return coord.NewICRS(angle.Rad(ra).Wrap2Pi(), angle.Rad(dec)), nil
+	return coord.NewICRS(angle.Rad(ra), angle.Rad(dec)), nil
 }
 
 // ─── SOFA provider (analytical Sun/Moon) ─────────────────────────────────────
