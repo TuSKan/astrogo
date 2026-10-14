@@ -58,7 +58,7 @@ func manyBodies(t *testing.T, asteroids, comets int, lastLimit *atomic.Int64, re
 // with more candidates than the default of 50 gives its 50 brightest and then
 // an error wrapping resolve.ErrTruncated, and the cut list is not cached
 // (#776). It used to stop at 50 silently, a list that looked complete.
-func TestSearchBrightSaysWhenItIsCut(t *testing.T) { //nolint:paralleltest // remote.SetURL is process-wide
+func TestSearchBrightSaysWhenItIsCut(t *testing.T) {
 	var (
 		lastLimit atomic.Int64
 		requests  atomic.Int32
@@ -106,7 +106,7 @@ func TestSearchBrightSaysWhenItIsCut(t *testing.T) { //nolint:paralleltest // re
 
 // TestSearchBrightKeepsTheCallersLimit: a limit the caller set is what they
 // asked for, so a list that stops there is complete for them.
-func TestSearchBrightKeepsTheCallersLimit(t *testing.T) { //nolint:paralleltest // remote.SetURL is process-wide
+func TestSearchBrightKeepsTheCallersLimit(t *testing.T) {
 	var (
 		lastLimit atomic.Int64
 		requests  atomic.Int32
