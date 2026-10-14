@@ -106,7 +106,7 @@ func (h HEALPix) PixelOf(lon, lat angle.Angle) int64 {
 	if za <= 2.0/3.0 {
 		face, ix, iy = h.equatorialPixel(tt, z)
 	} else {
-		face, ix, iy = h.polarPixel(tt, z, za)
+		face, ix, iy = h.polarPixel(tt, z, za, math.Cos(lat.Radians()))
 	}
 
 	return face*h.nside*h.nside + interleave(ix, iy)
@@ -127,20 +127,30 @@ func (h HEALPix) Center(pixel int64) (lon, lat angle.Angle, err error) {
 
 	var nr, kshift int64
 
-	var z float64
+	// z is the sine of the latitude and sinTheta its cosine, the sine of the
+	// colatitude. Near a pole z rounds to ±1 and its arcsine amplifies the
+	// rounding: at nside 2^29 the first rings' centers came back on the pole
+	// itself, almost five pixel widths from where they are (#778). In the caps
+	// 1 - |z| is known before z is, as nr^2/(3 nside^2), so sinTheta formed
+	// from it keeps every digit, and the latitude is taken from both, as the
+	// HEALPix C++ library's pix2loc does.
+	var z, sinTheta float64
 
 	switch {
 	case jr < h.nside: // north polar cap
 		nr = jr
-		z = 1 - float64(nr)*float64(nr)/(3*float64(h.nside)*float64(h.nside))
+		tmp := float64(nr) * float64(nr) / (3 * float64(h.nside) * float64(h.nside))
+		z, sinTheta = 1-tmp, math.Sqrt(tmp*(2-tmp))
 		kshift = 0
 	case jr > 3*h.nside: // south polar cap
 		nr = 4*h.nside - jr
-		z = float64(nr)*float64(nr)/(3*float64(h.nside)*float64(h.nside)) - 1
+		tmp := float64(nr) * float64(nr) / (3 * float64(h.nside) * float64(h.nside))
+		z, sinTheta = tmp-1, math.Sqrt(tmp*(2-tmp))
 		kshift = 0
 	default: // equatorial belt
 		nr = h.nside
 		z = float64(2*h.nside-jr) * 2 / (3 * float64(h.nside))
+		sinTheta = math.Sqrt((1 - z) * (1 + z))
 		kshift = (jr - h.nside) & 1
 	}
 
@@ -155,18 +165,24 @@ func (h HEALPix) Center(pixel int64) (lon, lat angle.Angle, err error) {
 
 	phi := (float64(jp) - float64(kshift+1)*0.5) * (math.Pi / 2 / float64(nr))
 
-	return angle.Rad(phi).Wrap2Pi(), angle.Rad(math.Asin(math.Max(-1, math.Min(1, z)))), nil
+	return angle.Rad(phi).Wrap2Pi(), angle.Rad(math.Atan2(z, sinTheta)), nil
 }
 
 // polarPixel handles the polar caps, |z| > 2/3, where the boundaries curve.
-func (h HEALPix) polarPixel(tt, z, za float64) (face, ix, iy int64) {
+//
+// sinTheta is the cosine of the latitude. The ring coordinate is
+// nside*sqrt(3(1-|z|)), and it is computed as nside*sinTheta/sqrt((1+|z|)/3),
+// the same quantity, because 1 - |z| cancels to nothing within milliarcseconds
+// of a pole while the cosine keeps its precision there. The HEALPix C++
+// library does the same in loc2pix.
+func (h HEALPix) polarPixel(tt, z, za, sinTheta float64) (face, ix, iy int64) {
 	ntt := int64(tt)
 	if ntt >= 4 {
 		ntt = 3
 	}
 
 	tp := tt - float64(ntt)
-	tmp := float64(h.nside) * math.Sqrt(3*(1-za))
+	tmp := float64(h.nside) * sinTheta / math.Sqrt((1+za)/3)
 
 	jp := int64(tp * tmp)
 	jm := int64((1 - tp) * tmp)
