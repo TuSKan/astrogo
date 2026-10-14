@@ -12,6 +12,10 @@ var (
 	ErrUninitBatch = errors.New("fits: uninitialized bintable batch")
 	// ErrColumnNotFound indicates a requested column does not exist.
 	ErrColumnNotFound = errors.New("fits: column not found")
+	// ErrColumnType indicates a binary-table column a scalar getter cannot
+	// convert: a logical column read as numbers, or a vector column, which
+	// holds several values per row, read as one.
+	ErrColumnType = errors.New("fits: column type cannot be read this way")
 
 	// ErrDatasumMismatch indicates a DATASUM verification failure.
 	ErrDatasumMismatch = errors.New("fits: DATASUM mismatch")
