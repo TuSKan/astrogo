@@ -95,9 +95,11 @@ func Offset(from *Geodetic, bearing angle.Angle, distance unit.Length) (*Geodeti
 		return nil, ErrNilGeodetic
 	}
 
+	// ErrNotFinite, as NewGeodetic gives below for a non-finite bearing. This
+	// wrapped ErrNilGeodetic, so a NaN distance read as a missing start (#758).
 	distanceM := distance.Meters()
 	if math.IsNaN(distanceM) || math.IsInf(distanceM, 0) {
-		return nil, fmt.Errorf("%w: distance %g m", ErrNilGeodetic, distanceM)
+		return nil, fmt.Errorf("%w: distance %g m", ErrNotFinite, distanceM)
 	}
 
 	d := distanceM / meanEarthRadiusM
