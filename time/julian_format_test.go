@@ -59,3 +59,39 @@ func TestFormattingRoundsToTheSecond(t *testing.T) {
 		t.Errorf("12:29:59.7 on -500 March 1 formats as %s, want -0500-03-01 12:30:00", got)
 	}
 }
+
+// TestFormattersReadTheUTCClock holds both formatters to one clock for one
+// instant, whichever scale holds it (#766). Format read UTC within years
+// 0–9999, through ToGo, and t's own scale outside them; FormatJulian always
+// read t's own. A TT instant in 585 BC printed 5h06m after the same instant
+// held as UTC, and in 2026 FormatJulian put it 1 min 9 s after Format.
+//
+// A quarter second past the minute keeps the comparison off a rounding edge:
+// the standard library truncates where the manual paths round, and both read
+// 12:00:00 there.
+func TestFormattersReadTheUTCClock(t *testing.T) {
+	t.Parallel()
+
+	const layout = "2006-01-02 15:04:05 MST"
+
+	for _, y := range []int{-584, 1000, 2026, 10001} {
+		utc := time.Date(y, 5, 28, 12, 0, 0, 250_000_000, time.LocationUTC)
+
+		for _, held := range []time.Time{utc.TT(), utc.TDB()} {
+			if got, want := held.Format(layout), utc.Format(layout); got != want {
+				t.Errorf("year %d held as %s: Format = %q, want %q", y, held.Scale(), got, want)
+			}
+
+			if got, want := held.FormatJulian(layout), utc.FormatJulian(layout); got != want {
+				t.Errorf("year %d held as %s: FormatJulian = %q, want %q", y, held.Scale(), got, want)
+			}
+		}
+	}
+
+	// The two formatters differ in calendar, never in clock: in 2026 the
+	// Julian date is thirteen days behind and the time of day is the same.
+	tt := time.Date(2026, 5, 28, 12, 0, 0, 250_000_000, time.LocationUTC).TT()
+	if g, j := tt.Format("15:04:05"), tt.FormatJulian("15:04:05"); g != j || g != "12:00:00" {
+		t.Errorf("TT instant at 12:00:00.25 UTC: Format clock %s, FormatJulian clock %s; want both 12:00:00", g, j)
+	}
+}
