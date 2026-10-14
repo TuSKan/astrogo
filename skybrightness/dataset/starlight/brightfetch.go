@@ -12,6 +12,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -239,39 +240,30 @@ func hipparcosPosition(index map[string]int, row []string) (ra, dec angle.Angle,
 // A source with no flux is excluded: it exists in the catalogue but contributes
 // nothing to the map, so for the question being asked — is this star's light
 // already counted? — it is not a counterpart.
+//
+// # Why the magnitude range is split
+//
+// The archive caps a synchronous answer: 50,000 rows for an anonymous query,
+// measured on 2026-10-14 against 177,426 sources brighter than G = 9. In CSV a
+// capped answer cannot be told from a complete one, and taken whole it matched
+// the Hipparcos stars against 28% of their counterparts and reported some
+// 10,900 missing where the answer is about 74, every one of whose light
+// AddBrightStars would then have counted twice (#772). So the answer is read
+// as a VOTable, whose QUERY_STATUS says OVERFLOW when the cap was hit, and a
+// capped interval is halved and asked again.
 func fetchGaiaBright(ctx context.Context, faintestG float64) ([]angle.Angle, []angle.Angle, error) {
 	client := aggregationClient(remote.GaiaTAP)
 
 	defer func() { _ = client.Close() }()
 
-	adql := fmt.Sprintf("SELECT ra, dec FROM gaiadr3.gaia_source "+
-		"WHERE phot_g_mean_mag < %g AND phot_g_mean_flux > 0", faintestG)
-
-	body, err := client.PostForm(ctx, remote.GaiaTAP, "", tapForm(adql))
-	if err != nil {
-		return nil, nil, fmt.Errorf("starlight: bright gaia query: %w", err)
+	page := func(ctx context.Context, lo, hi float64) ([]angle.Angle, []angle.Angle, bool, error) {
+		return fetchGaiaBrightPage(ctx, client, lo, hi)
 	}
 
-	defer func() { _ = body.Close() }()
+	var ra, dec []angle.Angle
 
-	rows, index, err := readTAPCSV(body)
-	if err != nil {
+	if err := collectGaiaBright(ctx, page, gaiaBrightestG, faintestG, 0, &ra, &dec); err != nil {
 		return nil, nil, err
-	}
-
-	ra := make([]angle.Angle, 0, len(rows))
-	dec := make([]angle.Angle, 0, len(rows))
-
-	for _, row := range rows {
-		a, okA := numField(index, row, "ra")
-		d, okD := numField(index, row, "dec")
-
-		if !okA || !okD {
-			continue
-		}
-
-		ra = append(ra, angle.Deg(a))
-		dec = append(dec, angle.Deg(d))
 	}
 
 	if len(ra) == 0 {
@@ -279,6 +271,104 @@ func fetchGaiaBright(ctx context.Context, faintestG float64) ([]angle.Angle, []a
 	}
 
 	return ra, dec, nil
+}
+
+// gaiaBrightestG is the lower edge of the first magnitude interval asked for,
+// brighter than any source in the catalogue, so the half-open intervals below
+// it cover every source to the faint limit.
+const gaiaBrightestG = -10.0
+
+// maxGaiaBrightSplits bounds the halving. Each halving at least halves the
+// interval, and the whole range is under twenty magnitudes, so a limit this
+// deep is only reached by a cap too small for any interval to fit: an answer
+// the archive will never complete, refused rather than returned partial.
+const maxGaiaBrightSplits = 24
+
+// gaiaBrightPage asks for the sources with lo <= G < hi, and reports whether
+// the archive truncated the answer.
+type gaiaBrightPage func(ctx context.Context, lo, hi float64) (ra, dec []angle.Angle, truncated bool, err error)
+
+// collectGaiaBright gathers the sources with lo <= G < hi through page,
+// halving any interval whose answer came back truncated. The intervals are
+// half-open, so a source on a boundary is counted once.
+func collectGaiaBright(ctx context.Context, page gaiaBrightPage, lo, hi float64, depth int, ra, dec *[]angle.Angle) error {
+	r, d, truncated, err := page(ctx, lo, hi)
+	if err != nil {
+		return err
+	}
+
+	if !truncated {
+		*ra = append(*ra, r...)
+		*dec = append(*dec, d...)
+
+		return nil
+	}
+
+	if depth >= maxGaiaBrightSplits {
+		return fmt.Errorf("%w: the Gaia archive truncated G in [%g, %g) after %d halvings",
+			ErrBrightStar, lo, hi, depth)
+	}
+
+	mid := lo + (hi-lo)/2
+
+	if err := collectGaiaBright(ctx, page, lo, mid, depth+1, ra, dec); err != nil {
+		return err
+	}
+
+	return collectGaiaBright(ctx, page, mid, hi, depth+1, ra, dec)
+}
+
+// fetchGaiaBrightPage is one [gaiaBrightPage] against the archive, read as a
+// VOTable so a capped answer says so.
+func fetchGaiaBrightPage(ctx context.Context, client *remote.Client, lo, hi float64) ([]angle.Angle, []angle.Angle, bool, error) {
+	adql := fmt.Sprintf("SELECT ra, dec FROM gaiadr3.gaia_source "+
+		"WHERE phot_g_mean_mag >= %s AND phot_g_mean_mag < %s AND phot_g_mean_flux > 0",
+		strconv.FormatFloat(lo, 'f', -1, 64), strconv.FormatFloat(hi, 'f', -1, 64))
+
+	// votable_plain is the archive's TABLEDATA serialization, the one the
+	// VOTable reader decodes; plain votable comes back as BINARY2.
+	form := tapForm(adql)
+	form.Set("FORMAT", "votable_plain")
+
+	body, err := client.PostForm(ctx, remote.GaiaTAP, "", form)
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("starlight: bright gaia query: %w", err)
+	}
+
+	defer func() { _ = body.Close() }()
+
+	table, err := votable.Read(body)
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("%w: bright gaia answer: %w", ErrGaiaResponse, err)
+	}
+
+	raCol, okRA := table.Column("ra")
+	decCol, okDec := table.Column("dec")
+
+	if !okRA || !okDec {
+		return nil, nil, false, fmt.Errorf("%w: bright gaia answer has no ra and dec columns", ErrGaiaResponse)
+	}
+
+	ra := make([]angle.Angle, 0, len(table.Rows))
+	dec := make([]angle.Angle, 0, len(table.Rows))
+
+	for _, row := range table.Rows {
+		if raCol >= len(row) || decCol >= len(row) {
+			continue
+		}
+
+		a, errA := strconv.ParseFloat(strings.TrimSpace(row[raCol]), 64)
+		d, errD := strconv.ParseFloat(strings.TrimSpace(row[decCol]), 64)
+
+		if errA != nil || errD != nil || math.IsNaN(a) || math.IsNaN(d) {
+			continue
+		}
+
+		ra = append(ra, angle.Deg(a))
+		dec = append(dec, angle.Deg(d))
+	}
+
+	return ra, dec, table.Truncated, nil
 }
 
 // tapForm builds the POST body every IVOA TAP sync endpoint takes.

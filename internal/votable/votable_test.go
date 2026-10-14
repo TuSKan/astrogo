@@ -277,3 +277,44 @@ func TestARealVOTableIsStillRead(t *testing.T) {
 			len(table.Rows), table.Value(table.Rows[0], "ra"))
 	}
 }
+
+// TestReadReportsOverflowAfterTheTable reads a truncated answer laid out as a
+// TAP service writes one: QUERY_STATUS OK before the table and OVERFLOW after
+// it, in the same RESOURCE. This is the end of the Gaia archive's answer to a
+// query it capped at 50,000 of 177,426 rows (#773). Read stopped at the first
+// </TABLEDATA> and never saw the OVERFLOW, so Truncated was false on exactly
+// the answers it exists to flag; TestReadReportsOverflow put the INFO before
+// the table, where no service does, and passed.
+//
+// A later RESOURCE still contributes nothing: its table is not the result.
+func TestReadReportsOverflowAfterTheTable(t *testing.T) {
+	t.Parallel()
+
+	const doc = `<VOTABLE version="1.4"><RESOURCE type="results">
+		<INFO name="QUERY_STATUS" value="OK"/>
+		<TABLE><FIELD name="ra" datatype="double"/><FIELD name="dec" datatype="double"/>
+		<DATA><TABLEDATA>
+			<TR><TD>83.45</TD><TD>-19.43</TD></TR>
+			<TR><TD>83.43</TD><TD>-18.68</TD></TR>
+		</TABLEDATA></DATA></TABLE>
+		<INFO name="QUERY_STATUS" value="OVERFLOW"/>
+	</RESOURCE>
+	<RESOURCE type="meta">
+		<TABLE><FIELD name="service" datatype="char"/><DATA><TABLEDATA>
+			<TR><TD>datalink</TD></TR>
+		</TABLEDATA></DATA></TABLE>
+	</RESOURCE></VOTABLE>`
+
+	table, err := votable.Read(strings.NewReader(doc))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+
+	if !table.Truncated {
+		t.Error("an OVERFLOW written after the table did not set Truncated")
+	}
+
+	if len(table.Rows) != 2 || len(table.Fields) != 2 {
+		t.Errorf("got %d rows and fields %v, want the result's 2 rows and [ra dec]", len(table.Rows), table.Fields)
+	}
+}
