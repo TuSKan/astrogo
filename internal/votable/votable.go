@@ -147,6 +147,14 @@ func Read(r io.Reader) (*Table, error) {
 		cell     strings.Builder
 		status   string
 		statusMu strings.Builder
+
+		// depth counts the RESOURCEs open around the current element, and
+		// tableDepth is depth where the first table's data ended, -1 until
+		// it has. Reading continues to the end of that RESOURCE, because a
+		// TAP service writes QUERY_STATUS OVERFLOW after the table, not
+		// before it (#773).
+		depth      int
+		tableDepth = -1
 	)
 
 	for {
@@ -177,6 +185,9 @@ func Read(r io.Reader) (*Table, error) {
 			}
 
 			switch name {
+			case "resource":
+				depth++
+
 			case "info":
 				// QUERY_STATUS carries the outcome in an attribute and the
 				// detail, when there is one, in the element's own text.
@@ -187,9 +198,9 @@ func Read(r io.Reader) (*Table, error) {
 				}
 
 			case "field":
-				// Only before any rows: a second table's fields must not be
-				// appended to the first table's header.
-				if !gotRows {
+				// Only before any rows, and only the first table's: a second
+				// table's fields must not be appended to the first's header.
+				if !gotRows && tableDepth < 0 {
 					name := attr(t, "name")
 					if name == "" {
 						name = attr(t, "ID")
@@ -199,7 +210,11 @@ func Read(r io.Reader) (*Table, error) {
 				}
 
 			case "tabledata":
-				inData = true
+				// Only the first table: a later one belongs to another
+				// RESOURCE and is not the result.
+				if tableDepth < 0 {
+					inData = true
+				}
 
 			case "tr":
 				if inData {
@@ -241,8 +256,18 @@ func Read(r io.Reader) (*Table, error) {
 				if inData {
 					// The first table with rows is the result; anything after
 					// it describes a service rather than answering a query.
+					// The rest of its own RESOURCE is still read, for the
+					// QUERY_STATUS that follows the table.
+					inData = false
+					tableDepth = depth
+				}
+
+			case "resource":
+				if tableDepth >= 0 && depth == tableDepth {
 					return finish(table, status, statusMu.String())
 				}
+
+				depth--
 			}
 		}
 	}
