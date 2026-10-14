@@ -305,18 +305,27 @@ func parseSpiceDate(s string) (float64, error) {
 	return jd, nil
 }
 
-// leapSecondsAt returns DELTA_AT — the accumulated leap seconds — at a Julian
-// Date, using the kernel's own table.
+// leapSecondsAt returns DELTA_AT — the accumulated leap seconds — at the UTC
+// Julian Date jd1 + jd2, using the kernel's own table.
 //
 // The interval is half-open: an entry takes effect at its own instant and
 // holds until the next. That matches IERS, which reports 36 at
 // 2016-12-31 23:59:60 and 37 at 2017-01-01 00:00:00; time's
 // TestLeapSecondBoundaryConvention pins the same rule for the built-in table.
-func (r *Reader) leapSecondsAt(jdTDB float64) float64 {
+//
+// The date is UTC because the table is: every entry is midnight UTC
+// (parseSpiceDate). It used to be looked up 69.184 s late, as if the table
+// were in TDB, so the last 69 s of every day ending in a leap second took the
+// new count a second early and ET came out a second late (#756).
+//
+// The two parts are compared without being summed. A summed modern Julian
+// Date has a 40 µs ULP, enough to round the end of 23:59:60 onto the
+// following midnight; the difference from an entry, taken first, is exact.
+func (r *Reader) leapSecondsAt(jd1, jd2 float64) float64 {
 	lastN := 0.0
 
 	for _, d := range r.DeltaAt {
-		if jdTDB < d.JD {
+		if (jd1-d.JD)+jd2 < 0 {
 			break
 		}
 
@@ -429,9 +438,7 @@ func UTCToET(t time.Time, l *Reader) float64 {
 	g := utc.ToGo()
 	secUTC := float64(g.Unix()-j2000Unix) + float64(g.Nanosecond())/1e9
 
-	// The leap-second lookup only needs to land in the right interval, so the
-	// summed Julian Date is precise enough for it.
-	secTAI := secUTC + l.leapSecondsAt(jdUTC+(69.184/secondsPerDay))
+	secTAI := secUTC + l.leapSecondsAt(d1, d2)
 
 	m := l.M0 + l.M1*secTAI
 	e := m + l.EB*math.Sin(m)
