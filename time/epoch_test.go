@@ -1,6 +1,7 @@
 package time_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -39,6 +40,51 @@ func TestTimeDayOfYear(t *testing.T) {
 
 	dec31 := time.Date(2025, 12, 31, 0, 0, 0, 0, time.LocationUTC)
 	testutil.AssertNear(t, "DayOfYear on Dec 31 (non-leap year)", dec31.DayOfYear(), 365.0, 1e-9)
+}
+
+// TestDayOfYearIsInTheYearYearReads holds DayOfYear to the date Year, Month
+// and Day describe, whatever the display location (#760).
+//
+// It measured from Jan 1 midnight in the display location while Year ignores
+// it, so near the new year the two named different dates: 01:00 UTC on
+// 1 January 2026 shown in São Paulo came out 0.917, below the first day, and
+// 23:00 UTC on 31 December shown in Tokyo 366.33 in a 365-day year. Mid-year
+// it was off by the zone's offset.
+func TestDayOfYearIsInTheYearYearReads(t *testing.T) {
+	t.Parallel()
+
+	zones := []string{"UTC", "America/Sao_Paulo", "Asia/Tokyo", "Asia/Kolkata", "Pacific/Kiritimati", "Pacific/Pago_Pago"}
+
+	instants := []time.GoTime{
+		time.GoDate(2026, time.January, 1, 1, 0, 0, 0, time.LocationUTC),
+		time.GoDate(2026, time.January, 1, 23, 30, 0, 0, time.LocationUTC),
+		time.GoDate(2026, time.July, 1, 12, 0, 0, 0, time.LocationUTC),
+		time.GoDate(2026, time.December, 31, 23, 0, 0, 0, time.LocationUTC),
+		time.GoDate(2028, time.December, 31, 20, 0, 0, 0, time.LocationUTC),
+	}
+
+	for _, zone := range zones {
+		loc, err := time.LoadLocation(zone)
+		if err != nil {
+			t.Fatalf("LoadLocation(%q): %v", zone, err)
+		}
+
+		for _, g := range instants {
+			at := time.FromGo(g.In(loc))
+
+			// The UTC calendar is the one Year reads for a UTC Time.
+			want := float64(g.YearDay()) + float64(g.Hour()*3600+g.Minute()*60+g.Second())/86400
+
+			if at.Year() != g.Year() {
+				t.Fatalf("%s in %s: Year() = %d, want the UTC year %d", g.Format("2006-01-02 15:04"), zone, at.Year(), g.Year())
+			}
+
+			if got := at.DayOfYear(); math.Abs(got-want) > 1e-9 {
+				t.Errorf("%s in %s: DayOfYear() = %.6f, want %.6f, the day of %d it falls on",
+					g.Format("2006-01-02 15:04"), zone, got, want, at.Year())
+			}
+		}
+	}
 }
 
 func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
