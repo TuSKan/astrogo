@@ -153,7 +153,8 @@
 //
 // One path is beyond both. The decoder's own Open allocates each group's
 // local heap from its declared size before returning, so a file corrupted
-// there can still exhaust memory; only the decoder can bound that. Across
+// there can still exhaust memory; only the decoder can bound that, and it is
+// reported as https://github.com/scigolib/hdf5/issues/68. Across
 // 6,000 single- to four-byte corruptions of the synthetic fixture's
 // metadata it was 2; every other was read or refused as an error.
 //
