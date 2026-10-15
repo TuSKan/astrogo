@@ -29,6 +29,13 @@ var (
 	// decode failure on a variable the file does have.
 	ErrVariableNotFound = errors.New("cams: variable not found")
 
+	// ErrMalformed is returned for a file this reader cannot decode safely:
+	// a dataset that declares more values than the file could hold, or a
+	// structure that makes the HDF5 decoder fail outright. Either is
+	// reported as an error rather than allowed to end the caller's process
+	// (#794).
+	ErrMalformed = errors.New("cams: malformed file")
+
 	// ErrUnexpectedAttributeType is returned when a known attribute
 	// (_FillValue, missing_value, _Netcdf4Dimid, _Netcdf4Coordinates)
 	// decodes to a Go type this reader does not know how to interpret —

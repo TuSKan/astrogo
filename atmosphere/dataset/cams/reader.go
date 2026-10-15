@@ -2,12 +2,16 @@ package cams
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"math"
 	"os"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/scigolib/hdf5"
@@ -25,6 +29,10 @@ type File struct {
 	// scratchPath is the temp file Open staged bucket/key's content into
 	// (see Open's doc comment for why); removed by Close.
 	scratchPath string
+
+	// size is the file's length in bytes, which bounds how many values any
+	// of its datasets can hold; see checkExtent.
+	size uint64
 
 	// dims maps a dimension name (longitude/latitude/level/time) to its
 	// length, read once at Open time from the file's dimension-scale
@@ -73,7 +81,8 @@ func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
 
 	tmpPath := tmp.Name()
 
-	if _, err := io.Copy(tmp, r); err != nil {
+	size, err := io.Copy(tmp, r)
+	if err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 
@@ -86,24 +95,30 @@ func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
 		return nil, fmt.Errorf("cams: %s: close scratch file: %w", key, err)
 	}
 
-	hf, err := hdf5.Open(tmpPath)
-	if err != nil {
+	var hf *hdf5.File
+
+	if err := decode(key, "open", func() (err error) {
+		hf, err = hdf5.Open(tmpPath)
+
+		return err //nolint:wrapcheck // decode wraps it with the key and the operation
+	}); err != nil {
 		_ = os.Remove(tmpPath)
 
-		return nil, fmt.Errorf("cams: open %s: %w", key, err)
+		return nil, err
 	}
 
 	cf := &File{
 		hf:          hf,
 		key:         key,
 		scratchPath: tmpPath,
+		size:        nonNegUint64(int(size)),
 		dims:        make(map[string]int),
 		dimNameByID: make(map[int32]string),
 		vars:        make(map[string]*hdf5.Dataset),
 	}
 
-	if err := cf.index(); err != nil {
-		_ = hf.Close()
+	if err := decode(key, "index", cf.index); err != nil {
+		_ = decode(key, "close", hf.Close)
 		_ = os.Remove(tmpPath)
 
 		return nil, err
@@ -112,13 +127,94 @@ func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
 	return cf, nil
 }
 
+// decode runs one call into the HDF5 decoder, turning a panic inside it into
+// an error wrapping [ErrMalformed] (#794).
+//
+// It cannot catch everything. A failed allocation is a fatal error in Go, not
+// a panic, and no deferred recover sees it; that is what checkExtent is for,
+// before any read that sizes a buffer from the file. This catches the rest:
+// the index or nil dereference a malformed structure leads a decoder into.
+func decode(key, op string, fn func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %s: %s: the decoder failed: %v", ErrMalformed, key, op, r)
+		}
+	}()
+
+	if err := fn(); err != nil {
+		return fmt.Errorf("cams: %s: %s: %w", key, op, err)
+	}
+
+	return nil
+}
+
+// deflateMaxRatio is the most a DEFLATE stream can expand, zlib's documented
+// limit: RFC 1951's longest match, 258 bytes, can be coded in as few as two
+// bits, so a byte of compressed data inflates to at most 1032. A chunked
+// dataset compressed that way decompresses to no more than this many times
+// the bytes of the file holding it.
+const deflateMaxRatio = 1032
+
+// datasetShape matches the dataspace and the chunk shape in the description
+// the decoder gives of a dataset, Dataset.Info: "1D array [n]",
+// "2D array [n x m]", "3D array [a b c]", and "chunked (chunks=[a b c])".
+var (
+	datasetShape = regexp.MustCompile(`\d+D array \[([0-9 x]*)\]`)
+	chunkShape   = regexp.MustCompile(`chunked \(chunks=\[([0-9 ]*)\]\)`)
+)
+
+// whole is checkExtent's n for a read of the entire dataset. No read asks for
+// this many values, so it cannot be mistaken for a real count.
+const whole = math.MaxUint64
+
+// declaredValues is the number of values the decoder's description of a
+// dataset declares, and whether the description could be read at all.
+func declaredValues(info string) (uint64, bool) {
+	switch m := datasetShape.FindStringSubmatch(info); {
+	case m != nil:
+		return shapeProduct(m[1]), true
+	case strings.Contains(info, ", scalar, "):
+		return 1, true
+	case strings.Contains(info, ", null, "):
+		return 0, true
+	default:
+		return 0, false
+	}
+}
+
+// shapeProduct is the number of values in a shape the decoder printed, its
+// dimensions separated by spaces or " x ", saturating rather than wrapping.
+func shapeProduct(dims string) uint64 {
+	n := uint64(1)
+
+	for f := range strings.FieldsSeq(strings.ReplaceAll(dims, "x", " ")) {
+		d, err := strconv.ParseUint(f, 10, 64)
+		if err != nil {
+			return math.MaxUint64
+		}
+
+		n = saturatingMul(n, d)
+	}
+
+	return n
+}
+
+// saturatingMul is a·b, or the largest uint64 where that overflows.
+func saturatingMul(a, b uint64) uint64 {
+	if a != 0 && b > math.MaxUint64/a {
+		return math.MaxUint64
+	}
+
+	return a * b
+}
+
 // Close closes the underlying file and removes Open's scratch temp
 // file. Safe to call once; a File must not be used afterward.
 func (cf *File) Close() error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
 
-	err := cf.hf.Close()
+	err := decode(cf.key, "close", cf.hf.Close)
 
 	if cf.scratchPath != "" {
 		if rmErr := os.Remove(cf.scratchPath); rmErr != nil && err == nil {
@@ -162,12 +258,76 @@ func (cf *File) Var(name string) (*Var, error) {
 		return nil, fmt.Errorf("%w: %q", ErrVariableNotFound, name)
 	}
 
-	v, err := cf.newVar(name, ds)
-	if err != nil {
+	var v *Var
+
+	if err := decode(cf.key, "variable "+name, func() (err error) {
+		v, err = cf.newVar(name, ds)
+
+		return err
+	}); err != nil {
 		return nil, err
 	}
 
 	return v, nil
+}
+
+// checkExtent refuses a read of n values from ds that the file could not
+// hold, before the decoder allocates a buffer for it.
+//
+// The decoder sizes its buffer from what the file declares: a dataset's
+// dataspace for Read, the chunk shape for a chunked one. It never checks that
+// against the file, and one corrupted byte made it ask for 8.8 TB, which ended
+// the process with a fatal error no recover could catch (#794). Every value
+// takes at least a byte, so contiguous or compact data cannot have more
+// values than the file has bytes, and chunked data, which is compressed,
+// cannot have more than deflateMaxRatio times that. A real CAMS file is far
+// inside both: a 0.4° global plane is 406,000 values in a file of tens of
+// megabytes.
+//
+// whole, passed as n, asks about the entire dataset, as Read reads it, whose
+// size is taken from its declared dataspace.
+//
+// # Why this reads Dataset.Info's string
+//
+// This package does not take shape from that string: it is the decoder's own
+// format, not a convention, and shape comes from NetCDF-4 metadata (see the
+// package doc). Here it is the only place the declared dataspace and chunk
+// shape can be seen before a read sizes a buffer from them, so it is read as
+// a bound, and the bound fails closed: a description it cannot read refuses
+// the read rather than skip the check, and TestCheckExtentReadsTheDecoders
+// Description pins the format against the version in go.mod.
+func (cf *File) checkExtent(ds *hdf5.Dataset, n uint64) error {
+	info, err := ds.Info()
+	if err != nil {
+		return fmt.Errorf("%w: %s: %s: %w", ErrMalformed, cf.key, ds.Name(), err)
+	}
+
+	limit := cf.size
+
+	if chunked := chunkShape.FindStringSubmatch(info); chunked != nil {
+		limit = saturatingMul(limit, deflateMaxRatio)
+
+		if chunk := shapeProduct(chunked[1]); chunk > limit {
+			return fmt.Errorf("%w: %s: %s declares chunks of %d values, more than a %d-byte file could hold",
+				ErrMalformed, cf.key, ds.Name(), chunk, cf.size)
+		}
+	}
+
+	if n == whole {
+		declared, ok := declaredValues(info)
+		if !ok {
+			return fmt.Errorf("%w: %s: %s: cannot read its declared shape from %q", ErrMalformed, cf.key, ds.Name(), info)
+		}
+
+		n = declared
+	}
+
+	if n > limit {
+		return fmt.Errorf("%w: %s: %s declares %d values, more than a %d-byte file could hold",
+			ErrMalformed, cf.key, ds.Name(), n, cf.size)
+	}
+
+	return nil
 }
 
 // index walks the file once, classifying every dataset as either a
@@ -204,6 +364,11 @@ func (cf *File) index() error {
 
 		if !isDim {
 			cf.vars[ds.Name()] = ds
+			return
+		}
+
+		if err := cf.checkExtent(ds, whole); err != nil {
+			walkErr = err
 			return
 		}
 
@@ -312,7 +477,7 @@ func isDimensionScale(ds *hdf5.Dataset) (bool, error) {
 		return false, nil
 	}
 
-	v, err := ds.ReadAttribute("CLASS")
+	v, err := readAttribute(ds, "CLASS")
 	if err != nil {
 		return false, fmt.Errorf("cams: read attribute %q: %w", "CLASS", err)
 	}
@@ -377,7 +542,7 @@ func readInt32Attribute(ds *hdf5.Dataset, name string) (value int32, ok bool, er
 		return 0, false, nil
 	}
 
-	v, err := ds.ReadAttribute(name)
+	v, err := readAttribute(ds, name)
 	if err != nil {
 		return 0, false, fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
@@ -409,7 +574,7 @@ func readFloat64Attribute(ds *hdf5.Dataset, name string) (value float64, ok bool
 		return 0, false, nil
 	}
 
-	v, err := ds.ReadAttribute(name)
+	v, err := readAttribute(ds, name)
 	if err != nil {
 		return 0, false, fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
@@ -440,7 +605,7 @@ func readStringAttribute(ds *hdf5.Dataset, name string) (string, error) {
 		return "", nil
 	}
 
-	v, err := ds.ReadAttribute(name)
+	v, err := readAttribute(ds, name)
 	if err != nil {
 		return "", fmt.Errorf("cams: read attribute %q: %w", name, err)
 	}
@@ -453,9 +618,62 @@ func readStringAttribute(ds *hdf5.Dataset, name string) (string, error) {
 	return s, nil
 }
 
+// readAttribute reads ds's attribute name, after checking that the values it
+// declares are in the bytes it carries (#794).
+//
+// An attribute's value is stored inline, in its own header message, so its
+// declared count times its element size can be no more than the bytes that
+// message holds. The decoder checks that for numbers (CVE-2025-6269) but not
+// for strings, whose slice it allocates from the declared count before
+// looking: one corrupted byte made it ask for 16.8 TB, a fatal error no
+// recover can catch. The count is a saturating product of the dimensions
+// rather than the decoder's own, which wraps.
+func readAttribute(ds *hdf5.Dataset, name string) (any, error) {
+	attrs, err := ds.Attributes()
+	if err != nil {
+		return nil, fmt.Errorf("read attributes: %w", err)
+	}
+
+	for _, a := range attrs {
+		if a.Name != name {
+			continue
+		}
+
+		if a.Dataspace == nil || a.Datatype == nil {
+			return nil, fmt.Errorf("%w: attribute %q has no dataspace or datatype", ErrMalformed, name)
+		}
+
+		n := a.Dataspace.TotalElements() // scalar 1, null 0
+		if len(a.Dataspace.Dimensions) > 0 {
+			n = 1
+			for _, d := range a.Dataspace.Dimensions {
+				n = saturatingMul(n, d)
+			}
+		}
+
+		if need := saturatingMul(n, uint64(max(a.Datatype.Size, 1))); need > uint64(len(a.Data)) {
+			return nil, fmt.Errorf("%w: attribute %q declares %d values, %d bytes, in a %d-byte message",
+				ErrMalformed, name, n, need, len(a.Data))
+		}
+
+		v, err := a.ReadValue()
+		if err != nil {
+			return nil, fmt.Errorf("decode attribute %q: %w", name, err)
+		}
+
+		return v, nil
+	}
+
+	return nil, fmt.Errorf("%w: attribute %q", errAttributeAbsent, name)
+}
+
+// errAttributeAbsent is readAttribute's error for an attribute ds does not
+// carry. The callers that allow absence ask attributePresent first.
+var errAttributeAbsent = errors.New("no such attribute")
+
 // readInt32SliceAttribute reads name as a []int32.
 func readInt32SliceAttribute(ds *hdf5.Dataset, name string) ([]int32, error) {
-	v, err := ds.ReadAttribute(name)
+	v, err := readAttribute(ds, name)
 	if err != nil {
 		return nil, fmt.Errorf("attribute %q: %w", name, err)
 	}
@@ -556,12 +774,27 @@ func (v *Var) ReadPlane(timeIdx, level int) ([]float64, error) {
 		}
 	}
 
+	values := uint64(1)
+	for _, c := range count {
+		values = saturatingMul(values, c)
+	}
+
+	var raw any
+
 	v.file.mu.Lock()
-	raw, err := v.ds.ReadSlice(start, count)
+
+	err := v.file.checkExtent(v.ds, values)
+	if err == nil {
+		err = decode(v.file.key, fmt.Sprintf("%s.ReadPlane(time=%d,level=%d)", v.name, timeIdx, level), func() (err error) {
+			raw, err = v.ds.ReadSlice(start, count)
+
+			return err //nolint:wrapcheck // decode wraps it with the key and the operation
+		})
+	}
 	v.file.mu.Unlock()
 
 	if err != nil {
-		return nil, fmt.Errorf("cams: %s.ReadPlane(time=%d,level=%d): %w", v.name, timeIdx, level, err)
+		return nil, err
 	}
 
 	vals, ok := raw.([]float64)

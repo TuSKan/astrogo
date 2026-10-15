@@ -1,0 +1,176 @@
+package cams
+
+import (
+	"context"
+	"errors"
+	"io"
+	"math"
+	"strings"
+	"testing"
+
+	"github.com/scigolib/hdf5"
+
+	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
+)
+
+// A malformed file is an error, never the end of the caller's process (#794).
+//
+// Each case is one byte of synthFixture's 426,636-byte file changed, found by
+// overwriting random bytes of its metadata and reading every variant through
+// Open, Var and ReadPlane. Before the fix the first three were a fatal "out of
+// memory" — the decoder sized a buffer from what the file declared, 8.8 TB in
+// the first — which no recover can catch, and the fourth a panic inside the
+// decoder's own Open.
+
+// fixtureSize pins the fixture the offsets below refer to. A change to
+// synthFixture moves them, and has to be met by finding them again.
+const fixtureSize = 426636
+
+func corruptFixture(t *testing.T, offset int, value byte) (remote.FS, string) {
+	t.Helper()
+
+	fsys, key := synthFixture(t)
+
+	r, err := remote.Open(context.Background(), fsys, key)
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+
+	b, err := io.ReadAll(r)
+	_ = r.Close()
+
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	if len(b) != fixtureSize {
+		t.Fatalf("the fixture is %d bytes, not %d: synthFixture changed, and these offsets have to be found again", len(b), fixtureSize)
+	}
+
+	b[offset] = value
+
+	out, err := remote.OpenFS(context.Background(), testutil.FileURL(t, t.TempDir()))
+	if err != nil {
+		t.Fatalf("open bucket: %v", err)
+	}
+
+	if err := remote.WriteFile(context.Background(), out, "corrupt.nc", strings.NewReader(string(b))); err != nil {
+		t.Fatalf("write corrupt file: %v", err)
+	}
+
+	return out, "corrupt.nc"
+}
+
+func TestOpenRefusesAMalformedFile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		offset int
+		value  byte
+		want   string
+	}{
+		{"a dimension scale claiming 2.2 trillion values", 5368, 0x02, "longitude declares 2199023255556 values"},
+		{"a string attribute claiming 386 MB in 16 bytes", 5824, 0x17, `attribute "CLASS" declares`},
+		{"an integer attribute claiming 16 GB in 4 bytes", 5953, 0xf2, `attribute "_Netcdf4Dimid" declares`},
+		{"a panic inside the decoder's Open", 63, 0x0a, "the decoder failed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fsys, key := corruptFixture(t, tt.offset, tt.value)
+
+			cf, err := Open(context.Background(), fsys, key)
+			if err == nil {
+				_ = cf.Close()
+
+				t.Fatal("Open succeeded on a malformed file")
+			}
+
+			if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("Open = %v, want ErrMalformed saying %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestDecodeTurnsAPanicIntoAnError(t *testing.T) {
+	t.Parallel()
+
+	err := decode("file.nc", "walk", func() error {
+		panic("index out of range") // as a malformed structure leads a decoder into
+	})
+
+	if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), "file.nc: walk: the decoder failed") {
+		t.Errorf("decode = %v, want ErrMalformed naming the file and the operation", err)
+	}
+
+	if err := decode("file.nc", "walk", func() error { return nil }); err != nil {
+		t.Errorf("decode of a call that succeeds = %v, want nil", err)
+	}
+}
+
+// The bound reads the decoder's description of a dataset, its own string
+// format, so the format is pinned here against the version in go.mod: every
+// dataset in the fixture must be readable, and a description that is not
+// must fail closed.
+func TestCheckExtentReadsTheDecodersDescription(t *testing.T) {
+	t.Parallel()
+
+	fsys, key := synthFixture(t)
+
+	cf, err := Open(context.Background(), fsys, key)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	defer func() { _ = cf.Close() }()
+
+	seen := 0
+
+	cf.hf.Walk(func(_ string, obj hdf5.Object) {
+		ds, ok := obj.(*hdf5.Dataset)
+		if !ok {
+			return
+		}
+
+		info, err := ds.Info()
+		if err != nil {
+			t.Errorf("%s: Info: %v", ds.Name(), err)
+
+			return
+		}
+
+		if _, ok := declaredValues(info); !ok {
+			t.Errorf("%s: the bound cannot read %q: the decoder's format changed", ds.Name(), info)
+		}
+
+		seen++
+	})
+
+	if seen == 0 {
+		t.Fatal("the fixture had no datasets to check")
+	}
+
+	for _, tt := range []struct {
+		info string
+		want uint64
+		ok   bool
+	}{
+		{"Dataset: float32, 1D array [4], contiguous (address=0x800, size=16)", 4, true},
+		{"Dataset: float64, 2D array [3 x 4], contiguous (address=0x800, size=96)", 12, true},
+		{"Dataset: float64, 4D array [2 3 3 4], chunked (chunks=[1 1 3 4])", 72, true},
+		{"Dataset: int32, scalar, compact (size=4)", 1, true},
+		{"Dataset: int32, null, compact (size=0)", 0, true},
+		{"Dataset: float64, 2D array [18446744073709551615 x 2], contiguous (address=0x0, size=0)", math.MaxUint64, true},
+		{"Dataset: float64, a shape this reader has never seen", 0, false},
+	} {
+		got, ok := declaredValues(tt.info)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("declaredValues(%q) = %d, %v; want %d, %v", tt.info, got, ok, tt.want, tt.ok)
+		}
+	}
+}
