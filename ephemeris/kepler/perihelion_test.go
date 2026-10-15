@@ -163,26 +163,22 @@ func TestFromPerihelionReproducesHorizonsOwnConversion(t *testing.T) {
 // overshoots its bracket and it bisects instead.
 //
 // Agreement is relative, since aphelion at e = 0.999 is a thousand AU out.
-// Near perihelion those two orbits are left out, because there the
-// eccentric-anomaly path is the less accurate side: SolveKepler stops at
-// 1e-12 rad, which at a = 500 AU is 5e-10 AU, and just before perihelion E
-// sits near 2π, where it carries that angle's rounding rather than a small
-// one's. The invariants, the continuity check and the two closed forms cover
-// that region instead.
+// Every orbit is also sampled near perihelion. The two most eccentric ones
+// used to be left out there, because "just before perihelion E sits near 2π,
+// where it carries that angle's rounding rather than a small one's" — which
+// was SolveKepler's defect, not a limit of the method: the same rounding
+// kept it from converging at all on some instants (#781). Solved in
+// (−π, π], E is small there.
 func TestFromPerihelionAgreesWithNewElementsOnAnEllipse(t *testing.T) {
 	const tol = 1e-12
 
-	shapes := []struct {
-		cometElements
-
-		nearPerihelion bool
-	}{
-		{encke, true},
-		{ponsBrooks, true},
-		{cometElements{"a near-circular orbit", 2460000.5, 2.7, 0.01, 10, 80, 73}, true},
-		{cometElements{"a circular orbit", 2460000.5, 1.3, 0, 5, 40, 0}, true},
-		{cometElements{"e = 0.99", 2460000.5, 0.5, 0.99, 30, 120, 250}, false},
-		{cometElements{"e = 0.999", 2460000.5, 0.5, 0.999, 150, 200, 10}, false},
+	shapes := []cometElements{
+		encke,
+		ponsBrooks,
+		{"a near-circular orbit", 2460000.5, 2.7, 0.01, 10, 80, 73},
+		{"a circular orbit", 2460000.5, 1.3, 0, 5, 40, 0},
+		{"e = 0.99", 2460000.5, 0.5, 0.99, 30, 120, 250},
+		{"e = 0.999", 2460000.5, 0.5, 0.999, 150, 200, 10},
 	}
 
 	mu := muAUDay()
@@ -198,13 +194,9 @@ func TestFromPerihelionAgreesWithNewElementsOnAnEllipse(t *testing.T) {
 
 			period := 2 * math.Pi * math.Sqrt(a*a*a/mu)
 
-			offsets := make([]float64, 0, 17)
-			if c.nearPerihelion {
-				offsets = append(offsets, -12000, -3000, -300, -30, -1, 0, 1, 30, 300, 3000, 12000)
-			}
-
-			for _, f := range []float64{0.45, 0.49, 0.499} {
-				offsets = append(offsets, f*period, -f*period)
+			offsets := []float64{
+				-12000, -3000, -300, -30, -1, 0, 1, 30, 300, 3000, 12000,
+				0.45 * period, -0.45 * period, 0.49 * period, -0.49 * period, 0.499 * period, -0.499 * period,
 			}
 
 			for _, d := range offsets {
