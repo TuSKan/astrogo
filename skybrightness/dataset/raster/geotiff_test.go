@@ -133,9 +133,16 @@ func tiffLZWEncode(raw []byte) []byte {
 			reset()
 		}
 
-		// Early change, mirroring the decoder: the encoder must widen one
-		// code before the value would actually need the extra bit.
-		if next >= 1<<width-1 && width < lzwMaxWidth {
+		// Early change, as libtiff's encoder makes it: widen once next has
+		// passed the largest code the width holds. The decoder's test reads
+		// next >= 1<<width-1, one lower, because its dictionary runs one
+		// entry behind this one: it adds nothing for the first code after a
+		// clear, where this adds an entry with every code it writes. Written
+		// with the decoder's threshold, as it was, this widened one code
+		// early, and any stream past 253 codes failed to decode; the
+		// package's own tests never wrote one. The decoder was right: it
+		// reads Pillow's (libtiff's) LZW strips sample for sample (#799).
+		if next >= 1<<width && width < lzwMaxWidth {
 			width++
 		}
 
@@ -530,6 +537,36 @@ func TestGeoTIFFLZWMultiStrip(t *testing.T) {
 		width: 5, height: 4, pixels: rampPixels(5, 4, 3), lzw: true, rowsPerStrip: 1,
 		originLon: 10, originLat: 50, pxSize: 0.1,
 	})
+}
+
+// TestLZWRoundTripsPastEveryCodeWidth: the encoder the LZW tests rely on
+// agrees with the decoder through every code-width change, 9 to 12 bits, and
+// through a dictionary clear. Every other LZW test writes a few dozen codes,
+// all at 9 bits, which is how the encoder widening one code early went
+// unnoticed until a long stream was needed (#799). Agreement with the decoder
+// is not agreement with the format; that came from decoding Pillow's
+// (libtiff's) LZW strips, identical in every sample.
+func TestLZWRoundTripsPastEveryCodeWidth(t *testing.T) {
+	t.Parallel()
+
+	// A cheap deterministic generator: bytes varied enough to fill the
+	// dictionary to 4096 entries and force a clear.
+	varied := make([]byte, 50000)
+	x := uint32(1)
+
+	for i := range varied {
+		x ^= x << 13
+		x ^= x >> 17
+		x ^= x << 5
+		varied[i] = byte(x)
+	}
+
+	for name, in := range map[string][]byte{"a long run": make([]byte, 1<<20), "varied bytes": varied} {
+		out, err := unlzw(tiffLZWEncode(in), len(in))
+		if err != nil || !bytes.Equal(out, in) {
+			t.Errorf("%s: %d bytes round-trip to %d, err %v", name, len(in), len(out), err)
+		}
+	}
 }
 
 // TestGeoTIFFFloatPredictor pins the predictor-3 undo pass against the forward

@@ -51,5 +51,9 @@ func FuzzOpen(f *testing.F) {
 		for _, ll := range [][2]float64{{-9.9, 39.9}, {-9, 39}, {170, -80}} {
 			_, _ = r.SampleBilinear(angle.Deg(ll[0]), angle.Deg(ll[1]))
 		}
+
+		// ReadGrid is sized by the image's dimensions, which come from the
+		// file: allocated at them up front, 2³¹−1 a side panicked (#799).
+		_, _ = r.ReadGrid()
 	})
 }
