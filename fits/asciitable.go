@@ -36,9 +36,9 @@ type ASCIITableHDU struct {
 // real or character field, which the standard gives no value. A blank integer
 // field is 0, as §7.2.5 says.
 func ReadASCIITable(h *Header, r io.Reader) (*ASCIITableHDU, error) {
-	tfields, err := h.GetInt("TFIELDS")
+	tfields, err := requiredCount(h, "TFIELDS", maxTFIELDS)
 	if err != nil {
-		return nil, fmt.Errorf("missing TFIELDS: %w", err)
+		return nil, err
 	}
 
 	rows, err := requiredAxis(h, "NAXIS2")

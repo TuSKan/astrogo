@@ -219,6 +219,10 @@ func payloadSize(h *Header) (int64, error) {
 // greater than 999" (FITS 4.0 §4.4.1.1).
 const maxNAXIS = 999
 
+// maxTFIELDS is the most fields a table row may have, ASCII or binary: "The
+// maximum permissible value is 999" (FITS 4.0 §7.2.1, §7.3.1).
+const maxTFIELDS = 999
+
 // dataAxes reads NAXIS and NAXIS1 … NAXISn, returning the lengths in header
 // order and the number of elements they describe: their product, or zero when
 // NAXIS is zero.
@@ -227,13 +231,9 @@ const maxNAXIS = 999
 // image declaring them read as empty with no error; a product wrapping negative
 // sized a buffer, and panicked (#460).
 func dataAxes(h *Header) (axes []int, elements int64, err error) {
-	naxis, err := requiredAxis(h, "NAXIS")
+	naxis, err := requiredCount(h, "NAXIS", maxNAXIS)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	if naxis > maxNAXIS {
-		return nil, 0, fmt.Errorf("%w: NAXIS = %d exceeds %d", errDataSize, naxis, maxNAXIS)
 	}
 
 	if naxis == 0 {

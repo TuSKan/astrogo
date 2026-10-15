@@ -134,6 +134,27 @@ func optionalCount(h *Header, keyword string, def int) (int, error) {
 	return v, nil
 }
 
+// requiredCount is requiredAxis for a count the standard caps: NAXIS, and
+// TFIELDS for both kinds of table, are each "no greater than 999" (FITS 4.0
+// §4.4.1.1, §7.2.1, §7.3.1).
+//
+// The cap is what makes the count safe to size anything with, and nothing
+// else stands in for it: TFIELDS sized every per-column slice before a byte
+// of the table was read, so -1 panicked and 100000000000 asked for 8.8 TB,
+// which in Go ends the process rather than returning an error (#796).
+func requiredCount(h *Header, keyword string, most int) (int, error) {
+	v, err := requiredAxis(h, keyword)
+	if err != nil {
+		return 0, err
+	}
+
+	if v > most {
+		return 0, fmt.Errorf("%w: %s = %d exceeds %d", errDataSize, keyword, v, most)
+	}
+
+	return v, nil
+}
+
 // errDataSize is a data size the structural keywords cannot describe: a
 // negative length or count, more axes than the standard allows, or a size too
 // large for an int64.
