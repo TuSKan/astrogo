@@ -314,15 +314,15 @@ func ambiguous(query string, list []lookupMatch) error {
 // brightnessMargin is how much fainter than the requested bound a body's
 // absolute magnitude (H/M1) may be and still be a candidate.
 //
-// A body is seen brighter than its absolute magnitude only when it is closer
-// than 1 AU to both the Sun and the Earth — r·Δ < 1 — which an orbit that
-// stays outside the Earth's never allows; those are bounded by perihelion
-// instead (see couldReach). The margin is for the bodies that come inside:
-// 4.0 admits one whose r·Δ falls to 10^(−0.8) ≈ 0.16 AU². This comment used
-// to calibrate it against Ceres, "H=3.4, best-ever apparent ≈6.7, a ≈3.3 mag
-// correction", but that correction runs the other way: Ceres is never
-// brighter than about 6.3, three magnitudes fainter than its H, as every
-// main-belt body is (#779).
+// A body is seen brighter than its absolute magnitude only when r·Δ, the
+// product of its distances in AU from the Sun and from the Earth, is below 1.
+// How small r·Δ can get is bounded by the perihelion when that is beyond the
+// Earth's aphelion (see couldReach), and not at all when it is inside; the
+// margin limits how far either may take a candidate: 4.0 admits a body whose
+// r·Δ falls to 10^(−0.8) ≈ 0.16 AU². This comment used to calibrate it
+// against Ceres, "H=3.4, best-ever apparent ≈6.7, a ≈3.3 mag correction", but
+// that correction runs the other way: Ceres is never brighter than about 6.3,
+// three magnitudes fainter than its H, as every main-belt body is (#779).
 //
 // It deliberately does NOT chase extreme close-approach NEA brightening
 // (e.g. 99942 Apophis's 2029 flyby: H=19.7 but a predicted peak apparent
