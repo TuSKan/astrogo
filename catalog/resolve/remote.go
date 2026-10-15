@@ -85,6 +85,13 @@ type BrightRequest struct {
 	MaxVMag float64
 	// Limit is the maximum number of results to return.
 	Limit int
+	// At is the instant the search is for. A provider that can tell where a
+	// body is at a given time may leave out what cannot be brighter than
+	// MaxVMag then; the zero Time asks for every object that could be at any
+	// time. A comet is bright for months around its perihelion and faint for
+	// the rest of its orbit, so for comets this is the difference between
+	// the ones in the sky now and every one that ever came close (#779).
+	At time.Time
 }
 
 // BrightObjectSearcher lets a provider bulk-list every object it knows about

@@ -93,11 +93,12 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 //
 // SBDB's cut is the one other reason allowed. sbdb.SearchBright keeps 50
 // candidates of each kind and says so with resolve.ErrTruncated when there
-// are more (#776). Asteroids are bounded by perihelion and no longer reach
-// 50 at these limits (#779), but the bound has no date, so a comet that
-// could be bright at a perihelion decades ago still counts: at magLimit 5
-// there are more than 50. Neither assertion here depends on the bodies cut,
-// so the report is accepted and logged; any other reason still fails.
+// are more (#776). At these limits neither kind reaches 50 any more:
+// asteroids are bounded by perihelion and comets by where their orbits have
+// them on the night (#779), and measured live neither call is cut. On
+// another night or at a looser limit there can be more than 50, and neither
+// assertion here depends on the bodies cut, so the report is accepted and
+// logged; any other reason still fails.
 func acceptOnlySBDBsCut(t *testing.T, call string, err error) {
 	t.Helper()
 

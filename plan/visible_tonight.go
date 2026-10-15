@@ -361,7 +361,7 @@ func VisibleTonight(
 	// it was evaluated and rejected. See ErrIncomplete.
 	var dropped skips
 
-	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit, &dropped), start, end, cfg, &dropped)
+	candidates := gatherCandidates(ctx, gatherBrightTargets(ctx, brightSources, magLimit, mid, &dropped), start, end, cfg, &dropped)
 	candidates = append(candidates, gatherSolarSystemCandidates(planetProvider, mid, magLimit, &dropped)...)
 
 	if cfg.includeMoons {
@@ -426,13 +426,17 @@ func VisibleTonight(
 // caller registers) are otherwise independent network round trips with no
 // reason to wait on each other; each source writes into its own slice
 // index, so no mutex is needed to combine them afterward.
-func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, dropped *skips) []resolve.Target {
+//
+// at, the middle of the night, goes out as the request's date, so a source
+// that can tell where a body is then leaves out what cannot be bright
+// tonight: SBDB's comets that are nowhere near perihelion (#779).
+func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, at time.Time, dropped *skips) []resolve.Target {
 	// A source's own query error is handled per-item below (skipped, not
 	// propagated), so parallel.Map's own error return is never non-nil.
 	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]resolve.Target, error) {
 		var targets []resolve.Target
 
-		iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit})
+		iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit, At: at})
 		iter(func(tgt resolve.Target, err error) bool {
 			if err != nil {
 				// One bad row does not end the source, but the caller is told
