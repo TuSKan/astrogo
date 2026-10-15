@@ -19,6 +19,6 @@ func FuzzParseResult(f *testing.F) {
 	f.Add("")
 
 	f.Fuzz(func(_ *testing.T, s string) {
-		_, _ = parseResult(strings.NewReader(s))
+		_, _, _ = parseResult(strings.NewReader(s))
 	})
 }

@@ -196,7 +196,7 @@ func TestParseVOTableReportsAWebPageAsDowntime(t *testing.T) {
 <body><h1>The archive is undergoing maintenance</h1></body></html>
 `
 
-	_, err := parseVOTable(strings.NewReader(page))
+	_, _, err := parseVOTable(strings.NewReader(page))
 	if err == nil {
 		t.Fatal("a web page parsed as a VOTable without error")
 	}
@@ -221,7 +221,7 @@ func TestParseVOTableDoesNotBlameTheServiceForABadDocument(t *testing.T) {
 	// Well-formed XML, recognizably a VOTable, and truncated mid-table.
 	const broken = `<?xml version="1.0"?><VOTABLE><RESOURCE><TABLE><DATA><TABLEDATA><TR><TD>1`
 
-	_, err := parseVOTable(strings.NewReader(broken))
+	_, _, err := parseVOTable(strings.NewReader(broken))
 	if err == nil {
 		t.Skip("this document parsed cleanly; it is not a useful negative case")
 	}
