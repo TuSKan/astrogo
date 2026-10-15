@@ -12,6 +12,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -426,8 +427,13 @@ func cellString(v any) string {
 // doesn't depend on (Stage 2 lives in plan.VisibleTonight, which already
 // imports both catalog and ephemeris).
 //
-// The perihelion bound does not depend on the date, so a comet that could be
-// bright at perihelion is a candidate however long ago that was.
+// The perihelion bound does not depend on the date, so without req.At a comet
+// that could be bright at perihelion is a candidate however long ago that
+// was: 153P/Ikeya-Zhang, at perihelion in 2002, heads the list. With req.At,
+// each comet is bounded by the nearest its orbit takes it to the Sun within
+// a month of that instant (sunDistanceAround), and the comets are ranked
+// among those. Asteroids are bounded by perihelion either way: their
+// distances from the Sun vary far less, and SBDB holds too many to fetch.
 //
 // req.Limit defaults to 50 per kind (asteroids and comets are queried and
 // capped separately, so up to 100 candidates total). Without a req.Limit, a
@@ -440,6 +446,10 @@ func cellString(v any) string {
 // trans-Neptunian, and Juno, Hebe and Iris were cut at every bound (#779).
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
+	if dated := !req.At.IsZero(); dated {
+		cacheKey += ":" + strconv.FormatFloat(req.At.TT().JD(), 'f', -1, 64)
+	}
+
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}
@@ -460,13 +470,23 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 	}
 
 	return func(yield func(resolve.Target, error) bool) {
-		asteroids, asteroidRows, err := p.queryBright(ctx, "a", "H", req.MaxVMag, ask)
+		asteroids, asteroidRows, err := p.queryBright(ctx, "a", "H", req.MaxVMag, time.Time{}, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
 
-		comets, cometRows, err := p.queryBright(ctx, "c", "M1", req.MaxVMag, ask)
+		// A dated search ranks the comets that can be bright on the date,
+		// which SBDB cannot select, so it is asked for every comet the
+		// undated bound admits and the date is applied to each row here. It
+		// holds about two thousand comets with a total magnitude, so that is
+		// one answer of a few hundred kilobytes.
+		cometAsk := ask
+		if !req.At.IsZero() {
+			cometAsk = datedCometRows
+		}
+
+		comets, cometRows, err := p.queryBright(ctx, "c", "M1", req.MaxVMag, req.At, cometAsk)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -474,14 +494,21 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 
 		// Whether a kind was cut is decided by the rows SBDB sent, not the
 		// ones kept: a row past the limit means there were more, whatever
-		// the exact check below then made of the rows that did arrive.
+		// the exact check below then made of the rows that did arrive. A
+		// dated comet search has every row SBDB holds unless it filled the
+		// page, so there it is the comets kept that are counted.
 		var cut []string
 
 		if asteroidRows > limit {
 			cut = append(cut, "asteroids")
 		}
 
-		if cometRows > limit {
+		cometsCut := cometRows > limit
+		if !req.At.IsZero() {
+			cometsCut = cometRows >= datedCometRows || (req.Limit <= 0 && len(comets) > limit)
+		}
+
+		if cometsCut {
 			cut = append(cut, "comets")
 		}
 
@@ -602,7 +629,10 @@ func (p *Provider) lookup(ctx context.Context, key, value string) (lookupPayload
 // from a complete one. Decodes the column-oriented response into
 // resolve.Targets carrying identity, H/G (asteroids) or M1/K1 (comets), and —
 // when the full set parses — osculating orbital elements (see elementFields).
-func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVMag float64, limit int) ([]resolve.Target, int, error) {
+//
+// A nonzero at bounds each comet by where its orbit has it around that date
+// rather than by its perihelion alone; see sunDistanceAround.
+func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVMag float64, at time.Time, limit int) ([]resolve.Target, int, error) {
 	fields := "full_name,spkid,H,G,class" + elementFields
 	if magField == "M1" {
 		fields = "full_name,spkid,M1,K1,class" + elementFields
@@ -646,11 +676,14 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			orbitClass = cellString(row[idx])
 		}
 
-		var eccentricity float64
+		var (
+			eccentricity float64
+			hasE         bool
+		)
 
 		if idx, ok := col["e"]; ok {
 			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				eccentricity = v
+				eccentricity, hasE = v, true
 			}
 		}
 
@@ -753,8 +786,15 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			}
 		}
 
-		if hasQ && !couldReach(t, q, maxVMag) {
-			continue
+		if hasQ {
+			closest := q
+			if sbKind == "c" && !at.IsZero() && hasE && hasTP {
+				closest = sunDistanceAround(q, eccentricity, time.FromJD(tp, time.TDB), at)
+			}
+
+			if !couldReach(t, closest, maxVMag) {
+				continue
+			}
 		}
 
 		targets = append(targets, t)
@@ -769,8 +809,9 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 // the Earth's can ever look.
 const earthAphelionAU = 1.0167
 
-// couldReach reports whether a body with perihelion distance q could ever be
-// seen brighter than maxVMag.
+// couldReach reports whether a body that comes no nearer the Sun than q could
+// be seen brighter than maxVMag: q is its perihelion distance, or for a dated
+// search the nearest it comes around that date (sunDistanceAround).
 //
 // Its distance from the Sun is never less than q, and if q is beyond the
 // Earth's aphelion its distance from the Earth is never less than
@@ -794,6 +835,48 @@ func couldReach(t resolve.Target, q, maxVMag float64) bool {
 	default:
 		return true
 	}
+}
+
+// datedCometRows is the page a dated search asks SBDB for comets: more than
+// it holds with a total magnitude, 1,995 on 2026-10-15, so that every comet
+// the undated bound admits arrives and the date can rank them.
+const datedCometRows = 5000
+
+// datedWindow is how far either side of a dated search's instant a comet's
+// distance from the Sun is bounded over.
+//
+// The orbit is propagated two-body from SBDB's osculating elements, and the
+// planets move a real comet off that orbit, most of all in when it reaches a
+// given distance. A month either side absorbs that much error in timing,
+// which is also more than any night a caller is asking about lasts.
+var datedWindow = unit.Days(30)
+
+// sunDistanceAround returns the nearest a comet with perihelion distance q,
+// eccentricity e and perihelion time tp comes to the Sun within datedWindow
+// of at, in AU. A comet whose orbit cannot be propagated gets q back, which
+// keeps it.
+//
+// Away from perihelion the distance changes monotonically, so the nearest is
+// at an end of the window. A comet falling toward the Sun at the start and
+// receding at the end passed perihelion inside it, and gets q.
+func sunDistanceAround(q, e float64, tp, at time.Time) float64 {
+	el, err := kepler.FromPerihelion(tp, unit.AU(q), e, angle.Zero(), angle.Zero(), angle.Zero())
+	if err != nil {
+		return q
+	}
+
+	before, vBefore, errBefore := el.StateAt(at.Add(-datedWindow))
+	after, vAfter, errAfter := el.StateAt(at.Add(datedWindow))
+
+	if errBefore != nil || errAfter != nil {
+		return q
+	}
+
+	if before.Dot(vBefore) < 0 && after.Dot(vAfter) > 0 {
+		return q
+	}
+
+	return math.Max(q, math.Min(before.Norm(), after.Norm()))
 }
 
 // brightOffsets are the band edges [brightConstraint] splits the magnitude
