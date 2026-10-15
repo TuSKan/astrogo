@@ -149,7 +149,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	v := url.Values{}
 	v.Set("REQUEST", "doQuery")
 	v.Set("LANG", "ADQL")
-	v.Set("FORMAT", "csv")
+	v.Set("FORMAT", responseFormat(p.endpoint))
 	v.Set("QUERY", adql)
 
 	return func(yield func(resolve.Target, error) bool) {
@@ -160,16 +160,19 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 		}
 		defer func() { _ = body.Close() }()
 
-		targets, err := parseResult(body)
+		targets, truncated, err := parseResult(body)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
 
-		err = p.cache.Set(cacheKey, targets)
-		if err != nil {
-			yield(resolve.Target{}, err)
-			return
+		// A cut list is not the answer to this query, so it is not kept as
+		// one.
+		if !truncated {
+			if err := p.cache.Set(cacheKey, targets); err != nil {
+				yield(resolve.Target{}, err)
+				return
+			}
 		}
 
 		for _, t := range targets {
@@ -177,7 +180,30 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 				return
 			}
 		}
+
+		if truncated {
+			yield(resolve.Target{}, fmt.Errorf("gaia: %w: the archive returned %d of the %d sources asked for",
+				resolve.ErrTruncated, len(targets), limit))
+		}
 	}
+}
+
+// responseFormat is the FORMAT this provider asks its archive for.
+//
+// A VOTable, because its QUERY_STATUS is the only way an archive says it cut
+// an answer, and CSV has nowhere to put it. ESA's synchronous endpoint caps
+// an answer at 50,000 rows and, asked for TOP 60000 as CSV, sends exactly
+// 50,000 and nothing else (measured 2026-10-14; #786). ESA writes TABLEDATA,
+// which the VOTable reader decodes, only for "votable_plain": "votable" and
+// the IVOA media type with serialization=TABLEDATA both come back as BINARY2.
+// Gaia@AIP refuses "votable_plain" and every TABLEDATA name, and answers a
+// TABLEDATA VOTable to "csv", so it is left asking for that.
+func responseFormat(endpoint remote.EndpointID) string {
+	if endpoint == remote.GaiaTAP {
+		return "votable_plain"
+	}
+
+	return "csv"
 }
 
 // parseResult decodes whichever serialisation the archive actually sent.
@@ -192,24 +218,27 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 //
 // A VOTable begins with an XML declaration or its root element and a CSV with
 // a column name, so the first non-space byte separates them without ambiguity.
-func parseResult(body io.Reader) ([]resolve.Target, error) {
+//
+// truncated reports a VOTable whose QUERY_STATUS says the archive cut it. A
+// CSV cannot say so, and is never reported truncated.
+func parseResult(body io.Reader) (targets []resolve.Target, truncated bool, err error) {
 	buf := bufio.NewReader(body)
 
 	for {
 		b, err := buf.Peek(1)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return nil, nil
+				return nil, false, nil
 			}
 
-			return nil, fmt.Errorf("gaia: read result: %w", err)
+			return nil, false, fmt.Errorf("gaia: read result: %w", err)
 		}
 
 		// Leading whitespace belongs to neither format, so it is skipped
 		// rather than allowed to decide the answer.
 		if b[0] == ' ' || b[0] == '\n' || b[0] == '\r' || b[0] == '\t' {
 			if _, err := buf.Discard(1); err != nil {
-				return nil, fmt.Errorf("gaia: read result: %w", err)
+				return nil, false, fmt.Errorf("gaia: read result: %w", err)
 			}
 
 			continue
@@ -219,22 +248,25 @@ func parseResult(body io.Reader) ([]resolve.Target, error) {
 			return parseVOTable(buf)
 		}
 
-		return parseCSV(buf)
+		targets, err := parseCSV(buf)
+
+		return targets, false, err
 	}
 }
 
-// parseVOTable turns a VOTable result into targets.
-func parseVOTable(body io.Reader) ([]resolve.Target, error) {
+// parseVOTable turns a VOTable result into targets, and reports whether the
+// archive said it cut them.
+func parseVOTable(body io.Reader) (targets []resolve.Target, truncated bool, err error) {
 	table, err := votable.Read(body)
 	if err != nil {
 		// A web page is the archive being down, not a malformed result, and
 		// a caller has to be able to tell those apart to know whether
 		// retrying is worth anything. votable spots it; remote names it.
 		if errors.Is(err, votable.ErrNotVOTable) {
-			return nil, fmt.Errorf("gaia: %w: %w", remote.ErrNotServingData, err)
+			return nil, false, fmt.Errorf("gaia: %w: %w", remote.ErrNotServingData, err)
 		}
 
-		return nil, fmt.Errorf("gaia: %w", err)
+		return nil, false, fmt.Errorf("gaia: %w", err)
 	}
 
 	col := make(map[string]int, len(table.Fields))
@@ -242,7 +274,7 @@ func parseVOTable(body io.Reader) ([]resolve.Target, error) {
 		col[f] = i
 	}
 
-	targets := make([]resolve.Target, 0, len(table.Rows))
+	targets = make([]resolve.Target, 0, len(table.Rows))
 
 	for _, row := range table.Rows {
 		if t, ok := targetFromRow(row, col); ok {
@@ -250,7 +282,7 @@ func parseVOTable(body io.Reader) ([]resolve.Target, error) {
 		}
 	}
 
-	return targets, nil
+	return targets, table.Truncated, nil
 }
 
 // parseCSV turns a CSV result into targets.
