@@ -342,7 +342,7 @@ func TestProjection_UnknownFallsBackToLinear(t *testing.T) {
 		w.SetCDELT([]float64{-0.01, 0.01}),
 	)
 
-	// With unknown projection, extractProjection returns "" → linear fallback.
+	// With unknown projection, celestialAxes returns "" → linear fallback.
 	// 5 pixels offset * 0.01 scale = 0.05 degrees
 	res, err := w.PixelToWorld([]float64{55.0, 55.0})
 	if err != nil {
