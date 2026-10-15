@@ -173,6 +173,7 @@ type Reader struct {
 	tiled                 bool
 	rowsPerStrip          int
 	tileWidth, tileHeight int
+	blockBytes            int // the most bytes a block decodes to; see blockSize
 	blockOffsets          []int64
 	blockByteCounts       []int64
 
@@ -184,11 +185,47 @@ type Reader struct {
 	cache    []float64
 }
 
+// readChunk is the first allocation readAt makes. It doubles from there as
+// the source delivers.
+const readChunk = 64 << 10
+
 // readAt reads exactly n bytes at offset off.
+//
+// n is whatever the file declares: a tag's value count, a strip's byte count.
+// A declaration is not evidence that the bytes exist, and allocating n up
+// front let a 26-byte file take 34 GB and a 130-byte one 4.3 GB before the
+// read found nothing there (#799); past what the machine can commit, Go's
+// out-of-memory ends the process. So memory follows the data rather than the
+// claim, as fits does since #461: the buffer grows as bytes arrive, and a
+// claim the source cannot back costs at most twice what it actually sent.
 func readAt(r io.ReaderAt, off int64, n int) ([]byte, error) {
-	buf := make([]byte, n)
-	if _, err := r.ReadAt(buf, off); err != nil {
-		return nil, fmt.Errorf("raster: read %d bytes at %d: %w", n, off, err)
+	if n < 0 {
+		return nil, fmt.Errorf("%w: read of %d bytes", ErrBadTIFF, n)
+	}
+
+	buf := make([]byte, 0, min(n, readChunk))
+
+	for len(buf) < n {
+		if len(buf) == cap(buf) {
+			grown := make([]byte, len(buf), min(n, 2*cap(buf)))
+			copy(grown, buf)
+			buf = grown
+		}
+
+		m, err := r.ReadAt(buf[len(buf):cap(buf)], off+int64(len(buf)))
+		buf = buf[:len(buf)+m]
+
+		switch {
+		case len(buf) == n:
+			// ReadAt may report io.EOF alongside the last byte asked for.
+			return buf, nil
+		case err != nil:
+			return nil, fmt.Errorf("raster: read %d bytes at %d: %w", n, off, err)
+		case m == 0:
+			// A ReaderAt must explain a short read; one that does not would
+			// otherwise be asked again forever.
+			return nil, fmt.Errorf("raster: read %d bytes at %d: %w", n, off, io.ErrUnexpectedEOF)
+		}
 	}
 
 	return buf, nil
@@ -232,8 +269,14 @@ func Open(r io.ReaderAt, override *GeoTransform) (*Reader, error) {
 // ReadGrid materializes the entire raster into an in-memory [Grid]. For very
 // large atlases prefer the windowed [Reader.sampleBilinear] path; this is
 // intended for clipped/regional files and tests.
+//
+// The grid grows as its pixels decode rather than being allocated at the size
+// the header declares. Allocated up front, an image declaring 2³¹−1 pixels a
+// side panicked out of a 118-byte file, and one merely too large for memory
+// would have ended the process (#799); grown, a declaration the file cannot
+// back fails at the first pixel it lacks, having held only what it read.
 func (t *Reader) ReadGrid() (*Grid, error) {
-	data := make([]float64, t.width*t.height)
+	var data []float64
 
 	for row := range t.height {
 		for col := range t.width {
@@ -242,7 +285,7 @@ func (t *Reader) ReadGrid() (*Grid, error) {
 				return nil, err
 			}
 
-			data[row*t.width+col] = v
+			data = append(data, v)
 		}
 	}
 
@@ -379,6 +422,13 @@ func (t *Reader) configure(f map[uint16]field, override *GeoTransform) error {
 	if err := t.configureLayout(f); err != nil {
 		return err
 	}
+
+	blockBytes, err := t.blockSize()
+	if err != nil {
+		return err
+	}
+
+	t.blockBytes = blockBytes
 
 	if err := t.configureGeo(f, override); err != nil {
 		return err
@@ -571,16 +621,23 @@ func (t *Reader) decodeBlock(i int) ([]float64, error) {
 		return nil, fmt.Errorf("%w: block %d out of range", ErrBadTIFF, i)
 	}
 
-	raw, err := readAt(t.r, t.blockOffsets[i], int(t.blockByteCounts[i]))
+	n := int(t.blockByteCounts[i])
+	if t.compression == compressionNone {
+		// Uncompressed, a block's bytes are its samples, so nothing past
+		// what the layout holds is read, whatever the byte count says.
+		n = min(n, t.blockBytes)
+	}
+
+	raw, err := readAt(t.r, t.blockOffsets[i], n)
 	if err != nil {
 		return nil, err
 	}
 
 	switch t.compression {
 	case compressionDeflate, compressionOldDeflate:
-		raw, err = inflate(raw)
+		raw, err = inflate(raw, t.blockBytes)
 	case compressionLZW:
-		raw, err = unlzw(raw)
+		raw, err = unlzw(raw, t.blockBytes)
 	}
 
 	if err != nil {
@@ -627,6 +684,50 @@ func (t *Reader) blockRowSamples() int {
 	return t.width
 }
 
+// blockSize is the most bytes one block can decode to: a whole tile, which is
+// padded to its full size, or a whole strip of RowsPerStrip rows, which is
+// never more rows than the image has (TIFF's own default RowsPerStrip is
+// 2³²−1, meaning "all of them").
+//
+// It is what bounds decompression. The codecs used to read to the end of their
+// input however far that went, and deflate reaches about 1000:1: a 65 KB strip
+// of a one-pixel image inflated to 64 MiB, which ReadGrid allocated 232 MB to
+// convert and returned as a valid grid (#799). The layout says how much a block
+// holds, so nothing past it is a sample of this image.
+func (t *Reader) blockSize() (int, error) {
+	rows := t.tileHeight
+	if !t.tiled {
+		rows = min(t.rowsPerStrip, t.height)
+	}
+
+	size, ok := mulNonNegative(t.blockRowSamples(), rows)
+	if ok {
+		size, ok = mulNonNegative(size, t.bits/8)
+	}
+
+	if !ok {
+		return 0, fmt.Errorf("%w: a block of %d × %d samples overflows", ErrBadTIFF, t.blockRowSamples(), rows)
+	}
+
+	return size, nil
+}
+
+// mulNonNegative is a × b for non-negative a and b, and false if it overflows
+// an int.
+func mulNonNegative(a, b int) (int, bool) {
+	if a < 0 || b < 0 || (a != 0 && b > math.MaxInt/a) {
+		return 0, false
+	}
+
+	return a * b, true
+}
+
+// errPastBlock is a block whose data decodes to more bytes than its layout
+// holds, limit.
+func errPastBlock(limit int) error {
+	return fmt.Errorf("%w: a block decodes past the %d bytes its layout holds", ErrBadTIFF, limit)
+}
+
 // LZW code-space constants from TIFF 6.0 §13. Codes 0-255 are literals, so the
 // dictionary proper starts at 258.
 const (
@@ -647,7 +748,10 @@ const (
 // a real TIFF strip to compress/lzw desyncs the code table within the first few
 // hundred codes; against the real VIIRS 2025 composite it fails outright with
 // "lzw: invalid code", which is how this was caught.
-func unlzw(raw []byte) ([]byte, error) {
+//
+// The output stops at limit, the most bytes the block's layout holds: past it
+// is an error rather than a sample (#799).
+func unlzw(raw []byte, limit int) ([]byte, error) {
 	var (
 		prefix [lzwMaxCode]int32 // -1 for a single-byte root
 		suffix [lzwMaxCode]byte  // last byte of the entry
@@ -664,7 +768,7 @@ func unlzw(raw []byte) ([]byte, error) {
 	reset()
 
 	var (
-		out    = make([]byte, 0, len(raw)*3)
+		out    = make([]byte, 0, min(len(raw)*3, limit))
 		next   = int32(lzwFirstCode)
 		width  = uint(lzwMinWidth)
 		prev   = int32(-1)
@@ -705,9 +809,18 @@ func unlzw(raw []byte) ([]byte, error) {
 	}
 
 	// emit appends code's full expansion, walking the prefix chain backwards
-	// into the space just reserved for it.
+	// into the space just reserved for it. An expansion that would take the
+	// output past limit is not appended; overflow records it for the loop.
+	var overflow bool
+
 	emit := func(code int32) {
 		n := int(length[code])
+		if len(out)+n > limit {
+			overflow = true
+
+			return
+		}
+
 		start := len(out)
 		out = append(out, make([]byte, n)...)
 
@@ -772,6 +885,10 @@ func unlzw(raw []byte) ([]byte, error) {
 			return nil, fmt.Errorf("%w: lzw code %d past dictionary end %d", ErrBadTIFF, code, next)
 		}
 
+		if overflow {
+			return nil, errPastBlock(limit)
+		}
+
 		prev = code
 
 		// Early change: grow one code before the width would actually
@@ -821,16 +938,22 @@ func (t *Reader) undoPredictor(raw []byte, rowSamples int) {
 }
 
 // inflate decompresses zlib/deflate-compressed strip or tile bytes.
-func inflate(raw []byte) ([]byte, error) {
+func inflate(raw []byte, limit int) ([]byte, error) {
 	zr, err := zlib.NewReader(bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("raster: zlib: %w", err)
 	}
 	defer func() { _ = zr.Close() }()
 
-	out, err := io.ReadAll(zr)
+	// One byte past the limit is enough to know the block overflows it,
+	// without inflating the rest (#799).
+	out, err := io.ReadAll(io.LimitReader(zr, int64(limit)+1))
 	if err != nil {
 		return nil, fmt.Errorf("raster: inflate: %w", err)
+	}
+
+	if len(out) > limit {
+		return nil, errPastBlock(limit)
 	}
 
 	return out, nil
