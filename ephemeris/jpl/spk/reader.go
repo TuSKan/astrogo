@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -180,24 +181,70 @@ func verifyOrBootstrapChecksum(ctx context.Context, fsys remote.FS, key string, 
 	sum := hex.EncodeToString(h.Sum(nil))
 	sumKey := checksumSidecarKey(key)
 
-	existing, err := fs.ReadFile(fsys, sumKey)
+	recorded, found, err := readChecksumSidecar(fsys, sumKey)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			if err := remote.WriteFile(ctx, fsys, sumKey, strings.NewReader(sum)); err != nil {
-				return fmt.Errorf("jpl: checksum: write sidecar: %w", err)
-			}
+		return err
+	}
 
+	if !found {
+		writeErr := remote.WriteFile(ctx, fsys, sumKey, strings.NewReader(sum))
+		if writeErr == nil {
 			return nil
 		}
 
-		return fmt.Errorf("jpl: checksum: read sidecar: %w", err)
+		// Another process opening the same kernel may have recorded it in
+		// the meantime, and on Windows its rename and this one exclude each
+		// other. Its record is as good as this one's if it agrees, and is a
+		// mismatch like any other if it does not.
+		recorded, found, err = readChecksumSidecar(fsys, sumKey)
+		if err != nil || !found {
+			return fmt.Errorf("jpl: checksum: write sidecar: %w", writeErr)
+		}
 	}
 
-	if strings.TrimSpace(string(existing)) != sum {
-		return fmt.Errorf("%w: sha256 mismatch (recorded %s, actual %s)", ErrCorruptSPK, strings.TrimSpace(string(existing)), sum)
+	if recorded != sum {
+		return fmt.Errorf("%w: sha256 mismatch (recorded %s, actual %s)", ErrCorruptSPK, recorded, sum)
 	}
 
 	return nil
+}
+
+// sidecarReadAttempts and sidecarRetryDelay bound how long a checksum sidecar
+// that cannot be opened is waited out: three tries over 50 ms, as
+// remote/file's readETag does for its own sidecar (#452).
+const (
+	sidecarReadAttempts = 3
+	sidecarRetryDelay   = 25 * time.Millisecond
+)
+
+// readChecksumSidecar returns the hash recorded at sumKey, and whether one is
+// recorded.
+//
+// Missing is final; any other failure is tried again. Several processes open
+// one cached kernel at once — `go test ./...` runs a binary per package
+// against a shared cache — and on Windows a sidecar being renamed into place
+// by one of them cannot be opened by another: the rename holds delete access
+// that Go's open does not share. It lasts milliseconds, and it failed the
+// open of a kernel that was fine (#784).
+func readChecksumSidecar(fsys remote.FS, sumKey string) (recorded string, found bool, err error) {
+	for attempt := range sidecarReadAttempts {
+		if attempt > 0 {
+			time.Sleep(sidecarRetryDelay)
+		}
+
+		var b []byte
+
+		b, err = fs.ReadFile(fsys, sumKey)
+		if err == nil {
+			return strings.TrimSpace(string(b)), true, nil
+		}
+
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", false, nil
+		}
+	}
+
+	return "", false, fmt.Errorf("jpl: checksum: read sidecar: %w", err)
 }
 
 // NewReader opens a DAF/SPK file and reads its metadata.

@@ -72,6 +72,71 @@ func TestSolveKepler_RejectsNonFiniteMeanAnomaly(t *testing.T) {
 	}
 }
 
+// bisectKepler solves E − e·sin E = M for M in (−π, π] by bisection, which
+// cannot cycle: the function rises monotonically from −π to π, so the bracket
+// closes on the root to the last bit whatever its slope there.
+func bisectKepler(m, e float64) float64 {
+	lo, hi := -math.Pi, math.Pi
+
+	for range 200 {
+		mid := lo + (hi-lo)/2
+		if mid == lo || mid == hi {
+			break
+		}
+
+		if mid-e*math.Sin(mid) < m {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+
+	return lo + (hi-lo)/2
+}
+
+// SolveKepler near perihelion on orbits close to parabolic (#781). Taken in
+// [0, 2π), the mean anomaly just before perihelion sat near 2π, where
+// Kepler's equation's rounding over its slope, about 1e-4 at e = 0.9999,
+// exceeded the 1e-12 tolerance: the iteration cycled between two values and
+// failed on about one instant in two thousand. Comet C/2026 C1, e = 0.99991,
+// was in that region for two years.
+//
+// The sweep is the one that found it, log-spaced from 1e-8 rad to π either
+// side of perihelion, given as a caller gives it: M = 2π − x before.
+func TestSolveKeplerConvergesNearPerihelionWhenNearlyParabolic(t *testing.T) {
+	t.Parallel()
+
+	// The solver's own tolerance. Measured, the two agree to 2.5e-14 rad at
+	// e = 0.9999 and 1.6e-13 at e = 1 − 1e-8, where the slope at the root is
+	// about 1e-8 and both carry an ulp of E over it.
+	const tol = 1e-12
+
+	for _, e := range []float64{0.9999, 0.9999082156462554, 0.99999, 0.999999, 0.9999999, 0.99999999} {
+		for x := 1e-8; x < math.Pi; x *= 1.001 {
+			for _, m := range []float64{2*math.Pi - x, x} {
+				ea, err := kepler.SolveKepler(angle.Rad(m), e)
+				if err != nil {
+					t.Fatalf("e = %v, M = %.17g: %v", e, m, err)
+				}
+
+				if r := ea.Radians(); r < 0 || r >= 2*math.Pi {
+					t.Fatalf("e = %v, M = %.17g: E = %.17g, not in [0, 2π)", e, m, r)
+				}
+
+				// The input's own offset from 2π is exact by Sterbenz.
+				signed := m
+				if m > math.Pi {
+					signed = m - 2*math.Pi
+				}
+
+				if got, want := ea.WrapPi().Radians(), bisectKepler(signed, e); math.Abs(got-want) > tol {
+					t.Fatalf("e = %v, M = %.17g: E = %.17g, bisection gives %.17g", e, m, got, want)
+				}
+			}
+		}
+	}
+}
+
 // keplerPeriodDays returns the two-body orbital period, in days, for a
 // semi-major axis a in AU around the Sun (via constants.IAU.SunGravitationalParameter).
 func keplerPeriodDays(a float64) float64 {
