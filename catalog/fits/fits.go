@@ -91,9 +91,10 @@ func New(filePath string) (*Provider, error) {
 // usableCoord reports whether a row's right ascension and declination are a
 // position rather than an artefact of reading one that was not there.
 //
-// GetFloatColumn writes the zero value for a null entry, so a row with no
-// position does not arrive as an error or a NaN — it arrives as 0.0, and
-// setting HasCoord on it puts a target in Cetus and points a telescope at it.
+// GetFloatColumn reads a null entry as NaN, refused below. A table that writes
+// zeros where it means "no position" is the case NaN cannot catch: the row
+// arrives as 0.0, and setting HasCoord on it puts a target in Cetus and points
+// a telescope at it.
 // This is the same failure catalog/mast was fixed for, and the one
 // catalog.trustworthyCoord describes as having been observed in more than one
 // provider; the fix belongs at the source, which is here.

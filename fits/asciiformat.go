@@ -21,8 +21,14 @@ import (
 //	Dw.d    exponential, double precision, the same layout as E
 //	Aw      character, w columns
 //
-// A field of all blanks is undefined, which is the format's way of saying null
-// — there is no TNULL here, and a blank is not zero.
+// An undefined value is the column's TNULLn string, implicitly space filled to
+// the field's width (§7.2.2). A blank integer field is 0, which §7.2.5 says
+// outright; a blank real or character field, which it gives no value, reads
+// as undefined. These comments used to say a blank was the format's null and
+// that "there is no TNULL here", and the reader and writer were built on it:
+// a declared null string sank the whole read, a numeric one became a real
+// value, and a null this package wrote read as 0 in a reader keeping to the
+// standard (#771).
 
 // asciiForm is one parsed TFORMn of an ASCII table.
 type asciiForm struct {
@@ -78,39 +84,145 @@ func (f asciiForm) String() string {
 	return string(f.code) + strconv.Itoa(f.width) + "." + strconv.Itoa(f.precision)
 }
 
-// parseCell decodes one field's text.
+// parseCell decodes one field's text by FITS 4.0 §7.2.5.
 //
-// blank reports a field of all spaces, which is how an ASCII table says the
-// value is undefined. It is returned separately from the zero value because
-// they are different things, and conflating them is how a missing measurement
-// becomes a real one.
-func (f asciiForm) parseCell(text string) (value float64, str string, blank bool, err error) {
+// null reports a field with no value: one matching the column's TNULLn
+// (hasNull), compared without its padding, or a blank real or character field.
+// It is returned separately from the zero value because they are different
+// things, and conflating them is how a missing measurement becomes a real one.
+// A blank integer field is not null but 0, as §7.2.5 says.
+func (f asciiForm) parseCell(text, tnull string, hasNull bool) (value float64, str string, null bool, err error) {
 	trimmed := strings.TrimSpace(text)
 
-	if trimmed == "" {
+	if hasNull && trimmed == strings.TrimSpace(tnull) {
 		return 0, "", true, nil
 	}
 
-	if f.code == 'A' {
+	switch {
+	case trimmed == "" && f.code == 'I':
+		return 0, "", false, nil
+	case trimmed == "":
+		return 0, "", true, nil
+	case f.code == 'A':
 		return 0, strings.TrimRight(text, " "), false, nil
 	}
 
-	// FITS permits a D exponent where Go expects E, since Fortran wrote
-	// double-precision literals that way.
-	normalized := strings.Map(func(r rune) rune {
-		if r == 'D' || r == 'd' {
-			return 'E'
-		}
-
-		return r
-	}, trimmed)
-
-	v, err := strconv.ParseFloat(normalized, 64)
+	v, err := f.parseNumber(trimmed)
 	if err != nil {
 		return 0, "", false, fmt.Errorf("%w: %q is not a number", ErrBadTForm, trimmed)
 	}
 
 	return v, "", false, nil
+}
+
+// parseNumber reads a numeric field's text, already trimmed.
+//
+// The standard's form is a signed digit string with at most one decimal
+// point, then optionally an exponent introduced by E, D or a bare sign:
+// "1.5-3" is 1.5e-3. A real field written without a decimal point has one
+// implied before its rightmost d digits, so "12345" in F8.2 is 123.45. That
+// form is deprecated but still defined, and reading it as 12345 is a factor of
+// a hundred no reader would notice.
+//
+// Text outside that form, such as the nan or inf some writers put in a real
+// field, is read as strconv reads it, with a D exponent taken for E.
+func (f asciiForm) parseNumber(s string) (float64, error) {
+	mantissa, exponent, ok := splitFortranNumber(s)
+	if !ok {
+		v, err := strconv.ParseFloat(strings.NewReplacer("D", "E", "d", "e").Replace(s), 64)
+		if err != nil {
+			return 0, fmt.Errorf("parse %q: %w", s, err)
+		}
+
+		return v, nil
+	}
+
+	if f.code != 'I' && f.precision > 0 && !strings.Contains(mantissa, ".") {
+		mantissa = impliedDecimal(mantissa, f.precision)
+	}
+
+	if exponent != "" {
+		mantissa += "e" + exponent
+	}
+
+	v, err := strconv.ParseFloat(mantissa, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse %q: %w", s, err)
+	}
+
+	return v, nil
+}
+
+// splitFortranNumber splits s into its mantissa, sign included, and its
+// exponent as a signed integer, reporting false if s is not in §7.2.5's form.
+func splitFortranNumber(s string) (mantissa, exponent string, ok bool) {
+	i := 0
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i++
+	}
+
+	digits, points := 0, 0
+
+	for ; i < len(s); i++ {
+		if s[i] == '.' {
+			points++
+
+			continue
+		}
+
+		if s[i] < '0' || s[i] > '9' {
+			break
+		}
+
+		digits++
+	}
+
+	if digits == 0 || points > 1 {
+		return "", "", false
+	}
+
+	mantissa, rest := s[:i], s[i:]
+
+	switch {
+	case rest == "":
+		return mantissa, "", true
+	case strings.ContainsRune("EeDd", rune(rest[0])):
+		rest = rest[1:]
+	case rest[0] != '+' && rest[0] != '-':
+		return "", "", false
+	}
+
+	j := 0
+	if j < len(rest) && (rest[j] == '+' || rest[j] == '-') {
+		j++
+	}
+
+	if j == len(rest) {
+		return "", "", false
+	}
+
+	for _, c := range rest[j:] {
+		if c < '0' || c > '9' {
+			return "", "", false
+		}
+	}
+
+	return mantissa, rest, true
+}
+
+// impliedDecimal places a decimal point before the rightmost d digits of a
+// signed digit string, with leading zeros assumed where there are fewer.
+func impliedDecimal(mantissa string, d int) string {
+	sign, digits := "", mantissa
+	if digits[0] == '+' || digits[0] == '-' {
+		sign, digits = digits[:1], digits[1:]
+	}
+
+	if len(digits) < d {
+		digits = strings.Repeat("0", d-len(digits)) + digits
+	}
+
+	return sign + digits[:len(digits)-d] + "." + digits[len(digits)-d:]
 }
 
 // formatCell renders a value into its fixed-width field.
