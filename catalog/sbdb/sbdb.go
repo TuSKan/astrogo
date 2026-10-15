@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -310,26 +311,27 @@ func ambiguous(query string, list []lookupMatch) error {
 		resolve.ErrAmbiguous, query, len(list), strings.Join(names, "; "), more)
 }
 
-// brightnessMargin is a cushion added to a requested magnitude bound
-// before using it as an absolute-magnitude (H/M1) prefilter — a body needs
-// some brightening from a favorable-opposition geometry to go from its
-// intrinsic absolute magnitude to what's actually seen, so the real filter
-// (computed apparent magnitude, done downstream once real per-body
-// geometry is known — see plan.VisibleTonight) needs candidates a tight
-// H/M1 bound alone would incorrectly exclude here.
+// brightnessMargin is how much fainter than the requested bound a body's
+// absolute magnitude (H/M1) may be and still be a candidate.
 //
-// 4.0 is calibrated against the largest real-world opposition brightening
-// among the well-known bright asteroids — Ceres, the biggest correction of
-// the three (H=3.4, best-ever apparent ≈6.7, a ≈3.3 mag correction) — with
-// headroom. It deliberately does NOT chase extreme close-approach NEA
-// brightening (e.g. 99942 Apophis's 2029 flyby: H=19.7 but a predicted
-// peak apparent magnitude ≈3.1, a ≈16.6 mag correction): a margin that
-// large would defeat the purpose of a prefilter (empirically, H<20 for
-// asteroids alone numbers in the hundreds of thousands) and belongs to a
-// fundamentally different query — a dedicated close-approach lookup
-// against JPL's Close Approach Data API — which this library doesn't
-// implement. This is a deliberate, documented scope limitation, not an
-// oversight.
+// A body is seen brighter than its absolute magnitude only when r·Δ, the
+// product of its distances in AU from the Sun and from the Earth, is below 1.
+// How small r·Δ can get is bounded by the perihelion when that is beyond the
+// Earth's aphelion (see couldReach), and not at all when it is inside; the
+// margin limits how far either may take a candidate: 4.0 admits a body whose
+// r·Δ falls to 10^(−0.8) ≈ 0.16 AU². This comment used to calibrate it
+// against Ceres, "H=3.4, best-ever apparent ≈6.7, a ≈3.3 mag correction", but
+// that correction runs the other way: Ceres is never brighter than about 6.3,
+// three magnitudes fainter than its H, as every main-belt body is (#779).
+//
+// It deliberately does NOT chase extreme close-approach NEA brightening
+// (e.g. 99942 Apophis's 2029 flyby: H=19.7 but a predicted peak apparent
+// magnitude ≈3.1, a ≈16.6 mag correction): a margin that large would defeat
+// the purpose of a prefilter (empirically, H<20 for asteroids alone numbers
+// in the hundreds of thousands) and belongs to a fundamentally different
+// query — a dedicated close-approach lookup against JPL's Close Approach
+// Data API — which this library doesn't implement. This is a deliberate,
+// documented scope limitation, not an oversight.
 const brightnessMargin = 4.0
 
 // dwarfPlanetSPKIDs holds the SPK-ID of each of the five IAU-recognized
@@ -414,26 +416,28 @@ func cellString(v any) string {
 	}
 }
 
-// SearchBright returns every asteroid and comet SBDB tracks with an
-// absolute magnitude (H for asteroids, M1 for comets) within
-// brightnessMargin of req.MaxVMag, brightest (lowest H/M1) first. This is
-// Stage 1 of a two-stage design — it returns identity plus H/G or M1/K1
-// only, never a real position or computed apparent magnitude, since that
-// needs per-body ephemeris state the catalog layer deliberately doesn't
-// depend on (Stage 2 lives in plan.VisibleTonight, which already imports
-// both catalog and ephemeris).
+// SearchBright returns the asteroids and comets SBDB tracks that could be
+// seen brighter than req.MaxVMag: an absolute magnitude (H for asteroids, M1
+// for comets) within brightnessMargin of it, and a perihelion near enough for
+// the body to reach it at all (see couldReach), brightest (lowest H/M1)
+// first. This is Stage 1 of a two-stage design — it returns identity plus
+// H/G or M1/K1 only, never a real position or computed apparent magnitude,
+// since that needs per-body ephemeris state the catalog layer deliberately
+// doesn't depend on (Stage 2 lives in plan.VisibleTonight, which already
+// imports both catalog and ephemeris).
+//
+// The perihelion bound does not depend on the date, so a comet that could be
+// bright at perihelion is a candidate however long ago that was.
 //
 // req.Limit defaults to 50 per kind (asteroids and comets are queried and
 // capped separately, so up to 100 candidates total). Without a req.Limit, a
 // kind with more candidates than that gives its 50 brightest followed by an
 // error wrapping [resolve.ErrTruncated], never a short list that looks
-// complete, and only a complete list is cached. Because queryBright
-// sorts server-side by H/M1 ascending before this cap is applied, the
-// candidates kept are always the genuinely brightest ones within
-// brightnessMargin, not an arbitrary subset — a real bug in an earlier
-// version of this function (no sort, so a raw 500-per-kind cap could
-// arbitrarily drop bright candidates while keeping fainter ones nearer the
-// H/M1 boundary) that live testing against the real SBDB Query API caught.
+// complete, and only a complete list is cached. queryBright sorts
+// server-side by H/M1 ascending before this cap is applied, so the
+// candidates kept are the lowest-H ones among those that could reach the
+// bound. Sorted without that bound, they were not: the lowest-H asteroids are
+// trans-Neptunian, and Juno, Hebe and Iris were cut at every bound (#779).
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -455,30 +459,34 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 		ask = limit + 1
 	}
 
-	maxAbsMag := req.MaxVMag + brightnessMargin
-
 	return func(yield func(resolve.Target, error) bool) {
-		asteroids, err := p.queryBright(ctx, "a", "H", maxAbsMag, ask)
+		asteroids, asteroidRows, err := p.queryBright(ctx, "a", "H", req.MaxVMag, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
 
-		comets, err := p.queryBright(ctx, "c", "M1", maxAbsMag, ask)
+		comets, cometRows, err := p.queryBright(ctx, "c", "M1", req.MaxVMag, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
 
+		// Whether a kind was cut is decided by the rows SBDB sent, not the
+		// ones kept: a row past the limit means there were more, whatever
+		// the exact check below then made of the rows that did arrive.
 		var cut []string
 
-		if len(asteroids) > limit {
-			asteroids, cut = asteroids[:limit], append(cut, "asteroids")
+		if asteroidRows > limit {
+			cut = append(cut, "asteroids")
 		}
 
-		if len(comets) > limit {
-			comets, cut = comets[:limit], append(cut, "comets")
+		if cometRows > limit {
+			cut = append(cut, "comets")
 		}
+
+		asteroids = asteroids[:min(len(asteroids), limit)]
+		comets = comets[:min(len(comets), limit)]
 
 		targets := make([]resolve.Target, 0, len(asteroids)+len(comets))
 		targets = append(targets, asteroids...)
@@ -498,8 +506,8 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 		}
 
 		if len(cut) > 0 {
-			yield(resolve.Target{}, fmt.Errorf("%w: SBDB has more than %d %s under absolute magnitude %g",
-				resolve.ErrTruncated, limit, strings.Join(cut, " and "), maxAbsMag))
+			yield(resolve.Target{}, fmt.Errorf("%w: SBDB has more than %d candidate %s for magnitude %g",
+				resolve.ErrTruncated, limit, strings.Join(cut, " and "), req.MaxVMag))
 		}
 	}
 }
@@ -586,15 +594,15 @@ func (p *Provider) lookup(ctx context.Context, key, value string) (lookupPayload
 }
 
 // queryBright issues one sb-kind-scoped bulk query against
-// remote.JPLSBDBQuery, filtering by magField < maxVal, sorted magField
-// ascending (brightest first — confirmed live that the query API's `sort`
-// parameter, distinct from ADQL-style syntax, accepts a bare field name
-// with ascending as the default direction) so that limit always keeps the
-// genuinely brightest candidates rather than an arbitrary subset. Decodes
-// the column-oriented response into resolve.Targets carrying identity,
-// H/G (asteroids) or M1/K1 (comets), and — when the full set parses —
-// osculating orbital elements (see elementFields).
-func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVal float64, limit int) ([]resolve.Target, error) {
+// remote.JPLSBDBQuery for the bodies [brightConstraint] admits, sorted
+// magField ascending (brightest first — confirmed live that the query API's
+// `sort` parameter, distinct from ADQL-style syntax, accepts a bare field name
+// with ascending as the default direction), keeps those [couldReach] passes,
+// and reports how many rows SBDB sent so the caller can tell a cut answer
+// from a complete one. Decodes the column-oriented response into
+// resolve.Targets carrying identity, H/G (asteroids) or M1/K1 (comets), and —
+// when the full set parses — osculating orbital elements (see elementFields).
+func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVMag float64, limit int) ([]resolve.Target, int, error) {
 	fields := "full_name,spkid,H,G,class" + elementFields
 	if magField == "M1" {
 		fields = "full_name,spkid,M1,K1,class" + elementFields
@@ -602,7 +610,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 
 	params := url.Values{}
 	params.Set("sb-kind", sbKind)
-	params.Set("sb-cdata", fmt.Sprintf(`{"AND":["%s|LT|%g"]}`, magField, maxVal))
+	params.Set("sb-cdata", brightConstraint(magField, maxVMag))
 	params.Set("fields", fields)
 	params.Set("sort", magField)
 	params.Set("limit", strconv.Itoa(limit))
@@ -614,7 +622,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 
 	var resp sbdbQueryResponse
 	if err := p.client.GetJSON(ctx, remote.JPLSBDBQuery, "", params, &resp); err != nil {
-		return nil, fmt.Errorf("sbdb: bulk query (sb-kind=%s): %w", sbKind, err)
+		return nil, 0, fmt.Errorf("sbdb: bulk query (sb-kind=%s): %w", sbKind, err)
 	}
 
 	col := make(map[string]int, len(resp.Fields))
@@ -745,10 +753,95 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			}
 		}
 
+		if hasQ && !couldReach(t, q, maxVMag) {
+			continue
+		}
+
 		targets = append(targets, t)
 	}
 
-	return targets, nil
+	return targets, len(resp.Data), nil
+}
+
+// earthAphelionAU is the farthest the Earth gets from the Sun, (1 + e)·a
+// with e = 0.0167. A body r from the Sun is at least r − 1.0167 AU from the
+// Earth, which is what bounds how bright a body whose orbit stays outside
+// the Earth's can ever look.
+const earthAphelionAU = 1.0167
+
+// couldReach reports whether a body with perihelion distance q could ever be
+// seen brighter than maxVMag.
+//
+// Its distance from the Sun is never less than q, and if q is beyond the
+// Earth's aphelion its distance from the Earth is never less than
+// q − earthAphelionAU. An asteroid's H-G magnitude is
+// H + 5·log10(r·Δ) plus a phase term that is never negative when
+// 0 <= G <= 1, so it is never brighter than H + 5·log10(q·(q − 1.0167)). A
+// comet's total magnitude is M1 + 5·log10(Δ) + K1·log10(r), never brighter
+// than M1 + 5·log10(q − 1.0167) + K1·log10(q) when K1 >= 0. A body that can
+// come inside the Earth's aphelion, or whose G or K1 is outside those ranges,
+// has no such bound and is kept.
+func couldReach(t resolve.Target, q, maxVMag float64) bool {
+	if q <= earthAphelionAU {
+		return true
+	}
+
+	switch {
+	case t.HasH && t.G >= 0 && t.G <= 1:
+		return t.H+5*math.Log10(q*(q-earthAphelionAU)) < maxVMag
+	case t.HasM1 && t.K1 >= 0:
+		return t.M1+5*math.Log10(q-earthAphelionAU)+t.K1*math.Log10(q) < maxVMag
+	default:
+		return true
+	}
+}
+
+// brightOffsets are the band edges [brightConstraint] splits the magnitude
+// range into, relative to the bound asked for: wide where SBDB holds only a
+// handful of bodies, one magnitude wide where it holds thousands.
+var brightOffsets = []float64{-20, -12, -8, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, brightnessMargin}
+
+// brightConstraint is the sb-cdata for the bodies of one kind that could be
+// seen brighter than maxVMag: absolute magnitude under maxVMag +
+// brightnessMargin, and, band by band, a perihelion close enough that
+// [couldReach] could pass for the brightest body in the band.
+//
+// Without the perihelion bound the bodies with the lowest H are distant
+// ones: of the 50 asteroids SBDB listed first under H 6, 9 or 11, 47 were
+// trans-Neptunian objects, which are fainter than their H by some 16
+// magnitudes, and Juno, Hebe and Iris were never a candidate at any bound
+// (#779). SBDB cannot evaluate the bound per body, so each band uses its
+// brightest edge, which admits a superset; queryBright applies the exact
+// test to what comes back. Below the first edge there is no constraint, and
+// for comets one more term admits any whose K1 is negative or missing, which
+// the bound does not cover.
+func brightConstraint(magField string, maxVMag float64) string {
+	num := func(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
+
+	terms := []string{strconv.Quote(magField + "|LT|" + num(maxVMag+brightOffsets[0]))}
+
+	for i := range len(brightOffsets) - 1 {
+		lo, hi := maxVMag+brightOffsets[i], maxVMag+brightOffsets[i+1]
+
+		// The farthest perihelion from which a body as bright as lo could
+		// reach maxVMag, solving the bound in couldReach for q.
+		x := math.Pow(10, (maxVMag-lo)/5)
+
+		maxQ := (earthAphelionAU + math.Sqrt(earthAphelionAU*earthAphelionAU+4*x)) / 2
+		if magField == "M1" {
+			maxQ = earthAphelionAU + x
+		}
+
+		terms = append(terms, fmt.Sprintf(`{"AND":[%q,%q,%q]}`,
+			magField+"|GE|"+num(lo), magField+"|LT|"+num(hi), "q|LT|"+num(maxQ)))
+	}
+
+	if magField == "M1" {
+		top := strconv.Quote("M1|LT|" + num(maxVMag+brightnessMargin))
+		terms = append(terms, `{"AND":[`+top+`,"K1|LT|0"]}`, `{"AND":[`+top+`,"K1|ND"]}`)
+	}
+
+	return `{"OR":[` + strings.Join(terms, ",") + `]}`
 }
 
 // setElementForms sets whichever of the two element forms SBDB published:

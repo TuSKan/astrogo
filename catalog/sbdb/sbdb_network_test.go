@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -109,19 +110,20 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 
 	prov := New()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Two bulk queries; the asteroid one takes about 12 s on its own.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	var got []resolve.Target
 
-	// MaxVMag: 1 (not -2) — brightnessMargin was deliberately tightened
-	// from 7.0 to 4.0 (calibrated against real asteroid opposition
-	// brightening; see the const's doc comment), and comets' M1 scale
-	// runs fainter than asteroids' H for the well-known bright bodies —
-	// confirmed live that -2+4=2 leaves zero comets with M1<2 today,
-	// while 1+4=5 comfortably includes real ones (e.g. 31P/Schwassmann-
-	// Wachmann 2) alongside real bright asteroids (H<5 includes Pluto).
-	iter := prov.SearchBright(ctx, resolve.BrightRequest{MaxVMag: 1, Limit: 20})
+	// MaxVMag 7, where real asteroids can be candidates. This test used to
+	// ask for 1 and expect asteroids, and got the dwarf planets: Pluto, Eris
+	// and the rest have the lowest H, and never get brighter than about 14.
+	// No asteroid reaches 1 — Vesta's best is about 5.2 — so under the
+	// perihelion bound none is a candidate there (#779). At 7 the bright
+	// main-belt asteroids are, and comets inside the Earth's aphelion are
+	// at any bound.
+	iter := prov.SearchBright(ctx, resolve.BrightRequest{MaxVMag: 7, Limit: 20})
 	iter(func(tgt resolve.Target, err error) bool {
 		testutil.SkipOnUpstreamFailure(t, err)
 
@@ -138,9 +140,15 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		t.Fatal("expected at least one real asteroid/comet from the live SBDB query API")
 	}
 
-	sawAsteroid, sawComet, sawElements := false, false, false
+	sawAsteroid, sawComet, sawElements, sawJuno := false, false, false, false
 
 	for _, tgt := range got {
+		if strings.HasPrefix(tgt.Name, "136199 Eris") || strings.HasPrefix(tgt.Name, "134340 Pluto") {
+			t.Errorf("%s is a candidate at 7, where it is never brighter than about 14", tgt.Name)
+		}
+
+		sawJuno = sawJuno || strings.HasPrefix(tgt.Name, "3 Juno")
+
 		if tgt.Name == "" || tgt.SPKID == "" {
 			t.Errorf("expected populated Name/SPKID from live server, got %+v", tgt)
 		}
@@ -148,12 +156,8 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		//nolint:exhaustive // counts the named kinds; the rest are legitimately not this test's subject
 		switch tgt.Kind {
 		case resolve.KindAsteroid, resolve.KindDwarfPlanet:
-			// At MaxVMag 1, Stage 1's H-sorted-ascending result set is
-			// dominated by the brightest (lowest-H) known asteroids —
-			// which is exactly the five IAU dwarf planets (Ceres, Pluto,
-			// Eris, Haumea, Makemake), each reported as KindDwarfPlanet
-			// rather than the generic KindAsteroid — so both are expected
-			// here, not just KindAsteroid.
+			// Ceres, a candidate at 7, is reported as KindDwarfPlanet
+			// rather than the generic KindAsteroid, so both count.
 			sawAsteroid = true
 
 			if !tgt.HasH {
@@ -196,13 +200,17 @@ func TestSBDBNetworkSearchBright(t *testing.T) {
 		}
 	}
 
-	// At the generous prefilter this test uses (MaxVMag 1 + the
-	// package's brightnessMargin), real known bodies like Pluto and
-	// several periodic comets should appear on both sides — if either
-	// never shows up, something's wrong with that sb-kind branch, not
-	// just "no bright enough body exists right now".
+	// At 7, the bright main-belt asteroids and several comets should appear
+	// on both sides — if either never shows up, something's wrong with that
+	// sb-kind branch, not just "no bright enough body exists right now".
+	// Juno reaches 6.6 at best and was never a candidate before the
+	// perihelion bound, at any bound, because 47 TNOs outranked it on H.
 	if !sawAsteroid {
 		t.Error("expected at least one asteroid in the live result set")
+	}
+
+	if !sawJuno {
+		t.Error("3 Juno is not a candidate at 7, where it reaches 6.6")
 	}
 
 	if !sawComet {

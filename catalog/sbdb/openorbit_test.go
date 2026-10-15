@@ -191,7 +191,10 @@ func TestSearchBrightDecodesBothFormsAtFullPrecision(t *testing.T) {
 
 	var comets []resolve.Target
 
-	for tgt, err := range New().SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 6}) {
+	// 8, not 6: C/1937 C1's perihelion is 1.73 AU, and with its M1 and K1 it
+	// is never brighter than 7.4, so at 6 it is rightly not a candidate
+	// (#779). This test is about decoding it.
+	for tgt, err := range New().SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 8}) {
 		if err != nil {
 			t.Fatalf("SearchBright: %v", err)
 		}
