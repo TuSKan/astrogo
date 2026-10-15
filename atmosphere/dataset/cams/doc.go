@@ -35,11 +35,13 @@
 //
 //  1. N-dimensional shape reporting. The public API has no structured
 //     Dims()/Shape() method — Dataset.Info() returns only a formatted
-//     string. This package does not parse that string: it derives shape
-//     from real per-file NetCDF-4 metadata instead (see "How shape and
-//     axis order are discovered" below), which is more robust and,
-//     unlike Info()'s string format, is a stable third-party convention
-//     this library didn't invent.
+//     string. This package does not take shape from that string: it
+//     derives shape from real per-file NetCDF-4 metadata instead (see "How
+//     shape and axis order are discovered" below), which is more robust
+//     and, unlike Info()'s string format, is a stable third-party
+//     convention this library didn't invent. It does read the string as
+//     a bound, before any read the decoder would size from the file, and
+//     fails closed if it cannot (#794; see "A malformed file" below).
 //  2. Chunked + deflate reads. Confirmed live: Dataset.Read() correctly
 //     decoded a full 182 MB, 4-dimensional, chunk=[1,1,451,900]
 //     deflate-level-1 aerosol tracer file (55,608,300 float64 values,
@@ -132,6 +134,29 @@
 // doesn't have — distinguishable via errors.Is from any other error,
 // which means the variable exists but its metadata could not be decoded
 // — never a fabricated zero-filled Var.
+//
+// # A malformed file
+//
+// The bytes come from Copernicus or from any file a caller points this at,
+// and a corrupt one is an error wrapping ErrMalformed, never the end of the
+// caller's process. That takes two guards, because the decoder sizes its
+// buffers from what the file declares and does not check it against the
+// file: one corrupted byte made it ask for 8.8 TB (#794).
+//
+//   - A bound before every read: a dataset cannot hold more values than the
+//     file has bytes, or for chunked data more than DEFLATE could inflate
+//     them to, and an attribute's values must fit in its own header
+//     message. A failed allocation is a fatal error in Go, so this has to
+//     come before the read; nothing can catch it after.
+//   - A recover around every call into the decoder, for the panics a
+//     malformed structure leads it into.
+//
+// One path is beyond both. The decoder's own Open allocates each group's
+// local heap from its declared size before returning, so a file corrupted
+// there can still exhaust memory; only the decoder can bound that, and it is
+// reported as https://github.com/scigolib/hdf5/issues/68. Across
+// 6,000 single- to four-byte corruptions of the synthetic fixture's
+// metadata it was 2; every other was read or refused as an error.
 //
 // Explicitly out of scope, deliberately not built here: the ECMWF L137
 // hybrid A/B pressure-reconstruction formula (real pressure from
