@@ -305,26 +305,24 @@ func TestSearchBrightSaysItWasCutWhenTheExactTestDropsTheRows(t *testing.T) {
 
 	perihelionArchive(t, rows, &cdata)
 
-	var (
-		got     int
-		lastErr error
-	)
+	got, cut := 0, false
 
 	for _, err := range New().SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 7}) {
-		if err != nil {
-			lastErr = err
-
-			continue
+		switch {
+		case errors.Is(err, resolve.ErrTruncated):
+			cut = true
+		case err != nil:
+			t.Fatalf("SearchBright: %v", err)
+		default:
+			got++
 		}
-
-		got++
 	}
 
 	if got != 0 {
 		t.Errorf("got %d candidates, want none: every row is a TNO that never reaches 7", got)
 	}
 
-	if !errors.Is(lastErr, resolve.ErrTruncated) {
-		t.Errorf("error = %v, want ErrTruncated: SBDB sent a full page", lastErr)
+	if !cut {
+		t.Error("no ErrTruncated, though SBDB sent a full page")
 	}
 }
