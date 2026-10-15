@@ -91,12 +91,13 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 // downtime and never fail CI for it; the TCP pre-check in requireJPL cannot
 // see a 503, which happens one layer deeper (#244).
 //
-// SBDB's cut is the one other reason allowed. sbdb.SearchBright keeps the 50
-// lowest-H bodies of each kind and says so with resolve.ErrTruncated (#776),
-// and at every magLimit this test uses there are more: 485 asteroids under
-// H 6, of which the 50 kept are 47 TNOs and Vesta, Ceres and Pallas (#779).
-// Neither assertion here depends on the bodies cut, so the report is accepted
-// and logged; any other reason still fails.
+// SBDB's cut is the one other reason allowed. sbdb.SearchBright keeps 50
+// candidates of each kind and says so with resolve.ErrTruncated when there
+// are more (#776). Asteroids are bounded by perihelion and no longer reach
+// 50 at these limits (#779), but the bound has no date, so a comet that
+// could be bright at a perihelion decades ago still counts: at magLimit 5
+// there are more than 50. Neither assertion here depends on the bodies cut,
+// so the report is accepted and logged; any other reason still fails.
 func acceptOnlySBDBsCut(t *testing.T, call string, err error) {
 	t.Helper()
 
