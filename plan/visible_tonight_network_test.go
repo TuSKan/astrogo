@@ -54,16 +54,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	defer cancel()
 
 	tight, err := plan.VisibleTonight(ctx, site, testNight, 2, sources, ephemeris.Default())
-	if err != nil {
-		// A skipped candidate is reported, not swallowed — that is what
-		// ErrIncomplete is for — so an unreachable or overloaded Horizons
-		// arrives here rather than as a missing row. CLAUDE.md's rule for
-		// this tier is to skip on external downtime and never fail CI for
-		// it; the TCP pre-check in requireJPL cannot see a 503, which
-		// happens one layer deeper (#244).
-		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("VisibleTonight (magLimit=2): %v", err)
-	}
+	acceptOnlySBDBsCut(t, "VisibleTonight (magLimit=2)", err)
 
 	for _, r := range tight {
 		if r.Target.Kind == resolve.KindAsteroid || r.Target.Kind == resolve.KindComet {
@@ -72,10 +63,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	}
 
 	loose, err := plan.VisibleTonight(ctx, site, testNight, 5, sources, ephemeris.Default())
-	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("VisibleTonight (magLimit=5): %v", err)
-	}
+	acceptOnlySBDBsCut(t, "VisibleTonight (magLimit=5)", err)
 
 	for _, r := range loose {
 		if r.Target.Kind != resolve.KindAsteroid && r.Target.Kind != resolve.KindComet {
@@ -92,6 +80,43 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 
 		t.Logf("found minor body: %s (%s), mag=%.2f, constellation=%s", r.Target.Name, r.Target.Kind, r.ApparentMag, r.Constellation)
 	}
+}
+
+// acceptOnlySBDBsCut fails the test on any error from VisibleTonight except
+// the one SBDB's candidate list now always carries.
+//
+// A skipped candidate is reported, not swallowed — that is what ErrIncomplete
+// is for — so an unreachable or overloaded Horizons arrives here rather than
+// as a missing row. CLAUDE.md's rule for this tier is to skip on external
+// downtime and never fail CI for it; the TCP pre-check in requireJPL cannot
+// see a 503, which happens one layer deeper (#244).
+//
+// SBDB's cut is the one other reason allowed. sbdb.SearchBright keeps the 50
+// lowest-H bodies of each kind and says so with resolve.ErrTruncated (#776),
+// and at every magLimit this test uses there are more: 485 asteroids under
+// H 6, of which the 50 kept are 47 TNOs and Vesta, Ceres and Pallas (#779).
+// Neither assertion here depends on the bodies cut, so the report is accepted
+// and logged; any other reason still fails.
+func acceptOnlySBDBsCut(t *testing.T, call string, err error) {
+	t.Helper()
+
+	if err == nil {
+		return
+	}
+
+	testutil.SkipOnUpstreamFailure(t, err)
+
+	if !errors.Is(err, plan.ErrIncomplete) {
+		t.Fatalf("%s: %v", call, err)
+	}
+
+	for _, reason := range flattenReasons(err) {
+		if !errors.Is(reason, resolve.ErrTruncated) {
+			t.Fatalf("%s reported a skip other than SBDB's cut: %v", call, reason)
+		}
+	}
+
+	t.Logf("%s: SBDB's candidate list was cut, as it reports (#779): %v", call, err)
 }
 
 // TestVisibleTonight_PlanetaryMoons is the live end-to-end test of

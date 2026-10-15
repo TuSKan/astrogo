@@ -424,7 +424,10 @@ func cellString(v any) string {
 // both catalog and ephemeris).
 //
 // req.Limit defaults to 50 per kind (asteroids and comets are queried and
-// capped separately, so up to 100 candidates total). Because queryBright
+// capped separately, so up to 100 candidates total). Without a req.Limit, a
+// kind with more candidates than that gives its 50 brightest followed by an
+// error wrapping [resolve.ErrTruncated], never a short list that looks
+// complete, and only a complete list is cached. Because queryBright
 // sorts server-side by H/M1 ascending before this cap is applied, the
 // candidates kept are always the genuinely brightest ones within
 // brightnessMargin, not an arbitrary subset — a real bug in an earlier
@@ -442,34 +445,61 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 		limit = 50
 	}
 
+	// Without a limit of the caller's own, the default is this provider's
+	// ceiling, so one row past it is asked for per kind: its arrival is what
+	// tells a cut list from a complete one, as for catalog/simbad. A cut list
+	// is followed by resolve.ErrTruncated and not cached; it used to end
+	// silently at 50, looking complete (#776).
+	ask := limit
+	if req.Limit <= 0 {
+		ask = limit + 1
+	}
+
 	maxAbsMag := req.MaxVMag + brightnessMargin
 
 	return func(yield func(resolve.Target, error) bool) {
-		asteroids, err := p.queryBright(ctx, "a", "H", maxAbsMag, limit)
+		asteroids, err := p.queryBright(ctx, "a", "H", maxAbsMag, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
 		}
 
-		comets, err := p.queryBright(ctx, "c", "M1", maxAbsMag, limit)
+		comets, err := p.queryBright(ctx, "c", "M1", maxAbsMag, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
+		}
+
+		var cut []string
+
+		if len(asteroids) > limit {
+			asteroids, cut = asteroids[:limit], append(cut, "asteroids")
+		}
+
+		if len(comets) > limit {
+			comets, cut = comets[:limit], append(cut, "comets")
 		}
 
 		targets := make([]resolve.Target, 0, len(asteroids)+len(comets))
 		targets = append(targets, asteroids...)
 		targets = append(targets, comets...)
 
-		if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(resolve.Target{}, err)
-			return
+		if len(cut) == 0 {
+			if err := p.cache.Set(cacheKey, targets); err != nil {
+				yield(resolve.Target{}, err)
+				return
+			}
 		}
 
 		for _, t := range targets {
 			if !yield(t, nil) {
 				return
 			}
+		}
+
+		if len(cut) > 0 {
+			yield(resolve.Target{}, fmt.Errorf("%w: SBDB has more than %d %s under absolute magnitude %g",
+				resolve.ErrTruncated, limit, strings.Join(cut, " and "), maxAbsMag))
 		}
 	}
 }
