@@ -1,23 +1,25 @@
 package fits
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 )
 
 // WCS defines the mathematical boundaries transforming image pixel matrices
 // into absolute scientific world coordinates (e.g., Right Ascension / Declination mapping).
 type WCS struct {
-	sipA    map[[2]int]float64
+	sipA    sipPoly
 	tpv2    map[int]float64
 	tpv1    map[int]float64
-	sipBP   map[[2]int]float64
-	sipAP   map[[2]int]float64
-	sipB    map[[2]int]float64
+	sipBP   sipPoly
+	sipAP   sipPoly
+	sipB    sipPoly
 	cdelt   []float64
 	pc      [][]float64
 	ctype   []string
@@ -150,15 +152,15 @@ func (w *WCS) SetPC(pc [][]float64) error {
 // Each map key [2]int{p, q} represents the exponent pair for u^p * v^q.
 // The maps may be nil to disable SIP distortion.
 func (w *WCS) SetSIP(a, b map[[2]int]float64) {
-	w.sipA = cloneCoeffs(a)
-	w.sipB = cloneCoeffs(b)
+	w.sipA = newSIPPoly(a)
+	w.sipB = newSIPPoly(b)
 }
 
 // SetSIPInverse sets the inverse SIP polynomial coefficients (AP, BP).
 // These are used in WorldToPixel to compute a direct inverse without iteration.
 func (w *WCS) SetSIPInverse(ap, bp map[[2]int]float64) {
-	w.sipAP = cloneCoeffs(ap)
-	w.sipBP = cloneCoeffs(bp)
+	w.sipAP = newSIPPoly(ap)
+	w.sipBP = newSIPPoly(bp)
 }
 
 // SetTPV sets the TPV distortion polynomial coefficients.
@@ -170,21 +172,94 @@ func (w *WCS) SetTPV(pv1, pv2 map[int]float64) {
 	w.tpv2 = cloneTPV(pv2)
 }
 
-// cloneCoeffs copies a SIP coefficient map, preserving nil — a nil map means
-// "no distortion" and an empty one would too, but only nil says it was never
-// set.
-func cloneCoeffs(m map[[2]int]float64) map[[2]int]float64 {
-	if m == nil {
+// sipPoly is a SIP polynomial, Σ c · u^p · v^q, held as its terms in one fixed
+// order rather than as the map it is set from.
+//
+// # Why not the map
+//
+// Summed in map order, the same pixel could transform to two different
+// answers from one call to the next: Go randomizes a map's iteration order,
+// and floating-point addition is not associative. Under an ordinary
+// fourth-order distortion, in the run that found it, 5 of 1,089 pixels sampled
+// over a 2048² frame did, in the last bit (#796). Sorted, the terms are summed
+// in one order, always.
+//
+// # Why each power is computed for its own term
+//
+// The power tables this replaced were sized by the largest exponent present
+// and allocated on every evaluation, so a polynomial cost what its largest
+// exponent said rather than what its terms did: one coefficient named
+// A_100000000_0, which a HIERARCH keyword can carry, would have made every
+// pixel cost 800 MB. [ipow] takes log₂ of the exponent in multiplications and
+// allocates nothing, so a polynomial costs its terms and no more.
+type sipPoly []sipTerm
+
+// sipTerm is one c · u^p · v^q.
+type sipTerm struct {
+	p, q int
+	c    float64
+}
+
+// newSIPPoly copies a coefficient map into a sipPoly ordered by (p, q). An
+// empty map is no distortion, the same as nil.
+func newSIPPoly(m map[[2]int]float64) sipPoly {
+	if len(m) == 0 {
 		return nil
 	}
 
-	out := make(map[[2]int]float64, len(m))
-	maps.Copy(out, m)
+	poly := make(sipPoly, 0, len(m))
+	for pq, c := range m {
+		poly = append(poly, sipTerm{p: pq[0], q: pq[1], c: c})
+	}
 
-	return out
+	slices.SortFunc(poly, func(a, b sipTerm) int {
+		return cmp.Or(cmp.Compare(a.p, b.p), cmp.Compare(a.q, b.q))
+	})
+
+	return poly
 }
 
-// cloneTPV is cloneCoeffs for the TPV term maps.
+// eval is the polynomial at (u, v).
+func (s sipPoly) eval(u, v float64) float64 {
+	var sum float64
+	for _, t := range s {
+		sum += t.c * ipow(u, t.p) * ipow(v, t.q)
+	}
+
+	return sum
+}
+
+// ipow is x^n for an integer n, by repeated squaring.
+//
+// A negative n is 1/x^-n, the power it names, rather than an index out of
+// range: SetSIP takes any exponent, and the power tables this replaced
+// panicked on one. The magnitude is taken as a uint so that the most negative
+// int, whose negation overflows an int, is still exact.
+func ipow(x float64, n int) float64 {
+	m := uint(n)
+	if n < 0 {
+		m = -m
+	}
+
+	r := 1.0
+
+	for ; m > 0; m >>= 1 {
+		if m&1 == 1 {
+			r *= x
+		}
+
+		x *= x
+	}
+
+	if n < 0 {
+		return 1 / r
+	}
+
+	return r
+}
+
+// cloneTPV copies a TPV term map, preserving nil — a nil map means "no
+// distortion" and an empty one would too, but only nil says it was never set.
 func cloneTPV(m map[int]float64) map[int]float64 {
 	if m == nil {
 		return nil
@@ -226,49 +301,6 @@ const (
 	deg2rad = math.Pi / 180.0
 	rad2deg = 180.0 / math.Pi
 )
-
-// sipEval evaluates a SIP polynomial: Σ coeffs[(p,q)] · u^p · v^q.
-//
-// Uses precomputed power tables instead of math.Pow for performance:
-// SIP is evaluated per-pixel, so on a 4096×4096 image this runs ~16M times.
-func sipEval(coeffs map[[2]int]float64, u, v float64) float64 {
-	if len(coeffs) == 0 {
-		return 0
-	}
-
-	// Determine maximum exponents to size the power tables.
-	var maxP, maxQ int
-	for pq := range coeffs {
-		if pq[0] > maxP {
-			maxP = pq[0]
-		}
-
-		if pq[1] > maxQ {
-			maxQ = pq[1]
-		}
-	}
-
-	// Precompute u^0..u^maxP and v^0..v^maxQ.
-	upow := make([]float64, maxP+1)
-	vpow := make([]float64, maxQ+1)
-	upow[0] = 1
-	vpow[0] = 1
-
-	for i := 1; i <= maxP; i++ {
-		upow[i] = upow[i-1] * u
-	}
-
-	for i := 1; i <= maxQ; i++ {
-		vpow[i] = vpow[i-1] * v
-	}
-
-	var sum float64
-	for pq, c := range coeffs {
-		sum += c * upow[pq[0]] * vpow[pq[1]]
-	}
-
-	return sum
-}
 
 // CUnit returns the physical unit declared for each axis by the header's
 // CUNITi keywords, as written and with no interpretation, or an empty string
@@ -363,8 +395,8 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 	if w.nAxis >= 2 && len(w.sipA) > 0 && w.lonAxis >= 0 {
 		u := offset[w.lonAxis]
 		v := offset[w.latAxis]
-		offset[w.lonAxis] = u + sipEval(w.sipA, u, v)
-		offset[w.latAxis] = v + sipEval(w.sipB, u, v)
+		offset[w.lonAxis] = u + w.sipA.eval(u, v)
+		offset[w.latAxis] = v + w.sipB.eval(u, v)
 	}
 
 	// Step 2: Linear Transformation mapping offsets onto standard linear plane.
@@ -496,8 +528,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 			// Apply SIP inverse correction if available.
 			// dp gives undistorted pixel offsets; AP/BP map back to distorted.
 			if len(w.sipAP) > 0 {
-				dp[0] += sipEval(w.sipAP, dp[0], dp[1])
-				dp[1] += sipEval(w.sipBP, dp[0], dp[1])
+				dp = w.sipInverse(dp)
 			}
 
 			pix[lo] = w.crpix[lo] + dp[0]
@@ -666,6 +697,20 @@ func (w *WCS) extractProjection() string {
 	}
 
 	return proj
+}
+
+// sipInverse moves an undistorted pixel offset to its distorted one by the
+// inverse polynomials, (u + AP(u, v), v + BP(u, v)).
+//
+// Both are evaluated at the same undistorted offset, as the convention defines
+// them. BP used to be evaluated at an offset AP had already moved: a worse
+// starting guess for WorldToPixel, which its Newton loop hid by converging
+// anyway.
+func (w *WCS) sipInverse(dp [2]float64) [2]float64 {
+	return [2]float64{
+		dp[0] + w.sipAP.eval(dp[0], dp[1]),
+		dp[1] + w.sipBP.eval(dp[0], dp[1]),
+	}
 }
 
 // project applies the forward spherical projection to compute intermediate
@@ -922,6 +967,15 @@ func ExtractWCS(h *Header) (*WCS, error) {
 		return nil, ErrWCSZeroDim
 	}
 
+	// The standard's cap, which Read applies to an image's data but nothing
+	// applied here: a table's header reaches this with an NAXIS Read never
+	// looked at, and 100000000000 sized the axis slices at 800 GB, which ends
+	// the process rather than returning (#796). Capped, the matrices below are
+	// at most 999 × 999.
+	if naxis > maxNAXIS {
+		return nil, fmt.Errorf("%w: NAXIS = %d exceeds %d", ErrWCSMalformedKeyword, naxis, maxNAXIS)
+	}
+
 	crpix := make([]float64, naxis)
 	crval := make([]float64, naxis)
 	cdelt := make([]float64, naxis)
@@ -1120,22 +1174,64 @@ func parseSIPPoly(h *Header, prefix string) (map[[2]int]float64, error) {
 		return nil, fmt.Errorf("%w: %s_ORDER = %d", ErrWCSMalformedKeyword, prefix, order)
 	}
 
+	// The coefficients are the cards the header holds, not a lookup of every
+	// term the order allows. That lookup was (order+1)(order+2)/2 keywords,
+	// about 140 ns each, so one card claiming an order of a million held the
+	// caller for some 19 hours (#796). Read from the cards, the work is what
+	// the header contains, whatever order it claims; the order only decides
+	// which of them are terms.
 	coeffs := make(map[[2]int]float64)
 
-	for p := 0; p <= order; p++ {
-		for q := 0; q <= order-p; q++ {
-			v, _, err := optionalFloat(h, fmt.Sprintf("%s_%d_%d", prefix, p, q), 0)
-			if err != nil {
-				return nil, err
-			}
+	for _, card := range h.Cards {
+		key := strings.ToUpper(strings.TrimSpace(card.Keyword))
 
-			if v != 0 {
-				coeffs[[2]int{p, q}] = v
-			}
+		p, q, ok := sipTermKeyword(key, prefix)
+		if !ok || p > order || q > order-p {
+			continue
+		}
+
+		v, _, err := optionalFloat(h, key, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		if v != 0 {
+			coeffs[[2]int{p, q}] = v
 		}
 	}
 
 	return coeffs, nil
+}
+
+// sipTermKeyword reads key as prefix_p_q, the name of a SIP coefficient. p and
+// q must be written as plain decimals, with no sign and no leading zero, so
+// that exactly the keywords a lookup of prefix_p_q would find are terms:
+// A_02_0 is not A_2_0.
+func sipTermKeyword(key, prefix string) (p, q int, ok bool) {
+	rest, ok := strings.CutPrefix(key, prefix+"_")
+	if !ok {
+		return 0, 0, false
+	}
+
+	ps, qs, ok := strings.Cut(rest, "_")
+	if !ok {
+		return 0, 0, false
+	}
+
+	p, okP := sipExponent(ps)
+	q, okQ := sipExponent(qs)
+
+	return p, q, okP && okQ
+}
+
+// sipExponent is s as a non-negative decimal written the one way %d writes it.
+func sipExponent(s string) (int, bool) {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 || strconv.Itoa(n) != s {
+		return 0, false
+	}
+
+	return n, true
 }
 
 // optionalFloat reads a numeric WCS keyword that may be absent. Absent, it

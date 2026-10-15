@@ -154,12 +154,41 @@ func FuzzRead(f *testing.F) {
 			fuzzCard("END"))...,
 	))
 
+	// A table claiming a negative field count over a row that is there, which
+	// sized its column slices and panicked (#796).
+	f.Add(append(
+		block(fuzzCard("SIMPLE  =                    T")+
+			fuzzCard("BITPIX  =                    8")+
+			fuzzCard("NAXIS   =                    0")+
+			fuzzCard("END")),
+		append(block(fuzzCard("XTENSION= 'BINTABLE'")+
+			fuzzCard("BITPIX  =                    8")+
+			fuzzCard("NAXIS   =                    2")+
+			fuzzCard("NAXIS1  =                    4")+
+			fuzzCard("NAXIS2  =                    1")+
+			fuzzCard("PCOUNT  =                    0")+
+			fuzzCard("GCOUNT  =                    1")+
+			fuzzCard("TFIELDS =                   -1")+
+			fuzzCard("TFORM1  = 'J       '")+
+			fuzzCard("END")), make([]byte, fits.BlockSize)...)...,
+	))
+
 	f.Add([]byte{})
 
 	f.Fuzz(func(_ *testing.T, data []byte) {
 		// Read walks every HDU and dispatches on the header's own type
 		// keywords, so this reaches the image, ASCII-table and bintable paths
 		// as the fuzzer learns to produce their XTENSION cards.
-		_, _ = fits.Read(bytes.NewReader(data))
+		file, err := fits.Read(bytes.NewReader(data))
+		if err != nil {
+			return
+		}
+
+		// A header's WCS is what a caller reads next, and it is sized and
+		// looped by counts the header declares: NAXIS, which Read does not
+		// bound for a table, and the SIP orders (#796).
+		for _, hdu := range file.HDUs {
+			_, _ = fits.ExtractWCS(hdu.Header())
+		}
 	})
 }

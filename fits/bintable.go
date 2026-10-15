@@ -245,9 +245,9 @@ func (f tformField) storedInt(row []byte) (int64, bool) {
 // caller never receives one column's numbers under another column's name; the
 // scalar getters refuse them with [ErrColumnType].
 func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
-	tfields, err := h.GetInt("TFIELDS")
+	tfields, err := requiredCount(h, "TFIELDS", maxTFIELDS)
 	if err != nil {
-		return nil, fmt.Errorf("missing TFIELDS: %w", err)
+		return nil, err
 	}
 
 	rows, err := requiredAxis(h, "NAXIS2")
