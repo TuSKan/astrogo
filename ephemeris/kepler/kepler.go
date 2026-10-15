@@ -468,42 +468,62 @@ func (el Elements) Validate() error {
 }
 
 // SolveKepler solves Kepler's equation E - e*sin(E) = M for the
-// eccentric anomaly E, given the mean anomaly M and eccentricity e
-// (0 <= e < 1), via Newton-Raphson iteration starting from the
-// Eccentricity-dependent initial guess E0 = M + e*sin(M) (or pi for
+// eccentric anomaly E in [0, 2π), given the mean anomaly M and eccentricity
+// e (0 <= e < 1), via Newton-Raphson iteration starting from the
+// Eccentricity-dependent initial guess E0 = M + e*sin(M) (or ±π for
 // e>0.9, where that guess converges poorly). Converges to 1e-12 rad or
 // fails with ErrKeplerNoConverge after 50 iterations; the result is
 // checked finite before being reported as a success, so a degenerate
 // iteration can never silently return a NaN/Inf eccentric anomaly.
+//
+// # Why M is taken in (−π, π]
+//
+// Near perihelion on an orbit with e close to 1, f'(E) = 1 − e·cos E is
+// small: about 1e-4 at e = 0.9999. The Newton step is f/f', so it cannot be
+// smaller than f's own rounding over f'. With M in [0, 2π), the side just
+// before perihelion puts E and M near 2π, f's rounding is an ulp of 2π,
+// 8.9e-16, and the step settles into a two-cycle near 9e-12 that never
+// meets the tolerance. Comet C/2026 C1, at e = 0.99991, sat in that region
+// for about two years before perihelion (#781). Taken in (−π, π], E is small
+// there and f's rounding is relative to it. The ±π start is on the root's
+// side of the curvature: f is convex on [0, π] and concave on [−π, 0], so
+// Newton's method from there approaches the root monotonically. A step taken
+// once f is at its rounding floor is accepted as well, since no further step
+// can improve on it.
 func SolveKepler(meanAnomaly angle.Angle, ecc float64) (angle.Angle, error) {
 	const (
 		tolerance = 1e-12
 		maxIter   = 50
+		epsilon   = 0x1p-52 // the spacing of float64 values at 1
 	)
 
 	if !finite(ecc) || ecc < 0 || ecc >= 1 {
 		return angle.Zero(), fmt.Errorf("%w: eccentricity %v", ErrUnsupportedOrbit, ecc)
 	}
 
-	m := meanAnomaly.Wrap2Pi().Radians()
+	m := meanAnomaly.WrapPi().Radians()
 	if !finite(m) {
 		return angle.Zero(), fmt.Errorf("%w: mean anomaly is not finite", ErrKeplerNoConverge)
 	}
 
 	e := m + ecc*math.Sin(m)
 	if ecc > 0.9 {
-		e = math.Pi
+		e = math.Copysign(math.Pi, m)
 	}
 
 	converged := false
 
 	for range maxIter {
-		f := e - ecc*math.Sin(e) - m
-		fp := 1 - ecc*math.Cos(e)
+		sinE, cosE := math.Sincos(e)
+		f := e - ecc*sinE - m
+		fp := 1 - ecc*cosE
 		de := f / fp
 		e -= de
 
-		if math.Abs(de) < tolerance {
+		// The rounding in f is a few ulps of its largest term.
+		floor := 4 * epsilon * (math.Abs(e) + math.Abs(m))
+
+		if math.Abs(de) < tolerance || math.Abs(f) <= floor {
 			converged = true
 			break
 		}
@@ -513,7 +533,7 @@ func SolveKepler(meanAnomaly angle.Angle, ecc float64) (angle.Angle, error) {
 		return angle.Zero(), fmt.Errorf("%w: after %d iterations", ErrKeplerNoConverge, maxIter)
 	}
 
-	return angle.Rad(e), nil
+	return angle.Rad(e).Wrap2Pi(), nil
 }
 
 // rotatePerifocalToEcliptic transforms a perifocal-frame vector into the
