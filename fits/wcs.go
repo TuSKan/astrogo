@@ -11,6 +11,14 @@ import (
 
 // WCS defines the mathematical boundaries transforming image pixel matrices
 // into absolute scientific world coordinates (e.g., Right Ascension / Declination mapping).
+//
+// [WCS.PixelToWorld] and [WCS.WorldToPixel] only read a WCS, so any number of
+// goroutines may transform through one at once; the setters change it, and
+// must not run beside them. The transforms used to re-derive the projection
+// and the celestial axes from CTYPE on every call, writing them into the WCS
+// as they went, so two goroutines transforming through a shared one were a
+// data race (#797). Those are now derived when CTYPE is set, the one thing
+// they depend on.
 type WCS struct {
 	sipA    map[[2]int]float64
 	tpv2    map[int]float64
@@ -24,6 +32,7 @@ type WCS struct {
 	cunit   []string
 	crval   []float64
 	crpix   []float64
+	proj    string // the celestial projection CTYPE names, or "" for none; see celestialAxes
 	latAxis int
 	lonAxis int
 	nAxis   int
@@ -37,7 +46,7 @@ func NewWCS(naxis int) *WCS {
 		pc[i][i] = 1.0 // Initialize with standard Identity matrix
 	}
 
-	return &WCS{
+	w := &WCS{
 		nAxis: naxis,
 		crpix: make([]float64, naxis),
 		crval: make([]float64, naxis),
@@ -46,6 +55,10 @@ func NewWCS(naxis int) *WCS {
 		cunit: make([]string, naxis),
 		pc:    pc,
 	}
+
+	w.proj, w.lonAxis, w.latAxis = celestialAxes(w.ctype)
+
+	return w
 }
 
 // The accessors copy in both directions, and the ones with a length invariant
@@ -116,6 +129,7 @@ func (w *WCS) SetCTYPE(ctype []string) error {
 	}
 
 	w.ctype = append([]string(nil), ctype...)
+	w.proj, w.lonAxis, w.latAxis = celestialAxes(w.ctype)
 
 	return nil
 }
@@ -349,8 +363,7 @@ func (w *WCS) PixelToWorld(pixels []float64) ([]float64, error) {
 		return nil, fmt.Errorf("%w: expected %d", ErrWCSDimension, w.nAxis)
 	}
 
-	// Detect projection type and set lonAxis/latAxis (needed by SIP and deprojection).
-	proj := w.extractProjection()
+	proj := w.proj
 
 	// Step 1: Compute pixel offsets from reference pixel.
 	offset := make([]float64, w.nAxis)
@@ -450,7 +463,7 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 	}
 
 	pix := make([]float64, w.nAxis)
-	proj := w.extractProjection()
+	proj := w.proj
 
 	if w.nAxis >= 2 && proj != "" {
 		// Analytical initial guess via forward spherical projection.
@@ -605,29 +618,29 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 
 // ── Projection Helpers ───────────────────────────────────────────────────────
 
-// extractProjection returns the 3-letter projection code from CTYPE (e.g., "TAN")
-// and populates lonAxis/latAxis to record the axis mapping.
+// celestialAxes returns the 3-letter projection code CTYPE names (e.g.,
+// "TAN") and which axes hold longitude and latitude.
 //
-// Standard layout: CTYPE1="RA---TAN", CTYPE2="DEC--TAN" → lonAxis=0, latAxis=1.
-// Swapped layout:  CTYPE1="DEC--TAN", CTYPE2="RA---TAN" → lonAxis=1, latAxis=0.
+// Standard layout: CTYPE1="RA---TAN", CTYPE2="DEC--TAN" → lon=0, lat=1.
+// Swapped layout:  CTYPE1="DEC--TAN", CTYPE2="RA---TAN" → lon=1, lat=0.
 // SIP distortion:  CTYPE1="RA---TAN-SIP" → the "-SIP" suffix is stripped.
 //
-// Returns "" if no recognized celestial projection is found.
-func (w *WCS) extractProjection() string {
-	if w.nAxis < 2 {
-		w.lonAxis, w.latAxis = -1, -1
-		return ""
+// Returns "", -1, -1 if no recognized celestial projection is found.
+//
+// A function of CTYPE alone, so it is computed when CTYPE is set and never by
+// a transform (#797).
+func celestialAxes(ctype []string) (proj string, lon, lat int) {
+	if len(ctype) < 2 {
+		return "", -1, -1
 	}
 
 	known := map[string]bool{"TAN": true, "SIN": true, "ARC": true, "STG": true, "AIT": true}
 
 	// Identify which axis is longitude (RA) and which is latitude (DEC).
-	var proj string
-
-	w.lonAxis, w.latAxis = -1, -1
+	lon, lat = -1, -1
 
 	for i := range 2 {
-		ct := w.ctype[i]
+		ct := ctype[i]
 		// Strip the "-SIP" distortion suffix if present.
 		ct = strings.TrimSuffix(ct, "-SIP")
 
@@ -645,27 +658,26 @@ func (w *WCS) extractProjection() string {
 
 		switch {
 		case strings.HasPrefix(prefix, "RA"):
-			w.lonAxis = i
+			lon = i
 			proj = code
 		case strings.HasPrefix(prefix, "DEC"):
-			w.latAxis = i
+			lat = i
 			proj = code
 		case strings.HasPrefix(prefix, "GLON") || strings.HasPrefix(prefix, "ELON"):
-			w.lonAxis = i
+			lon = i
 			proj = code
 		case strings.HasPrefix(prefix, "GLAT") || strings.HasPrefix(prefix, "ELAT"):
-			w.latAxis = i
+			lat = i
 			proj = code
 		}
 	}
 
 	// Both axes must be identified for a valid celestial WCS.
-	if w.lonAxis < 0 || w.latAxis < 0 {
-		w.lonAxis, w.latAxis = -1, -1
-		return ""
+	if lon < 0 || lat < 0 {
+		return "", -1, -1
 	}
 
-	return proj
+	return proj, lon, lat
 }
 
 // project applies the forward spherical projection to compute intermediate
