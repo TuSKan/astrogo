@@ -1,9 +1,21 @@
+//go:build validation
+
+// The lab's benchmarks are behind the validation tag so that CI's Benchmarks
+// job, which runs every untagged benchmark six times on each push to main,
+// does not spend two minutes on comparisons docs/kepler.md has already made.
+// The lab's tests stay untagged: they run on every platform, which is how
+// the arm64 rounding in reduceExact was found. Run these with
+//
+//	go test -tags=validation -run='^$' -bench=. -count=6 ./internal/keplerlab/
+
 package keplerlab_test
 
 import (
 	"math"
 	"math/rand/v2"
 	"testing"
+
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // samples is a fixed set of (M, e) pairs: M uniform over a revolution, e
@@ -57,4 +69,29 @@ func BenchmarkSolvers(b *testing.B) {
 			})
 		}
 	}
+}
+
+// BenchmarkPreparedOrbit: what preparing an orbit saves per state.
+func BenchmarkPreparedOrbit(b *testing.B) {
+	el := ceresLike(b)
+	o := prepare(el)
+	at := el.Epoch().Add(unit.Days(123.456))
+
+	b.Run("StateAt", func(b *testing.B) {
+		for b.Loop() {
+			p, _, err := el.StateAt(at)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			sink += p.X
+		}
+	})
+
+	b.Run("prepared", func(b *testing.B) {
+		for b.Loop() {
+			p, _ := o.stateAt(at)
+			sink += p.X
+		}
+	})
 }

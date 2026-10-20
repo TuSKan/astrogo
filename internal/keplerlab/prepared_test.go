@@ -125,28 +125,3 @@ func TestPreparedOrbitAgrees(t *testing.T) {
 		t.Errorf("the prepared orbit differs from StateAt by %.3g relative", worst)
 	}
 }
-
-// BenchmarkPreparedOrbit: what preparing an orbit saves per state.
-func BenchmarkPreparedOrbit(b *testing.B) {
-	el := ceresLike(b)
-	o := prepare(el)
-	at := el.Epoch().Add(unit.Days(123.456))
-
-	b.Run("StateAt", func(b *testing.B) {
-		for b.Loop() {
-			p, _, err := el.StateAt(at)
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			sink += p.X
-		}
-	})
-
-	b.Run("prepared", func(b *testing.B) {
-		for b.Loop() {
-			p, _ := o.stateAt(at)
-			sink += p.X
-		}
-	})
-}

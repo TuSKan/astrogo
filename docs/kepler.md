@@ -338,5 +338,10 @@ ephemeris layer's (docs/ephemeris.md §6.2).
 
 ```bash
 go test -count=1 -v -run 'Test' ./internal/keplerlab/
-go test -run='^$' -bench=. -count=6 ./internal/keplerlab/ | tee kepler.txt
+go test -tags=validation -run='^$' -bench=. -count=6 ./internal/keplerlab/ | tee kepler.txt
 ```
+
+The tests are untagged and run in every CI job on all three platforms. The
+benchmarks are behind the `validation` tag, so CI's Benchmarks job — every
+untagged benchmark, six times, on each push to main — does not repeat a
+comparison this document has already made.
