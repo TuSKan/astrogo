@@ -23,6 +23,63 @@ var solvers = []solver{
 	{"enrke", enrke},
 	{"markley-stable", markleyStable},
 	{"newton-stable", newtonStable},
+	{"mikkola-published", mikkolaPublished},
+	{"mikkola-stable", mikkolaStable},
+}
+
+// ─── Mikkola 1987 ────────────────────────────────────────────────────────────
+
+// mikkolaStart is Mikkola's starting approximation, "A cubic approximation
+// for Kepler's equation" (Celest. Mech. 40, 329, 1987), eqs. (6)–(9), for m
+// in [−π, π]: Kepler's equation in s = sin(E/3) with arcsin truncated after
+// its cubic term, solved by Cardano, the s⁵ correction (7) added, and E
+// recovered through (8).
+func mikkolaStart(m, e float64) float64 {
+	den := 4*e + 0.5
+	alpha := (1 - e) / den // (9a)
+	beta := 0.5 * m / den  // (9a)
+
+	z := math.Cbrt(beta + math.Copysign(math.Sqrt(beta*beta+alpha*alpha*alpha), beta)) // (9b)
+	if z == 0 {                                                                        // e = 1 and M = 0 together
+		return m
+	}
+
+	s := z - alpha/z                         // (9c)
+	s -= 0.078 * s * s * s * s * s / (1 + e) // (7)
+
+	return m + e*(3*s-4*s*s*s) // (8)
+}
+
+// mikkolaPublished is Mikkola's method as published: his starter, then
+// Burkhart and Danby's correction carried to dx₄ (his eq. 24) — the same
+// recurrence as Markley's δ₃ … δ₅ — on the direct residual, with M reduced by
+// the float64 2π.
+func mikkolaPublished(m, e float64) float64 {
+	m = reduceFloat(m)
+	bigE := mikkolaStart(m, e)
+
+	s, c := math.Sincos(bigE)
+
+	return bigE + markleyDelta5(bigE-e*s-m, 1-e*c, e*s, e*c)
+}
+
+// mikkolaStable is Mikkola's starter with the same stable residual, slope,
+// exact reduction and odd symmetry as markleyStable.
+func mikkolaStable(m, e float64) float64 {
+	m = reduceExact(m)
+	if m == 0 {
+		return m
+	}
+
+	am := math.Abs(m)
+	bigE := mikkolaStart(am, e)
+
+	s, c := math.Sincos(bigE)
+	f1 := stableSlope(s, c, e)
+
+	bigE += markleyDelta5(stableResidual(bigE, s, am, e), f1, e*s, 1-f1)
+
+	return math.Copysign(bigE, m)
 }
 
 // production is kepler.SolveKepler as it ships: Newton from M + e·sin M (±π
@@ -146,7 +203,8 @@ func markleyStart(m, e float64) float64 {
 	d := 3*(1-e) + alpha*e                                        // (5)
 	q := 2*alpha*d*(1-e) - m*m                                    // (9)
 	r := 3*alpha*d*(d-1+e)*m + m*m*m                              // (10)
-	w := math.Pow(math.Abs(r)+math.Sqrt(q*q*q+r*r), 2.0/3)        // (14)
+	w := math.Cbrt(math.Abs(r) + math.Sqrt(q*q*q+r*r))            // (14), as a cube root
+	w *= w                                                        // and its square: Pow(·, 2/3) costs more
 
 	if w == 0 { // e = 1 and M = 0 together, the one singular point
 		return m

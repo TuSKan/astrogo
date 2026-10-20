@@ -69,6 +69,7 @@ func agmPi(p uint) *big.Float {
 		t.Sub(t, d)
 
 		a = an
+
 		pw.Mul(pw, f(2))
 	}
 
@@ -235,25 +236,6 @@ func solveExact(m, e float64) *big.Float {
 	}
 
 	return bigE
-}
-
-// relErr is |got − want| / |want| in units of 2⁻⁵², the float64 epsilon —
-// "ulps of E". A zero want must be matched by a zero of the same sign.
-func relErr(got float64, want *big.Float) float64 {
-	if want.Sign() == 0 {
-		if got == 0 && math.Signbit(got) == want.Signbit() {
-			return 0
-		}
-
-		return math.Inf(1)
-	}
-
-	d := new(big.Float).SetPrec(prec).Sub(newF(got), want)
-	d.Quo(d, want)
-
-	r, _ := d.Float64()
-
-	return math.Abs(r) / 0x1p-52
 }
 
 // TestOraclePiAgrees: two unrelated algorithms for π agree to the precision
