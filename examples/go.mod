@@ -13,7 +13,7 @@ module github.com/TuSKan/astrogo/examples
 
 go 1.27
 
-require github.com/TuSKan/astrogo v0.20.0
+require github.com/TuSKan/astrogo v0.21.0
 
 require (
 	github.com/andybalholm/brotli v1.2.3 // indirect
