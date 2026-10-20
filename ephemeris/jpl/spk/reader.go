@@ -714,9 +714,10 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
 	}
 
-	idx := max(int32((et-tInit)/tLen), 0)
-
-	recStart := s.StartAddr + idx*rSize
+	recStart, err := chebyshevRecord(s, et, tInit, tLen, rSize, meta[3])
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
 
 	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
 	if err != nil {
@@ -760,9 +761,10 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
 	}
 
-	idx := max(int32((et-tInit)/tLen), 0)
-
-	recStart := s.StartAddr + idx*rSize
+	recStart, err := chebyshevRecord(s, et, tInit, tLen, rSize, meta[3])
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
 
 	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
 	if err != nil {
@@ -792,6 +794,49 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	}
 
 	return pos, vel, nil
+}
+
+// chebyshevRecord returns the first word of the type 2 or 3 record that holds
+// et. The records are tLen seconds each from tInit, n of them, each rSize
+// words, and the segment's four-word directory (INIT, INTLEN, RSIZE, N)
+// follows the last.
+//
+// An et at the end of the last record is the segment's final instant, which
+// segment selection admits, and it belongs to the last record: the index
+// (et−tInit)/tLen is then exactly n, one past the end. Unclamped, that read
+// the directory and whatever follows it as Chebyshev coefficients — finite
+// numbers, so no check caught them, and de440s put the Earth 6×10⁶¹ km from
+// its center at the last instant the kernel covers (#807). jplephem maps
+// index n to the last record the same way. Any other index outside the
+// records means the directory does not describe et, and is reported rather
+// than clamped: a clamp would hand back the nearest record's polynomial far
+// outside the interval it fits.
+func chebyshevRecord(s *Segment, et, tInit, tLen float64, rSize int32, n float64) (int32, error) {
+	if !finite(n) || n < 1 || n != math.Trunc(n) || n > math.MaxInt32 {
+		return 0, fmt.Errorf("%w: %v records", ErrInvalidRecordCount, n)
+	}
+
+	nRecs := int32(n)
+
+	pos := math.Floor((et - tInit) / tLen)
+	if !(pos >= 0 && pos <= float64(nRecs)) {
+		return 0, fmt.Errorf("%w: ET %v falls in record %v of a segment with %d", ErrCorruptSPK, et, pos, nRecs)
+	}
+
+	idx := int32(pos)
+	if idx == nRecs {
+		idx--
+	}
+
+	// The records end where the directory's four words begin. Checking that
+	// here, rather than trusting N, keeps a directory that overstates its
+	// record count from steering the read into whatever follows.
+	start := int64(s.StartAddr) + int64(idx)*int64(rSize)
+	if start+int64(rSize)-1 > int64(s.EndAddr)-4 {
+		return 0, fmt.Errorf("%w: record %d of %d words runs past the segment's records", ErrCorruptSPK, idx, rSize)
+	}
+
+	return int32(start), nil
 }
 
 // EvalChebyshev evaluates a Chebyshev polynomial and optionally its derivative.

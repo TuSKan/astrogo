@@ -333,10 +333,13 @@ func TestEvaluateType21_ValidRecord(t *testing.T) {
 	}
 }
 
-// buildType2Words assembles a single-record type-2 segment word array. The
-// meta block evaluateType2 reads is ReadDoubles(EndAddr-3, EndAddr) — 4
-// words, not 3 — even though only meta[0..2] (tInit, tLen, rSize) are
-// used; the trailing 0.0 is the unused 4th word (nRecs, in a real kernel).
+// buildType2Words assembles a single-record type-2 segment word array: one
+// record covering ET [0, 10], then the four-word directory evaluateType2
+// reads, INIT, INTLEN, RSIZE and N.
+//
+// The directory used to say N = 0 and INTLEN = 1 while every test evaluated
+// at ET 5, five records past the only one — the out-of-range read #807 fixed,
+// passing here because each test only asked for an error.
 func buildType2Words(mid, radius float64, coeffs []float64) []float64 {
 	words := []float64{mid, radius}
 	words = append(words, coeffs...)
@@ -345,7 +348,7 @@ func buildType2Words(mid, radius float64, coeffs []float64) []float64 {
 
 	rSize := float64(2 + 3*len(coeffs))
 
-	return append(words, 0.0, 1.0, rSize, 0.0) // tInit, tLen, rSize, (unused)
+	return append(words, 0.0, 10.0, rSize, 1.0) // INIT, INTLEN, RSIZE, N
 }
 
 func evaluateType2Segment(words []float64) error {
@@ -449,7 +452,8 @@ func buildType3Words(mid, radius float64, coeff float64) []float64 {
 		words = append(words, coeff)
 	}
 
-	return append(words, 0.0, 1.0, 8.0, 0.0) // tInit, tLen, rSize (2+6*1=8), (unused)
+	// One record covering ET [0, 10]; see buildType2Words.
+	return append(words, 0.0, 10.0, 8.0, 1.0) // INIT, INTLEN, RSIZE (2+6*1), N
 }
 
 func evaluateType3Segment(words []float64) error {
