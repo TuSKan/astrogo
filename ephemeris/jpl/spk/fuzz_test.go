@@ -153,7 +153,7 @@ func FuzzEvaluateSegment(f *testing.F) {
 	f.Add(uint8(2), int32(1), int32(20), 50.0, make([]byte, 200))
 	f.Add(uint8(0), int32(0), int32(0), math.NaN(), []byte{})
 
-	f.Fuzz(func(_ *testing.T, typeSel uint8, startAddr, endAddr int32, et float64, data []byte) {
+	f.Fuzz(func(t *testing.T, typeSel uint8, startAddr, endAddr int32, et float64, data []byte) {
 		segType := [3]int32{2, 3, 21}[int(typeSel)%3]
 
 		r := &spk.Reader{
@@ -168,7 +168,26 @@ func FuzzEvaluateSegment(f *testing.F) {
 			EndET:     1e12,
 		}
 
-		_, _, _ = spk.EvaluateSegment(seg, r, et) // property: never panics or hangs
+		// Property: never panics or hangs — and the record cache changes
+		// nothing. On the same bytes, a cached Reader answers what an uncached
+		// one does, bit for bit or error for error, the second time it is
+		// asked as well as the first.
+		wantP, wantV, wantErr := spk.EvaluateSegment(seg, r, et)
+
+		cached := spk.WithRecordCache(r)
+
+		for call := range 2 {
+			gotP, gotV, gotErr := spk.EvaluateSegment(seg, cached, et)
+
+			switch {
+			case (wantErr == nil) != (gotErr == nil):
+				t.Fatalf("call %d: cached err %v, uncached %v", call+1, gotErr, wantErr)
+			case wantErr != nil && gotErr.Error() != wantErr.Error():
+				t.Fatalf("call %d: cached err %q, uncached %q", call+1, gotErr, wantErr)
+			case wantErr == nil && (!sameVec(gotP, wantP) || !sameVec(gotV, wantV)):
+				t.Fatalf("call %d: cached %+v %+v, uncached %+v %+v", call+1, gotP, gotV, wantP, wantV)
+			}
+		}
 	})
 }
 

@@ -10,6 +10,10 @@ internals every option shares (§6.1) that reproduces today's provider bit for
 bit. #803 records the decision this document re-examines; the numbers below
 confirm it and change one detail of it (§7.4).
 
+**Since then: the first change has shipped** (#802, §6.1). The record cache
+is in `spk.Reader`, the prototype it replaces is deleted, and the measured
+production numbers are in §6.1 beside the prototype's.
+
 **Recommendation in one paragraph.** First, make SPK evaluation read nothing
 it has read before — each segment's directory at open, its last decoded record
 published atomically (#802). Prototyped, that takes a geometric sky from the
@@ -298,10 +302,11 @@ body is placed against today (#810).
 
 ## 6. The six optimizations, measured
 
-### 6.1 The prototype
+### 6.1 The prototype, and the record cache it became
 
-`internal/workload/prototype_test.go` builds the two internals every option
-needs and nothing else:
+`internal/workload/prototype_test.go` (since deleted, replaced by the
+production cache below) built the two internals every option needs and
+nothing else:
 
 - **a record cache** — each type 2 segment's directory read once, its last
   record decoded and published through an `atomic.Pointer`, immutable once
@@ -310,10 +315,10 @@ needs and nothing else:
   memoized per epoch, so a body's chain is evaluated once whatever asks for
   it.
 
-`TestPrototypeReproducesTheProvider` holds it to `jpl.Provider.State` **bit
-for bit** over a year of hourly epochs for the whole sky, 78,840 states that
-cross thousands of records, and was canaried: changing τ's division to a
-multiplication by the reciprocal fails it.
+`TestPrototypeReproducesTheProvider` (since deleted) held it to
+`jpl.Provider.State` **bit for bit** over a year of hourly epochs for the
+whole sky, 78,840 states that cross thousands of records, and was canaried:
+changing τ's division to a multiplication by the reciprocal failed it.
 
 | workload | today | record cache | + instant | + position only |
 | --- | ---: | ---: | ---: | ---: |
@@ -324,6 +329,34 @@ multiplication by the reciprocal fails it.
 | Moon, 4-day steps, disk | 2,772 ns/state | | 1,629 ns | |
 | 16 readers, one epoch, disk | | | 69 ns/op | |
 | 16 readers, random epochs, disk | 5,448 ns/op | | 1,994 ns/op | |
+
+**The record cache in production (#802).**
+
+- **What it holds.** `spk.Reader` keeps each evaluated segment's directory and its last decoded record. Types 2 and 3 keep their four-word directory; type 21 keeps its epoch table.
+- **How it's shared.** Records are published through an `atomic.Pointer` and keyed by the segment's addresses.
+- **It's the reference arithmetic.** `TestRecordCacheReproducesDe440s` holds it to an uncached reader bit for bit over every de440s segment, a year of hourly epochs in order and shuffled.
+- **Allocation contracts.** `TestRecordCacheHitAllocatesNothing` and `TestStateFromCachedRecordsAllocatesNothing` make zero allocations a contract. The segment lookup's escaping pointer, the one allocation the cache left, went in the same change.
+
+The workload benchmarks, before and after on the same machine (benchstat medians of 6, every row p = 0.002):
+
+| workload | before | after |
+| --- | ---: | ---: |
+| geometric sky, disk | 355 µs | **7.6 µs** |
+| geometric sky, `mem://` | 151 µs | 7.5 µs |
+| geometric sky, bytes | 16.4 µs | 6.8 µs |
+| — allocations | 188 | **0** |
+| the Moon at one epoch, disk | 2.57 µs, 20 allocations | 0.96 µs, 0 |
+| the Moon at 1-minute steps, disk | 2,525 ns/state | 918 ns/state |
+| apparent sky, bytes | 87.5 µs | 49.2 µs |
+| observed sky from a site, disk | 388 µs | 54 µs |
+| Mars oppositions over a year | 6.0 ms, ≈19,100 reads | 3.3 ms, 963 reads |
+| a day of Moon events | 6.0 ms | 5.9 ms (not significant: `Context`-bound, #790) |
+| 16 readers, random epochs, disk | 5.3 µs/op | 2.0 µs/op (misses still meet #811's lock) |
+
+The three backends are now within noise of each other, as the prototype
+predicted. The sky costs about twice the prototype's 3.8 µs because each
+`State` still goes through the provider: its read lock, the segment lookup,
+UTC → TDB, and the Earth's chain once per body, which is the instant's job.
 
 ### 6.2 Verdicts
 
@@ -472,7 +505,8 @@ Performance is reported and never gates (CLAUDE.md); these gate.
 1. **Bit identity for refactors that claim to change only work.** The record
    cache and the instant's geometric path reproduce the old provider to the
    last bit over a year of hourly epochs for the sky, as
-   `TestPrototypeReproducesTheProvider` does, canaried. Comparing two
+   `TestRecordCacheReproducesDe440s` and `TestRecordCacheIsBitIdentical` do
+   for the record cache, canaried. Comparing two
    *different* arithmetic paths bit for bit is not allowed (it fails under
    arm64's FMA); those get bounds.
 2. **Independent references.**
@@ -502,11 +536,11 @@ Performance is reported and never gates (CLAUDE.md); these gate.
 ## 9. Phases
 
 1. **This change.** The document and `internal/workload`; no production code.
-2. **SPK evaluation without reads (#802)** — the recommended first change.
-   Directory at open; last record per segment decoded and published
-   atomically; type 21's epoch table at open; no allocation on a hit. Gates
-   1, 3, 4. Expected, as prototyped: sky from disk 360 → ~4 µs, a minute
-   track 2.6 → ~0.7 µs per state, all three backends equal. No API change.
+2. **SPK evaluation without reads (#802) — done.**
+   - **What it does.** A segment's directory and its type 21 epoch table are read on first use; its last record is decoded and published atomically; a hit allocates nothing.
+   - **Gates.** 1, 3 and 4.
+   - **Measured** (§6.1): the sky from disk 355 → 7.6 µs, a minute track 2.5 → 0.92 µs per state, all three backends equal.
+   - **No API change.**
 3. **Identity, centre and frame (#809, #813, the first half of #803).** `ID`
    as a NAIF code, `State.Center` as an `ID`, `Locate`, segments checked for
    their frame. Breaking.

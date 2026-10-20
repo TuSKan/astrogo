@@ -168,16 +168,17 @@ func openCounted(tb testing.TB) (*jpl.Provider, *readCounter) {
 	return p, c
 }
 
-// readCounter counts the reads issued by every kernel of one provider. The
-// planetary and satellite kernels are SPK types 2 and 3, which read twice per
-// evaluation — the segment's directory, then the record — so half the count
-// is the number of segment evaluations.
+// readCounter counts the reads issued by every kernel of one provider.
+//
+// Before the record cache (#802) a type 2 or 3 evaluation read twice — the
+// segment's directory, then the record — so half the count was the number of
+// segment evaluations, and the baseline in docs/ephemeris.md §4 reports it as
+// evals/op. Since then a segment's directory is read once and a record once
+// for as long as evaluations stay in it, so the count is reported as what it
+// is, reads/op.
 type readCounter struct {
 	reads atomic.Int64
 }
-
-// evaluations is the number of segment evaluations behind the reads.
-func (c *readCounter) evaluations() int64 { return c.reads.Load() / 2 }
 
 // add puts the kernel read from ra into p, counting its reads.
 func (c *readCounter) add(tb testing.TB, p *jpl.Provider, ra spk.ReadAtCloser, name string) {

@@ -46,7 +46,7 @@ type place = func(core.Provider, core.ID, time.Time) (core.State, error)
 
 // measure runs op once outside the clock — the first call of anything pays
 // for lazy loads that are not its cost — zeroes the counters, times op, and
-// reports what one op cost in State calls and segment evaluations. Either
+// reports what one op cost in State calls and kernel reads. Either
 // counter may be nil.
 func measure(b *testing.B, cp *countingProvider, f *readCounter, op func() error) {
 	b.Helper()
@@ -78,7 +78,7 @@ func measure(b *testing.B, cp *countingProvider, f *readCounter, op func() error
 	}
 
 	if f != nil {
-		b.ReportMetric(float64(f.evaluations())/n, "evals/op")
+		b.ReportMetric(float64(f.reads.Load())/n, "reads/op")
 	}
 }
 
