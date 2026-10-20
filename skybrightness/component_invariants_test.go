@@ -116,13 +116,13 @@ func TestComponentsAreLinearInTheirSource(t *testing.T) {
 		},
 	}
 
-	for name, make := range build {
-		one, err := make(1)
+	for name, newComponent := range build {
+		one, err := newComponent(1)
 		if err != nil {
 			t.Fatalf("%s at scale 1: %v", name, err)
 		}
 
-		many, err := make(factor)
+		many, err := newComponent(factor)
 		if err != nil {
 			t.Fatalf("%s at scale %d: %v", name, factor, err)
 		}

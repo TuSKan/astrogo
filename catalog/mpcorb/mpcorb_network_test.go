@@ -234,7 +234,11 @@ func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 
 	var n int
 
-	for range seq {
+	for _, err := range seq {
+		if err != nil {
+			t.Fatalf("row %d after consent: %v", n+1, err)
+		}
+
 		n++
 
 		if n == 10 {

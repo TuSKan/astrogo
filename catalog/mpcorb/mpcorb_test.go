@@ -374,7 +374,11 @@ func TestReadStopsWhenTheCallerStops(t *testing.T) {
 
 	seen := 0
 
-	for range mpcorb.Read(strings.NewReader(fixture)) {
+	for _, err := range mpcorb.Read(strings.NewReader(fixture)) {
+		if err != nil {
+			t.Fatalf("row %d: %v", seen+1, err)
+		}
+
 		seen++
 
 		if seen == 2 {
