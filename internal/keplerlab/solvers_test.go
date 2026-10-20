@@ -128,7 +128,13 @@ func reduceExact(m float64) float64 {
 	c := twoPi()
 	k := math.RoundToEven(m / c[0])
 
-	p := k * c[0]
+	// The explicit conversion is load-bearing. Go may fuse a product into a
+	// later addition, across statements, and arm64 does: unconverted, k·c0
+	// was folded into m − p as one fused operation, so the rounding error pe
+	// below was subtracted from a product that had never been rounded, and
+	// every phase past a revolution came out wrong on macOS alone. A
+	// conversion rounds, and the spec forbids fusing across it.
+	p := float64(k * c[0])
 	pe := math.FMA(k, c[0], -p) // k·c0 = p + pe exactly
 
 	r := m - p // exact: p is within a factor of two of m

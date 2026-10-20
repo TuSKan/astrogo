@@ -72,7 +72,11 @@ answer returned in [0, 2π). Its only caller outside tests is
 - **Reduction.** M is reduced by 2π *exactly*: the result is the float64
   nearest M − 2πk for the integer k that brings it into [−π, π], taken with
   three-part 2π and fused multiply-adds, so a phase a hair past a whole
-  revolution keeps its relative precision.
+  revolution keeps its relative precision. The product k·2π must be rounded
+  by an explicit `float64(…)` conversion before its exact error is
+  subtracted: Go may fuse a product into a later addition across statements,
+  arm64 does, and the lab's first macOS CI run failed at every phase past a
+  revolution until the conversion forbade it.
 - **Range and symmetry.** E is in [−π, π]; E(−M) = −E(M) bit for bit, and
   E(±0) = ±0.
 - **Accuracy.** |E − E*| ≤ 2 ulps of E*, where E* is the exact root for the
