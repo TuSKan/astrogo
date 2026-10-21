@@ -84,10 +84,9 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // State returns id's geocentric state at t — the propagated Elements
 // for id if registered, otherwise delegated to the configured base
 // provider. core.Provider.State is contractually geocentric, so a
-// registered body's own heliocentric StateAt result is converted via
-// Earth's heliocentric position from gofaext.Epv00, matching how every
-// other core.Provider in this codebase (ephemeris's own sofaProvider)
-// derives a geocentric state from heliocentric SOFA/JPL data.
+// registered body's own heliocentric StateAt result is made geocentric with
+// the base provider's Sun: the same ephemeris places the orbit's Earth as
+// places every other body the caller asks the base for.
 func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	el, ok := p.elements[id]
 	if !ok {
@@ -131,20 +130,26 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		}, nil
 	}
 
-	tdb := t.TDB()
-	d1, d2 := tdb.JDParts()
-
-	pvh, _, status := gofaext.Epv00(d1, d2)
-	if status < 0 {
-		return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	// Geocentric is heliocentric plus the Sun's geocentric state, and the Sun
+	// comes from the base, so the orbit is placed against the base's own
+	// Earth. It used to come from SOFA's Epv00 whatever the base was, so a
+	// JPL base placed the Sun from the kernel and the Earth from a model 4.0 km
+	// rms and 11.7 km at worst away from it over 1900–2100 — 1.6″ for a body
+	// at 0.01 AU, and two ephemerides inside one place (#810). The default
+	// SOFA base's Sun is minus that same Epv00 heliocentric Earth, so a
+	// Provider built without WithBase answers exactly what it did, to the bit.
+	sun, err := p.base.State(core.Sun, t)
+	if err != nil {
+		return core.State{}, fmt.Errorf("kepler: the Sun from the base provider: %w", err)
 	}
 
-	earthPos := vector.V3(pvh[0][0], pvh[0][1], pvh[0][2])
-	earthVel := vector.V3(pvh[1][0], pvh[1][1], pvh[1][2])
+	if err := sun.Require(core.FrameICRS, core.CenterGeocenter); err != nil {
+		return core.State{}, fmt.Errorf("kepler: the Sun from the base provider: %w", err)
+	}
 
 	return core.State{
-		Pos:    heloPos.Sub(earthPos),
-		Vel:    heloVel.Sub(earthVel),
+		Pos:    heloPos.Add(sun.Pos),
+		Vel:    heloVel.Add(sun.Vel),
 		Frame:  core.FrameICRS,
 		Center: core.CenterGeocenter,
 	}, nil
