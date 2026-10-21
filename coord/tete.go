@@ -73,10 +73,10 @@ func (c TETE) String() string {
 //
 // # Across a time step
 //
-// [Context.SetTime] holds the equation of the origins with precession-nutation:
-// EO drifts at about 0.006 arcseconds an hour, which is the term already at
-// the bottom of that method's documented error budget, and both are built
-// again once the Context is an hour from its epoch.
+// [Context.SetTime] interpolates the equation of the origins with the rest of
+// the precession-nutation state, across the same day-long bracket. EO moves
+// at about 0.006 arcseconds an hour, nearly all of it precession and so
+// linear, which interpolation carries exactly.
 func (ctx *Context) CIRSToTETE(c CIRS) TETE {
 	return TETE{
 		ra:  c.RA().Sub(angle.Rad(ctx.eo)).Wrap360(),

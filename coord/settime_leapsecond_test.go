@@ -29,8 +29,8 @@ func (leapStepEOP) EOP(mjd float64) (time.EOP, error) {
 // reused its base's DUT1, and DUT1 jumps by a second at a leap second, so a
 // Context derived across one was rotated a second away from the one
 // NewContext builds: 13″ for this star. SetTime takes t's own DUT1. What
-// remains is what it holds fixed inside the hour, bounded by its doc comment
-// at 0.1″ per hour of separation.
+// remains is its interpolation of the series' state, bounded by its doc
+// comment at 0.007″.
 func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
 	t.Cleanup(time.ResetEOP)

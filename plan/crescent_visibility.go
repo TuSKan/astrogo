@@ -29,7 +29,7 @@ import (
 //
 // An evening is evaluated at four instants: geometric sunset, the almanac's
 // sunset, Yallop's best time and Qureshi's. One coord.Context is built, at
-// sunset, and moved to the others with SetTime, which holds it to ≲0.1″
+// sunset, and moved to the others with SetTime, which holds it to ≲0.007″
 // against these criteria's tenths of a degree. The Sun and Moon are
 // each looked up once per instant, and every criterion at that instant reads
 // the same two lookups.
