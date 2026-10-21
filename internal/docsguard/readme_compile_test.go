@@ -1,12 +1,16 @@
 package docsguard_test
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // goBlock matches a fenced Go code block and captures its body.
@@ -109,7 +113,7 @@ func TestREADMECodeBlocksCompile(t *testing.T) {
 		t.Fatalf("temp dir: %v", err)
 	}
 
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	t.Cleanup(func() { removeAndWait(t, dir) })
 
 	// A main package cannot share a directory with anything else, so each
 	// whole program gets its own; the fragments share one.
@@ -318,4 +322,58 @@ func itoa(i int) string {
 	}
 
 	return string(b)
+}
+
+// removeAndWait removes the README check's scratch package and does not return
+// until it is gone (#838).
+//
+// On Windows os.RemoveAll can return while a file another process still has
+// open, a virus scanner reading the .go file just written, stays listed as
+// delete-pending until that handle closes. The next test process to walk the
+// repository then finds the fragments: a gate runs ./... untagged and then
+// tagged, back to back, and TestNoStandardLibraryTimeOutsideTimePackage
+// failed on a leftover frag11.go that way. So this retries, about thirty
+// seconds at most and without reading the clock, and says so if the
+// directory outlives that rather than discarding the error.
+func removeAndWait(t *testing.T, dir string) {
+	t.Helper()
+
+	var err error
+
+	for range 600 {
+		err = os.RemoveAll(dir)
+
+		if _, serr := os.Stat(dir); errors.Is(serr, fs.ErrNotExist) {
+			return
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	t.Errorf("the README check's scratch package %s is still there after 30 s: %v\n"+
+		"  A walker in this package would read it as part of the repository; remove it by hand.", dir, err)
+}
+
+// TestRemoveAndWaitLeavesNothing: the scratch package's layout, a directory of
+// fragments beside program directories, is gone when removeAndWait returns.
+func TestRemoveAndWaitLeavesNothing(t *testing.T) {
+	t.Parallel()
+
+	dir := filepath.Join(t.TempDir(), ".readmecheck")
+
+	for _, sub := range []string{"fragments", "prog3"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o750); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.WriteFile(filepath.Join(dir, sub, "main.go"), []byte("package main\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	removeAndWait(t, dir)
+
+	if _, err := os.Stat(dir); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("%s is still there: %v", dir, err)
+	}
 }
