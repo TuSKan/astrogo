@@ -20,42 +20,6 @@ func exactState(a, e, n, m float64) (x, y, vx, vy *big.Float) {
 	return exactStateFromE(a, e, n, solveExact(m, e))
 }
 
-// exactStateFromE is the perifocal state at eccentric anomaly bigE, at prec.
-// Given the float64 nearest the exact root, it is the floor: the state a
-// solver returning the correctly rounded E would give if everything after it
-// were exact, so no float64 path can do better on average.
-func exactStateFromE(a, e, n float64, bigE *big.Float) (x, y, vx, vy *big.Float) {
-	s, c := sinCos(bigE)
-
-	ba, be, bn := newF(a), newF(e), newF(n)
-
-	oneMinusE2 := new(big.Float).SetPrec(prec).Mul(be, be)
-	oneMinusE2.Sub(newI(1), oneMinusE2)
-
-	b := new(big.Float).SetPrec(prec).Sqrt(oneMinusE2)
-	b.Mul(b, ba)
-
-	x = new(big.Float).SetPrec(prec).Sub(c, be)
-	x.Mul(x, ba)
-
-	y = new(big.Float).SetPrec(prec).Mul(b, s)
-
-	// Ė = n / (1 − e·cos E)
-	den := new(big.Float).SetPrec(prec).Mul(be, c)
-	den.Sub(newI(1), den)
-
-	edot := new(big.Float).SetPrec(prec).Quo(bn, den)
-
-	vx = new(big.Float).SetPrec(prec).Mul(ba, s)
-	vx.Mul(vx, edot)
-	vx.Neg(vx)
-
-	vy = new(big.Float).SetPrec(prec).Mul(b, c)
-	vy.Mul(vy, edot)
-
-	return x, y, vx, vy
-}
-
 // stableState is the proposed state construction from E: every quantity that
 // cancels near perihelion as e → 1 written as a sum of same-signed terms.
 //
@@ -86,24 +50,6 @@ func stableState(a, e, n, bigE float64) (x, y, vx, vy float64) {
 // distErr is |(gx, gy) − (wx, wy)| / |(wx, wy)| in units of 2⁻⁵².
 func distErr(gx, gy float64, wx, wy *big.Float) float64 {
 	return absErr(gx, gy, wx, wy) / norm(wx, wy) / 0x1p-52
-}
-
-// absErr is |(gx, gy) − (wx, wy)|.
-func absErr(gx, gy float64, wx, wy *big.Float) float64 {
-	dx := new(big.Float).SetPrec(prec).Sub(newF(gx), wx)
-	dy := new(big.Float).SetPrec(prec).Sub(newF(gy), wy)
-
-	fx, _ := dx.Float64()
-	fy, _ := dy.Float64()
-
-	return math.Hypot(fx, fy)
-}
-
-func norm(wx, wy *big.Float) float64 {
-	fx, _ := wx.Float64()
-	fy, _ := wy.Float64()
-
-	return math.Hypot(fx, fy)
 }
 
 // TestStateAccuracy measures the whole path from elements to a state, on

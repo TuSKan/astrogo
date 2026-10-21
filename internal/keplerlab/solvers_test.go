@@ -2,11 +2,8 @@ package keplerlab_test
 
 import (
 	"math"
-	"math/big"
-	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/ephemeris/kepler"
 )
 
 // solver is a candidate: the eccentric anomaly for a finite mean anomaly m
@@ -82,36 +79,39 @@ func mikkolaStable(m, e float64) float64 {
 	return math.Copysign(bigE, m)
 }
 
-// production is kepler.SolveKepler as it ships: Newton from M + e·sin M (±π
-// above e = 0.9) on the direct residual, M wrapped to (−π, π], the answer in
-// [0, 2π).
+// production is kepler.SolveKepler as it shipped until stable Markley
+// replaced it, kept here so that docs/kepler.md's "production" rows can still
+// be reproduced: Newton from M + e·sin M (±π above e = 0.9) on the direct
+// residual, M wrapped to (−π, π], the answer in [0, 2π).
 func production(m, e float64) float64 {
-	ea, err := kepler.SolveKepler(angle.Rad(m), e)
-	if err != nil {
-		return math.NaN()
+	const (
+		tolerance = 1e-12
+		maxIter   = 50
+		epsilon   = 0x1p-52
+	)
+
+	m = angle.Rad(m).WrapPi().Radians()
+
+	bigE := m + e*math.Sin(m)
+	if e > 0.9 {
+		bigE = math.Copysign(math.Pi, m)
 	}
 
-	return ea.Radians()
+	for range maxIter {
+		s, c := math.Sincos(bigE)
+		f := bigE - e*s - m
+		de := f / (1 - e*c)
+		bigE -= de
+
+		if math.Abs(de) < tolerance || math.Abs(f) <= 4*epsilon*(math.Abs(bigE)+math.Abs(m)) {
+			return angle.Rad(bigE).Wrap2Pi().Radians()
+		}
+	}
+
+	return math.NaN()
 }
 
 // ─── range reduction ─────────────────────────────────────────────────────────
-
-// twoPi is 2π as an unevaluated sum of three float64s, each the rounding of
-// what the previous ones leave, taken from the oracle rather than typed in.
-var twoPi = sync.OnceValue(func() [3]float64 {
-	pi()
-
-	var parts [3]float64
-
-	rest := new(big.Float).SetPrec(reducePrec).Set(big2Pi)
-
-	for i := range parts {
-		parts[i], _ = rest.Float64()
-		rest.Sub(rest, new(big.Float).SetPrec(reducePrec).SetFloat64(parts[i]))
-	}
-
-	return parts
-})
 
 // reduceFloat is the usual reduction: math.Remainder by the float64 nearest
 // 2π, which is 2.4×10⁻¹⁶ short of it per revolution removed.

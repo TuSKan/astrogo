@@ -3,72 +3,9 @@ package keplerlab_test
 import (
 	"fmt"
 	"math"
-	"math/big"
 	"strings"
 	"testing"
 )
-
-// eccentricities spans the elliptic range up to its last float64, densest
-// where the equation's conditioning, 1/(1 − e·cos E), is worst.
-var eccentricities = []float64{
-	0, 1e-3, 0.1, 0.5, 0.7, 0.9, 0.99, 0.999, 0.99999,
-	1 - 1e-7, 1 - 1e-10, 1 - 1e-13, math.Nextafter(1, 0),
-}
-
-// meanAnomalies is the sweep: log-spaced from 10⁻²⁰ to π, both signs, the
-// float64s on either side of whole revolutions, and phases many revolutions
-// out. Under -short it is thinned, not dropped.
-func meanAnomalies(short bool) []float64 {
-	perDecade := 12
-	if short {
-		perDecade = 2
-	}
-
-	var ms []float64
-
-	for k := -20 * perDecade; k <= 0; k++ {
-		m := math.Pi * math.Pow(10, float64(k)/float64(perDecade))
-		ms = append(ms, m, -m)
-	}
-
-	for _, rev := range []float64{1, 7, 1e3, 1e6} {
-		c := rev * 2 * math.Pi
-		ms = append(ms, c, math.Nextafter(c, 0), math.Nextafter(c, math.Inf(1)), c+1e-9, c-1e-9, c+1.5, -c-0.5)
-	}
-
-	return append(ms, 0, math.Copysign(0, -1), 1e9, 1e12)
-}
-
-// errorOf is a candidate's error against the exact root: relative, in ulps of
-// E, and absolute, in radians. The difference is taken modulo 2π, so an
-// answer on another branch — [0, 2π) rather than [−π, π] — is judged as the
-// angle it is, through the float64 it is: its cos and sin are what a state is
-// built from.
-func errorOf(got float64, want *big.Float) (rel, abs float64) {
-	if math.IsNaN(got) || math.IsInf(got, 0) {
-		return math.Inf(1), math.Inf(1)
-	}
-
-	d := new(big.Float).SetPrec(reducePrec).SetFloat64(got)
-	d.Sub(d, want)
-
-	k := new(big.Float).SetPrec(reducePrec).Quo(d, big2Pi)
-	if kf, _ := k.Float64(); math.Abs(kf) >= 0.5 {
-		d.Sub(d, new(big.Float).SetPrec(reducePrec).Mul(big2Pi, new(big.Float).SetFloat64(math.Round(kf))))
-	}
-
-	abs, _ = d.Float64()
-	abs = math.Abs(abs)
-
-	if want.Sign() == 0 {
-		return 0, abs // M = ±0 is judged by TestZeroAndSymmetry
-	}
-
-	d.Quo(d, want)
-	rel, _ = d.Float64()
-
-	return math.Abs(rel) / 0x1p-52, abs
-}
 
 type worst struct {
 	rel, abs  float64
