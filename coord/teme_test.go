@@ -66,22 +66,23 @@ func TestTEMEToGCRSIsTheEquinoxRoute(t *testing.T) {
 }
 
 // TestTEMELookAngleIgnoresTheContextWindow is why the Context's matrix is the
-// right one to use (#812). A Context moved within its window keeps the
-// precession-nutation of its epoch, and GCRS through it carries that drift;
-// but GeocentricToObserved turns GCRS back through the same matrix, so a TEME
-// vector's look angle is what a Context built at the instant gives — Earth
-// rotation and GMST are both taken at the instant, and only polar motion is
-// the epoch's.
+// right one to use (#812). A moved Context interpolates its precession-
+// nutation across a day (#790), and GCRS through it carries that
+// interpolation's error; but GeocentricToObserved turns GCRS back through the
+// same matrix, so a TEME vector's look angle is what a Context built at the
+// instant gives — Earth rotation and GMST are both taken at the instant.
 //
-// The equinox route, exact in GCRS, then meets the moved Context's stale
-// matrix: measured, 2.7 mas off for the low orbit and 4.0 mas for the
-// geostationary one, 55 minutes into the window. That is the control; it
-// shows the window is wide enough here to be seen.
+// The probe is 12 hours from the build, mid-bracket, where that error peaks.
+// The equinox route, exact in GCRS, meets the moved Context's interpolated
+// matrix there: measured, 0.91 mas off. That is the control; it shows the
+// window is wide enough to be seen. It used to probe 55 minutes in, where the
+// hourly rebuild's stale matrix put the control at 2.7 to 4.0 mas, and #790's
+// interpolation left 0.17 (#825).
 func TestTEMELookAngleIgnoresTheContextWindow(t *testing.T) {
 	site, atm, base, _ := setTimeFixture(t)
 
 	moved := coord.NewContext(base, site, atm)
-	at := base.Add(unit.Minutes(55)) // inside the hour, so no rebuild
+	at := base.Add(unit.Hours(12)) // mid-bracket
 	moved.SetTime(at)
 
 	fresh := coord.NewContext(at, site, atm)
@@ -95,11 +96,11 @@ func TestTEMELookAngleIgnoresTheContextWindow(t *testing.T) {
 		return math.Hypot(da, dz)
 	}
 
-	// What is left is rounding: this test binary loads no EOP, so polar motion,
-	// the one factor the moved Context keeps from its epoch, is zero at both
-	// instants. Measured, the two agree to under a microarcsecond; 0.1 mas
-	// leaves the control above ten times the bound.
-	const tol = 0.1 * math.Pi / (180 * 3600 * 1000)
+	// What is left is rounding: this test binary loads no EOP, so polar
+	// motion, the one factor not taken at the instant, is zero at both.
+	// Measured, the two agree to under a microarcsecond; 0.01 mas is ten
+	// thousand times that, and leaves the control at ninety times the bound.
+	const tol = 0.01 * math.Pi / (180 * 3600 * 1000)
 
 	var worstControl float64
 
@@ -108,7 +109,7 @@ func TestTEMELookAngleIgnoresTheContextWindow(t *testing.T) {
 		got := moved.GeocentricToObserved(moved.TEMEToGCRS(v).MulScalar(1 / kmPerAU))
 
 		if d := sep(got, want); d > tol {
-			t.Errorf("%v: a moved Context's look angle is %.3g mas from a fresh one's, want ≤ 0.1 mas",
+			t.Errorf("%v: a moved Context's look angle is %.3g mas from a fresh one's, want ≤ 0.01 mas",
 				v, d*180*3600*1000/math.Pi)
 		}
 
