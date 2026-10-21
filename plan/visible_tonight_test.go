@@ -298,7 +298,7 @@ func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 
 // TestVisibleTonight_NilPlanetProviderDoesNotPanic is a regression test
 // for a real latent nil-pointer-panic risk: VisibleTonight's unexported
-// moonNote helper calls geoPos(eph.At(planetProvider, t).Geometric(eph.Moon, eph.Earth)) directly
+// moonNote helper reads the Moon from planetProvider directly
 // (bypassing plan.NewMoon, which would have defaulted a nil provider
 // itself) — calling a method on a nil interface value panics, not just
 // errors. A magLimit loose enough to guarantee the Moon is a candidate

@@ -311,10 +311,12 @@ func table2Epochs(
 
 			cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
 
-			sun, err := geoPos(eph.At(provider, time.FromGo(when)).Geometric(eph.Sun, eph.Earth))
+			sunSt, err := eph.At(provider, time.FromGo(when)).Geometric(eph.Sun, eph.Earth)
 			if err != nil {
 				t.Fatalf("Sun at %v: %v", when, err)
 			}
+
+			sun := sunSt.Pos
 
 			if cc.GeocentricToObserved(sun).Alt().Degrees() < -18 {
 				dark = append(dark, when)

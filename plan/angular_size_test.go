@@ -165,6 +165,7 @@ func TestAngularDiameter_ZeroDistance(t *testing.T) {
 // atObserver is a body whose geocentric vector is given outright.
 type atObserver struct {
 	*Planet
+
 	at vector.Vec3
 }
 

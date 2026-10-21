@@ -44,7 +44,7 @@ const (
 	FrameTEME        = core.FrameTEME
 )
 
-// ErrWrongFrame reports a chain of [Provider.Locate] answers that cannot be
+// ErrWrongFrame reports a chain of [core.Provider.Locate] answers that cannot be
 // composed: one of them is not on the ICRS's axes.
 var ErrWrongFrame = core.ErrWrongFrame
 

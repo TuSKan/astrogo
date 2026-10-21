@@ -46,8 +46,8 @@ const (
 	// FrameUnspecified is the zero value, and asserts nothing.
 	//
 	// Deliberately not ICRS: a State that nobody labeled must not claim a
-	// frame it was never checked against. A caller that needs certainty asks
-	// with [State.Require] and gets an error rather than a guess.
+	// frame it was never checked against: an Instant refuses to compose it,
+	// with [ErrWrongFrame], rather than guess.
 	FrameUnspecified Frame = iota
 
 	// FrameICRS is the International Celestial Reference System, the frame

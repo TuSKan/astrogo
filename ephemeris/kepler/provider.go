@@ -177,31 +177,6 @@ type epv00At struct {
 	pvh, pvb [2][3]float64
 }
 
-// epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
-// same date.
-func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
-	s.mu.Lock()
-	e := s.last
-	s.mu.Unlock()
-
-	if e.set && e.d1 == d1 && e.d2 == d2 {
-		return e, nil
-	}
-
-	pvh, pvb, status := gofaext.Epv00(d1, d2)
-	if status < 0 {
-		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
-	}
-
-	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
-
-	s.mu.Lock()
-	s.last = e
-	s.mu.Unlock()
-
-	return e, nil
-}
-
 func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
@@ -296,3 +271,28 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 }
 
 func (s *sofaBase) Close() error { return nil }
+
+// epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
+// same date.
+func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
+	s.mu.Lock()
+	e := s.last
+	s.mu.Unlock()
+
+	if e.set && e.d1 == d1 && e.d2 == d2 {
+		return e, nil
+	}
+
+	pvh, pvb, status := gofaext.Epv00(d1, d2)
+	if status < 0 {
+		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	}
+
+	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+
+	s.mu.Lock()
+	s.last = e
+	s.mu.Unlock()
+
+	return e, nil
+}

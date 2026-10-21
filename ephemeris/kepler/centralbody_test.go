@@ -2,6 +2,7 @@ package kepler_test
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -613,7 +614,12 @@ func (f *failingFor) Locate(id core.ID, t time.Time) (core.State, error) {
 		return core.State{}, errMockBase
 	}
 
-	return f.base.Locate(id, t)
+	st, err := f.base.Locate(id, t)
+	if err != nil {
+		return core.State{}, fmt.Errorf("failingFor: %w", err)
+	}
+
+	return st, nil
 }
 
 func (f *failingFor) Close() error { return nil }

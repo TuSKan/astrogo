@@ -31,7 +31,7 @@ type Instant struct {
 // remembering, which costs time and changes no answer.
 const instantMemo = 24
 
-// located is one remembered answer of [Provider.Locate].
+// located is one remembered answer of [github.com/TuSKan/astrogo/ephemeris/core.Provider.Locate].
 type located struct {
 	id ID
 	st State
@@ -47,31 +47,6 @@ func At(p Provider, t time.Time) *Instant { return &Instant{p: p, t: t} }
 
 // Time returns the epoch of the Instant.
 func (in *Instant) Time() time.Time { return in.t }
-
-// locate is [Provider.Locate] at the Instant's epoch, remembered.
-func (in *Instant) locate(id ID) (State, error) {
-	for i := range in.n {
-		if in.memo[i].id == id {
-			return in.memo[i].st, nil
-		}
-	}
-
-	st, err := in.p.Locate(id, in.t)
-	if err != nil {
-		return State{}, fmt.Errorf("ephemeris: locate %v: %w", id, err)
-	}
-
-	if st.Frame != FrameICRS && st.Frame != FrameGCRS {
-		return State{}, fmt.Errorf("%w: %v is located on %s axes, which do not compose with the ICRS", ErrWrongFrame, id, st.Frame)
-	}
-
-	if in.n < len(in.memo) {
-		in.memo[in.n] = located{id: id, st: st}
-		in.n++
-	}
-
-	return st, nil
-}
 
 // Geometric returns the state of target about center at the Instant's epoch:
 // r_target(t) − r_center(t), both at TDB t, with no light time.
@@ -180,17 +155,6 @@ type Observer struct {
 // Geocenter is the observer at the centre of the Earth.
 func Geocenter() Observer { return Observer{} }
 
-// observer returns the observer's barycentric position and velocity at the
-// Instant's epoch.
-func (in *Instant) observer(obs Observer) (pos, vel vector.Vec3, err error) {
-	earth, err := in.Geometric(Earth, SolarSystemBarycenter)
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	return earth.Pos.Add(obs.pos), earth.Vel.Add(obs.vel), nil
-}
-
 // Astrometric returns the astrometric state of target seen by obs, as SOFA
 // and JPL Horizons' quantity 1 define it: the target at the epoch its light
 // left, t − τ, less the observer at t,
@@ -221,6 +185,107 @@ type astrometric struct {
 	pos, vel vector.Vec3 // the astrometric state
 	ob, ov   vector.Vec3 // the observer, barycentric, at t
 	then     Instant     // at t − τ
+}
+
+// Apparent returns the apparent state of target seen by obs, in SOFA's order
+// (iauAtciq): the astrometric direction ([Instant.Astrometric]), deflected by
+// the Sun's gravity with the true geometry (iauLd), then aberrated by the
+// observer's barycentric velocity (iauAb), relativistically. The range and the
+// velocity are the astrometric ones: deflection and aberration bend a ray,
+// not a motion. Center is the Earth.
+//
+// The deflection takes the Sun to the target at t − τ, where the light left
+// it, and the Sun to the observer at t, where it arrives; SOFA's iauLdsun
+// limiter keeps it finite inside the solar disc. The Sun's own light is not
+// deflected.
+//
+// Until #803 astrogo took the apparent place as the geocentric state at the
+// retarded epoch, which carries aberration to first order because the Earth
+// moves back with the target. Against Horizons' quantity 2 that scattered
+// 9.8 mas in right ascension, and SOFA's order 1.7 mas.
+func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
+	var a astrometric
+	if err := in.astrometric(target, obs, &a); err != nil {
+		return State{}, err
+	}
+
+	sun, err := in.Geometric(Sun, SolarSystemBarycenter)
+	if err != nil {
+		return State{}, fmt.Errorf("ephemeris: the Sun for light deflection and aberration: %w", err)
+	}
+
+	// The Sun to the observer, and how far.
+	e := a.ob.Sub(sun.Pos)
+	em := e.Norm()
+	dir := unitArray(a.pos)
+
+	if target != Sun {
+		q, err := a.then.Geometric(target, Sun)
+		if err != nil {
+			return State{}, fmt.Errorf("ephemeris: the Sun at the retarded epoch for light deflection: %w", err)
+		}
+
+		if q.Pos.Norm() > 0 && em > 0 {
+			// iauLdsun's limiter, verbatim: 1e-6 over the squared distance,
+			// floored so an observer inside one au does not get a larger
+			// limit than one at the Earth.
+			dir = gofaext.Ld(1.0, dir, unitArray(q.Pos), unitArray(e), em, 1e-6/math.Max(em*em, 1))
+		}
+	}
+
+	// iauAb's last term is the Sun's gravitational potential at the
+	// observer, over em; an observer at the Sun's centre, which only a
+	// synthetic provider can put there, has it dropped rather than infinite.
+	if em == 0 {
+		em = math.Inf(1)
+	}
+
+	v := a.ov.DivScalar(lightAUPerDay)
+	bm1 := math.Sqrt(1 - v.Norm2())
+	dir = gofaext.Ab(dir, [3]float64{v.X, v.Y, v.Z}, em, bm1)
+
+	return State{
+		Pos:    vector.V3(dir[0], dir[1], dir[2]).Unit().MulScalar(a.pos.Norm()),
+		Vel:    a.vel,
+		Frame:  FrameICRS,
+		Center: Earth,
+	}, nil
+}
+
+// locate is [github.com/TuSKan/astrogo/ephemeris/core.Provider.Locate] at the Instant's epoch, remembered.
+func (in *Instant) locate(id ID) (State, error) {
+	for i := range in.n {
+		if in.memo[i].id == id {
+			return in.memo[i].st, nil
+		}
+	}
+
+	st, err := in.p.Locate(id, in.t)
+	if err != nil {
+		return State{}, fmt.Errorf("ephemeris: locate %v: %w", id, err)
+	}
+
+	if st.Frame != FrameICRS && st.Frame != FrameGCRS {
+		return State{}, fmt.Errorf("%w: %v is located on %s axes, which do not compose with the ICRS", ErrWrongFrame, id, st.Frame)
+	}
+
+	if in.n < len(in.memo) {
+		in.memo[in.n] = located{id: id, st: st}
+		in.n++
+	}
+
+	return st, nil
+}
+
+// observer returns the observer's barycentric position and velocity at the
+// Instant's epoch.
+func (in *Instant) observer(obs Observer) (pos, vel vector.Vec3, err error) {
+	earth, err := in.Geometric(Earth, SolarSystemBarycenter)
+	if err != nil {
+		return vector.Vec3{}, vector.Vec3{}, err
+	}
+
+	return earth.Pos.Add(obs.pos), earth.Vel.Add(obs.vel), nil
 }
 
 // astrometric solves the light time from target to obs into a.
@@ -289,69 +354,4 @@ func (in *Instant) astrometric(target ID, obs Observer, a *astrometric) error {
 	}
 
 	return nil
-}
-
-// Apparent returns the apparent state of target seen by obs, in SOFA's order
-// (iauAtciq): the astrometric direction ([Instant.Astrometric]), deflected by
-// the Sun's gravity with the true geometry (iauLd), then aberrated by the
-// observer's barycentric velocity (iauAb), relativistically. The range and the
-// velocity are the astrometric ones: deflection and aberration bend a ray,
-// not a motion. Center is the Earth.
-//
-// The deflection takes the Sun to the target at t − τ, where the light left
-// it, and the Sun to the observer at t, where it arrives; SOFA's iauLdsun
-// limiter keeps it finite inside the solar disc. The Sun's own light is not
-// deflected.
-//
-// Until #803 astrogo took the apparent place as the geocentric state at the
-// retarded epoch, which carries aberration to first order because the Earth
-// moves back with the target. Against Horizons' quantity 2 that scattered
-// 9.8 mas in right ascension, and SOFA's order 1.7 mas.
-func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
-	var a astrometric
-	if err := in.astrometric(target, obs, &a); err != nil {
-		return State{}, err
-	}
-
-	sun, err := in.Geometric(Sun, SolarSystemBarycenter)
-	if err != nil {
-		return State{}, fmt.Errorf("ephemeris: the Sun for light deflection and aberration: %w", err)
-	}
-
-	// The Sun to the observer, and how far.
-	e := a.ob.Sub(sun.Pos)
-	em := e.Norm()
-	dir := unitArray(a.pos)
-
-	if target != Sun {
-		q, err := a.then.Geometric(target, Sun)
-		if err != nil {
-			return State{}, fmt.Errorf("ephemeris: the Sun at the retarded epoch for light deflection: %w", err)
-		}
-
-		if q.Pos.Norm() > 0 && em > 0 {
-			// iauLdsun's limiter, verbatim: 1e-6 over the squared distance,
-			// floored so an observer inside one au does not get a larger
-			// limit than one at the Earth.
-			dir = gofaext.Ld(1.0, dir, unitArray(q.Pos), unitArray(e), em, 1e-6/math.Max(em*em, 1))
-		}
-	}
-
-	// iauAb's last term is the Sun's gravitational potential at the
-	// observer, over em; an observer at the Sun's centre, which only a
-	// synthetic provider can put there, has it dropped rather than infinite.
-	if em == 0 {
-		em = math.Inf(1)
-	}
-
-	v := a.ov.DivScalar(lightAUPerDay)
-	bm1 := math.Sqrt(1 - v.Norm2())
-	dir = gofaext.Ab(dir, [3]float64{v.X, v.Y, v.Z}, em, bm1)
-
-	return State{
-		Pos:    vector.V3(dir[0], dir[1], dir[2]).Unit().MulScalar(a.pos.Norm()),
-		Vel:    a.vel,
-		Frame:  FrameICRS,
-		Center: Earth,
-	}, nil
 }

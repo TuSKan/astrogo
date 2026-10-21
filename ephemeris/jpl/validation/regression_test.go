@@ -3,6 +3,7 @@
 package jpl_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -37,7 +38,12 @@ type mockLinearProvider struct {
 
 func (m *mockLinearProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
 	if id != m.target {
-		return m.rest.Locate(id, t)
+		st, err := m.rest.Locate(id, t)
+		if err != nil {
+			return eph.State{}, fmt.Errorf("mockLinearProvider: %w", err)
+		}
+
+		return st, nil
 	}
 
 	jd1Req, jd2Req := t.JDParts()

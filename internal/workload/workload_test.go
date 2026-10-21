@@ -40,14 +40,9 @@ var (
 	plutoAsMinorPlanet = core.ID(2134340)
 )
 
-// place is a function from provider, target and epoch to a state: the
-// geometric state about the Earth, or one of eph's light-time places, each
-// from an Instant of its own.
+// place is a function from provider, target and epoch to a state: one of
+// eph's light-time places, each from an Instant of its own.
 type place = func(core.Provider, core.ID, time.Time) (core.State, error)
-
-func geometricPlace(p core.Provider, id core.ID, t time.Time) (core.State, error) {
-	return eph.At(p, t).Geometric(id, eph.Earth) //nolint:wrapcheck // the Instant's error names the body
-}
 
 func astrometricPlace(p core.Provider, id core.ID, t time.Time) (core.State, error) {
 	return eph.At(p, t).Astrometric(id, eph.Geocenter()) //nolint:wrapcheck // the Instant's error names the body

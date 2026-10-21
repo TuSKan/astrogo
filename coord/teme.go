@@ -24,7 +24,7 @@ import (
 //
 // The direct route evaluates the IAU 2006/2000A precession-nutation matrix and
 // the equation of the equinoxes at the instant, about 85 µs, and that is what
-// [github.com/TuSKan/astrogo/ephemeris/satellite.Satellite.State] does, having
+// [github.com/TuSKan/astrogo/ephemeris/satellite.Satellite.Locate] does, having
 // no Context. Here the matrix is the Context's, so the rotation costs the
 // polynomial and two matrix products.
 //

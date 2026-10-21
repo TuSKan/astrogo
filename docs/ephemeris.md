@@ -326,7 +326,7 @@ nothing else:
   it.
 
 `TestPrototypeReproducesTheProvider` (since deleted) held it to
-`jpl.Provider.State` **bit for bit** over a year of hourly epochs for the
+`jpl.Provider.State` (since renamed `Locate`, #803) **bit for bit** over a year of hourly epochs for the
 whole sky, 78,840 states that cross thousands of records, and was canaried:
 changing τ's division to a multiplication by the reciprocal failed it.
 

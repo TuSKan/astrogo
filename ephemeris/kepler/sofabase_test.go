@@ -30,11 +30,7 @@ func TestSOFABaseLocatesAboutItsSeriesCentres(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for g := range 8 {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			for k := range 40 {
 				at := start.Add(unit.Days(float64(g*40+k) * 1.3))
 				d1, d2 := at.TDB().JDParts()
@@ -63,7 +59,7 @@ func TestSOFABaseLocatesAboutItsSeriesCentres(t *testing.T) {
 					}
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
