@@ -657,13 +657,12 @@ func validateChebyshevMeta(tInit, tLen float64, rSize int32) error {
 }
 
 func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	rec, nCoeffs, err := r.chebyshevWords(s, et, 3)
+	rec, nCoeffs, tau, err := r.chebyshevWords(s, et, 3)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	mid, radius := rec[0], rec[1]
-	tau := (et - mid) / radius
+	radius := rec[1]
 	pos.X, vel.X = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, true)
 	pos.Y, vel.Y = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, true)
 	pos.Z, vel.Z = EvalChebyshev(rec[2+2*nCoeffs:2+3*nCoeffs], tau, radius, true)
@@ -676,13 +675,12 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 }
 
 func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	rec, nCoeffs, err := r.chebyshevWords(s, et, 6)
+	rec, nCoeffs, tau, err := r.chebyshevWords(s, et, 6)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	mid, radius := rec[0], rec[1]
-	tau := (et - mid) / radius
+	radius := rec[1]
 	pos.X, _ = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, false)
 	pos.Y, _ = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, false)
 	pos.Z, _ = EvalChebyshev(rec[2+2*nCoeffs:2+3*nCoeffs], tau, radius, false)
@@ -696,6 +694,57 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	}
 
 	return pos, vel, nil
+}
+
+// recordTau is et's place on its record's interval, mid ± radius, where the
+// record's Chebyshev series is defined: τ in [−1, 1].
+//
+// A record's polynomial fits its own interval and nothing beyond it; outside,
+// the series grows without bound. The final instant of a segment, where
+// (et − INIT)/INTLEN is exactly N, belongs to the last record at τ = 1 (#807),
+// but that index covers the whole interval after it as well, and an epoch
+// there used to be evaluated on the last record's polynomial at τ up to 3 —
+// forty times the true value a record past the end, with no error (#815).
+// The record's own mid and radius are the one test that a directory, a
+// segment window or a caller cannot get wrong for it.
+//
+// The allowance is the rounding of the two computations that put et here, as
+// a fraction of the half-span:
+//
+//   - the record's choice. The directory's index ⌊(et − INIT)/INTLEN⌋ rounds
+//     et − INIT to an ulp, so an epoch that close before a boundary goes to
+//     the record that opens there, a hair outside it. On de440s, which starts
+//     in 1849, that ulp is about a microsecond: an epoch 2⁻⁴⁰ of a record
+//     before a boundary went to the next record at τ = −1 − 2⁻³⁹ —
+//     measured, not supposed: TestEveryRecordBoundaryIsInsideItsRecord found
+//     it. Evaluating a polynomial that far past its end is exact to its own
+//     precision, and is what any SPK reader does there.
+//   - τ itself: et and the stored mid to an ulp each, and the division.
+//
+// At the record boundaries themselves the allowance is never needed: across
+// de440, de440s, de441, de442 and nep097, about 426,000 boundary
+// evaluations, |τ| never exceeds 1, because those kernels' middles and
+// half-spans are exact.
+func recordTau(et, mid, radius, tInit float64) (float64, error) {
+	tau := (et - mid) / radius
+
+	allowance := (2*ulp(et-tInit)+ulp(mid)+ulp(et))/math.Abs(radius) + 4*epsilon
+	if !(math.Abs(tau) <= 1+allowance) {
+		return 0, fmt.Errorf("%w: ET %v is at τ = %.6g on its record, whose polynomial holds only for |τ| <= 1",
+			ErrCorruptSPK, et, tau)
+	}
+
+	return tau, nil
+}
+
+// epsilon is the spacing of float64 values at 1.
+const epsilon = 0x1p-52
+
+// ulp is the spacing of float64 values at |x|.
+func ulp(x float64) float64 {
+	x = math.Abs(x)
+
+	return math.Nextafter(x, math.Inf(1)) - x
 }
 
 // chebyshevDir is a type 2 or 3 segment's directory, validated: records of
@@ -753,7 +802,9 @@ func (r *Reader) chebyshevDirectory(s *Segment, components int32) (*chebyshevDir
 // index n to the last record the same way. Any other index outside the
 // records means the directory does not describe et, and is reported rather
 // than clamped: a clamp would hand back the nearest record's polynomial far
-// outside the interval it fits.
+// outside the interval it fits. Index n covers the whole interval after the
+// final instant, not only the instant; an epoch there reaches the last record
+// and is refused by recordTau (#815).
 func (d *chebyshevDir) record(s *Segment, et float64) (start, idx int32, err error) {
 	pos := math.Floor((et - d.tInit) / d.tLen)
 	if !(pos >= 0 && pos <= float64(d.nRecs)) {
@@ -776,41 +827,46 @@ func (d *chebyshevDir) record(s *Segment, et float64) (start, idx int32, err err
 	return int32(start64), idx, nil
 }
 
-// chebyshevWords is the record of s that holds et, validated, and its
-// coefficients per component: from the record cache when the last record
-// evaluated in s is that one, read and decoded otherwise.
-func (r *Reader) chebyshevWords(s *Segment, et float64, components int32) (rec []float64, nCoeffs int32, err error) {
+// chebyshevWords is the record of s that holds et, validated, its
+// coefficients per component, and et's place τ on it: the record from the
+// record cache when the last record evaluated in s is that one, read and
+// decoded otherwise.
+func (r *Reader) chebyshevWords(s *Segment, et float64, components int32) (rec []float64, nCoeffs int32, tau float64, err error) {
 	dir, entry, err := r.chebyshevDirectory(s, components)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
 	start, idx, err := dir.record(s, et)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
-	if rec := entry.cached(idx); rec != nil {
-		return rec, dir.nCoeffs, nil
+	rec = entry.cached(idx)
+	if rec == nil {
+		rec, err = r.ReadDoubles(start, start+dir.rSize-1)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		if int32(len(rec)) < 2+components*dir.nCoeffs {
+			return nil, 0, 0, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+components*dir.nCoeffs)
+		}
+
+		mid, radius := rec[0], rec[1]
+		if !finite(mid) || !finite(radius) || radius == 0 {
+			return nil, 0, 0, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
+		}
+
+		entry.keep(idx, rec)
 	}
 
-	rec, err = r.ReadDoubles(start, start+dir.rSize-1)
+	tau, err = recordTau(et, rec[0], rec[1], dir.tInit)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
-	if int32(len(rec)) < 2+components*dir.nCoeffs {
-		return nil, 0, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+components*dir.nCoeffs)
-	}
-
-	mid, radius := rec[0], rec[1]
-	if !finite(mid) || !finite(radius) || radius == 0 {
-		return nil, 0, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
-	}
-
-	entry.keep(idx, rec)
-
-	return rec, dir.nCoeffs, nil
+	return rec, dir.nCoeffs, tau, nil
 }
 
 // type21Dir is a type 21 segment's directory, validated: MAXDIM, the record
