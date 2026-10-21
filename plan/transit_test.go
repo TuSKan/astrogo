@@ -233,7 +233,7 @@ func TestTransitIsWhereSiderealTimeMeetsRightAscension(t *testing.T) {
 			}
 
 			for _, at := range transits {
-				st, err := eph.ApparentState(prov, id, at)
+				st, err := eph.At(prov, at).Apparent(id, eph.Geocenter())
 				if err != nil {
 					t.Fatal(err)
 				}

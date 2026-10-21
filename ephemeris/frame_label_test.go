@@ -1,104 +1,67 @@
 package ephemeris_test
 
 import (
-	"errors"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 )
 
-// TestProvidersLabelTheirFrame is the point of the Frame and Center fields.
+// TestProvidersNameTheirCentreAndAxes is the point of the Frame and Center
+// fields.
 //
-// Before them, the frame contract on State was a comment reading "Geocentric
+// Before them, the contract on State was a comment reading "Geocentric
 // position in AU (ICRS-like)" — hedged, on a struct several providers fill in
-// differently. The analytical provider produces ICRS; ephemeris/satellite
-// converts SGP4's TEME output to GCRS and produces that. Those differ by frame
-// bias, about 23 milliarcseconds, and nothing in the type distinguished them.
-//
-// A value from one used where the other was meant stays mathematically valid
-// and becomes physically wrong, which is the failure mode this whole class of
-// bug shares with the four time-scale defects: an invariant that lived in
-// prose instead of in something a compiler or a test can see.
-func TestProvidersLabelTheirFrame(t *testing.T) {
+// differently. A provider now locates a body about the centre it computes it
+// from and says which, and an Instant composes those, so a label that lied
+// would put a body an AU from where it is. The analytical provider computes
+// the planets about the Sun and the Moon about the Earth; a state composed
+// from them is about the centre it was asked for.
+func TestProvidersNameTheirCentreAndAxes(t *testing.T) {
 	t.Parallel()
 
 	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	p := eph.Default()
 
-	st, err := eph.Default().State(eph.MarsBarycenter, when)
+	for _, c := range []struct {
+		id, center eph.ID
+	}{
+		{eph.MarsBarycenter, eph.Sun},
+		{eph.Earth, eph.Sun},
+		{eph.Moon, eph.Earth},
+		{eph.Sun, eph.SolarSystemBarycenter},
+	} {
+		st, err := p.Locate(c.id, when)
+		if err != nil {
+			t.Fatalf("Locate(%v): %v", c.id, err)
+		}
+
+		if st.Frame != eph.FrameICRS || st.Center != c.center {
+			t.Errorf("the analytical provider locates %v about %v on %s axes, want about %v on the ICRS's", c.id, st.Center, st.Frame, c.center)
+		}
+	}
+
+	st, err := eph.At(p, when).Geometric(eph.MarsBarycenter, eph.Earth)
 	if err != nil {
-		t.Fatalf("State: %v", err)
+		t.Fatal(err)
 	}
 
-	if st.Frame != eph.FrameICRS {
-		t.Errorf("the analytical provider labels its frame %s, want ICRS", st.Frame)
-	}
-
-	if st.Center != eph.CenterGeocenter {
-		t.Errorf("the analytical provider labels its origin %s, want geocenter", st.Center)
+	if st.Frame != eph.FrameICRS || st.Center != eph.Earth {
+		t.Errorf("Mars composed about the Earth is about %v on %s axes", st.Center, st.Frame)
 	}
 }
 
-// TestRequireCatchesAFrameMismatch checks the guard the labels exist for.
-func TestRequireCatchesAFrameMismatch(t *testing.T) {
-	t.Parallel()
-
-	icrs := eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocenter}
-	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocenter}
-
-	if err := icrs.Require(eph.FrameICRS, eph.CenterGeocenter); err != nil {
-		t.Errorf("a matching state was refused: %v", err)
-	}
-
-	// The case that used to be invisible: a satellite state where a planetary
-	// one was meant.
-	err := gcrs.Require(eph.FrameICRS, eph.CenterGeocenter)
-	if !errors.Is(err, eph.ErrWrongFrame) {
-		t.Errorf("GCRS passed as ICRS: err = %v, want ErrWrongFrame", err)
-	}
-
-	if err := icrs.Require(eph.FrameICRS, eph.CenterBarycenter); !errors.Is(err, eph.ErrWrongCenter) {
-		t.Errorf("geocentric passed as barycentric: err = %v, want ErrWrongCenter", err)
-	}
-}
-
-// An unlabeled state passes rather than failing.
-//
-// The zero value asserts nothing, and Require checks against a *wrong* label
-// rather than demanding every producer carry one. Making unspecified an error
-// would turn "we do not know" into a failure at every call site not yet
-// updated, which is a migration rather than a safeguard — and would punish
-// third-party providers implementing the interface for astrogo's own change.
-func TestRequireAcceptsAnUnlabeledState(t *testing.T) {
-	t.Parallel()
-
-	var unlabeled eph.State
-
-	if err := unlabeled.Require(eph.FrameICRS, eph.CenterBarycenter); err != nil {
-		t.Errorf("an unlabeled state was refused: %v", err)
-	}
-
-	// And a labeled state is not constrained by a caller who does not care.
-	gcrs := eph.State{Frame: eph.FrameGCRS, Center: eph.CenterGeocenter}
-	if err := gcrs.Require(eph.FrameUnspecified, eph.CenterUnspecified); err != nil {
-		t.Errorf("a caller with no requirement got an error: %v", err)
-	}
-}
-
-// The String forms appear in the error messages above, so they have to read.
-func TestFrameAndCenterStrings(t *testing.T) {
+// The String forms appear in the errors the Instant reports for axes it cannot
+// compose, so they have to read.
+func TestFrameStrings(t *testing.T) {
 	t.Parallel()
 
 	for got, want := range map[string]string{
-		eph.FrameUnspecified.String():  "unspecified",
-		eph.FrameICRS.String():         "ICRS",
-		eph.FrameGCRS.String():         "GCRS",
-		eph.FrameTEME.String():         "TEME",
-		eph.FrameITRS.String():         "ITRS",
-		eph.CenterUnspecified.String(): "unspecified",
-		eph.CenterGeocenter.String():   "geocenter",
-		eph.CenterBarycenter.String():  "barycenter",
-		eph.CenterHeliocenter.String(): "heliocenter",
+		eph.FrameUnspecified.String(): "unspecified",
+		eph.FrameICRS.String():        "ICRS",
+		eph.FrameGCRS.String():        "GCRS",
+		eph.FrameTEME.String():        "TEME",
+		eph.FrameITRS.String():        "ITRS",
 	} {
 		if got != want {
 			t.Errorf("String() = %q, want %q", got, want)

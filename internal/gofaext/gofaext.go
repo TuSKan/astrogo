@@ -577,6 +577,17 @@ func Ld(bm float64, p, q, e [3]float64, em, dlim float64) [3]float64 {
 	return p1
 }
 
+// Ab applies stellar aberration to the natural direction pnat (a unit
+// vector), for an observer moving at v (its barycentric velocity in units of
+// c) at a distance s from the Sun in AU, with bm1 = √(1 − |v|²): iauAb.
+func Ab(pnat, v [3]float64, s, bm1 float64) [3]float64 {
+	var ppr [3]float64
+
+	gofa.Ab(pnat, v, s, bm1, &ppr)
+
+	return ppr
+}
+
 // TTToTCG converts Terrestrial Time to Geocentric Coordinate Time.
 //
 // TCG is the coordinate time of the geocentric reference system: TT is TCG

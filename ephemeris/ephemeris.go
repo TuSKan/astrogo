@@ -12,7 +12,6 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -29,35 +28,25 @@ type (
 	// Frame names the reference frame a State's vectors are expressed in.
 	// See [core.State] for why the zero value asserts nothing.
 	Frame = core.Frame
-	// Center names the origin a State's vectors are measured from.
-	Center = core.Center
 	// ID is an ephemeris ID.
 	ID = core.ID
 	// Source is an ephemeris source.
 	Source = core.Source
 )
 
-// Reference frames and origins a [State] can be labeled with. The
-// unspecified values are the zero values and assert nothing — see
-// [core.State].
+// Reference frames a [State] can be labeled with. FrameUnspecified is the
+// zero value and asserts nothing — see [core.State].
 const (
 	FrameUnspecified = core.FrameUnspecified
 	FrameICRS        = core.FrameICRS
 	FrameGCRS        = core.FrameGCRS
 	FrameITRS        = core.FrameITRS
 	FrameTEME        = core.FrameTEME
-
-	CenterUnspecified = core.CenterUnspecified
-	CenterGeocenter   = core.CenterGeocenter
-	CenterBarycenter  = core.CenterBarycenter
-	CenterHeliocenter = core.CenterHeliocenter
 )
 
-// Errors reported by [core.State.Require].
-var (
-	ErrWrongFrame  = core.ErrWrongFrame
-	ErrWrongCenter = core.ErrWrongCenter
-)
+// ErrWrongFrame reports a chain of [core.Provider.Locate] answers that cannot be
+// composed: one of them is not on the ICRS's axes.
+var ErrWrongFrame = core.ErrWrongFrame
 
 const (
 	// Mercury is the identifier for Mercury.
@@ -142,12 +131,13 @@ var (
 	ErrUnknownSource = errors.New("eph: unknown source")
 	// ErrZeroVector is the error for when a near-zero vector is provided.
 	ErrZeroVector = errors.New("eph: cannot convert near-zero vector to ICRS")
-	// ErrSofaEpv00 is the error for when the sofa epv00 function fails.
-	ErrSofaEpv00 = errors.New("eph: sofa epv00 failed")
-	// ErrSofaPlan94 is the error for when the sofa plan94 function fails.
-	ErrSofaPlan94 = errors.New("eph: sofa plan94 failed")
-	// ErrUnsupportedBody is the error for when an unsupported body is provided.
-	ErrUnsupportedBody = errors.New("eph: unsupported body for sofa provider")
+	// ErrUnsupportedBody is the error [Default] returns for a body its SOFA
+	// series do not place.
+	ErrUnsupportedBody = kepler.ErrUnsupportedBody
+	// ErrChainTooDeep reports a provider whose centres do not reach the Solar
+	// System barycenter within a chain any kernel nests: one whose centres
+	// loop.
+	ErrChainTooDeep = errors.New("eph: chain of centres too deep")
 )
 
 // Satellite is the SGP4 orbit propagator for NORAD TLE data.
@@ -365,7 +355,7 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // rather than the only thing closing the gap — it keeps Default's contract
 // visible at the call site instead of resting on a lower layer's behavior.
 func Default() Provider {
-	p := kepler.New(kepler.WithBase(&sofaProvider{}))
+	p := kepler.New()
 	if err := p.Register(PlutoBarycenter, kepler.PlutoElements()); err != nil {
 		panic(fmt.Sprintf("ephemeris: failed to register built-in Pluto elements: %v", err))
 	}
@@ -374,28 +364,6 @@ func Default() Provider {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-// Position is a convenience helper that returns the geocentric position
-// of a body at time t.
-func Position(p Provider, id ID, t time.Time) (vector.Vec3, error) {
-	st, err := p.State(id, t)
-	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("ephemeris: position: %w", err)
-	}
-
-	return st.Pos, nil
-}
-
-// Velocity is a convenience helper that returns the geocentric velocity
-// of a body at time t.
-func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
-	st, err := p.State(id, t)
-	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("ephemeris: velocity: %w", err)
-	}
-
-	return st.Vel, nil
-}
 
 // lightAUPerDay is the speed of light in astronomical units per day, the
 // denominator of the light-time iteration below.
@@ -418,163 +386,6 @@ func Velocity(p Provider, id ID, t time.Time) (vector.Vec3, error) {
 // var, not const: both inputs are struct fields.
 var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
 	constants.Derived.JulianDaySeconds.Value / constants.IAU.AstronomicalUnit.Value
-
-// ApparentState returns the apparent state of a target: where it is seen from
-// the Earth at obsTime, with both light time and annual aberration included.
-// It iterates the light time by repeatedly polling the Provider at (t - tau).
-//
-// Apparent, not astrometric. The distinction matters and is easy to miss,
-// because it does not come from the iteration but from what a Provider means
-// by a geocentric state. State(target, t') is target(t') - earth(t'), so
-// asking for it at the retarded epoch moves the observer back along with the
-// target. The astrometric vector wants the opposite: the target retarded and
-// the Earth left where it is. The two differ by earth(t) - earth(t - tau),
-// which is v_earth * tau; and since tau is the range over c, that term is the
-// range times v_earth/c, which is precisely the first-order aberration
-// displacement and in the right direction.
-//
-// So this returns the apparent place, correctly. Do not apply aberration to
-// the result — it is already there, and doubling it puts a planet at
-// opposition some twenty arcseconds from where it is.
-//
-// Gravitational light deflection by the Sun is applied too, which is the other
-// half of what "apparent" means and was missing until #263. Measured over
-// 2026 it is a few hundredths of an arcsecond at ordinary elongations and a
-// couple of tenths in the tail — small, and the same size as astrogo's own
-// measured agreement with JPL Horizons, which is the argument for having it.
-// [AstrometricState] deliberately does not apply it: the astrometric place is
-// light time and nothing else, which is what Horizons publishes as quantity 1
-// and what astrogo agrees with there to three microarcseconds.
-//
-// Only the position is deflected. Deflection bends a light ray, so it is a
-// statement about a direction; the returned velocity is the target's, un-bent,
-// and differentiating the deflected position would not reproduce it.
-//
-// [coord.Context.GeocentricToObserved] is the matching consumer: it adds
-// diurnal parallax, the rotation into the local horizon, diurnal aberration
-// and refraction, and deliberately does not touch annual aberration or
-// deflection.
-func ApparentState(p Provider, target ID, obsTime time.Time) (State, error) {
-	st, err := p.State(target, obsTime)
-	if err != nil {
-		return State{}, fmt.Errorf("ephemeris: apparent state: %w", err)
-	}
-
-	tauDays := st.Pos.Norm() / lightAUPerDay
-
-	for range lightTimeMaxIter {
-		retardedTime := obsTime.Add(unit.Days(-tauDays))
-
-		st, err = p.State(target, retardedTime)
-		if err != nil {
-			return State{}, fmt.Errorf("ephemeris: apparent state retarded: %w", err)
-		}
-
-		next := st.Pos.Norm() / lightAUPerDay
-		settled := math.Abs(next-tauDays) < lightTimeTolDays
-		tauDays = next
-
-		if settled {
-			break
-		}
-	}
-
-	deflected, err := deflectBySun(p, st.Pos, target, obsTime, obsTime.Add(unit.Days(-tauDays)))
-	if err != nil {
-		return State{}, err
-	}
-
-	st.Pos = deflected
-
-	return st, nil
-}
-
-// deflectBySun bends a geocentric direction by the Sun's gravity, returning
-// the position with its direction corrected and its length unchanged.
-//
-// # Why it is here and not in coord
-//
-// Deflection happens on the way from the target to the Earth, so it belongs to
-// the geocentric place. By the time [coord.Context.GeocentricToObserved] has
-// the vector, that place is an input; correcting it there would mean coord
-// re-deriving the Sun's position to fix something that should have arrived
-// correct.
-//
-// # The geometry
-//
-// SOFA's iauLd, which needs three directions and one distance:
-//
-//	p    observer to source        - the geocentric vector, normalized
-//	q    Sun to source             - that vector less the Sun's own geocentric
-//	                                 position, both at the retarded epoch where
-//	                                 the light was
-//	e    Sun to observer           - the reverse of the Sun's geocentric
-//	                                 position at the observing epoch
-//	em   Sun to observer, in au    - and its magnitude
-//
-// The Sun comes from the same Provider as the target rather than from Epv00,
-// which [earthBarycentric] uses for the aberration correction. The reason is
-// self-consistency: one ephemeris, one Sun, and a synthetic Provider used in a
-// test gets the geometry it declares rather than the real Sun's. Every
-// Provider in this library answers for the Sun already, because elongation and
-// apparent magnitude need it — see [WithKeplerBase], which exists to guarantee
-// exactly that for a Kepler propagator.
-//
-// The observer is taken at obsTime rather than at the retarded epoch, which is
-// what SOFA's own Atciq does. Over a light time the Earth moves at most a few
-// thousandths of an au, worth a per cent of a term that is itself a few
-// hundredths of an arcsecond - three or four microarcseconds, well below what
-// anything downstream can see.
-//
-// The deflection limiter is SOFA's own expression from iauLdsun: phi^2/2 with
-// phi about five arcminutes at one au, so it engages only well inside the
-// solar disc, where nothing is observable anyway and the unlimited formula
-// would diverge.
-//
-// The Sun itself is returned untouched. Its own geocentric position is the one
-// being subtracted, so q would have no direction, and a body does not deflect
-// its own light.
-func deflectBySun(p Provider, pos vector.Vec3, target ID, obsTime, retardedTime time.Time) (vector.Vec3, error) {
-	if target == core.Sun {
-		return pos, nil
-	}
-
-	sunNow, err := p.State(core.Sun, obsTime)
-	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("ephemeris: apparent state: sun for light deflection: %w", err)
-	}
-
-	sunThen, err := p.State(core.Sun, retardedTime)
-	if err != nil {
-		return vector.Vec3{}, fmt.Errorf("ephemeris: apparent state: retarded sun for light deflection: %w", err)
-	}
-
-	// Sun to observer is the reverse of the Sun's geocentric position.
-	sunToObserver := sunNow.Pos.MulScalar(-1)
-	sunToSource := pos.Sub(sunThen.Pos)
-
-	norm := pos.Norm()
-	em := sunToObserver.Norm()
-
-	if norm == 0 || sunToSource.Norm() == 0 || em == 0 {
-		return pos, nil
-	}
-
-	// iauLdsun's limiter, verbatim: 1e-6 over the squared distance, floored so
-	// an observer inside one au does not get a larger limit than one at Earth.
-	em2 := math.Max(em*em, 1.0)
-
-	deflected := gofaext.Ld(1.0,
-		unitArray(pos), unitArray(sunToSource), unitArray(sunToObserver),
-		em, 1e-6/em2)
-
-	// Ld returns a vector that is not exactly unit - SOFA says the departure is
-	// always negligible - so the range is restored from the input rather than
-	// carried through, keeping Distance() exactly what light time made it.
-	out := vector.V3(deflected[0], deflected[1], deflected[2])
-
-	return out.Unit().MulScalar(norm), nil
-}
 
 // unitArray is the [3]float64 form gofa's vector routines take.
 func unitArray(v vector.Vec3) [3]float64 {
@@ -608,10 +419,9 @@ func unitArray(v vector.Vec3) [3]float64 {
 // target at every time step (see plan/apparent.go), where it used to call the
 // provider once.
 const (
-	// lightTimeTolDays is ~0.9 microseconds. At 30 km/s — faster than
-	// anything in the solar system moves relative to Earth — that is 0.03 m
-	// of travel, which subtends under a microarcsecond at any distance a
-	// solar-system body is ever at.
+	// lightTimeTolDays is ~0.9 microseconds of light time, and the position
+	// a target moves in it: Instant.astrometric stops once its last step
+	// along the target's velocity leaves less error than that.
 	lightTimeTolDays = 1e-11
 
 	// lightTimeMaxIter caps the loop. Nothing measured needs more than three
@@ -630,250 +440,4 @@ func ToICRS(pos vector.Vec3) (coord.ICRS, error) {
 	ra, dec := pos.ToSpherical()
 
 	return coord.NewICRS(angle.Rad(ra), angle.Rad(dec)), nil
-}
-
-// ─── SOFA provider (analytical Sun/Moon) ─────────────────────────────────────
-
-type sofaProvider struct{}
-
-func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
-	tdb := t.TDB()
-	d1, d2 := tdb.JDParts()
-
-	switch id { //nolint:exhaustive // the default rejects every point SOFA has no theory for: the outer planets' centres, Pluto
-	case Sun:
-		pvh, _, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return State{}, ErrSofaEpv00
-		}
-
-		ph := pvh[0]
-		vh := pvh[1]
-
-		return State{
-			Pos:    vector.Vec3{X: -ph[0], Y: -ph[1], Z: -ph[2]},
-			Vel:    vector.Vec3{X: -vh[0], Y: -vh[1], Z: -vh[2]},
-			Frame:  FrameICRS,
-			Center: CenterGeocenter,
-		}, nil
-
-	case Moon:
-		pv := gofaext.Moon98(d1, d2)
-
-		return State{
-			Pos:    vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]},
-			Vel:    vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]},
-			Frame:  FrameICRS,
-			Center: CenterGeocenter,
-		}, nil
-
-	case SolarSystemBarycenter:
-		_, pvb, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return State{}, ErrSofaEpv00
-		}
-
-		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
-		// the SSB's own geocentric state (SSB - Earth) is its negation.
-		return State{
-			Pos:    vector.Vec3{X: -pvb[0][0], Y: -pvb[0][1], Z: -pvb[0][2]},
-			Vel:    vector.Vec3{X: -pvb[1][0], Y: -pvb[1][1], Z: -pvb[1][2]},
-			Frame:  FrameICRS,
-			Center: CenterGeocenter,
-		}, nil
-
-	case Earth:
-		// The geocentre, from the geocentre.
-		return State{Frame: FrameICRS, Center: CenterGeocenter}, nil
-
-	case EarthMoonBarycenter:
-		// The Moon's share of the pair's mass along the Moon's vector: exact by
-		// the barycenter's definition, and as good as Moon98. Plan94's own
-		// barycenter less SOFA's Earth, heliocentric theory at a geocentric
-		// scale, was measured up to 1,942 km from it over 2026-2027 — 40% of
-		// the 4,671 km it is (#809).
-		pv := gofaext.Moon98(d1, d2)
-		mu := constants.Ephemeris.MoonGravitationalParameter.Value /
-			constants.Ephemeris.EarthMoonGravitationalParameter.Value
-
-		return State{
-			Pos:    vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]}.MulScalar(mu),
-			Vel:    vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]}.MulScalar(mu),
-			Frame:  FrameICRS,
-			Center: CenterGeocenter,
-		}, nil
-
-	case MercuryBarycenter, Mercury, VenusBarycenter, Venus,
-		MarsBarycenter, JupiterBarycenter, SaturnBarycenter, UranusBarycenter, NeptuneBarycenter:
-		pvh, _, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return State{}, ErrSofaEpv00
-		}
-
-		pv, status := gofaext.Plan94(d1, d2, plan94Body(id))
-		if status < 0 {
-			return State{}, ErrSofaPlan94
-		}
-
-		return State{
-			Pos: vector.Vec3{
-				X: pv[0][0] - pvh[0][0],
-				Y: pv[0][1] - pvh[0][1],
-				Z: pv[0][2] - pvh[0][2],
-			},
-			Vel: vector.Vec3{
-				X: pv[1][0] - pvh[1][0],
-				Y: pv[1][1] - pvh[1][1],
-				Z: pv[1][2] - pvh[1][2],
-			},
-			Frame:  FrameICRS,
-			Center: CenterGeocenter,
-		}, nil
-
-	default:
-		if bary, ok := planetBarycenter(id); ok {
-			return State{}, fmt.Errorf("%w: %v; SOFA's theory places its system barycenter, %v",
-				ErrUnsupportedBody, id, bary)
-		}
-
-		return State{}, ErrUnsupportedBody
-	}
-}
-
-func (s *sofaProvider) Close() error { return nil }
-
-// planetBarycenter is the system barycenter of the planet whose center id is,
-// from Mars out: the code to ask a provider for that holds only barycenters,
-// as SOFA's theory and a planetary kernel do (#809).
-func planetBarycenter(id ID) (ID, bool) {
-	if id%100 == 99 && id/100 >= MarsBarycenter && id/100 <= PlutoBarycenter {
-		return id / 100, true
-	}
-
-	return 0, false
-}
-
-// plan94Body is SOFA Plan94's number for the point id names: 1, 2 and 4 to 8
-// for Mercury, Venus and Mars to Neptune. Plan94's theory places the system
-// barycenters of Mars to Neptune, so those are the points it answers for, and
-// the planets' own centers are refused rather than answered with their
-// barycenters (#809). Mercury and Venus have no moons, so each is its own
-// barycenter under two codes.
-//
-// Plan94's 3 is the Earth-Moon barycenter, not the Earth. The Earth used to be
-// asked for under it, and came back as the barycenter, labeled as the
-// geocenter; the barycenter itself is answered from the Moon, not from 3.
-func plan94Body(id ID) int {
-	if id == Mercury || id == Venus {
-		return int(id / 100)
-	}
-
-	return int(id)
-}
-
-// AstrometricState returns the astrometric state of a target: the target
-// retarded by light time, with the observer left where it is.
-//
-// # Why this is a separate function and not ApparentState
-//
-// The two differ by exactly the annual aberration, and which one a consumer
-// wants is decided by whether that consumer applies aberration itself:
-//
-//	astrometric = target(t - tau) - earth(t)
-//	apparent    = target(t - tau) - earth(t - tau)
-//
-// [ApparentState] returns the second, because a Provider's geocentric state
-// at the retarded epoch moves the observer back along with the target — see
-// its doc comment for the derivation. That is the right input for
-// [coord.Context.GeocentricToObserved], which applies no aberration of its
-// own. It is the wrong input for [coord.Context.AstrometricToObserved] and
-// [coord.Context.ICRSToAltAz], which run the whole apparent-place chain
-// themselves and would count the aberration twice.
-//
-// It is also the quantity every reference publishes as "astrometric": JPL
-// Horizons' quantity 1, and the column an almanac compares against. Until
-// this existed astrogo could not be measured against that column at all —
-// only against the observed alt/az at the far end of the pipeline, which
-// folds in Earth orientation and cannot say which stage a residual came from.
-//
-// # How the Earth is put back
-//
-// The retarded state already has the Earth at the wrong epoch, so the
-// correction is the Earth's own barycentric displacement over the light time,
-// from SOFA's Epv00. That is v_earth * tau to first order — about 20.5
-// arcseconds of direction at one astronomical unit, the constant of
-// aberration — and it is applied exactly rather than to first order, since
-// the two positions are both available.
-//
-// The light time is iterated on the *astrometric* range rather than the
-// geocentric one, because that is the distance the light actually travelled.
-// The difference is second order and under a microarcsecond, but it costs one
-// subtraction to be right.
-func AstrometricState(p Provider, target ID, obsTime time.Time) (State, error) {
-	st, err := p.State(target, obsTime)
-	if err != nil {
-		return State{}, fmt.Errorf("ephemeris: astrometric state: %w", err)
-	}
-
-	earthNow, err := earthBarycentric(obsTime)
-	if err != nil {
-		return State{}, err
-	}
-
-	tauDays := st.Pos.Norm() / lightAUPerDay
-
-	var pos vector.Vec3
-
-	for range lightTimeMaxIter {
-		retardedTime := obsTime.Add(unit.Days(-tauDays))
-
-		st, err = p.State(target, retardedTime)
-		if err != nil {
-			return State{}, fmt.Errorf("ephemeris: astrometric state retarded: %w", err)
-		}
-
-		earthThen, err := earthBarycentric(retardedTime)
-		if err != nil {
-			return State{}, err
-		}
-
-		// target(t-tau) - earth(t), written as the retarded geocentric vector
-		// minus the Earth's own travel over the light time.
-		pos = st.Pos.Sub(earthNow.Sub(earthThen))
-
-		next := pos.Norm() / lightAUPerDay
-		settled := math.Abs(next-tauDays) < lightTimeTolDays
-		tauDays = next
-
-		if settled {
-			break
-		}
-	}
-
-	st.Pos = pos
-
-	return st, nil
-}
-
-// earthBarycentric returns the Earth's barycentric position in AU at t, from
-// SOFA's Epv00.
-//
-// Epv00 is an analytical model rather than the JPL integration the target may
-// have come from, which is fine here and would not be if this were the answer
-// rather than a correction. As a position it is 4.6 km rms and 13.4 km at
-// worst from DE405 over 1900–2100 (SOFA's own note), and 4.0 km rms and 11.7
-// km at worst from de440s's heliocentric Earth (#810) — but only the
-// *difference* over a light time is used, hours at most for the outer
-// planets, and that difference carries the velocity's error, 1.4 mm/s rms,
-// times the light time: tens of meters at Neptune, against the kilometers of
-// either position.
-func earthBarycentric(t time.Time) (vector.Vec3, error) {
-	d1, d2 := t.TDB().JDParts()
-
-	_, pvb, status := gofaext.Epv00(d1, d2)
-	if status < 0 {
-		return vector.Vec3{}, ErrSofaEpv00
-	}
-
-	return vector.V3(pvb[0][0], pvb[0][1], pvb[0][2]), nil
 }

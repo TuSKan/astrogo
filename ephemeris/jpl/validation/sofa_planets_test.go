@@ -256,12 +256,12 @@ func TestSOFAPlanetsAgainstDE440(t *testing.T) {
 			sofa := eph.Default()
 
 			for _, at := range planetEpochs() {
-				want, werr := p.State(body.id, at)
+				want, werr := eph.At(p, at).Geometric(body.id, core.Earth)
 				if werr != nil {
 					t.Fatalf("DE440 State(%s) at %s: %v", body.id, at.Format(isoDate), werr)
 				}
 
-				got, gerr := sofa.State(body.id, at)
+				got, gerr := eph.At(sofa, at).Geometric(body.id, core.Earth)
 				if gerr != nil {
 					t.Fatalf("SOFA State(%s) at %s: %v", body.id, at.Format(isoDate), gerr)
 				}
@@ -335,12 +335,12 @@ func TestNoTimekeepingStepAtTheLeapSecondBoundary(t *testing.T) {
 		for mo := 1; mo <= 12; mo++ {
 			at := time.Date(year, time.Month(mo), 1, 0, 0, 0, 0, time.LocationUTC)
 
-			want, werr := p.State(core.Sun, at)
+			want, werr := eph.At(p, at).Geometric(core.Sun, core.Earth)
 			if werr != nil {
 				t.Fatalf("DE440 State(Sun) in %d: %v", year, werr)
 			}
 
-			got, gerr := sofa.State(core.Sun, at)
+			got, gerr := eph.At(sofa, at).Geometric(core.Sun, core.Earth)
 			if gerr != nil {
 				t.Fatalf("SOFA State(Sun) in %d: %v", year, gerr)
 			}

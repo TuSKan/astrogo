@@ -19,8 +19,8 @@ type fixedVecProvider struct {
 	vec vector.Vec3
 }
 
-func (p *fixedVecProvider) State(_ eph.ID, _ time.Time) (eph.State, error) {
-	return eph.State{Pos: p.vec}, nil
+func (p *fixedVecProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+	return geocentricMock(id, p.vec, vector.Vec3{})
 }
 
 func (p *fixedVecProvider) Close() error { return nil }
@@ -150,15 +150,26 @@ func TestAngularDiameter_ZeroDistance(t *testing.T) {
 	tm := ctx.Time()
 
 	// Placing the body exactly at the observer's own ICRS position makes
-	// the topocentric vector (body - observer) exactly zero.
-	prov := &fixedVecProvider{vec: ctx.ObsVec()}
-	sun := NewSun(prov)
+	// the topocentric vector (body - observer) exactly zero. The body says
+	// where it is itself: an apparent place is rebuilt from a direction and
+	// a range, so one computed from a provider lands within rounding of the
+	// observer rather than on it, and the guard under test is for zero.
+	sun := atObserver{Planet: NewSun(&fixedVecProvider{}), at: ctx.ObsVec()}
 
 	_, err := AngularDiameter(sun, tm, ctx)
 	if !errors.Is(err, ErrZeroDistance) {
 		t.Fatalf("AngularDiameter error = %v, want ErrZeroDistance", err)
 	}
 }
+
+// atObserver is a body whose geocentric vector is given outright.
+type atObserver struct {
+	*Planet
+
+	at vector.Vec3
+}
+
+func (a atObserver) GeocentricVec(time.Time) (vector.Vec3, error) { return a.at, nil }
 
 // TestAngularDiameter_DetailsAutoPopulateAndOverride confirms the
 // plan/details.go wiring: TargetDetails.AngularSize is populated

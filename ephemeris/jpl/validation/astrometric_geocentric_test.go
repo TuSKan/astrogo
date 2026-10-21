@@ -97,6 +97,9 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 		{"499", "Mars", core.MarsBarycenter},
 		{"5", "Jupiter", core.JupiterBarycenter},
 		{"6", "Saturn", core.SaturnBarycenter},
+		// Uranus and Neptune since #803, where the light time is hours.
+		{"7", "Uranus", core.UranusBarycenter},
+		{"8", "Neptune", core.NeptuneBarycenter},
 	}
 
 	// The reference records what it shares with astrogo as well as what it
@@ -131,7 +134,7 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 				"milliarcseconds does not fail this, and fifty times below the ~0.5 arcsec "+
 				"topocentric bias the comparison exists to locate — which is the only "+
 				"property that makes it evidence",
-			"measured: 5 bodies x 13 epochs across 2026, max 3.1e-06 arcsec, which is the "+
+			"measured: 7 bodies x 13 epochs across 2026, max 2.4e-06 arcsec, which is the "+
 				"~3.6 microarcsecond precision Horizons prints with EXTRA_PREC"))
 
 	var (
@@ -157,9 +160,9 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 		for _, row := range rows {
 			epoch := time.FromJD(row.jdUT, time.UTC)
 
-			state, err := eph.AstrometricState(provider, body.id, epoch)
+			state, err := eph.At(provider, epoch).Astrometric(body.id, eph.Geocenter())
 			if err != nil {
-				t.Fatalf("%s: AstrometricState: %v", body.name, err)
+				t.Fatalf("%s: Astrometric: %v", body.name, err)
 			}
 
 			var got coord.Astrometric

@@ -204,7 +204,7 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 // by the solar parallax, 8.8″.
 func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.Provider) (time.Time, error) {
 	alt := func(t time.Time) (float64, error) {
-		sun, err := eph.Position(prov, eph.Sun, t)
+		sun, err := geocentric(prov, eph.Sun, t)
 		if err != nil {
 			return 0, fmt.Errorf("crescent: sun position: %w", err)
 		}
@@ -428,12 +428,12 @@ type crescentGeometry struct {
 func crescentGeometryAt(ctx *coord.Context, prov eph.Provider) (crescentGeometry, error) {
 	t := ctx.Time()
 
-	sun, err := eph.Position(prov, eph.Sun, t)
+	sun, err := geocentric(prov, eph.Sun, t)
 	if err != nil {
 		return crescentGeometry{}, fmt.Errorf("crescent: sun position: %w", err)
 	}
 
-	moon, err := eph.Position(prov, eph.Moon, t)
+	moon, err := geocentric(prov, eph.Moon, t)
 	if err != nil {
 		return crescentGeometry{}, fmt.Errorf("crescent: moon position: %w", err)
 	}

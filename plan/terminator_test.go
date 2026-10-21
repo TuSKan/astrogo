@@ -324,7 +324,7 @@ func TestSublunarPoint_Basic(t *testing.T) {
 }
 
 // TestTerminatorFunctions_NilProviderDefaults is a regression test: all
-// three exported functions in this file call eph.Position(p, ...)
+// three exported functions in this file read their geocentric positions
 // directly (bypassing plan.NewSun/NewMoon), so each needs its own
 // nil-provider guard.
 func TestTerminatorFunctions_NilProviderDefaults(t *testing.T) {

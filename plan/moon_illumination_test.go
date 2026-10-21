@@ -121,7 +121,7 @@ func geocentricSeparation(t *testing.T, prov eph.Provider, a, b eph.ID, at time.
 	var dirs [2]coord.ICRS
 
 	for n, id := range []eph.ID{a, b} {
-		pos, err := eph.Position(prov, id, at)
+		pos, err := geocentric(prov, id, at)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
@@ -76,7 +77,7 @@ func TestJPLUnitsAreAUAndAUPerDay(t *testing.T) {
 		}
 	})
 
-	state, err := p.State(core.Sun, fixedEpoch())
+	state, err := eph.At(p, fixedEpoch()).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("failed to evaluate Sun state: %v", err)
 	}
@@ -97,7 +98,7 @@ func TestJPLUnsupportedBody(t *testing.T) {
 		}
 	})
 
-	_, err := p.State(core.ID(255), fixedEpoch())
+	_, err := eph.At(p, fixedEpoch()).Geometric(core.ID(255), core.Earth)
 	if err == nil {
 		t.Error("Expected error for unsupported body")
 	}
@@ -116,7 +117,7 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 	// Year 5000
 	tm := time.FromJD(3545000.0, time.UTC)
 
-	_, err := p.State(core.Sun, tm)
+	_, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	if err == nil {
 		t.Error("Expected error for out-of-coverage epoch")
 	}
@@ -134,12 +135,12 @@ func TestJPLDeterministicRepeatedCalls(t *testing.T) {
 
 	tm := fixedEpoch()
 
-	s1, err := p.State(core.Sun, tm)
+	s1, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("s1 failed: %v", err)
 	}
 
-	s2, err := p.State(core.Sun, tm)
+	s2, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("s2 failed: %v", err)
 	}
@@ -243,7 +244,7 @@ func TestSmallBodyEros(t *testing.T) {
 
 	// Get state
 	// By its NAIF code: a bare 433 is not read as a small body (#809).
-	state, err := p.State(eros, start)
+	state, err := eph.At(p, start).Geometric(eros, core.Earth)
 	if err != nil {
 		t.Fatalf("Failed to get state for Eros: %v", err)
 	}
@@ -326,7 +327,7 @@ func TestProvider_ConcurrentAddKernelAndState(t *testing.T) {
 	for range 8 {
 		wg.Go(func() {
 			for range 50 {
-				if _, err := p.State(core.Sun, tm); err != nil {
+				if _, err := eph.At(p, tm).Geometric(core.Sun, core.Earth); err != nil {
 					t.Errorf("State: %v", err)
 				}
 

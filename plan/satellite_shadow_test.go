@@ -77,12 +77,12 @@ func TestSatelliteShadowAgreesWithSkyfield(t *testing.T) {
 	sun := eph.Default()
 
 	eclipsed := func(tm time.Time) bool {
-		satSt, err := prov.State(prov.ID(), tm)
+		satSt, err := eph.At(prov, tm).Geometric(prov.ID(), eph.Earth)
 		if err != nil {
 			t.Fatalf("satellite state at %v: %v", tm, err)
 		}
 
-		sunSt, err := sun.State(eph.Sun, tm)
+		sunSt, err := eph.At(sun, tm).Geometric(eph.Sun, eph.Earth)
 		if err != nil {
 			t.Fatalf("sun state at %v: %v", tm, err)
 		}

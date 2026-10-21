@@ -259,11 +259,8 @@ func TestNeptune_SecularBrightening(t *testing.T) {
 // Asteroid — sbpy cross-validation
 // ══════════════════════════════════════════════════════════════════════════════
 
-// These reference values are computed using sbpy:
-//   from sbpy.photometry import HG, HG1G2, HG12_Pen16
-//   import numpy as np
-//   HG.evaluate(np.deg2rad(0), 3.53, 0.12) → 3.53
-//   HG.evaluate(np.deg2rad(20), 10.0, 0.15) → per-alpha check
+// The laws themselves are held to sbpy's published values in
+// asteroid_sbpy_test.go; these are their properties.
 
 func TestAsteroidHG_AtZeroPhase(t *testing.T) {
 	// At α=0, Φ₁(0)=Φ₂(0)=1 → V = H + 5·log₁₀(r·Δ)
@@ -307,21 +304,6 @@ func TestAsteroidHG_BowellSinCorrection(t *testing.T) {
 	t.Logf("HG α=45°: %.3f (baseline %.3f, diff %.4f)", mag, baseline, mag-baseline)
 }
 
-func TestAsteroidHG1G2_Themis(t *testing.T) {
-	// sbpy reference: HG1G2(7.063, 0.62, 0.14) for Themis.
-	// At α=0: V = 7.063 − 2.5·log₁₀(0.62·Φ₁(0) + 0.14·Φ₂(0) + 0.24·Φ₃(0)) + 0
-	// With r=Δ=1: the distance modulus is 0.
-	H := 7.063
-	G1, G2 := 0.62, 0.14
-	m0 := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(0))
-	// At zero phase, should be close to H (but not exactly H because Φ values ≠ 1 at 0° for splines that start at 7.5°).
-	if math.Abs(m0-H) > 1.0 {
-		t.Errorf("HG1G2 Themis at α=0°: %.3f, expected ~%.3f", m0, H)
-	}
-
-	t.Logf("HG1G2 Themis α=0° r=Δ=1: V = %.3f", m0)
-}
-
 func TestAsteroidHG1G2_PhaseMonotonicity(t *testing.T) {
 	H, G1, G2 := 10.0, 0.62, 0.14
 	r, d := 2.5, 1.5
@@ -334,35 +316,6 @@ func TestAsteroidHG1G2_PhaseMonotonicity(t *testing.T) {
 	}
 
 	t.Logf("HG1G2: α=0°:%.2f, 30°:%.2f, 60°:%.2f", m0, m30, m60)
-}
-
-func TestAsteroidHG12Star_Penttila(t *testing.T) {
-	// Penttilä 2016: G₁ = 0.84293649·G₁₂*, G₂ = 0.53513350·(1−G₁₂*)
-	H := 7.121
-	G12star := 0.68
-
-	m := magnitude.AsteroidHG12Star(H, G12star, 1.0, 1.0, angle.Deg(30))
-	// Compare with manual HG1G2 call using the mapping.
-	G1 := 0.84293649 * G12star
-	G2 := 0.53513350 * (1 - G12star)
-	mRef := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(30))
-
-	assertNear(t, "HG12* vs manual HG1G2", m, mRef, 1e-10)
-	t.Logf("HG12* at α=30°: %.4f (G1=%.4f, G2=%.4f)", m, G1, G2)
-}
-
-func TestAsteroidHG12_Muinonen(t *testing.T) {
-	// Original Muinonen HG12 mapping (discontinuous at G12=0.2).
-	H := 7.121
-	G12 := 0.68
-
-	m := magnitude.AsteroidHG12(H, G12, 1.0, 1.0, angle.Deg(30))
-	// Should use the G12 >= 0.2 branch.
-	G1 := 0.9529*G12 + 0.02162
-	G2 := -0.6125*G12 + 0.5572
-	mRef := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(30))
-
-	assertNear(t, "HG12 vs manual HG1G2", m, mRef, 1e-10)
 }
 
 func TestAsteroidHG12Star_Monotonic(t *testing.T) {
@@ -657,37 +610,6 @@ func TestGaiaGToJohnsonB(t *testing.T) {
 	if math.Abs(bv-0.653) > 0.1 {
 		t.Errorf("the Sun's B-V comes out %.3f, want 0.653 within 0.1", bv)
 	}
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Cubic Spline — Validation against sbpy knot tables
-// ══════════════════════════════════════════════════════════════════════════════
-
-func TestAsteroidHG1G2_SplineKnots(t *testing.T) {
-	// At spline knot positions, HG1G2 should reproduce the knot values.
-	// For G1=1, G2=0: V = H − 2.5·log₁₀(Φ₁(α)) + 5·log₁₀(r·Δ)
-	// With r=Δ=1, H=0: V = −2.5·log₁₀(Φ₁(α))
-	H := 0.0
-	G1, G2 := 1.0, 0.0
-
-	// sbpy Φ₁ knot at α=30°: y=0.3349
-	m30 := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(30))
-	phi1_30 := math.Pow(10, -m30/2.5) // recover Φ₁ from magnitude
-	assertNear(t, "Φ₁(30°)", phi1_30, 0.3349, 0.005)
-	t.Logf("Φ₁(30°) = %.4f (expected ~0.3349)", phi1_30)
-
-	// sbpy Φ₁ knot at α=90°: y=0.0511
-	m90 := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(90))
-	phi1_90 := math.Pow(10, -m90/2.5)
-	assertNear(t, "Φ₁(90°)", phi1_90, 0.0511, 0.005)
-	t.Logf("Φ₁(90°) = %.4f (expected ~0.0511)", phi1_90)
-
-	// Φ₂ at α=60°: y=0.3176 (with G1=0, G2=1)
-	G1, G2 = 0.0, 1.0
-	m60_2 := magnitude.AsteroidHG1G2(H, G1, G2, 1.0, 1.0, angle.Deg(60))
-	phi2_60 := math.Pow(10, -m60_2/2.5)
-	assertNear(t, "Φ₂(60°)", phi2_60, 0.3176, 0.005)
-	t.Logf("Φ₂(60°) = %.4f (expected ~0.3176)", phi2_60)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

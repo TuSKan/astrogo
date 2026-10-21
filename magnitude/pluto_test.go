@@ -213,7 +213,7 @@ var errNoState = errors.New("stateless provider")
 
 type statelessProvider struct{}
 
-func (statelessProvider) State(eph.ID, time.Time) (core.State, error) {
+func (statelessProvider) Locate(eph.ID, time.Time) (core.State, error) {
 	return core.State{}, errNoState
 }
 

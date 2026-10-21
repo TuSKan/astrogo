@@ -279,9 +279,17 @@ func (p *Provider) Close() error {
 	return lastErr
 }
 
-// State returns the geocentric state (position and velocity) of the given
-// body at time t.
-func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
+// Locate returns id's state at t about the centre of the segment that holds
+// it there, as the kernel stores it: the Moon and the Earth about the
+// Earth-Moon barycenter, a planet's barycenter about the Solar System
+// barycenter, a moon of Neptune about Neptune's barycenter. ephemeris.At
+// composes those into a state about any centre.
+//
+// It used to answer geocentric, summing the target's chain and the Earth's
+// each to the Solar System barycenter and differencing the two: a 9-body sky
+// evaluated 30 segments where 13 were distinct, and the Moon passed through a
+// barycenter an AU away from both ends of its vector (#803).
+func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -289,39 +297,28 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	// result to about 40 microseconds, which is 4 cm of lunar motion (#150).
 	et := lsk.UTCToET(t, p.LSK)
 
-	// Get target relative to SSB (0)
 	// An ID is a NAIF code (#809): the target is looked up as itself, with no
 	// table between, so a code no loaded kernel holds is refused rather than
 	// read as some other body.
-	targetSSB, err := p.evaluateRecursive(int32(id), et, 0)
+	ref, err := p.findSegmentLocked(int32(id), et)
 	if err != nil {
 		return core.State{}, err
 	}
 
-	// Get Earth relative to SSB (0)
-	earthSSB, err := p.evaluateRecursive(399, et, 0)
+	k := p.Kernels[ref.KernelIndex]
+	seg := &k.Segments[ref.SegmentIndex]
+
+	pos, vel, err := spk.EvaluateSegment(seg, k.Reader, et)
 	if err != nil {
-		return core.State{}, fmt.Errorf("jpl: failed to get Earth state: %w", err)
+		return core.State{}, fmt.Errorf("jpl: evaluate segment: %w", err)
 	}
 
-	// Geocentric = Target(SSB) - Earth(SSB)
-	relPos := targetSSB.Pos.Sub(earthSSB.Pos)
-	relVel := targetSSB.Vel.Sub(earthSSB.Vel)
-
-	// Convert to AU and AU/day
+	// The kernel's km and km/s, to AU and AU/day.
 	return core.State{
-		Pos: vector.Vec3{
-			X: relPos.X / kmPerAU,
-			Y: relPos.Y / kmPerAU,
-			Z: relPos.Z / kmPerAU,
-		},
-		Vel: vector.Vec3{
-			X: relVel.X * 86400 / kmPerAU,
-			Y: relVel.Y * 86400 / kmPerAU,
-			Z: relVel.Z * 86400 / kmPerAU,
-		},
+		Pos:    vector.V3(pos.X/kmPerAU, pos.Y/kmPerAU, pos.Z/kmPerAU),
+		Vel:    vector.V3(vel.X*86400/kmPerAU, vel.Y*86400/kmPerAU, vel.Z*86400/kmPerAU),
 		Frame:  core.FrameICRS,
-		Center: core.CenterGeocenter,
+		Center: core.ID(seg.Center),
 	}, nil
 }
 
@@ -691,44 +688,6 @@ func (p *Provider) rebuildIndexLocked() {
 			p.ByTargetCoverage[seg.Target] = cov
 		}
 	}
-}
-
-// evaluateRecursive evaluates the state of a target body at a given time.
-// It recursively evaluates the state of the target body at a given time.
-//
-// Only called from State, which already holds p.mu for the duration — it
-// uses the *Locked helpers rather than FindSegment/segment to avoid
-// recursively re-acquiring the RWMutex from the same goroutine.
-func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (core.State, error) {
-	currentID := targetID
-
-	var totalPos, totalVel vector.Vec3
-
-	// Limit depth to prevent infinite loops (though SPK trees should be shallow)
-	for range 10 {
-		if currentID == baseID {
-			return core.State{Pos: totalPos, Vel: totalVel, Frame: core.FrameICRS, Center: core.CenterGeocenter}, nil
-		}
-
-		ref, err := p.findSegmentLocked(currentID, et)
-		if err != nil {
-			return core.State{}, err
-		}
-
-		k := p.Kernels[ref.KernelIndex]
-		s := &k.Segments[ref.SegmentIndex]
-
-		pos, vel, err := spk.EvaluateSegment(s, k.Reader, et)
-		if err != nil {
-			return core.State{}, fmt.Errorf("jpl: evaluate segment: %w", err)
-		}
-
-		totalPos = totalPos.Add(pos)
-		totalVel = totalVel.Add(vel)
-		currentID = s.Center
-	}
-
-	return core.State{}, fmt.Errorf("%w: target %d", ErrRecursionDepth, targetID)
 }
 
 // findSegmentLocked is FindSegment's body, callable by other methods that

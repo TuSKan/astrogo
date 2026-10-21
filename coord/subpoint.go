@@ -12,8 +12,8 @@ import (
 )
 
 // SubPoint returns the geodetic point on Earth's reference ellipsoid where a
-// body at geocentric position geocentric (GCRS, in AU, as eph.Position and
-// MovingBody.GeocentricVec produce throughout this codebase) is observed
+// body at geocentric position geocentric (GCRS, in AU, as an ephemeris
+// Instant's states about the Earth and MovingBody.GeocentricVec are) is observed
 // exactly at the zenith, at time t: the foot of the WGS84 ellipsoid normal
 // that passes through the body, at height zero.
 //

@@ -25,7 +25,7 @@ func TestGeocentricToObservedCarriesTheTopocentricDistance(t *testing.T) {
 
 	at := time.Date(2026, time.March, 20, 15, 45, 0, 0, time.LocationUTC)
 
-	moon, err := eph.Position(eph.Default(), eph.Moon, at)
+	moon, err := geoPos(eph.At(eph.Default(), at).Geometric(eph.Moon, eph.Earth))
 	if err != nil {
 		t.Fatalf("Moon position: %v", err)
 	}

@@ -37,12 +37,12 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 		t.Fatalf("precondition: converted instant is on scale %v", gps.Scale())
 	}
 
-	fromUTC, err := sat.State(sat.ID(), utc)
+	fromUTC, err := sat.Locate(sat.ID(), utc)
 	if err != nil {
 		t.Fatalf("State(utc): %v", err)
 	}
 
-	fromGPS, err := sat.State(sat.ID(), gps)
+	fromGPS, err := sat.Locate(sat.ID(), gps)
 	if err != nil {
 		t.Fatalf("State(gps): %v", err)
 	}
@@ -71,7 +71,7 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 		t.Errorf("GPST - UTC = %.6f s at a 2008 epoch, want 14 (delta-AT 33 - 19)", gap)
 	}
 
-	fromMisread, err := sat.State(sat.ID(), misread)
+	fromMisread, err := sat.Locate(sat.ID(), misread)
 	if err != nil {
 		t.Fatalf("State(misread): %v", err)
 	}

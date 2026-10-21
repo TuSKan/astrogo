@@ -127,9 +127,9 @@ func main() {
 func computeAndPrint(prov eph.Provider, body eph.ID, t time.Time,
 	refRA, refDec angle.Angle, refDist float64,
 ) {
-	// Use ApparentState to apply light-time correction (iterative retardation),
+	// The apparent place applies the light-time correction (iterative retardation),
 	// matching Skyfield's observe() and Horizons' astrometric coordinates.
-	st, err := eph.ApparentState(prov, body, t)
+	st, err := eph.At(prov, t).Apparent(body, eph.Geocenter())
 	if err != nil {
 		log.Printf("│  ✗ Error: %v\n", err)
 		return

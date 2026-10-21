@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -64,13 +65,13 @@ func TestLowNumberedAsteroidsLoad(t *testing.T) {
 				t.Fatalf("%s not in SupportedBodies: %v", want, p.SupportedBodies())
 			}
 
-			state, err := p.State(want, start)
+			state, err := eph.At(p, start).Geometric(want, core.Earth)
 			if err != nil {
 				t.Fatalf("State(%s): %v", want, err)
 			}
 
 			// The asteroid must not be the planet it used to collide with.
-			planet, perr := p.State(c.collidesAs, start)
+			planet, perr := eph.At(p, start).Geometric(c.collidesAs, core.Earth)
 			if perr != nil {
 				t.Fatalf("State(%s): %v", c.collidesAs, perr)
 			}

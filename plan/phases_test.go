@@ -241,7 +241,7 @@ func TestEclipseType_StringUnknown(t *testing.T) {
 }
 
 // TestPhasesFunctions_NilProviderDefaults is a regression test: every
-// exported function in this file calls eph.Position(prov, ...) directly
+// exported function in this file reads its geocentric positions directly
 // (bypassing plan.NewPlanet/NewSun/NewMoon, which default a nil provider
 // themselves), so each one needs its own guard. A short interval keeps
 // this fast — the point is confirming no error/panic on a nil provider,

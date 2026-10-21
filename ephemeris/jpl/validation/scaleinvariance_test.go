@@ -76,13 +76,13 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 
 	for name, id := range bodies {
 		t.Run(name, func(t *testing.T) {
-			base, err := p.State(id, utc)
+			base, err := eph.At(p, utc).Geometric(id, core.Earth)
 			if err != nil {
 				t.Fatalf("State at the reference epoch: %v", err)
 			}
 
 			for _, s := range scales {
-				got, err := p.State(id, s.at(utc))
+				got, err := eph.At(p, s.at(utc)).Geometric(id, core.Earth)
 				if err != nil {
 					t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 				}

@@ -137,12 +137,12 @@ func newOppositionScan(target Observable, sun MovingBody, start time.Time) (*opp
 
 	o.body = body
 
-	st, err := body.Provider().State(body.EphID(), start)
+	st, err := eph.At(body.Provider(), start).Geometric(body.EphID(), eph.Earth)
 	if err != nil {
 		return nil, fmt.Errorf("events: target position: %w", err)
 	}
 
-	sunSt, err := sun.Provider().State(eph.Sun, start)
+	sunSt, err := eph.At(sun.Provider(), start).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return nil, fmt.Errorf("events: other position: %w", err)
 	}
@@ -187,7 +187,7 @@ func (o *oppositionScan) sample(t time.Time) (oppositionSample, error) {
 		}
 	}
 
-	sunSt, err := o.sun.Provider().State(eph.Sun, t)
+	sunSt, err := eph.At(o.sun.Provider(), t).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return oppositionSample{}, fmt.Errorf("events: other position: %w", err)
 	}
@@ -215,7 +215,7 @@ func (o *oppositionScan) sample(t time.Time) (oppositionSample, error) {
 		}, nil
 	}
 
-	st, err := o.body.Provider().State(o.body.EphID(), t)
+	st, err := eph.At(o.body.Provider(), t).Geometric(o.body.EphID(), eph.Earth)
 	if err != nil {
 		return oppositionSample{}, fmt.Errorf("events: target position: %w", err)
 	}

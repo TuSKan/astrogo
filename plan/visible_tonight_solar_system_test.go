@@ -59,12 +59,12 @@ var errNoPluto = errors.New("plutolessProvider: no Pluto")
 // plutolessProvider answers for everything but Pluto.
 type plutolessProvider struct{ eph.Provider }
 
-func (p plutolessProvider) State(id eph.ID, t time.Time) (core.State, error) {
+func (p plutolessProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
 	if id == eph.PlutoBarycenter {
 		return core.State{}, errNoPluto
 	}
 
-	st, err := p.Provider.State(id, t)
+	st, err := p.Provider.Locate(id, t)
 	if err != nil {
 		return core.State{}, fmt.Errorf("plutolessProvider: %w", err)
 	}
@@ -144,12 +144,12 @@ func TestMoonCandidatesReportAMoonTheyCannotEvaluate(t *testing.T) {
 // a distance from the observer and the phase angle between them.
 type twoPointProvider struct{}
 
-func (twoPointProvider) State(id eph.ID, _ time.Time) (core.State, error) {
+func (twoPointProvider) Locate(id eph.ID, _ time.Time) (core.State, error) {
 	if id == eph.Sun {
-		return core.State{Pos: vector.Vec3{X: 1}}, nil
+		return geocentricMock(id, vector.Vec3{X: 1}, vector.Vec3{})
 	}
 
-	return core.State{Pos: vector.Vec3{Y: 5}}, nil
+	return geocentricMock(id, vector.Vec3{Y: 5}, vector.Vec3{})
 }
 
 func (twoPointProvider) Close() error { return nil }

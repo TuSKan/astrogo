@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -195,7 +196,7 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 				// TestJPLStateAgainstHorizons reads.
 				when := time.FromJD(2451545.0+ref.ET/86400.0, time.TDB)
 
-				state, serr := p.State(sbID, when)
+				state, serr := eph.At(p, when).Geometric(sbID, core.Earth)
 				if serr != nil {
 					t.Errorf("%s: State at JD %.5f: %v", body.name, when.JD(), serr)
 

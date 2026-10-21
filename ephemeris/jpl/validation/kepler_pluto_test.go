@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
@@ -135,12 +136,12 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 		for _, mo := range []time.Month{time.January, time.April, time.July, time.October} {
 			at := time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC)
 
-			want, werr := p.State(core.PlutoBarycenter, at)
+			want, werr := eph.At(p, at).Geometric(core.PlutoBarycenter, core.Earth)
 			if werr != nil {
 				t.Fatalf("DE440 State(Pluto) at %s: %v", at.Format(isoDate), werr)
 			}
 
-			got, gerr := base.State(core.PlutoBarycenter, at)
+			got, gerr := eph.At(base, at).Geometric(core.PlutoBarycenter, core.Earth)
 			if gerr != nil {
 				t.Fatalf("Kepler State(Pluto) at %s: %v", at.Format(isoDate), gerr)
 			}

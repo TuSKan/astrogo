@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/remote"
@@ -107,7 +108,7 @@ func TestKernelLifecycle(t *testing.T) {
 	}
 
 	// State should still resolve Mars (index rebuilt correctly after the add).
-	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
+	if _, err := eph.At(p, seedEpoch(t)).Geometric(core.MarsBarycenter, core.Earth); err != nil {
 		t.Errorf("State after AddKernelFrom: %v", err)
 	}
 
@@ -122,7 +123,7 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("expected 1 kernel after RemoveKernel, got %d", len(got))
 	}
 
-	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
+	if _, err := eph.At(p, seedEpoch(t)).Geometric(core.MarsBarycenter, core.Earth); err != nil {
 		t.Errorf("State after RemoveKernel: %v", err)
 	}
 
@@ -144,7 +145,7 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("AddKernelFrom after UnloadAll: %v", err)
 	}
 
-	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
+	if _, err := eph.At(p, seedEpoch(t)).Geometric(core.MarsBarycenter, core.Earth); err != nil {
 		t.Errorf("State after UnloadAll+AddKernelFrom: %v", err)
 	}
 }

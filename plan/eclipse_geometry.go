@@ -83,12 +83,12 @@ var earthEquatorialRadiusKm = constants.WGS84.SemiMajorAxis.Value / 1000
 var auKm = constants.IAU.AstronomicalUnit.Value / 1000
 
 func newEclipseGeometry(t time.Time, prov eph.Provider) (eclipseGeometry, error) {
-	sun, err := eph.ApparentState(prov, eph.Sun, t)
+	sun, err := eph.At(prov, t).Apparent(eph.Sun, eph.Geocenter())
 	if err != nil {
 		return eclipseGeometry{}, fmt.Errorf("eclipse: sun position: %w", err)
 	}
 
-	moon, err := eph.Position(prov, eph.Moon, t)
+	moon, err := geocentric(prov, eph.Moon, t)
 	if err != nil {
 		return eclipseGeometry{}, fmt.Errorf("eclipse: moon position: %w", err)
 	}

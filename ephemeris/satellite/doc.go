@@ -13,7 +13,7 @@
 //
 // # If your timestamp came from a receiver, say so
 //
-// [Satellite.State] takes an astrogo time.Time, which carries its own scale, and
+// [Satellite.Locate] takes an astrogo time.Time, which carries its own scale, and
 // a GNSS receiver does not hand out UTC. GPS and Galileo system time run 18
 // seconds ahead of it today, because they were synchronised once in 1980 and
 // told to ignore leap seconds since.
@@ -26,7 +26,7 @@
 // for you, at whatever epoch:
 //
 //	t := time.FromJD(gpsJD, time.GPST)   // not time.UTC
-//	state, err := sat.State(sat.ID(), t)
+//	state, err := sat.Locate(sat.ID(), t)
 //
 // BeiDou is a different offset again — TAI − 33 s, so BDT − UTC is 4 s today —
 // and has [github.com/TuSKan/astrogo/time.BDT]. GLONASS is UTC plus three hours
@@ -58,12 +58,12 @@
 // Construct a [Satellite] from a name and the two lines of a TLE:
 //
 //	sat, err := satellite.NewFromTLE("ISS", line1, line2)
-//	state, err := sat.State(sat.ID(), t)  // geocentric GCRS, au and au/day
+//	state, err := sat.Locate(sat.ID(), t)  // geocentric GCRS, au and au/day
 //	h, err := sat.Altitude(t)      // above the WGS84 ellipsoid
 //
 // # Frame Conversion
 //
-// SGP4 outputs TEME coordinates (km, km/s). [Satellite.State] converts them:
+// SGP4 outputs TEME coordinates (km, km/s). [Satellite.Locate] converts them:
 //   - TEME → true equator and equinox of date, by the equation of the
 //     equinoxes
 //   - true of date → GCRS, by the transpose of the IAU 2006/2000A

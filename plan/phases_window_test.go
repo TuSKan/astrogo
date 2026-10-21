@@ -132,7 +132,7 @@ type failingOnceProvider struct {
 	calls, on int
 }
 
-func (p *failingOnceProvider) State(id eph.ID, t time.Time) (core.State, error) {
+func (p *failingOnceProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
 	call := p.calls
 	p.calls++
 
@@ -140,7 +140,7 @@ func (p *failingOnceProvider) State(id eph.ID, t time.Time) (core.State, error) 
 		return core.State{}, errFailingOnce
 	}
 
-	st, err := p.Provider.State(id, t)
+	st, err := p.Provider.Locate(id, t)
 	if err != nil {
 		return core.State{}, fmt.Errorf("failingOnceProvider: %w", err)
 	}

@@ -260,7 +260,7 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	}
 
 	// Elongation from the Sun (topocentric).
-	sunVec, err := eph.Position(mb.Provider(), eph.Sun, t)
+	sunVec, err := geocentric(mb.Provider(), eph.Sun, t)
 	if err == nil {
 		sunRA, sunDec := sunVec.Sub(ctx.ObsVec()).ToSpherical()
 		sunPos := coord.NewICRS(angle.Rad(sunRA), angle.Rad(sunDec))
@@ -570,7 +570,7 @@ func RadialVelocity(obs Observable, ctx *coord.Context) (unit.Velocity, error) {
 	// velocity, and a catalog value for one would be meaningless — the
 	// ordering matters if a type ever implements both.
 	if mb, ok := obs.(MovingBody); ok {
-		state, err := mb.Provider().State(mb.EphID(), ctx.Time())
+		state, err := eph.At(mb.Provider(), ctx.Time()).Geometric(mb.EphID(), eph.Earth)
 		if err != nil {
 			return 0, fmt.Errorf("radial velocity for %s: %w", mb.Name(), err)
 		}

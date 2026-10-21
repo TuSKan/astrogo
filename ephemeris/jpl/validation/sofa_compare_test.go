@@ -165,12 +165,12 @@ func runSOFATest(t *testing.T, bid eph.ID) {
 	sofa := eph.Default()
 
 	for _, e := range sofaEpochs() {
-		jplState, err := p.State(bid, e.t)
+		jplState, err := eph.At(p, e.t).Geometric(bid, core.Earth)
 		if err != nil {
 			t.Fatalf("JPL State() failed at %s: %v", e.name, err)
 		}
 
-		sofaState, err := sofa.State(bid, e.t)
+		sofaState, err := eph.At(sofa, e.t).Geometric(bid, core.Earth)
 		if err != nil {
 			t.Fatalf("SOFA State() failed at %s: %v", e.name, err)
 		}
