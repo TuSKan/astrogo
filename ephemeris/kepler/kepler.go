@@ -339,72 +339,6 @@ func FromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, ec
 	return el, nil
 }
 
-// prepare computes el.prep, or clears it if el is not valid: StateAt then
-// reports why.
-func (el *Elements) prepare() {
-	el.prep = prepared{}
-	if el.Validate() != nil {
-		return
-	}
-
-	pr := prepared{ok: true}
-
-	day := constants.Derived.JulianDaySeconds.Value
-	e := el.eccentricity
-
-	if el.perihelion == 0 {
-		gm := el.CentralBody().GM // m³/s²
-		aMeters := el.semiMajorAxis.Meters()
-
-		pr.n = math.Sqrt(gm/(aMeters*aMeters*aMeters)) * day
-		if el.periodDays != 0 {
-			pr.n = 2 * math.Pi / el.periodDays
-		}
-
-		pr.a = el.semiMajorAxis.AU()
-		pr.b = pr.a * math.Sqrt((1-e)*(1+e))
-	} else {
-		q := el.perihelion.AU()
-		pr.alpha = (1 - e) / q
-
-		auMeters := unit.AU(1).Meters()
-		pr.mu = el.CentralBody().GM * day * day / (auMeters * auMeters * auMeters)
-
-		if el.periodDays != 0 {
-			// Validate admits a period only for a closed orbit. Holding it
-			// means the mass parameter that gives an orbit of this size that
-			// period.
-			n := 2 * math.Pi / el.periodDays
-			pr.mu = n * n / (pr.alpha * pr.alpha * pr.alpha)
-		}
-
-		if pr.alpha > 0 {
-			pr.period = 2 * math.Pi / math.Sqrt(pr.mu*pr.alpha*pr.alpha*pr.alpha)
-		}
-
-		pr.sqrtMu = math.Sqrt(pr.mu)
-		pr.v0 = math.Sqrt(pr.mu * (1 + e) / q) // speed at perihelion, from vis-viva
-	}
-
-	pr.p = el.toICRF(vector.V3(1, 0, 0))
-	pr.q = el.toICRF(vector.V3(0, 1, 0))
-
-	el.prep = pr
-}
-
-// toICRF carries a perifocal vector at the epoch's argument of periapsis into
-// the ICRS-aligned equatorial frame: through the orbit's three angles, then
-// from whatever plane they are measured in.
-func (el Elements) toICRF(v vector.Vec3) vector.Vec3 {
-	ref := rotatePerifocalToEcliptic(v, el.inclination, el.ascendingNode, el.argPeriapsis)
-
-	if lp := el.plane; lp != nil {
-		return lp.rotateToICRF(ref)
-	}
-
-	return rotateEclipticToEquatorialJ2000(ref)
-}
-
 // CentralBody reports the body these elements are referred to, defaulting to
 // the Sun.
 func (el Elements) CentralBody() CentralBody {
@@ -715,6 +649,72 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	pos, vel = el.orient(posPf, velPf, dtDays)
 
 	return pos, vel, nil
+}
+
+// prepare computes el.prep, or clears it if el is not valid: StateAt then
+// reports why.
+func (el *Elements) prepare() {
+	el.prep = prepared{}
+	if el.Validate() != nil {
+		return
+	}
+
+	pr := prepared{ok: true}
+
+	day := constants.Derived.JulianDaySeconds.Value
+	e := el.eccentricity
+
+	if el.perihelion == 0 {
+		gm := el.CentralBody().GM // m³/s²
+		aMeters := el.semiMajorAxis.Meters()
+
+		pr.n = math.Sqrt(gm/(aMeters*aMeters*aMeters)) * day
+		if el.periodDays != 0 {
+			pr.n = 2 * math.Pi / el.periodDays
+		}
+
+		pr.a = el.semiMajorAxis.AU()
+		pr.b = pr.a * math.Sqrt((1-e)*(1+e))
+	} else {
+		q := el.perihelion.AU()
+		pr.alpha = (1 - e) / q
+
+		auMeters := unit.AU(1).Meters()
+		pr.mu = el.CentralBody().GM * day * day / (auMeters * auMeters * auMeters)
+
+		if el.periodDays != 0 {
+			// Validate admits a period only for a closed orbit. Holding it
+			// means the mass parameter that gives an orbit of this size that
+			// period.
+			n := 2 * math.Pi / el.periodDays
+			pr.mu = n * n / (pr.alpha * pr.alpha * pr.alpha)
+		}
+
+		if pr.alpha > 0 {
+			pr.period = 2 * math.Pi / math.Sqrt(pr.mu*pr.alpha*pr.alpha*pr.alpha)
+		}
+
+		pr.sqrtMu = math.Sqrt(pr.mu)
+		pr.v0 = math.Sqrt(pr.mu * (1 + e) / q) // speed at perihelion, from vis-viva
+	}
+
+	pr.p = el.toICRF(vector.V3(1, 0, 0))
+	pr.q = el.toICRF(vector.V3(0, 1, 0))
+
+	el.prep = pr
+}
+
+// toICRF carries a perifocal vector at the epoch's argument of periapsis into
+// the ICRS-aligned equatorial frame: through the orbit's three angles, then
+// from whatever plane they are measured in.
+func (el Elements) toICRF(v vector.Vec3) vector.Vec3 {
+	ref := rotatePerifocalToEcliptic(v, el.inclination, el.ascendingNode, el.argPeriapsis)
+
+	if lp := el.plane; lp != nil {
+		return lp.rotateToICRF(ref)
+	}
+
+	return rotateEclipticToEquatorialJ2000(ref)
 }
 
 // validatePerihelionForm is Validate for a set built by FromPerihelion.
