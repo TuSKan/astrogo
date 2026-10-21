@@ -58,12 +58,12 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 		// LookAngle answers below the horizon too — a negative altitude, not
 		// an error — and no sample in these six hours errors, so one that
 		// does is a defect, not a sample to leave out.
-		cached, err := LookAngle(sat, 0, ctxAt(at))
+		cached, err := LookAngle(sat, sat.ID(), ctxAt(at))
 		if err != nil {
 			t.Fatalf("%v: LookAngle through the moving Context: %v", at, err)
 		}
 
-		exact, err := LookAngle(sat, 0, coord.NewContext(at, site, defaultAtm))
+		exact, err := LookAngle(sat, sat.ID(), coord.NewContext(at, site, defaultAtm))
 		if err != nil {
 			t.Fatalf("%v: LookAngle through a fresh context: %v", at, err)
 		}
@@ -116,7 +116,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	end := start.Add(unit.Hours(6))
 	minEl := angle.Deg(10)
 
-	passes, err := SatellitePasses(sat, "ISS", start, end, site, minEl)
+	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, site, minEl)
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 			what string
 			at   time.Time
 		}{{"rise", p.Rise.Time}, {"set", p.Set.Time}} {
-			got, err := LookAngle(sat, 0, coord.NewContext(ev.at, site, defaultAtm))
+			got, err := LookAngle(sat, sat.ID(), coord.NewContext(ev.at, site, defaultAtm))
 			if err != nil {
 				t.Errorf("%s at %v: LookAngle: %v", ev.what, ev.at, err)
 				continue

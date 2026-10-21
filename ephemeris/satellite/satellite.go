@@ -31,12 +31,12 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
 // ErrUnexpectedID indicates State was queried for a body other than the
 // satellite this provider tracks. A *Satellite is single-purpose (one
-// instance = one object), so id must be the zero value (core.ID(0)); any
-// other id — including a real NAIF ID like a Sun/Moon lookup — used to be
-// silently ignored and answered with this satellite's own state instead of
-// an error, which is exactly what made plan.Satellite.ApparentMagnitudeCtx's
+// instance = one object), so id must be its own, [Satellite.ID]; any other
+// id — including a real NAIF ID like a Sun/Moon lookup — used to be silently
+// ignored and answered with this satellite's own state instead of an error,
+// which is exactly what made plan.Satellite.ApparentMagnitudeCtx's
 // Sun-position bug possible (see CHANGELOG).
-var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite (use core.ID(0))")
+var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite's own")
 
 // ErrMalformedTLE indicates a two-line element set that is not well formed:
 // the wrong length, the wrong line numbers, a failed checksum, two lines
@@ -73,6 +73,9 @@ type Satellite struct {
 	// epoch is the element set's own epoch. Read straight from prop's
 	// elements, so the two cannot disagree.
 	epoch time.Time
+
+	// id is the satellite's NAIF code, from its NORAD catalog number.
+	id core.ID
 }
 
 // NewFromTLE creates a Satellite from raw TLE lines.
@@ -109,13 +112,24 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 		return nil, fmt.Errorf("%w: %w", ErrPropagation, err)
 	}
 
+	id, ok := core.SatelliteID(el.NORAD)
+	if !ok {
+		return nil, fmt.Errorf("%w: catalog number %d has no NAIF code", ErrMalformedTLE, el.NORAD)
+	}
+
 	return &Satellite{
 		Name:       el.Name,
 		MeanMotion: unit.RevolutionsPerDay(el.MeanMotion),
 		prop:       prop,
 		epoch:      el.Epoch,
+		id:         id,
 	}, nil
 }
+
+// ID is the satellite's NAIF code, −100000 − its NORAD catalog number: the
+// one id its State answers for. It used to answer for zero, which is the
+// Solar System barycenter's code now that an ID is a NAIF code (#809).
+func (s *Satellite) ID() core.ID { return s.id }
 
 // Propagator returns the underlying SGP4 model.
 //
@@ -128,15 +142,15 @@ func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 // State returns the geocentric position/velocity in GCRS (AU, AU/day),
 // implementing the [core.Provider] interface contract.
 //
-// id must be core.ID(0) — this provider tracks exactly one body — any other
-// id returns [ErrUnexpectedID] rather than silently answering for the wrong
-// body.
+// id must be [Satellite.ID] — this provider tracks exactly one body — and
+// any other id returns [ErrUnexpectedID] rather than silently answering for
+// the wrong body.
 //
 // The conversion pipeline: TEME (km) → true equator and equinox of date by
 // the equation of the equinoxes → GCRS (AU) by the transpose of the IAU
 // 2006/2000A bias-precession-nutation matrix (Pnm06a).
 func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
-	if id != 0 {
+	if id != s.id {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
 	}
 

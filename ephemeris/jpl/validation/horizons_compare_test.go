@@ -31,7 +31,7 @@ func horizonsCases() []horizonsCase {
 	return []horizonsCase{
 		{10, "Sun", eph.Sun},
 		{301, "Moon", eph.Moon},
-		{4, "Mars", eph.Mars},
+		{4, "Mars", eph.MarsBarycenter},
 	}
 }
 

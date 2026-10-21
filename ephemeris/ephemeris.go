@@ -84,7 +84,33 @@ const (
 	Sun = core.Sun
 	// SolarSystemBarycenter is the identifier for the Solar System Barycenter.
 	SolarSystemBarycenter = core.SolarSystemBarycenter
+	// MercuryBarycenter is NAIF 1, the same point as Mercury.
+	MercuryBarycenter = core.MercuryBarycenter
+	// VenusBarycenter is NAIF 2, the same point as Venus.
+	VenusBarycenter = core.VenusBarycenter
+	// EarthMoonBarycenter is NAIF 3.
+	EarthMoonBarycenter = core.EarthMoonBarycenter
+	// MarsBarycenter is NAIF 4.
+	MarsBarycenter = core.MarsBarycenter
+	// JupiterBarycenter is NAIF 5.
+	JupiterBarycenter = core.JupiterBarycenter
+	// SaturnBarycenter is NAIF 6.
+	SaturnBarycenter = core.SaturnBarycenter
+	// UranusBarycenter is NAIF 7.
+	UranusBarycenter = core.UranusBarycenter
+	// NeptuneBarycenter is NAIF 8.
+	NeptuneBarycenter = core.NeptuneBarycenter
+	// PlutoBarycenter is NAIF 9.
+	PlutoBarycenter = core.PlutoBarycenter
 )
+
+// SmallBodyID is the NAIF code of the numbered small body n; see
+// [core.SmallBodyID].
+func SmallBodyID(n int) (ID, bool) { return core.SmallBodyID(n) }
+
+// SatelliteID is the NAIF code of the Earth satellite with NORAD catalog
+// number n; see [core.SatelliteID].
+func SatelliteID(norad int) (ID, bool) { return core.SatelliteID(norad) }
 
 const (
 	// Planets is the source for planets.
@@ -340,7 +366,7 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // visible at the call site instead of resting on a lower layer's behavior.
 func Default() Provider {
 	p := kepler.New(kepler.WithBase(&sofaProvider{}))
-	if err := p.Register(Pluto, kepler.PlutoElements()); err != nil {
+	if err := p.Register(PlutoBarycenter, kepler.PlutoElements()); err != nil {
 		panic(fmt.Sprintf("ephemeris: failed to register built-in Pluto elements: %v", err))
 	}
 
@@ -614,7 +640,7 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 
-	switch id { //nolint:exhaustive // the default rejects every body SOFA has no theory for, Pluto among them
+	switch id { //nolint:exhaustive // the default rejects every point SOFA has no theory for: the outer planets' centres, Pluto
 	case Sun:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
@@ -656,34 +682,35 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 			Center: CenterGeocenter,
 		}, nil
 
-	case Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune:
+	case Earth:
+		// The geocentre, from the geocentre.
+		return State{Frame: FrameICRS, Center: CenterGeocenter}, nil
+
+	case EarthMoonBarycenter:
+		// The Moon's share of the pair's mass along the Moon's vector: exact by
+		// the barycenter's definition, and as good as Moon98. Plan94's own
+		// barycenter less SOFA's Earth, heliocentric theory at a geocentric
+		// scale, was measured up to 1,942 km from it over 2026-2027 — 40% of
+		// the 4,671 km it is (#809).
+		pv := gofaext.Moon98(d1, d2)
+		mu := constants.Ephemeris.MoonGravitationalParameter.Value /
+			constants.Ephemeris.EarthMoonGravitationalParameter.Value
+
+		return State{
+			Pos:    vector.Vec3{X: pv[0][0], Y: pv[0][1], Z: pv[0][2]}.MulScalar(mu),
+			Vel:    vector.Vec3{X: pv[1][0], Y: pv[1][1], Z: pv[1][2]}.MulScalar(mu),
+			Frame:  FrameICRS,
+			Center: CenterGeocenter,
+		}, nil
+
+	case MercuryBarycenter, Mercury, VenusBarycenter, Venus,
+		MarsBarycenter, JupiterBarycenter, SaturnBarycenter, UranusBarycenter, NeptuneBarycenter:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
 			return State{}, ErrSofaEpv00
 		}
 
-		var np int
-
-		switch id { //nolint:exhaustive // the enclosing case admits only these eight planets
-		case Mercury:
-			np = 1
-		case Venus:
-			np = 2
-		case Earth:
-			np = 3
-		case Mars:
-			np = 4
-		case Jupiter:
-			np = 5
-		case Saturn:
-			np = 6
-		case Uranus:
-			np = 7
-		case Neptune:
-			np = 8
-		}
-
-		pv, status := gofaext.Plan94(d1, d2, np)
+		pv, status := gofaext.Plan94(d1, d2, plan94Body(id))
 		if status < 0 {
 			return State{}, ErrSofaPlan94
 		}
@@ -704,11 +731,45 @@ func (s *sofaProvider) State(id ID, t time.Time) (State, error) {
 		}, nil
 
 	default:
+		if bary, ok := planetBarycenter(id); ok {
+			return State{}, fmt.Errorf("%w: %v; SOFA's theory places its system barycenter, %v",
+				ErrUnsupportedBody, id, bary)
+		}
+
 		return State{}, ErrUnsupportedBody
 	}
 }
 
 func (s *sofaProvider) Close() error { return nil }
+
+// planetBarycenter is the system barycenter of the planet whose center id is,
+// from Mars out: the code to ask a provider for that holds only barycenters,
+// as SOFA's theory and a planetary kernel do (#809).
+func planetBarycenter(id ID) (ID, bool) {
+	if id%100 == 99 && id/100 >= MarsBarycenter && id/100 <= PlutoBarycenter {
+		return id / 100, true
+	}
+
+	return 0, false
+}
+
+// plan94Body is SOFA Plan94's number for the point id names: 1, 2 and 4 to 8
+// for Mercury, Venus and Mars to Neptune. Plan94's theory places the system
+// barycenters of Mars to Neptune, so those are the points it answers for, and
+// the planets' own centers are refused rather than answered with their
+// barycenters (#809). Mercury and Venus have no moons, so each is its own
+// barycenter under two codes.
+//
+// Plan94's 3 is the Earth-Moon barycenter, not the Earth. The Earth used to be
+// asked for under it, and came back as the barycenter, labeled as the
+// geocenter; the barycenter itself is answered from the Moon, not from 3.
+func plan94Body(id ID) int {
+	if id == Mercury || id == Venus {
+		return int(id / 100)
+	}
+
+	return int(id)
+}
 
 // AstrometricState returns the astrometric state of a target: the target
 // retarded by light time, with the observer left where it is.

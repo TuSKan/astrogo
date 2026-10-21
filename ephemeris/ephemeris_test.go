@@ -217,7 +217,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	p := NewMovingBodyProvider()
 
-	st, err := p.State(core.Pluto, time.J2000())
+	st, err := p.State(core.PlutoBarycenter, time.J2000())
 	if err != nil {
 		t.Fatalf("State(Pluto): %v", err)
 	}
@@ -230,7 +230,7 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	}
 
 	// Every SOFA-covered body still works, which is the other half.
-	if _, err := p.State(core.Mars, time.J2000()); err != nil {
+	if _, err := p.State(core.MarsBarycenter, time.J2000()); err != nil {
 		t.Errorf("State(Mars): %v", err)
 	}
 }
@@ -246,8 +246,8 @@ func TestDefaultAnswersEveryNamedBody(t *testing.T) {
 	defer func() { _ = p.Close() }()
 
 	named := []core.ID{
-		core.Mercury, core.Venus, core.Earth, core.Mars, core.Jupiter,
-		core.Saturn, core.Uranus, core.Neptune, core.Pluto,
+		core.Mercury, core.Venus, core.Earth, core.MarsBarycenter, core.JupiterBarycenter,
+		core.SaturnBarycenter, core.UranusBarycenter, core.NeptuneBarycenter, core.PlutoBarycenter,
 		core.Moon, core.Sun, core.SolarSystemBarycenter,
 	}
 
@@ -316,10 +316,10 @@ func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
 		t.Fatalf("NewProvider(Satellites) returned %T, want *satellite.Satellite", p)
 	}
 
-	// State with core.ID(0), not the NAIF catalogue number: a satellite
-	// provider tracks exactly one object and refuses any other id, so that a
-	// Sun lookup cannot be silently answered with the satellite's own state.
-	if _, err := p.State(core.ID(0), when); err != nil {
+	// State with the satellite's own NAIF code: a satellite provider tracks
+	// exactly one object and refuses any other id, so that a Sun lookup
+	// cannot be silently answered with the satellite's own state.
+	if _, err := p.State(sat.ID(), when); err != nil {
 		t.Fatalf("State: %v", err)
 	}
 
@@ -382,17 +382,17 @@ func TestPositionAndVelocityAgreeWithState(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	st, err := p.State(core.Mars, time.J2000())
+	st, err := p.State(core.MarsBarycenter, time.J2000())
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}
 
-	pos, err := Position(p, core.Mars, time.J2000())
+	pos, err := Position(p, core.MarsBarycenter, time.J2000())
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}
 
-	vel, err := Velocity(p, core.Mars, time.J2000())
+	vel, err := Velocity(p, core.MarsBarycenter, time.J2000())
 	if err != nil {
 		t.Fatalf("Velocity: %v", err)
 	}

@@ -26,7 +26,7 @@
 //	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 //
 // Measured with go1.27 on windows/amd64, a program calling
-// eph.Default().State(eph.Mars, t) is 4.7 MB and 107 packages without the
+// eph.Default().State(eph.MarsBarycenter, t) is 4.7 MB and 107 packages without the
 // import and 12.4 MB and 236 with it, 69 of them crypto. The import adds those
 // bytes only to the build that wants them. The same pattern remote/eop uses;
 // see #112, whose figures (13.9 MB and 424 packages) were measured when the
@@ -41,7 +41,7 @@
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
 //	if err != nil { log.Fatal(err) }
 //	defer p.Close()
-//	state, _ := p.State(eph.Mars, t)
+//	state, _ := p.State(eph.MarsBarycenter, t) // a DE kernel holds the barycenter, not Mars itself
 //
 //	// Multi-kernel (deep historical + modern)
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))

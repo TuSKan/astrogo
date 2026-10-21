@@ -46,9 +46,9 @@ func TestConjunctionsAreInRightAscensionOfDate(t *testing.T) {
 		a, b       eph.ID
 		start, end time.Time
 	}{
-		{"Venus-Jupiter 2023", eph.Venus, eph.Jupiter,
+		{"Venus-Jupiter 2023", eph.Venus, eph.JupiterBarycenter,
 			time.Date(2023, 2, 25, 0, 0, 0, 0, time.LocationUTC), time.Date(2023, 3, 8, 0, 0, 0, 0, time.LocationUTC)},
-		{"Jupiter-Saturn 2020", eph.Jupiter, eph.Saturn,
+		{"Jupiter-Saturn 2020", eph.JupiterBarycenter, eph.SaturnBarycenter,
 			time.Date(2020, 12, 15, 0, 0, 0, 0, time.LocationUTC), time.Date(2020, 12, 28, 0, 0, 0, 0, time.LocationUTC)},
 		{"Moon-Venus 2026", eph.Moon, eph.Venus,
 			time.Date(2026, 1, 10, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 1, 25, 0, 0, 0, 0, time.LocationUTC)},

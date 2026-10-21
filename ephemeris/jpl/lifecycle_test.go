@@ -107,7 +107,7 @@ func TestKernelLifecycle(t *testing.T) {
 	}
 
 	// State should still resolve Mars (index rebuilt correctly after the add).
-	if _, err := p.State(core.Mars, seedEpoch(t)); err != nil {
+	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
 		t.Errorf("State after AddKernelFrom: %v", err)
 	}
 
@@ -122,7 +122,7 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("expected 1 kernel after RemoveKernel, got %d", len(got))
 	}
 
-	if _, err := p.State(core.Mars, seedEpoch(t)); err != nil {
+	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
 		t.Errorf("State after RemoveKernel: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestKernelLifecycle(t *testing.T) {
 		t.Fatalf("AddKernelFrom after UnloadAll: %v", err)
 	}
 
-	if _, err := p.State(core.Mars, seedEpoch(t)); err != nil {
+	if _, err := p.State(core.MarsBarycenter, seedEpoch(t)); err != nil {
 		t.Errorf("State after UnloadAll+AddKernelFrom: %v", err)
 	}
 }

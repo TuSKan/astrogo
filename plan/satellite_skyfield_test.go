@@ -39,7 +39,7 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 
 	start := time.Date(2026, time.April, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	passes, err := SatellitePasses(sat, "ISS", start, start.Add(unit.Days(2)), observer, angle.Deg(10))
+	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Days(2)), observer, angle.Deg(10))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}

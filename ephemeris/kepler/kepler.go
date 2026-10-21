@@ -213,6 +213,10 @@ func (p SecularPrecession) rate() float64 {
 //
 // Reports false for a body with no satellite system in the table — the Sun,
 // the Moon, Mercury and Venus.
+//
+// A planet's centre and its system barycenter find the same GM — the
+// planet's — and the CentralBody keeps the id it was asked for, so an orbit
+// is placed about whichever of the two points the caller named (#809).
 func CentralBodyFor(id core.ID) (CentralBody, bool) {
 	gm, ok := map[core.ID]float64{
 		core.Earth:   constants.Ephemeris.EarthGravitationalParameter.Value,
@@ -222,7 +226,7 @@ func CentralBodyFor(id core.ID) (CentralBody, bool) {
 		core.Uranus:  constants.Ephemeris.UranusGravitationalParameter.Value,
 		core.Neptune: constants.Ephemeris.NeptuneGravitationalParameter.Value,
 		core.Pluto:   constants.Ephemeris.PlutoGravitationalParameter.Value,
-	}[id]
+	}[id.Body()]
 	if !ok {
 		return CentralBody{}, false
 	}

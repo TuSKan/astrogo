@@ -13,6 +13,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/time"
@@ -208,21 +209,27 @@ const (
 
 // ─── Body ID ─────────────────────────────────────────────────────────────────
 
-// ID identifies a major Solar System body or a generic celestial object.
+// ID is a NAIF integer code, and nothing else: the identifier JPL's kernels,
+// Horizons and SPICE use for every body and point in the Solar System. The
+// constants below are names for codes.
 //
-// # For the outer planets this is the system barycenter, not the planet
+// It used to hold astrogo's own enumeration, 1 to 12, beside NAIF codes above
+// it, and the two overlapped exactly where NAIF puts the system barycenters:
+// a provider that did not know an astrogo number read it as a NAIF one, so
+// Pluto (astrogo 9) was served as NAIF 9, the Pluto barycenter, by
+// coincidence, while the Solar System barycenter (astrogo 12) was refused
+// (#809). One integer, one meaning.
 //
-// A planetary kernel — de440, de441 — contains barycenters for the giant
-// planets, because their satellite systems live in separate kernels
-// (jup365, sat441, ura184, nep097). So a provider backed by one resolves
-// [Mars], [Jupiter], [Saturn], [Uranus] and [Neptune] to NAIF 4, 5, 6, 7 and
-// 8: the barycenter of the planet and its moons. [Mercury], [Venus] and
-// [Earth] resolve to 199, 299 and 399, the body centers, because a planet
-// with no significant moons *is* its own barycenter.
+// # A planet's center and its system's barycenter are different points
 //
-// One identifier space therefore holds two kinds of point, and which one you
-// get depends on the body. The difference is small and not negligible —
-// measured against JPL Horizons' body-center commands over 2026:
+// NAIF numbers both, and so does astrogo: [Jupiter] is 599, the planet, and
+// [JupiterBarycenter] is 5, the barycenter of the planet and its moons. A
+// planetary kernel — de440, de441 — holds the barycenters of the giant
+// planets, because their satellite systems live in separate kernels (jup365,
+// sat441, ura184, nep097), so the center of Jupiter needs one of those loaded
+// as well. A provider answers the code it is asked for or refuses it; it
+// never answers one for the other. The difference, measured against JPL
+// Horizons over 2026:
 //
 //	Uranus    0.0497 arcsec
 //	Jupiter   0.0324 arcsec
@@ -230,66 +237,83 @@ const (
 //	Neptune   0.0093 arcsec
 //	Mars      0.0000 arcsec   (Phobos and Deimos displace it by centimeters)
 //
-// That is far inside every tolerance astrogo publishes, and far outside what
-// someone checking Jupiter against Horizons' default `599` would expect: it
-// reads as an astrogo error and is not one. Ask Horizons for `5` to compare
-// like for like (#253).
+// Which one a planner observes is its choice, made visibly: plan's planets
+// from Mars out are the barycenters (#253). Mercury and Venus have no moons,
+// so their barycenters and their centers are one point under two codes.
 //
-// Getting the body center needs the satellite kernel loaded, which is a
-// different provider and a multi-gigabyte download; see
-// [github.com/TuSKan/astrogo/ephemeris.Moons].
-type ID uint32
+// # Small bodies and satellites
+//
+// A numbered small body is [SmallBodyID] n, NAIF's 20000000 + n; an Earth
+// satellite is [SatelliteID] of its NORAD catalog number, NAIF's
+// −100000 − n. Neither overlaps another body.
+type ID int32
 
+// The Solar System's named points, by NAIF code.
 const (
-	// Mercury is the identifier for Mercury. Body center, NAIF 199 — Mercury
-	// has no moons, so its barycenter is itself.
-	Mercury ID = iota + 1
-	// Venus is the identifier for Venus. Body center, NAIF 299, for the same
-	// reason as Mercury.
-	Venus
-	// Earth is the identifier for Earth. Body center, NAIF 399 — distinct
-	// from the Earth-Moon barycenter, which is 4,671 km away.
-	Earth
-	// Mars is the identifier for the Mars system barycenter, NAIF 4. Phobos
-	// and Deimos displace it from the planet by centimeters, so the
-	// distinction is unobservable here.
-	Mars
-	// Jupiter is the identifier for the Jupiter system barycenter, NAIF 5 —
-	// about 0.03 arcsec from the planet as seen from Earth. See [ID].
-	Jupiter
-	// Saturn is the identifier for the Saturn system barycenter, NAIF 6 —
-	// about 0.03 arcsec from the planet as seen from Earth. See [ID].
-	Saturn
-	// Uranus is the identifier for the Uranus system barycenter, NAIF 7 —
-	// about 0.05 arcsec from the planet as seen from Earth. See [ID].
-	Uranus
-	// Neptune is the identifier for the Neptune system barycenter, NAIF 8 —
-	// about 0.01 arcsec from the planet as seen from Earth. See [ID].
-	Neptune
-	// Pluto is the identifier for Pluto. Unlike every other body here it has
-	// no NAIF mapping in the JPL provider at all — NAIFFor reports false —
-	// so a kernel-backed provider cannot serve it and eph.Default answers
-	// with a Kepler two-body propagation instead, worth 0.138 AU at worst.
-	// See docs/VALIDATION.md's `ephemeris.kepler.pluto` row.
-	Pluto
-	// Moon is the identifier for the Moon. Body center, NAIF 301.
-	Moon
-	// Sun is the identifier for the Sun. Body center, NAIF 10.
-	Sun
-	// SolarSystemBarycenter is the identifier for the solar system barycenter.
-	SolarSystemBarycenter
+	// SolarSystemBarycenter is the barycenter of the Solar System, NAIF 0,
+	// the origin every planetary kernel's chains end at.
+	SolarSystemBarycenter ID = 0
+	// MercuryBarycenter is NAIF 1, the same point as [Mercury].
+	MercuryBarycenter ID = 1
+	// VenusBarycenter is NAIF 2, the same point as [Venus].
+	VenusBarycenter ID = 2
+	// EarthMoonBarycenter is NAIF 3, 4,671 km from the Earth's center on
+	// average.
+	EarthMoonBarycenter ID = 3
+	// MarsBarycenter is NAIF 4: Mars and its two moons, centimeters from
+	// [Mars].
+	MarsBarycenter ID = 4
+	// JupiterBarycenter is NAIF 5, about 0.03 arcsec from [Jupiter] as seen
+	// from Earth.
+	JupiterBarycenter ID = 5
+	// SaturnBarycenter is NAIF 6, about 0.03 arcsec from [Saturn].
+	SaturnBarycenter ID = 6
+	// UranusBarycenter is NAIF 7, about 0.05 arcsec from [Uranus].
+	UranusBarycenter ID = 7
+	// NeptuneBarycenter is NAIF 8, about 0.01 arcsec from [Neptune].
+	NeptuneBarycenter ID = 8
+	// PlutoBarycenter is NAIF 9: Pluto and Charon, whose barycenter lies
+	// outside Pluto.
+	PlutoBarycenter ID = 9
+	// Sun is the Sun's center, NAIF 10.
+	Sun ID = 10
+	// Mercury is Mercury's center, NAIF 199.
+	Mercury ID = 199
+	// Venus is Venus's center, NAIF 299.
+	Venus ID = 299
+	// Moon is the Moon's center, NAIF 301.
+	Moon ID = 301
+	// Earth is the Earth's center, NAIF 399: the geocenter.
+	Earth ID = 399
+	// Mars is the center of Mars, NAIF 499.
+	Mars ID = 499
+	// Jupiter is the center of Jupiter, NAIF 599. A planetary kernel alone
+	// does not have it; see [ID].
+	Jupiter ID = 599
+	// Saturn is the center of Saturn, NAIF 699.
+	Saturn ID = 699
+	// Uranus is the center of Uranus, NAIF 799.
+	Uranus ID = 799
+	// Neptune is the center of Neptune, NAIF 899.
+	Neptune ID = 899
+	// Pluto is the center of Pluto, NAIF 999.
+	Pluto ID = 999
 )
 
-// SmallBodyBase is the offset that separates numbered small bodies from the
-// named ones, and is NAIF's own convention for asteroid SPK IDs.
-//
-// It exists because the two namespaces used to overlap. A small body was
-// identified by its bare number, so asteroid 4 Vesta and [Mars] were both
-// ID 4 — as were Ceres and [Mercury], Pallas and [Venus], Juno and [Earth],
-// and every asteroid numbered up to [SolarSystemBarycenter] at 12. A provider
-// holding a planetary kernel resolved the planet and silently dropped the
-// asteroid, which took four of the five largest asteroids out of reach with
-// nothing to say why.
+// Body is the center of the planet whose system barycenter id is — Jupiter
+// (599) for [JupiterBarycenter] (5) — and id itself for anything else. It is
+// for the questions a planet and its barycenter answer alike, its size and
+// its brightness, not for placing either.
+func (id ID) Body() ID {
+	if id >= MercuryBarycenter && id <= PlutoBarycenter {
+		return id*100 + 99
+	}
+
+	return id
+}
+
+// SmallBodyBase is NAIF's offset for numbered small bodies: asteroid n is
+// SmallBodyBase + n.
 //
 // Untyped on purpose: it is an offset within the ID space rather than a body,
 // so it has no place among the values a switch over an ID should handle.
@@ -299,28 +323,17 @@ const SmallBodyBase = 20000000
 const smallBodySpan = 1000000
 
 // SmallBodyID returns the identifier for the numbered small body n — 433 for
-// Eros, 3200 for Phaethon — placed clear of the named bodies.
+// Eros, 3200 for Phaethon — and whether n is a small-body number at all.
 //
-// This is the form [github.com/TuSKan/astrogo/ephemeris/jpl.Provider.SupportedBodies]
-// reports. A bare core.ID(433) still resolves, so existing callers keep
-// working, but it cannot be enumerated without ambiguity and is not what a
-// new caller should write.
-//
-// Returns 0 for an n outside NAIF's small-body block, which is not a valid
-// body identifier and will fail to resolve rather than aliasing another body.
-//
-// That zero means "n is not a small-body number", not "body 0", and the two
-// are only interchangeable when the result is about to be resolved. Check it
-// before comparing: a comparison against it answers no for every body, so it
-// turns "the question could not be asked" into "the answer is different from
-// what you wanted" — which is how a Horizons comet SPK-ID, well outside this
-// block, was reported as the wrong object having loaded correctly.
-func SmallBodyID(n int) ID {
+// It used to return 0 for an n outside NAIF's block, which then failed to
+// resolve. Zero is the Solar System barycenter now, so the answer is a bool
+// beside the ID rather than a value inside it.
+func SmallBodyID(n int) (ID, bool) {
 	if n <= 0 || n >= smallBodySpan {
-		return 0
+		return 0, false
 	}
 
-	return SmallBodyBase + ID(n)
+	return SmallBodyBase + ID(n), true
 }
 
 // SmallBodyNumber reports the small-body number this ID stands for, and
@@ -333,38 +346,68 @@ func (id ID) SmallBodyNumber() (int, bool) {
 	return int(id - SmallBodyBase), true
 }
 
+// satelliteBase is NAIF's offset for an Earth satellite with no DSN code: the
+// satellite with NORAD catalog number n is −satelliteBase − n.
+const satelliteBase = 100000
+
+// SatelliteID returns the identifier NAIF gives an Earth satellite with
+// NORAD catalog number n, −100000 − n — −125544 for the ISS — and whether n
+// is a catalog number at all.
+func SatelliteID(norad int) (ID, bool) {
+	if norad <= 0 || norad > math.MaxInt32-satelliteBase {
+		return 0, false
+	}
+
+	return ID(-satelliteBase - norad), true
+}
+
+// SatelliteNumber reports the NORAD catalog number this ID stands for, and
+// whether it is one at all.
+func (id ID) SatelliteNumber() (int, bool) {
+	if id >= -satelliteBase {
+		return 0, false
+	}
+
+	return int(-id) - satelliteBase, true
+}
+
 // String returns the conventional name of the body identifier.
 func (id ID) String() string {
-	switch id {
-	case Mercury:
-		return "Mercury"
-	case Venus:
-		return "Venus"
-	case Earth:
-		return "Earth"
-	case Mars:
-		return "Mars"
-	case Jupiter:
-		return "Jupiter"
-	case Saturn:
-		return "Saturn"
-	case Uranus:
-		return "Uranus"
-	case Neptune:
-		return "Neptune"
-	case Pluto:
-		return "Pluto"
-	case Moon:
-		return "Moon"
-	case Sun:
-		return "Sun"
-	case SolarSystemBarycenter:
-		return "SolarSystemBarycenter"
-	default:
-		if n, ok := id.SmallBodyNumber(); ok {
-			return fmt.Sprintf("SmallBody(%d)", n)
-		}
-
-		return fmt.Sprintf("BodyID(%d)", id)
+	if name, ok := idNames[id]; ok {
+		return name
 	}
+
+	if n, ok := id.SmallBodyNumber(); ok {
+		return fmt.Sprintf("SmallBody(%d)", n)
+	}
+
+	if n, ok := id.SatelliteNumber(); ok {
+		return fmt.Sprintf("Satellite(%d)", n)
+	}
+
+	return fmt.Sprintf("NAIF(%d)", int32(id))
+}
+
+var idNames = map[ID]string{
+	SolarSystemBarycenter: "SolarSystemBarycenter",
+	MercuryBarycenter:     "MercuryBarycenter",
+	VenusBarycenter:       "VenusBarycenter",
+	EarthMoonBarycenter:   "EarthMoonBarycenter",
+	MarsBarycenter:        "MarsBarycenter",
+	JupiterBarycenter:     "JupiterBarycenter",
+	SaturnBarycenter:      "SaturnBarycenter",
+	UranusBarycenter:      "UranusBarycenter",
+	NeptuneBarycenter:     "NeptuneBarycenter",
+	PlutoBarycenter:       "PlutoBarycenter",
+	Sun:                   "Sun",
+	Mercury:               "Mercury",
+	Venus:                 "Venus",
+	Moon:                  "Moon",
+	Earth:                 "Earth",
+	Mars:                  "Mars",
+	Jupiter:               "Jupiter",
+	Saturn:                "Saturn",
+	Uranus:                "Uranus",
+	Neptune:               "Neptune",
+	Pluto:                 "Pluto",
 }

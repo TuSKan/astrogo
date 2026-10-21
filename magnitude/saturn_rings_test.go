@@ -61,7 +61,7 @@ func TestSaturnsRingsBrightenItFromEitherFace(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tm := time.Date(tc.y, time.Month(tc.m), tc.d, 0, 0, 0, 0, time.LocationUTC)
 
-			got, err := magnitude.PlanetApparent(p, eph.Saturn, tm)
+			got, err := magnitude.PlanetApparent(p, eph.SaturnBarycenter, tm)
 			if err != nil {
 				t.Fatalf("PlanetApparent: %v", err)
 			}

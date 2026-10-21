@@ -60,7 +60,7 @@ var errNoPluto = errors.New("plutolessProvider: no Pluto")
 type plutolessProvider struct{ eph.Provider }
 
 func (p plutolessProvider) State(id eph.ID, t time.Time) (core.State, error) {
-	if id == eph.Pluto {
+	if id == eph.PlutoBarycenter {
 		return core.State{}, errNoPluto
 	}
 
@@ -197,7 +197,7 @@ func TestMoonCandidatesKeepAMoonBrighterThanTheLimit(t *testing.T) {
 
 	var dropped skips
 
-	unknown := []moonSpec{{name: "Nonesuch", parent: eph.Mars}}
+	unknown := []moonSpec{{name: "Nonesuch", parent: eph.MarsBarycenter}}
 	if got := moonCandidates(twoPointProvider{}, unknown, at, 30, &dropped); len(got) != 0 {
 		t.Errorf("%d candidates for a moon moonSpecs does not know, want 0", len(got))
 	}

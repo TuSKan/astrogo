@@ -25,7 +25,7 @@ func TestProvidersLabelTheirFrame(t *testing.T) {
 
 	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	st, err := eph.Default().State(eph.Mars, when)
+	st, err := eph.Default().State(eph.MarsBarycenter, when)
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}

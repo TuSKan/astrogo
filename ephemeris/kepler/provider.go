@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -245,17 +246,43 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Center: core.CenterGeocenter,
 		}, nil
 
-	case core.Mercury, core.Venus, core.Earth, core.Mars,
-		core.Jupiter, core.Saturn, core.Uranus, core.Neptune:
+	case core.Earth:
+		// The geocentre, from the geocentre.
+		return core.State{Frame: core.FrameICRS, Center: core.CenterGeocenter}, nil
+
+	case core.EarthMoonBarycenter:
+		// The Moon's share of the pair's mass along the Moon's vector, as
+		// ephemeris.Default answers it: exact by definition, where Plan94's
+		// barycenter less SOFA's Earth was up to 1,942 km off (#809).
+		pv := gofaext.Moon98(d1, d2)
+		mu := constants.Ephemeris.MoonGravitationalParameter.Value /
+			constants.Ephemeris.EarthMoonGravitationalParameter.Value
+
+		return core.State{
+			Pos:    vector.V3(pv[0][0], pv[0][1], pv[0][2]).MulScalar(mu),
+			Vel:    vector.V3(pv[1][0], pv[1][1], pv[1][2]).MulScalar(mu),
+			Frame:  core.FrameICRS,
+			Center: core.CenterGeocenter,
+		}, nil
+
+	case core.MercuryBarycenter, core.Mercury, core.VenusBarycenter, core.Venus,
+		core.MarsBarycenter, core.JupiterBarycenter,
+		core.SaturnBarycenter, core.UranusBarycenter, core.NeptuneBarycenter:
 		pvh, _, status := gofaext.Epv00(d1, d2)
 		if status < 0 {
 			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
 		}
 
-		np := map[core.ID]int{
-			core.Mercury: 1, core.Venus: 2, core.Earth: 3, core.Mars: 4,
-			core.Jupiter: 5, core.Saturn: 6, core.Uranus: 7, core.Neptune: 8,
-		}[id]
+		// Plan94's planets are 1 to 8, its Mars to Neptune the system
+		// barycenters, so those are what it answers for; the planets' own
+		// centers are refused below rather than answered with their
+		// barycenters (#809). Its 3 is the Earth-Moon barycenter, under
+		// which the Earth used to be asked for and came back as the
+		// barycenter.
+		np := int(id)
+		if id == core.Mercury || id == core.Venus {
+			np = int(id / 100)
+		}
 
 		pv, status := gofaext.Plan94(d1, d2, np)
 		if status < 0 {
@@ -269,7 +296,7 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Center: core.CenterGeocenter,
 		}, nil
 
-	case core.Pluto:
+	case core.PlutoBarycenter:
 		// SOFA has no Pluto. Two-body propagation of the Standish elements
 		// is an approximation, and documented as one — but it is the
 		// difference between a Charon orbit that can be placed and one that
@@ -291,6 +318,12 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			Frame:  core.FrameICRS,
 			Center: core.CenterGeocenter,
 		}, nil
+
+	case core.Mars, core.Jupiter, core.Saturn, core.Uranus, core.Neptune, core.Pluto:
+		// The planets' own centers: SOFA's theory places their system
+		// barycenters, and answering one for the other is what #809 removed.
+		return core.State{}, fmt.Errorf("%w: %v; SOFA's theory places its system barycenter, %v",
+			ErrUnsupportedBody, id, id/100)
 
 	default:
 		return core.State{}, fmt.Errorf("%w: %v", ErrUnsupportedBody, id)

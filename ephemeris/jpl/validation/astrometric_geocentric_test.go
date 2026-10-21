@@ -94,9 +94,9 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	}{
 		{"10", "Sun", core.Sun},
 		{"299", "Venus", core.Venus},
-		{"499", "Mars", core.Mars},
-		{"5", "Jupiter", core.Jupiter},
-		{"6", "Saturn", core.Saturn},
+		{"499", "Mars", core.MarsBarycenter},
+		{"5", "Jupiter", core.JupiterBarycenter},
+		{"6", "Saturn", core.SaturnBarycenter},
 	}
 
 	// The reference records what it shares with astrogo as well as what it

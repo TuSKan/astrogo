@@ -167,17 +167,19 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 
 			defer func() { _ = p.Close() }()
 
+			sbID, _ := core.SmallBodyID(body.id)
+
 			for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
 				at := epoch.Add(unit.Days(float64(dt)))
 
-				want, werr := p.State(core.SmallBodyID(body.id), at)
+				want, werr := p.State(sbID, at)
 				if werr != nil {
 					t.Errorf("%s: kernel State at dt=%+d: %v", body.name, dt, werr)
 
 					continue
 				}
 
-				got, gerr := keplerProvider(t, body.id, el).State(core.SmallBodyID(body.id), at)
+				got, gerr := keplerProvider(t, body.id, el).State(sbID, at)
 				if gerr != nil {
 					t.Errorf("%s: kepler State at dt=%+d: %v", body.name, dt, gerr)
 
@@ -243,8 +245,10 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 func keplerProvider(t *testing.T, id int, el kepler.Elements) *kepler.Provider {
 	t.Helper()
 
+	sbID, _ := core.SmallBodyID(id)
+
 	p := kepler.New()
-	if err := p.Register(core.SmallBodyID(id), el); err != nil {
+	if err := p.Register(sbID, el); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 

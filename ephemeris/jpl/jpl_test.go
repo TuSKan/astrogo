@@ -15,34 +15,6 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-func TestBodyMapping(t *testing.T) {
-	tests := []struct {
-		id   core.ID
-		want int
-	}{
-		{core.Sun, 10},
-		{core.Moon, 301},
-		{core.Earth, 399},
-		{core.Mars, 4},
-	}
-
-	for _, tt := range tests {
-		got, ok := jpl.NAIFFor(tt.id)
-		if !ok {
-			t.Errorf("NAIFFor(%v) not found", tt.id)
-			continue
-		}
-
-		if got != tt.want {
-			t.Errorf("NAIFFor(%v) = %v, want %v", tt.id, got, tt.want)
-		}
-	}
-
-	if _, ok := jpl.NAIFFor(core.ID(255)); ok {
-		t.Error("NAIFFor reports an unknown body ID as mapped")
-	}
-}
-
 func TestTimeConv(t *testing.T) {
 	l := &lsk.Reader{
 		DeltaAt: []lsk.LeapData{
@@ -262,15 +234,16 @@ func TestSmallBodyEros(t *testing.T) {
 	bodies := p.SupportedBodies()
 	// SupportedBodies reports NAIF's own small-body identifier now, not
 	// the bare number, which used to collide with the planets.
-	found := slices.Contains(bodies, core.SmallBodyID(433))
+	eros, _ := core.SmallBodyID(433)
+	found := slices.Contains(bodies, eros)
 
 	if !found {
 		t.Errorf("Eros (433) not found in supported bodies: %v", bodies)
 	}
 
 	// Get state
-	// A bare core.ID(433) still resolves, so this stays as it was.
-	state, err := p.State(core.ID(433), start)
+	// By its NAIF code: a bare 433 is not read as a small body (#809).
+	state, err := p.State(eros, start)
 	if err != nil {
 		t.Fatalf("Failed to get state for Eros: %v", err)
 	}

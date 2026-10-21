@@ -30,8 +30,8 @@ var (
 
 	// sky is the solar system as a planner asks for it.
 	sky = []core.ID{
-		core.Sun, core.Moon, core.Mercury, core.Venus, core.Mars,
-		core.Jupiter, core.Saturn, core.Uranus, core.Neptune,
+		core.Sun, core.Moon, core.Mercury, core.Venus, core.MarsBarycenter,
+		core.JupiterBarycenter, core.SaturnBarycenter, core.UranusBarycenter, core.NeptuneBarycenter,
 	}
 
 	// plutoAsMinorPlanet is Pluto's NAIF minor-planet ID (2000000 + 134340),
@@ -112,7 +112,7 @@ func stateOf(p core.Provider, id core.ID) func() error {
 // workload is made of.
 func BenchmarkOneBodyOneEpoch(b *testing.B) {
 	for _, be := range backends {
-		for _, id := range []core.ID{core.Mars, core.Moon} {
+		for _, id := range []core.ID{core.MarsBarycenter, core.Moon} {
 			b.Run("jpl-"+be.name+"/"+id.String(), func(b *testing.B) {
 				p, f := be.open(b)
 				measure(b, nil, f, stateOf(p, id))
@@ -120,7 +120,7 @@ func BenchmarkOneBodyOneEpoch(b *testing.B) {
 		}
 	}
 
-	for _, id := range []core.ID{core.Mars, core.Moon} {
+	for _, id := range []core.ID{core.MarsBarycenter, core.Moon} {
 		b.Run("default/"+id.String(), func(b *testing.B) {
 			measure(b, nil, nil, stateOf(eph.Default(), id))
 		})
@@ -233,7 +233,7 @@ func BenchmarkLightTime(b *testing.B) {
 		{"astrometric", eph.AstrometricState},
 		{"apparent", eph.ApparentState},
 	} {
-		for _, id := range []core.ID{core.Moon, core.Mars, core.Neptune} {
+		for _, id := range []core.ID{core.Moon, core.MarsBarycenter, core.NeptuneBarycenter} {
 			b.Run(pl.name+"/jpl-bytes/"+id.String(), func(b *testing.B) {
 				p, f := openCounted(b)
 				cp := &countingProvider{Provider: p}
@@ -470,7 +470,7 @@ func BenchmarkSatellite(b *testing.B) {
 
 	b.Run("state", func(b *testing.B) {
 		measure(b, nil, nil, func() error {
-			_, err := sat.State(0, at)
+			_, err := sat.State(sat.ID(), at)
 
 			return err //nolint:wrapcheck // the provider's error is the one to report
 		})
@@ -484,7 +484,7 @@ func BenchmarkSatellite(b *testing.B) {
 
 		measure(b, nil, nil, func() error {
 			for _, t := range times {
-				if _, err := sat.State(0, t); err != nil {
+				if _, err := sat.State(sat.ID(), t); err != nil {
 					return err //nolint:wrapcheck // the provider's error is the one to report
 				}
 			}

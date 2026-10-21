@@ -63,10 +63,18 @@ func main() {
 		}
 	}()
 
+	// A Satellites provider is a *satellite.Satellite. Its ID is its NAIF
+	// code, -100000 minus the NORAD catalog number, and the one id it
+	// answers for.
+	sat, ok := prov.(*satellite.Satellite)
+	if !ok {
+		log.Fatalf("a Satellites provider should be a *satellite.Satellite, got %T", prov)
+	}
+
 	// Use the unified State API — same as for JPL planets.
 	epoch := target.Epoch
 
-	state, err := prov.State(0, epoch)
+	state, err := prov.State(sat.ID(), epoch)
 	if err != nil {
 		log.Fatalf("State failed: %v", err)
 	}
@@ -86,13 +94,8 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	header("Orbital Altitude")
 
-	// A Satellites provider is a *satellite.Satellite, which knows the
-	// ellipsoid; a generic Provider only knows a geocentric distance.
-	sat, ok := prov.(*satellite.Satellite)
-	if !ok {
-		log.Fatalf("a Satellites provider should be a *satellite.Satellite, got %T", prov)
-	}
-
+	// The *satellite.Satellite knows the ellipsoid; a generic Provider only
+	// knows a geocentric distance.
 	alt, err := sat.Altitude(epoch)
 	if err != nil {
 		log.Fatalf("Altitude failed: %v", err)
@@ -114,7 +117,7 @@ func main() {
 	// Build the observation context (caches SOFA matrices for this time+site).
 	ctx := coord.NewContext(epoch, observer, atmosphere.Refraction{})
 
-	altaz, err := plan.LookAngle(prov, 0, ctx)
+	altaz, err := plan.LookAngle(prov, sat.ID(), ctx)
 	if err != nil {
 		log.Fatalf("LookAngle failed: %v", err)
 	}
@@ -143,7 +146,7 @@ func main() {
 
 	header("Pass Prediction (next 24h, min %1.f° elevation)", minEl.Degrees())
 
-	passes, err := plan.SatellitePasses(prov, target.Name, start, end, observer, minEl)
+	passes, err := plan.SatellitePasses(prov, sat.ID(), target.Name, start, end, observer, minEl)
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}

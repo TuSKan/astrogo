@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -117,29 +118,16 @@ func TestNewEarthTargetsEarth(t *testing.T) {
 			got, eph.Earth)
 	}
 
-	// And the id is actually used rather than merely stored: two constructors
-	// must not produce the same sky position.
+	// And the id is actually used rather than merely stored. The Earth seen
+	// from the geocentre is the zero vector, which has no direction, so
+	// Position refuses it. It used to answer: the default provider was asked
+	// for the Earth under Plan94's 3, the Earth-Moon barycenter, and placed
+	// the geocentre 4,671 km from itself (#809).
 	epoch := time.Date(2026, 3, 20, 12, 0, 0, 0, time.LocationUTC)
 
-	here, err := earth.Position(epoch)
-	if err != nil {
-		t.Fatalf("Position: %v", err)
+	if _, err := earth.Position(epoch); !errors.Is(err, eph.ErrZeroVector) {
+		t.Errorf("Position: err = %v, want eph.ErrZeroVector — the geocentre has no direction from itself", err)
 	}
-
-	there, err := NewMars(eph.Default()).Position(epoch)
-	if err != nil {
-		t.Fatalf("Mars Position: %v", err)
-	}
-
-	if here.RA() == there.RA() && here.Dec() == there.Dec() {
-		t.Error("NewEarth and NewMars produce the same position; the ephemeris id is not reaching the lookup")
-	}
-
-	// Not asserted: Dist(). Position returns a direction and leaves the
-	// distance at zero for every body -- eph.ToICRS computes the radius and
-	// does not carry it -- so a check on it would pass whatever this
-	// constructor did. TargetDetails.Distance is the populated one (measured:
-	// Mars 2.31 AU), and it goes through a different path.
 }
 
 // TestWithStepSetsTheSamplingCadence covers the VisibleTonight option that had

@@ -188,12 +188,14 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 				t.Skipf("Horizons returned no vectors for %s", body.name)
 			}
 
+			sbID, _ := core.SmallBodyID(body.id)
+
 			for _, ref := range refs {
 				// ET is seconds past J2000.0 TDB, the same convention
 				// TestJPLStateAgainstHorizons reads.
 				when := time.FromJD(2451545.0+ref.ET/86400.0, time.TDB)
 
-				state, serr := p.State(core.SmallBodyID(body.id), when)
+				state, serr := p.State(sbID, when)
 				if serr != nil {
 					t.Errorf("%s: State at JD %.5f: %v", body.name, when.JD(), serr)
 

@@ -17,7 +17,7 @@ import (
 func Example() {
 	when := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
 
-	pos, err := eph.Position(eph.Default(), eph.Mars, when)
+	pos, err := eph.Position(eph.Default(), eph.MarsBarycenter, when)
 	if err != nil {
 		panic(err)
 	}
@@ -36,12 +36,12 @@ func Example() {
 func ExampleApparentState() {
 	when := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
 
-	geometric, err := eph.Position(eph.Default(), eph.Mars, when)
+	geometric, err := eph.Position(eph.Default(), eph.MarsBarycenter, when)
 	if err != nil {
 		panic(err)
 	}
 
-	apparent, err := eph.ApparentState(eph.Default(), eph.Mars, when)
+	apparent, err := eph.ApparentState(eph.Default(), eph.MarsBarycenter, when)
 	if err != nil {
 		panic(err)
 	}

@@ -77,8 +77,8 @@ func TestApparentStateReportsWhichFetchFailed(t *testing.T) {
 		failAtObs bool
 		wants     string
 	}{
-		{"target at the observing epoch", eph.Mars, true, "apparent state"},
-		{"target at the retarded epoch", eph.Mars, false, "retarded"},
+		{"target at the observing epoch", eph.MarsBarycenter, true, "apparent state"},
+		{"target at the retarded epoch", eph.MarsBarycenter, false, "retarded"},
 		{"Sun at the observing epoch", eph.Sun, true, "sun for light deflection"},
 		{"Sun at the retarded epoch", eph.Sun, false, "retarded sun for light deflection"},
 	}
@@ -96,7 +96,7 @@ func TestApparentStateReportsWhichFetchFailed(t *testing.T) {
 				failEnabled: true,
 			}
 
-			st, err := eph.ApparentState(p, eph.Mars, obsTime)
+			st, err := eph.ApparentState(p, eph.MarsBarycenter, obsTime)
 			if err == nil {
 				t.Fatalf("provider failed for %s and ApparentState returned no error, "+
 					"state %+v.\n"+
@@ -170,7 +170,7 @@ func TestApparentStateSurvivesDegenerateDeflectionGeometry(t *testing.T) {
 
 			p := &staticProvider{pos: tc.pos, sun: tc.sun}
 
-			st, err := eph.ApparentState(p, eph.Mars, obsTime)
+			st, err := eph.ApparentState(p, eph.MarsBarycenter, obsTime)
 			if err != nil {
 				t.Fatalf("ApparentState: %v", err)
 			}
@@ -306,7 +306,7 @@ func TestApparentStateDeflectsAnOrdinaryGeometry(t *testing.T) {
 
 	p := &staticProvider{pos: pos, sun: sun}
 
-	st, err := eph.ApparentState(p, eph.Mars, obsTime)
+	st, err := eph.ApparentState(p, eph.MarsBarycenter, obsTime)
 	if err != nil {
 		t.Fatalf("ApparentState: %v", err)
 	}

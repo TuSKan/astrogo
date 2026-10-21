@@ -3,8 +3,6 @@
 package workload_test
 
 import (
-	"errors"
-	"fmt"
 	"math"
 	"testing"
 
@@ -29,9 +27,6 @@ import (
 // floating-point argument predicts — never the size of an effect the design
 // may later remove, since a test asserting a defect exists is a test that
 // fails when the defect is fixed.
-
-// errNoNAIF reports a body the JPL provider has no NAIF code for.
-var errNoNAIF = errors.New("no NAIF mapping")
 
 var (
 	kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
@@ -121,7 +116,7 @@ func TestObservedPlaceParallaxAndAberrationOrder(t *testing.T) {
 		id      core.ID
 		control float64 // arcsec bound when the body is the control, else 0
 	}{
-		{core.Mars, 0.05},
+		{core.MarsBarycenter, 0.05},
 		{core.Moon, 0},
 	} {
 		var (
@@ -247,13 +242,10 @@ func TestEpv00EarthAgainstTheKernel(t *testing.T) {
 // reception, light time iterated from the observer, in km.
 //
 // The barycentric states come from the kernel's own segment chains, since the
-// provider answers only geocentric states and cannot be asked for the
-// barycenter itself (core.SolarSystemBarycenter has no NAIF mapping).
+// provider answers only geocentric states. An ID is the NAIF code the chains
+// are indexed by (#809).
 func topocentricAstrometric(p *jpl.Provider, ctx *coord.Context, id core.ID, at time.Time) (vector.Vec3, error) {
-	naif, ok := jpl.NAIFFor(id)
-	if !ok {
-		return vector.Vec3{}, fmt.Errorf("%w: %v", errNoNAIF, id)
-	}
+	naif := int32(id)
 
 	et := lsk.UTCToET(at, p.LSK)
 
@@ -270,7 +262,7 @@ func topocentricAstrometric(p *jpl.Provider, ctx *coord.Context, id core.ID, at 
 	tau := 0.0 // seconds
 
 	for range 6 {
-		body, err := barycentric(p, int32(naif), et-tau)
+		body, err := barycentric(p, naif, et-tau)
 		if err != nil {
 			return vector.Vec3{}, err
 		}

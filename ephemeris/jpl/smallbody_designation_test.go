@@ -71,13 +71,17 @@ func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
+	// Asked for by NAIF code: a bare 433 is no body (#809).
+	eros, _ := core.SmallBodyID(433)
+	phaethon, _ := core.SmallBodyID(3200)
+
 	for _, tc := range []struct {
 		des  string
 		want core.ID
 	}{
-		{"433", 433},    // Eros, by number
-		{"433;", 433},   // the same, in Horizons' own designation syntax
-		{"3200;", 3200}, // Phaethon
+		{"433", eros},       // Eros, by number
+		{"433;", eros},      // the same, in Horizons' own designation syntax
+		{"3200;", phaethon}, // Phaethon
 	} {
 		t.Run(tc.des, func(t *testing.T) {
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, tc.des,
@@ -90,7 +94,7 @@ func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 			t.Cleanup(func() { _ = p.Close() })
 
 			if _, err := p.State(tc.want, start); err != nil {
-				t.Errorf("State(%d) after loading %q: %v", tc.want, tc.des, err)
+				t.Errorf("State(%v) after loading %q: %v", tc.want, tc.des, err)
 			}
 		})
 	}

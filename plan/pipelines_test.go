@@ -42,7 +42,7 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	iss := plan.NewSatellite("ISS", eph.ID(0), prov)
+	iss := plan.NewSatellite("ISS", prov.ID(), prov)
 
 	const toleranceArcsec = 1.0
 

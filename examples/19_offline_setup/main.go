@@ -93,7 +93,7 @@ func main() {
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
-		state, err := p.State(eph.Mars, time.NowUTC())
+		state, err := p.State(eph.MarsBarycenter, time.NowUTC())
 		if err != nil {
 			fmt.Printf("    State: %v\n", err)
 		} else {

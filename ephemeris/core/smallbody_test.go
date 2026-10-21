@@ -10,13 +10,13 @@ import (
 // identifiers — 4 Vesta on Mars, 1 Ceres on Mercury — so a provider holding
 // a planetary kernel dropped the asteroid as a duplicate.
 func TestSmallBodyIDsDoNotCollideWithNamedBodies(t *testing.T) {
-	named := []ID{
-		Mercury, Venus, Earth, Mars, Jupiter, Saturn,
-		Uranus, Neptune, Pluto, Moon, Sun, SolarSystemBarycenter,
+	named := make([]ID, 0, len(idNames))
+	for id := range idNames {
+		named = append(named, id)
 	}
 
 	for n := 1; n <= 20; n++ {
-		got := SmallBodyID(n)
+		got, _ := SmallBodyID(n)
 
 		for _, id := range named {
 			if got == id {
@@ -28,7 +28,7 @@ func TestSmallBodyIDsDoNotCollideWithNamedBodies(t *testing.T) {
 
 func TestSmallBodyNumberRoundTrip(t *testing.T) {
 	for _, n := range []int{1, 4, 12, 16, 433, 624, 3200, 101955} {
-		id := SmallBodyID(n)
+		id, _ := SmallBodyID(n)
 
 		got, ok := id.SmallBodyNumber()
 		if !ok {
@@ -51,18 +51,21 @@ func TestSmallBodyNumberRejectsOtherIDs(t *testing.T) {
 
 	for _, id := range cases {
 		if n, ok := id.SmallBodyNumber(); ok {
-			t.Errorf("ID(%d).SmallBodyNumber() = %d, true; want not-a-small-body", uint32(id), n)
+			t.Errorf("ID(%d).SmallBodyNumber() = %d, true; want not-a-small-body", int32(id), n)
 		}
 	}
 }
 
 func TestSmallBodyIDString(t *testing.T) {
-	if got := SmallBodyID(433).String(); got != "SmallBody(433)" {
+	eros, _ := SmallBodyID(433)
+	vesta, _ := SmallBodyID(4)
+
+	if got := eros.String(); got != "SmallBody(433)" {
 		t.Errorf("SmallBodyID(433).String() = %q, want %q", got, "SmallBody(433)")
 	}
 
 	// Vesta must not print as Mars, which is what the collision did.
-	if got := SmallBodyID(4).String(); got == Mars.String() {
+	if got := vesta.String(); got == Mars.String() {
 		t.Errorf("SmallBodyID(4) prints as %q, the same as Mars", got)
 	}
 
@@ -73,8 +76,11 @@ func TestSmallBodyIDString(t *testing.T) {
 }
 
 func ExampleSmallBodyID() {
-	fmt.Println(SmallBodyID(433))
-	fmt.Println(SmallBodyID(4), "not", Mars)
+	eros, _ := SmallBodyID(433)
+	vesta, _ := SmallBodyID(4)
+
+	fmt.Println(eros)
+	fmt.Println(vesta, "not", Mars)
 	// Output:
 	// SmallBody(433)
 	// SmallBody(4) not Mars
@@ -82,11 +88,12 @@ func ExampleSmallBodyID() {
 
 // TestSmallBodyIDRejectsOutOfRange keeps an impossible number from aliasing
 // a real body: returning SmallBodyBase+n for a negative n would wrap into
-// the identifier space of something else entirely.
+// the identifier space of something else entirely, and returning 0 would be
+// the Solar System barycenter (#809).
 func TestSmallBodyIDRejectsOutOfRange(t *testing.T) {
 	for _, n := range []int{0, -1, -433, 1000000, 1 << 40} {
-		if got := SmallBodyID(n); got != 0 {
-			t.Errorf("SmallBodyID(%d) = %d, want 0", n, got)
+		if got, ok := SmallBodyID(n); ok {
+			t.Errorf("SmallBodyID(%d) = %d, true; want not a small-body number", n, got)
 		}
 	}
 }

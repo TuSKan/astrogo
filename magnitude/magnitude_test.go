@@ -50,11 +50,11 @@ func TestPlanetApparent_AllPlanets(t *testing.T) {
 	}{
 		{"Mercury", eph.Mercury, -2.5, 7.0},
 		{"Venus", eph.Venus, -4.9, -3.0},
-		{"Mars", eph.Mars, -3.0, 2.0},
-		{"Jupiter", eph.Jupiter, -3.0, -1.0},
-		{"Saturn", eph.Saturn, -1.5, 2.0},
-		{"Uranus", eph.Uranus, 5.0, 6.5},
-		{"Neptune", eph.Neptune, 7.5, 8.5},
+		{"Mars", eph.MarsBarycenter, -3.0, 2.0},
+		{"Jupiter", eph.JupiterBarycenter, -3.0, -1.0},
+		{"Saturn", eph.SaturnBarycenter, -1.5, 2.0},
+		{"Uranus", eph.UranusBarycenter, 5.0, 6.5},
+		{"Neptune", eph.NeptuneBarycenter, 7.5, 8.5},
 	}
 
 	for _, tc := range cases {
@@ -192,7 +192,7 @@ func TestPhaseAngle_Jupiter_Small(t *testing.T) {
 
 	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	alpha, err := magnitude.PhaseAngle(p, eph.Jupiter, tm)
+	alpha, err := magnitude.PhaseAngle(p, eph.JupiterBarycenter, tm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,12 +242,12 @@ func TestNeptune_SecularBrightening(t *testing.T) {
 	t1980 := time.Date(1980, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	t2026 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	m1980, err := magnitude.PlanetApparent(p, eph.Neptune, t1980)
+	m1980, err := magnitude.PlanetApparent(p, eph.NeptuneBarycenter, t1980)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m2026, err := magnitude.PlanetApparent(p, eph.Neptune, t2026)
+	m2026, err := magnitude.PlanetApparent(p, eph.NeptuneBarycenter, t2026)
 	if err != nil {
 		t.Fatal(err)
 	}

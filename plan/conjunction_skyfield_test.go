@@ -41,13 +41,13 @@ func TestConjunctionsAgreeWithSkyfield(t *testing.T) {
 		start, end time.Time
 		skyfield   time.Time
 	}{
-		{"Venus-Jupiter", eph.Venus, eph.Jupiter, day(2023, 2, 25), day(2023, 3, 8),
+		{"Venus-Jupiter", eph.Venus, eph.JupiterBarycenter, day(2023, 2, 25), day(2023, 3, 8),
 			time.Date(2023, 3, 2, 10, 40, 47, 60_000_000, time.LocationUTC)},
-		{"Jupiter-Saturn", eph.Jupiter, eph.Saturn, day(2020, 12, 15), day(2020, 12, 28),
+		{"Jupiter-Saturn", eph.JupiterBarycenter, eph.SaturnBarycenter, day(2020, 12, 15), day(2020, 12, 28),
 			time.Date(2020, 12, 21, 13, 32, 4, 470_000_000, time.LocationUTC)},
 		{"Moon-Venus", eph.Moon, eph.Venus, day(2026, 1, 10), day(2026, 1, 25),
 			time.Date(2026, 1, 19, 1, 1, 0, 0, time.LocationUTC)},
-		{"Mars-Saturn", eph.Mars, eph.Saturn, day(2026, 4, 1), day(2026, 5, 15),
+		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
 			time.Date(2026, 4, 20, 17, 36, 7, 520_000_000, time.LocationUTC)},
 	} {
 		events, err := plan.Conjunctions(c.start, c.end, plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov))
@@ -93,13 +93,13 @@ func TestAppulsesAgreeWithSkyfield(t *testing.T) {
 		skyfield   time.Time
 		sepDeg     float64
 	}{
-		{"Venus-Jupiter", eph.Venus, eph.Jupiter, day(2023, 2, 25), day(2023, 3, 8),
+		{"Venus-Jupiter", eph.Venus, eph.JupiterBarycenter, day(2023, 2, 25), day(2023, 3, 8),
 			time.Date(2023, 3, 2, 5, 5, 18, 370_000_000, time.LocationUTC), 0.489177},
-		{"Jupiter-Saturn", eph.Jupiter, eph.Saturn, day(2020, 12, 15), day(2020, 12, 28),
+		{"Jupiter-Saturn", eph.JupiterBarycenter, eph.SaturnBarycenter, day(2020, 12, 15), day(2020, 12, 28),
 			time.Date(2020, 12, 21, 18, 21, 0, 40_000_000, time.LocationUTC), 0.101773},
 		{"Moon-Venus", eph.Moon, eph.Venus, day(2026, 1, 10), day(2026, 1, 25),
 			time.Date(2026, 1, 19, 2, 23, 50, 760_000_000, time.LocationUTC), 2.042813},
-		{"Mars-Saturn", eph.Mars, eph.Saturn, day(2026, 4, 1), day(2026, 5, 15),
+		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
 			time.Date(2026, 4, 19, 22, 14, 27, 20_000_000, time.LocationUTC), 1.194358},
 	} {
 		events, err := plan.Appulses(c.start, c.end, plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov))

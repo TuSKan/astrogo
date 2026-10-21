@@ -16,7 +16,7 @@ func TestSatelliteDetailsDistanceIsTheRange(t *testing.T) {
 	t.Parallel()
 
 	prov, site := testISS(t)
-	sat := NewSatellite("ISS", 0, prov)
+	sat := NewSatellite("ISS", prov.ID(), prov)
 
 	for _, at := range []time.Time{
 		time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC),
@@ -29,7 +29,7 @@ func TestSatelliteDetailsDistanceIsTheRange(t *testing.T) {
 			t.Fatalf("GetDetails: %v", err)
 		}
 
-		look, err := LookAngle(prov, 0, ctx)
+		look, err := LookAngle(prov, prov.ID(), ctx)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}

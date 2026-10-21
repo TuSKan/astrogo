@@ -23,10 +23,10 @@ func TestNumberedAsteroidClassifiesTheDesignation(t *testing.T) {
 		want        core.ID
 		wantOK      bool
 	}{
-		{"an asteroid number", "433", core.SmallBodyID(433), true},
-		{"the semicolon form Horizons prefers", "433;", core.SmallBodyID(433), true},
-		{"the ambiguous bare one", "1", core.SmallBodyID(1), true},
-		{"the last number in the block", "999999", core.SmallBodyID(999999), true},
+		{"an asteroid number", "433", smallBody(433), true},
+		{"the semicolon form Horizons prefers", "433;", smallBody(433), true},
+		{"the ambiguous bare one", "1", smallBody(1), true},
+		{"the last number in the block", "999999", smallBody(999999), true},
 
 		{"the first number outside it", "1000000", 0, false},
 		{"a comet SPK-ID from Horizons", "1000390", 0, false},
@@ -92,7 +92,7 @@ func TestVerifyRequestedBodyLoadedStillCatchesTheSubstitution(t *testing.T) {
 
 	// The message has to name the body that was wanted, or a reader is told
 	// a substitution happened without being told what to look for.
-	if !strings.Contains(err.Error(), core.SmallBodyID(1).String()) {
+	if !strings.Contains(err.Error(), smallBody(1).String()) {
 		t.Errorf("error does not name the requested body: %v", err)
 	}
 }
@@ -108,10 +108,17 @@ func TestVerifyRequestedBodyLoadedAcceptsTheAsteroidItAskedFor(t *testing.T) {
 
 			p := &Provider{kernel: designation}
 
-			loaded := []core.ID{core.Earth, core.Sun, core.SmallBodyID(433)}
+			loaded := []core.ID{core.Earth, core.Sun, smallBody(433)}
 			if err := p.verifyRequestedBodyLoaded(loaded); err != nil {
 				t.Fatalf("%q: %v", designation, err)
 			}
 		})
 	}
+}
+
+// smallBody is core.SmallBodyID for a number the test knows is one.
+func smallBody(n int) core.ID {
+	id, _ := core.SmallBodyID(n)
+
+	return id
 }

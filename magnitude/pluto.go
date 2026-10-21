@@ -27,7 +27,7 @@ type PlutoCharonMagnitudes struct {
 // Charon, with its sharp opposition surge, no linear law can stand in for.
 // The two are computed separately and combined in flux.
 //
-// This is the alternative to PlanetApparent(p, eph.Pluto, t), which uses the
+// This is the alternative to PlanetApparent(p, eph.PlutoBarycenter, t), which uses the
 // historical law V = −1.01 + 5 log10(rΔ) + 0.041α and agrees with JPL
 // Horizons. The two do not agree with each other, and the difference is the
 // reason both exist:
@@ -60,7 +60,10 @@ func PlutoCharonApparent(p eph.Provider, t time.Time) (PlutoCharonMagnitudes, er
 // heliocentric and geocentric distances (AU), its phase angle (degrees), and
 // its sub-Earth east longitude in the paper's system (degrees).
 func plutoCharonGeometry(p eph.Provider, t time.Time) (r, delta, phAng, lon float64, err error) {
-	plutoSt, err := p.State(eph.Pluto, t)
+	// The Pluto–Charon barycenter, which every planetary kernel and
+	// eph.Default have; Pluto's own center needs NAIF's plu kernel, and
+	// is 2,100 km from it, nothing at 40 AU for a distance or a phase.
+	plutoSt, err := p.State(eph.PlutoBarycenter, t)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("magnitude: Pluto state: %w", err)
 	}

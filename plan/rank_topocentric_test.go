@@ -22,7 +22,7 @@ func TestAsObjectKeepsMovingBody(t *testing.T) {
 
 	for _, obj := range []Observable{
 		NewMoon(eph.Default()),
-		NewSatellite("ISS", 0, sat),
+		NewSatellite("ISS", sat.ID(), sat),
 		NewStar("s", angle.Hour(5.6), angle.Deg(-1.2)),
 	} {
 		_, want := obj.(MovingBody)
@@ -113,7 +113,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 		t.Fatalf("NewPlanner: %v", err)
 	}
 
-	sat := NewSatellite("ISS", 0, prov)
+	sat := NewSatellite("ISS", prov.ID(), prov)
 	day := time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC)
 	checked := 0
 
@@ -123,7 +123,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 
 		// Widened by a pass's length each side, so a pass already in progress
 		// at the window's start, or still in progress at its end, is found.
-		passes, err := SatellitePasses(prov, "ISS", start.Add(unit.Minutes(-15)), end.Add(unit.Minutes(15)), loc, angle.Deg(0))
+		passes, err := SatellitePasses(prov, prov.ID(), "ISS", start.Add(unit.Minutes(-15)), end.Add(unit.Minutes(15)), loc, angle.Deg(0))
 		if err != nil {
 			t.Fatalf("SatellitePasses: %v", err)
 		}

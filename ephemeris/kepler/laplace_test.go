@@ -44,7 +44,7 @@ func jovianBare(t *testing.T, i int) kepler.Elements {
 
 	s := jovianMeanElements[i]
 
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
@@ -64,7 +64,7 @@ func jovianElements(t *testing.T, i int) kepler.Elements {
 
 	s := jovianMeanElements[i]
 
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
@@ -142,7 +142,7 @@ func TestInclinedOrbitTiltsFromThePole(t *testing.T) {
 func TestReadingLaplaceElementsAsEclipticIsBadlyWrong(t *testing.T) {
 	s := jovianMeanElements[0]
 
-	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, _ := kepler.CentralBodyFor(core.JupiterBarycenter)
 
 	base, err := kepler.NewElements(time.J2000(), unit.AU(kmToAU(s.aKM)), s.e,
 		angle.Deg(s.incl), angle.Deg(s.node), angle.Deg(s.argp), angle.Deg(s.meanAnom))
@@ -240,7 +240,7 @@ func poleSeparation(a, b vector.Vec3) angle.Angle {
 // TestTwoBodyPeriodMissesThePublishedOne quantifies, for every Galilean
 // satellite, what plain two-body motion gets wrong.
 func TestTwoBodyPeriodMissesThePublishedOne(t *testing.T) {
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}

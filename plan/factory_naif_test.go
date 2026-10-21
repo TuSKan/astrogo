@@ -31,9 +31,9 @@ func TestFromCatalogTranslatesJPLMajorBodies(t *testing.T) {
 	}{
 		{"Sun", "10", eph.Sun},
 		{"Moon", "301", eph.Moon},
-		{"Mars", "499", eph.Mars},
-		{"Jupiter Barycenter", "5", eph.Jupiter},
-		{"Pluto", "999", eph.Pluto},
+		{"Mars", "499", eph.MarsBarycenter},
+		{"Jupiter Barycenter", "5", eph.JupiterBarycenter},
+		{"Pluto", "999", eph.PlutoBarycenter},
 	} {
 		for _, p := range []eph.Provider{nil, eph.Default()} {
 			obj, err := FromCatalog(jplTarget(c.name, c.naif), p)

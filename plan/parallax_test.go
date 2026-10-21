@@ -71,8 +71,8 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 	}{
 		{"Moon", plan.NewMoon(prov)},
 		{"Sun", plan.NewSun(prov)},
-		{"Mars", plan.NewPlanet("Mars", eph.Mars, prov)},
-		{"Jupiter", plan.NewPlanet("Jupiter", eph.Jupiter, prov)},
+		{"Mars", plan.NewPlanet("Mars", eph.MarsBarycenter, prov)},
+		{"Jupiter", plan.NewPlanet("Jupiter", eph.JupiterBarycenter, prov)},
 	}
 
 	// One arcsecond. Both paths now run the same transform on the same vector,

@@ -123,7 +123,7 @@ func TestApparentStateIsTheApparentPlaceNotTheAstrometricOne(t *testing.T) {
 	epoch := time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
 	provider := &orbitingProvider{epoch: epoch}
 
-	got, err := eph.ApparentState(provider, eph.Mars, epoch)
+	got, err := eph.ApparentState(provider, eph.MarsBarycenter, epoch)
 	if err != nil {
 		t.Fatalf("ApparentState: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestApparentStateWithNoMotionIsGeometricApartFromDeflection(t *testing.T) {
 		sun: vector.V3(0.322, 0.940, 0),
 	}
 
-	got, err := eph.ApparentState(still, eph.Jupiter, epoch)
+	got, err := eph.ApparentState(still, eph.JupiterBarycenter, epoch)
 	if err != nil {
 		t.Fatalf("ApparentState: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestApparentStateWithNoMotionIsGeometricApartFromDeflection(t *testing.T) {
 	// exactly the range over c on the first pass.
 	tau := still.pos.Norm() / lightSpeedAUPerDay
 
-	want, err := eph.DeflectBySun(still, still.pos, eph.Jupiter, epoch, epoch.Add(unit.Days(-tau)))
+	want, err := eph.DeflectBySun(still, still.pos, eph.JupiterBarycenter, epoch, epoch.Add(unit.Days(-tau)))
 	if err != nil {
 		t.Fatalf("DeflectBySun: %v", err)
 	}

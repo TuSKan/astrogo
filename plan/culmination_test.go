@@ -14,13 +14,13 @@ import (
 // culminationByFullContexts is findCulmination as it was before #476: a full
 // coord.NewContext at every sample. Kept here as the reference the cached
 // version is held to.
-func culminationByFullContexts(prov eph.Provider, observer *coord.Geodetic, start, end time.Time) (PassEvent, error) {
+func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geodetic, start, end time.Time) (PassEvent, error) {
 	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
 
 	sample := func(t time.Time) error {
-		altaz, err := LookAngle(prov, 0, coord.NewContext(t, observer, defaultAtm))
+		altaz, err := LookAngle(prov, id, coord.NewContext(t, observer, defaultAtm))
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func culminationByFullContexts(prov eph.Provider, observer *coord.Geodetic, star
 		}
 	}
 
-	altaz, err := LookAngle(prov, 0, coord.NewContext(bestTime, observer, defaultAtm))
+	altaz, err := LookAngle(prov, id, coord.NewContext(bestTime, observer, defaultAtm))
 	if err != nil {
 		return PassEvent{}, err
 	}
@@ -78,7 +78,7 @@ func TestCulminationThroughTheContextCache(t *testing.T) {
 
 	// Four days rather than the week measured: the reference builds a full
 	// Context at every sample, and plan's race job has little time to spare.
-	passes, err := SatellitePasses(sat, "ISS", start, start.Add(unit.Hours(24*4)), site, angle.Deg(10))
+	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Hours(24*4)), site, angle.Deg(10))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCulminationThroughTheContextCache(t *testing.T) {
 	}
 
 	for i, p := range passes {
-		want, err := culminationByFullContexts(sat, site, p.Rise.Time, p.Set.Time)
+		want, err := culminationByFullContexts(sat, sat.ID(), site, p.Rise.Time, p.Set.Time)
 		if err != nil {
 			t.Fatalf("pass %d: reference: %v", i, err)
 		}

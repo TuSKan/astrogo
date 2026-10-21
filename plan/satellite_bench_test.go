@@ -45,7 +45,7 @@ func BenchmarkLookAngle(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, err := LookAngle(sat, 0, ctx); err != nil {
+		if _, err := LookAngle(sat, sat.ID(), ctx); err != nil {
 			b.Fatalf("LookAngle: %v", err)
 		}
 	}
@@ -68,7 +68,7 @@ func BenchmarkSatellitePasses_6h(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, err := SatellitePasses(sat, "ISS", start, end, site, angle.Deg(10)); err != nil {
+		if _, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, site, angle.Deg(10)); err != nil {
 			b.Fatalf("SatellitePasses: %v", err)
 		}
 	}

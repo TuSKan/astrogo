@@ -25,7 +25,6 @@ var (
 	ErrUnknownSource         = errors.New("jpl: unknown source")
 	ErrRecursionDepth        = errors.New("jpl: recursion depth exceeded")
 	ErrNilKernel             = errors.New("jpl: kernel is nil")
-	ErrBodyIDOutOfRange      = errors.New("jpl: body id outside the signed 32-bit NAIF range")
 	ErrKernelIndexOutOfRange = errors.New("jpl: kernel index out of range")
 
 	// ErrUnsupportedFrame refuses a kernel holding a segment in a reference
@@ -78,60 +77,15 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // addKernelLocked).
 const naifJ2000 = 1
 
-// NAIFFor returns the NAIF integer identifier for a body, and whether the
-// body is one this package has a mapping for.
-//
-// The table behind it is unexported. If callers could assign to it, one
-// reassignment would change which SPK segment every other caller in the
-// binary resolves to — silently, and with no way for a later reader to see
-// it happened.
-//
-// # The mapping mixes body centers and system barycenters
-//
-// 199, 299 and 399 are body centers; 4, 5, 6, 7 and 8 are system
-// barycenters. That is not an inconsistency to fix but what a planetary
-// kernel contains — the giant planets' satellite systems live in separate
-// kernels, so de440 and de441 can only offer the barycenter, while Mercury
-// and Venus have no moons and so *are* their own barycenters.
-//
-// It does mean two kinds of point share one identifier space. Measured
-// against Horizons' body-center commands over 2026, the gap is 0.0497 arcsec
-// at Uranus, 0.0324 at Jupiter, 0.0288 at Saturn, 0.0093 at Neptune and zero
-// at Mars. Small, systematic, and easy to mistake for an astrogo error when
-// comparing against a reference that defaults to the body center — see
-// [github.com/TuSKan/astrogo/ephemeris/core.ID] (#253).
-//
-// core.Pluto is deliberately absent: there is no NAIF mapping for it here,
-// so this reports false and a kernel-backed provider cannot serve it.
-func NAIFFor(id core.ID) (int, bool) {
-	naif, ok := bodyIDToNAIF[id]
-
-	return naif, ok
-}
-
-// NAIFBodies returns every body this package can map to a NAIF identifier,
-// sorted, for a caller enumerating what a kernel might contain.
-func NAIFBodies() []core.ID {
-	out := make([]core.ID, 0, len(bodyIDToNAIF))
-
-	for id := range bodyIDToNAIF {
-		out = append(out, id)
-	}
-
-	slices.Sort(out)
-
-	return out
-}
-
-// bodyIDToNAIF maps core.ID to NAIF integer IDs; see [NAIFFor].
-var bodyIDToNAIF = map[core.ID]int{
-	core.Sun: 10, core.Moon: 301, core.Mercury: 199, core.Venus: 299,
-	core.Earth: 399, core.Mars: 4, core.Jupiter: 5, core.Saturn: 6,
-	core.Uranus: 7, core.Neptune: 8,
-}
-
-// ErrNoSegment is returned when no segment is found for the target at the requested epoch.
+// ErrNoSegment is returned when the loaded kernels hold the target but no
+// segment of it covers the requested epoch.
 var ErrNoSegment = errors.New("jpl: no coverage for target at requested epoch")
+
+// ErrUnknownTarget is returned when no loaded kernel holds the target at all:
+// the Pluto centre (999) from a planetary kernel, which has only the Pluto
+// barycenter (9). It used to be reported as ErrNoSegment, as if the kernel
+// covered the body at other epochs (#809).
+var ErrUnknownTarget = errors.New("jpl: no loaded kernel holds the target")
 
 // Kernel represents a single SPK file and its metadata.
 type Kernel struct {
@@ -331,30 +285,15 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	naif, ok := NAIFFor(id)
-	if !ok {
-		// core.ID is uint32; a NAIF id is signed 32-bit. The top half of the
-		// unsigned range therefore has no meaning as an id, and converting it
-		// does not merely lose information — it wraps to a NEGATIVE id, which
-		// is meaningful, because that is how NAIF numbers spacecraft. Cassini
-		// is -82. So core.ID(4294967295) would quietly be looked up as -1
-		// rather than refused, and the answer would be a real body's state
-		// under a caller's typo.
-		//
-		// Reported rather than clamped: there is no id here to fall back to.
-		if id > math.MaxInt32 {
-			return core.State{}, fmt.Errorf("%w: %d", ErrBodyIDOutOfRange, id)
-		}
-
-		naif = int(id)
-	}
-
 	// Straight to ET seconds: going via a summed Julian Date quantises the
 	// result to about 40 microseconds, which is 4 cm of lunar motion (#150).
 	et := lsk.UTCToET(t, p.LSK)
 
 	// Get target relative to SSB (0)
-	targetSSB, err := p.evaluateRecursive(int32(naif), et, 0)
+	// An ID is a NAIF code (#809): the target is looked up as itself, with no
+	// table between, so a code no loaded kernel holds is refused rather than
+	// read as some other body.
+	targetSSB, err := p.evaluateRecursive(int32(id), et, 0)
 	if err != nil {
 		return core.State{}, err
 	}
@@ -559,37 +498,19 @@ func (p *Provider) FindSegment(target int32, et float64) (*SegmentRef, error) {
 	return &ref, nil
 }
 
-// SupportedBodies returns a list of body IDs available in the loaded kernels.
+// SupportedBodies returns every target the loaded kernels hold, as the NAIF
+// codes they hold them under, sorted.
 func (p *Provider) SupportedBodies() []core.ID {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	seen := make(map[core.ID]bool)
-
-	var res []core.ID
+	res := make([]core.ID, 0, len(p.ByTarget))
 
 	for targetID := range p.ByTarget {
-		// A small body keeps NAIF's own 20000000+ identifier rather than
-		// being folded down to its bare number. Subtracting the offset put
-		// asteroid 4 Vesta on core.ID(4), which is Mars, so the body was
-		// dropped from this list as a duplicate — silently, along with
-		// Ceres, Pallas, Juno and every asteroid numbered up to 12. See
-		// [core.SmallBodyBase].
-		bid := core.ID(targetID)
-
-		// Check if it's a known body
-		for b, naif := range bodyIDToNAIF {
-			if int32(naif) == targetID {
-				bid = b
-				break
-			}
-		}
-
-		if !seen[bid] {
-			res = append(res, bid)
-			seen[bid] = true
-		}
+		res = append(res, core.ID(targetID))
 	}
+
+	slices.Sort(res)
 
 	return res
 }
@@ -632,7 +553,7 @@ func (p *Provider) loadSmallBodyKernels(readers []*spk.Reader) error {
 // comet index issues SPK-IDs that are also bare integers — 1000390 for
 // C/2002 J5 (LINEAR) — and they sit outside NAIF's numbered-asteroid
 // allocation entirely. [core.SmallBodyID] is the authority on that bound and
-// reports 0 for anything beyond it, so it is asked rather than having its
+// reports false for anything beyond it, so it is asked rather than having its
 // constant copied here, where the two could drift apart without either side
 // noticing.
 func numberedAsteroid(designation string) (core.ID, bool) {
@@ -641,9 +562,7 @@ func numberedAsteroid(designation string) (core.ID, bool) {
 		return 0, false
 	}
 
-	id := core.SmallBodyID(n)
-
-	return id, id != 0
+	return core.SmallBodyID(n)
 }
 
 // verifyRequestedBodyLoaded checks that the body loaded is the body asked
@@ -822,18 +741,12 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 // four for a geocentric Moon, and with records cached (#802) the only
 // allocations a State made.
 func (p *Provider) findSegmentLocked(target int32, et float64) (SegmentRef, error) {
-	// Fast failure path 1: target not loaded
+	// Fast failure path 1: target not loaded. A bare number is not retried as
+	// a small body's: 4 is the Mars barycenter, and 4 Vesta is 20000004
+	// (#809).
 	refs, ok := p.ByTarget[target]
 	if !ok {
-		// Try asteroid mapping (20,000,000 + ID)
-		if target > 0 && target < 1000000 {
-			target += 20000000
-			refs, ok = p.ByTarget[target]
-		}
-
-		if !ok {
-			return SegmentRef{}, ErrNoSegment
-		}
+		return SegmentRef{}, fmt.Errorf("%w: %d", ErrUnknownTarget, target)
 	}
 
 	// Fast failure path 2: ET outside known target coverage

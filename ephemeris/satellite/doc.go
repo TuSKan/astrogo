@@ -26,7 +26,7 @@
 // for you, at whatever epoch:
 //
 //	t := time.FromJD(gpsJD, time.GPST)   // not time.UTC
-//	state, err := sat.State(0, t)
+//	state, err := sat.State(sat.ID(), t)
 //
 // BeiDou is a different offset again — TAI − 33 s, so BDT − UTC is 4 s today —
 // and has [github.com/TuSKan/astrogo/time.BDT]. GLONASS is UTC plus three hours
@@ -58,7 +58,7 @@
 // Construct a [Satellite] from a name and the two lines of a TLE:
 //
 //	sat, err := satellite.NewFromTLE("ISS", line1, line2)
-//	state, err := sat.State(0, t)  // geocentric GCRS, au and au/day
+//	state, err := sat.State(sat.ID(), t)  // geocentric GCRS, au and au/day
 //	h, err := sat.Altitude(t)      // above the WGS84 ellipsoid
 //
 // # Frame Conversion

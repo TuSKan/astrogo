@@ -73,7 +73,7 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 	t.Run("State", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := sat.State(core.ID(0), at); !errors.Is(err, satellite.ErrPropagation) {
+		if _, err := sat.State(sat.ID(), at); !errors.Is(err, satellite.ErrPropagation) {
 			t.Errorf("State returned %v, want one wrapping ErrPropagation", err)
 		}
 	})
@@ -88,7 +88,7 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 
 	// And the same satellite at its own epoch still answers, so the test above
 	// is measuring the failure rather than a satellite that never worked.
-	if _, err := sat.State(core.ID(0), epoch); err != nil {
+	if _, err := sat.State(sat.ID(), epoch); err != nil {
 		t.Errorf("at its own epoch the same element set failed too (%v), so the assertions "+
 			"above prove nothing about decay", err)
 	}

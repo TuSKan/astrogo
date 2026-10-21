@@ -58,32 +58,32 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 		{eph.Venus, 2025, 3, 23, 168.316, -4.220},
 		{eph.Venus, 2023, 8, 13, 169.292, -4.120},
 
-		{eph.Mars, 2003, 8, 28, 4.8948, -2.862},
-		{eph.Mars, 2025, 11, 20, 8.842, 1.421},
-		{eph.Mars, 2004, 7, 19, 11.5877, 1.788},
-		{eph.Mars, 2023, 8, 13, 18.420, 1.768},
-		{eph.Mars, 2024, 3, 10, 20.6988, 1.222},
-		{eph.Mars, 2020, 1, 1, 24.259, 1.548},
-		{eph.Mars, 2023, 1, 20, 28.923, -0.683},
-		{eph.Mars, 2025, 3, 23, 34.6780, 0.231},
-		{eph.Mars, 2026, 9, 23, 35.294, 1.086},
-		{eph.Mars, 2021, 3, 15, 36.2079, 1.037},
-		{eph.Mars, 2022, 6, 15, 43.126, 0.577},
+		{eph.MarsBarycenter, 2003, 8, 28, 4.8948, -2.862},
+		{eph.MarsBarycenter, 2025, 11, 20, 8.842, 1.421},
+		{eph.MarsBarycenter, 2004, 7, 19, 11.5877, 1.788},
+		{eph.MarsBarycenter, 2023, 8, 13, 18.420, 1.768},
+		{eph.MarsBarycenter, 2024, 3, 10, 20.6988, 1.222},
+		{eph.MarsBarycenter, 2020, 1, 1, 24.259, 1.548},
+		{eph.MarsBarycenter, 2023, 1, 20, 28.923, -0.683},
+		{eph.MarsBarycenter, 2025, 3, 23, 34.6780, 0.231},
+		{eph.MarsBarycenter, 2026, 9, 23, 35.294, 1.086},
+		{eph.MarsBarycenter, 2021, 3, 15, 36.2079, 1.037},
+		{eph.MarsBarycenter, 2022, 6, 15, 43.126, 0.577},
 
-		{eph.Jupiter, 2020, 1, 1, 0.625, -1.838},
-		{eph.Jupiter, 2021, 3, 15, 6.441, -2.008},
-		{eph.Jupiter, 2024, 3, 10, 9.132, -2.138},
-		{eph.Jupiter, 2023, 8, 13, 11.734, -2.445},
+		{eph.JupiterBarycenter, 2020, 1, 1, 0.625, -1.838},
+		{eph.JupiterBarycenter, 2021, 3, 15, 6.441, -2.008},
+		{eph.JupiterBarycenter, 2024, 3, 10, 9.132, -2.138},
+		{eph.JupiterBarycenter, 2023, 8, 13, 11.734, -2.445},
 
-		{eph.Uranus, 2025, 11, 20, 0.088, 5.617},
-		{eph.Uranus, 2020, 1, 1, 2.620, 5.777},
-		{eph.Uranus, 2023, 8, 13, 2.955, 5.770},
-		{eph.Uranus, 2026, 9, 23, 2.699, 5.665},
+		{eph.UranusBarycenter, 2025, 11, 20, 0.088, 5.617},
+		{eph.UranusBarycenter, 2020, 1, 1, 2.620, 5.777},
+		{eph.UranusBarycenter, 2023, 8, 13, 2.955, 5.770},
+		{eph.UranusBarycenter, 2026, 9, 23, 2.699, 5.665},
 
-		{eph.Neptune, 2021, 3, 15, 0.128, 7.831},
-		{eph.Neptune, 2020, 1, 1, 1.724, 7.789},
-		{eph.Neptune, 2022, 6, 15, 1.946, 7.776},
-		{eph.Neptune, 2026, 9, 23, 0.120, 7.679},
+		{eph.NeptuneBarycenter, 2021, 3, 15, 0.128, 7.831},
+		{eph.NeptuneBarycenter, 2020, 1, 1, 1.724, 7.789},
+		{eph.NeptuneBarycenter, 2022, 6, 15, 1.946, 7.776},
+		{eph.NeptuneBarycenter, 2026, 9, 23, 0.120, 7.679},
 
 		// Pluto with Charon, from the Explanatory Supplement's V(1,0) = -1.01;
 		// Horizons uses -1.00, so these sit 0.010-0.012 mag bright (#407).
@@ -91,11 +91,11 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 		// check on astrogo's geometry and arithmetic, not on the law, which
 		// can be tenths of a magnitude from Pluto's real brightness (see
 		// plutoMag).
-		{eph.Pluto, 2020, 1, 1, 0.3608, 14.384},
-		{eph.Pluto, 2024, 7, 1, 0.6269, 14.412},
-		{eph.Pluto, 2026, 12, 20, 0.9357, 14.608},
-		{eph.Pluto, 2026, 9, 23, 1.3494, 14.536},
-		{eph.Pluto, 2022, 4, 1, 1.5852, 14.460},
+		{eph.PlutoBarycenter, 2020, 1, 1, 0.3608, 14.384},
+		{eph.PlutoBarycenter, 2024, 7, 1, 0.6269, 14.412},
+		{eph.PlutoBarycenter, 2026, 12, 20, 0.9357, 14.608},
+		{eph.PlutoBarycenter, 2026, 9, 23, 1.3494, 14.536},
+		{eph.PlutoBarycenter, 2022, 4, 1, 1.5852, 14.460},
 	}
 
 	for _, tc := range cases {

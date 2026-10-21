@@ -135,12 +135,12 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 		for _, mo := range []time.Month{time.January, time.April, time.July, time.October} {
 			at := time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC)
 
-			want, werr := p.State(core.Pluto, at)
+			want, werr := p.State(core.PlutoBarycenter, at)
 			if werr != nil {
 				t.Fatalf("DE440 State(Pluto) at %s: %v", at.Format(isoDate), werr)
 			}
 
-			got, gerr := base.State(core.Pluto, at)
+			got, gerr := base.State(core.PlutoBarycenter, at)
 			if gerr != nil {
 				t.Fatalf("Kepler State(Pluto) at %s: %v", at.Format(isoDate), gerr)
 			}
