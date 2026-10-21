@@ -68,12 +68,12 @@ func TestNativeMoonAgreesWithTheBarycentricRoute(t *testing.T) {
 					t.Fatalf("native at %v: %v", at, err)
 				}
 
-				m, err := p.State(core.ID(c.moon), at)
+				m, err := eph.At(p, at).Geometric(core.ID(c.moon), eph.Earth)
 				if err != nil {
 					t.Fatalf("moon at %v: %v", at, err)
 				}
 
-				pl, err := p.State(core.ID(c.planet), at)
+				pl, err := eph.At(p, at).Geometric(core.ID(c.planet), eph.Earth)
 				if err != nil {
 					t.Fatalf("planet at %v: %v", at, err)
 				}
@@ -133,7 +133,7 @@ func TestObservedPlaceParallaxAndAberrationOrder(t *testing.T) {
 			// only the geometry is under test.
 			ctx := coord.NewContext(at, site, atmosphere.Refraction{})
 
-			app, err := eph.ApparentState(p, c.id, at)
+			app, err := eph.At(p, at).Apparent(c.id, eph.Geocenter())
 			if err != nil {
 				t.Fatalf("%v at %v: apparent: %v", c.id, at, err)
 			}
@@ -202,7 +202,7 @@ func TestEpv00EarthAgainstTheKernel(t *testing.T) {
 	for i := range n {
 		at := start.Add(unit.Days(73049 * float64(i) / n)) // to 2100
 
-		sun, err := p.State(core.Sun, at)
+		sun, err := eph.At(p, at).Geometric(core.Sun, eph.Earth)
 		if err != nil {
 			t.Fatalf("Sun at %v: %v", at, err)
 		}
@@ -302,12 +302,12 @@ func barycentric(p *jpl.Provider, target int32, et float64) (vector.Vec3, error)
 
 // elongatedFromSun reports whether id is at least minDeg from the Sun.
 func elongatedFromSun(p core.Provider, id core.ID, at time.Time, minDeg float64) (bool, error) {
-	body, err := p.State(id, at)
+	body, err := eph.At(p, at).Geometric(id, eph.Earth)
 	if err != nil {
 		return false, err //nolint:wrapcheck // the caller names the body and epoch
 	}
 
-	sun, err := p.State(core.Sun, at)
+	sun, err := eph.At(p, at).Geometric(core.Sun, eph.Earth)
 	if err != nil {
 		return false, err //nolint:wrapcheck // the caller names the body and epoch
 	}

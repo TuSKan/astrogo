@@ -47,7 +47,7 @@ func TestState(t *testing.T) {
 
 	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	state, err := sat.State(sat.ID(), epoch)
+	state, err := sat.Locate(sat.ID(), epoch)
 	if err != nil {
 		t.Fatalf("State failed: %v", err)
 	}
@@ -90,11 +90,11 @@ func TestState_RejectsUnexpectedID(t *testing.T) {
 
 	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	if _, err := sat.State(eph.Sun, epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
+	if _, err := sat.Locate(eph.Sun, epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
 		t.Errorf("State(eph.Sun, ...) = %v, want ErrUnexpectedID", err)
 	}
 
-	if _, err := sat.State(sat.ID(), epoch); err != nil {
+	if _, err := sat.Locate(sat.ID(), epoch); err != nil {
 		t.Errorf("State(0, ...) should still succeed, got %v", err)
 	}
 }
@@ -109,12 +109,12 @@ func TestStateForwardOrbit(t *testing.T) {
 	t0 := time.Date(2026, 4, 19, 11, 45, 32, 0, time.LocationUTC)
 	t1 := t0.Add(unit.Days(90.0 / 1440.0))
 
-	s0, err := sat.State(sat.ID(), t0)
+	s0, err := sat.Locate(sat.ID(), t0)
 	if err != nil {
 		t.Fatalf("State at epoch failed: %v", err)
 	}
 
-	s1, err := sat.State(sat.ID(), t1)
+	s1, err := sat.Locate(sat.ID(), t1)
 	if err != nil {
 		t.Fatalf("State at epoch+90m failed: %v", err)
 	}

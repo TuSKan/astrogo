@@ -25,12 +25,12 @@ func TestSatelliteAnswersToItsNAIFCode(t *testing.T) {
 
 	at := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	if _, err := sat.State(sat.ID(), at); err != nil {
+	if _, err := sat.Locate(sat.ID(), at); err != nil {
 		t.Errorf("State(its own code): %v", err)
 	}
 
 	for _, id := range []core.ID{core.SolarSystemBarycenter, core.Sun, 25544} {
-		if _, err := sat.State(id, at); !errors.Is(err, satellite.ErrUnexpectedID) {
+		if _, err := sat.Locate(id, at); !errors.Is(err, satellite.ErrUnexpectedID) {
 			t.Errorf("State(%v) = %v, want ErrUnexpectedID", id, err)
 		}
 	}

@@ -2,6 +2,7 @@ package kepler
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
@@ -82,16 +83,20 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 	return nil
 }
 
-// State returns id's geocentric state at t — the propagated Elements
-// for id if registered, otherwise delegated to the configured base
-// provider. core.Provider.State is contractually geocentric, so a
-// registered body's own heliocentric StateAt result is made geocentric with
-// the base provider's Sun: the same ephemeris places the orbit's Earth as
-// places every other body the caller asks the base for.
-func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
+// Locate returns id's state at t about the centre its orbit is fitted
+// about: the Sun for heliocentric elements, the parent planet for a
+// satellite's ([Elements.CentralBody]). A body with no elements registered is
+// the base provider's to locate.
+//
+// It used to answer geocentric, placing a heliocentric orbit against the
+// base's Sun, and before #810 against SOFA's Epv00 whatever the base was.
+// Located about its own centre, the orbit meets the Earth, the Sun and any
+// parent planet only where ephemeris.At composes it with the base's chains,
+// so one ephemeris places them all.
+func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
 	el, ok := p.elements[id]
 	if !ok {
-		st, err := p.base.State(id, t)
+		st, err := p.base.Locate(id, t)
 		if err != nil {
 			return core.State{}, fmt.Errorf("kepler: base provider: %w", err)
 		}
@@ -99,61 +104,12 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 		return st, nil
 	}
 
-	relPos, relVel, err := el.StateAt(t)
+	pos, vel, err := el.StateAt(t)
 	if err != nil {
 		return core.State{}, err
 	}
 
-	// StateAt returns the orbit about its central body. For heliocentric
-	// elements that is already the heliocentric state; for a satellite it is
-	// the offset from its parent, and the parent's own heliocentric position
-	// has to be added before anything can be subtracted from it.
-	//
-	// The parent comes from the base provider rather than being propagated
-	// here: it is a planet, the base already answers for planets, and
-	// re-deriving it would be a second, worse ephemeris for a body this
-	// package can simply ask about.
-	heloPos, heloVel := relPos, relVel
-
-	if central := el.CentralBody(); central.ID != core.Sun {
-		parent, perr := p.base.State(central.ID, t)
-		if perr != nil {
-			return core.State{}, fmt.Errorf("kepler: central body %s: %w", central.ID, perr)
-		}
-
-		// The base answers geocentric, so the Earth term below would cancel
-		// it out; add the parent's geocentric state and return directly.
-		return core.State{
-			Pos:    parent.Pos.Add(relPos),
-			Vel:    parent.Vel.Add(relVel),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
-	}
-
-	// Geocentric is heliocentric plus the Sun's geocentric state, and the Sun
-	// comes from the base, so the orbit is placed against the base's own
-	// Earth. It used to come from SOFA's Epv00 whatever the base was, so a
-	// JPL base placed the Sun from the kernel and the Earth from a model 4.0 km
-	// rms and 11.7 km at worst away from it over 1900–2100 — 1.6″ for a body
-	// at 0.01 AU, and two ephemerides inside one place (#810). The default
-	// SOFA base's Sun is minus that same Epv00 heliocentric Earth, so a
-	// Provider built without WithBase answers exactly what it did, to the bit.
-	sun, err := p.base.State(core.Sun, t)
-	if err != nil {
-		return core.State{}, fmt.Errorf("kepler: the Sun from the base provider: %w", err)
-	}
-
-	if err := sun.Require(core.FrameICRS, core.CenterGeocenter); err != nil {
-		return core.State{}, fmt.Errorf("kepler: the Sun from the base provider: %w", err)
-	}
-
-	return core.State{
-		Pos:    heloPos.Add(sun.Pos),
-		Vel:    heloVel.Add(sun.Vel),
-		Frame:  core.FrameICRS,
-		Center: core.CenterGeocenter,
-	}, nil
+	return core.State{Pos: pos, Vel: vel, Frame: core.FrameICRS, Center: el.CentralBody().ID}, nil
 }
 
 // Close releases no resources — Provider holds no files or caches.
@@ -188,91 +144,91 @@ var plutoElements = func() Elements {
 }()
 
 // sofaBase is the default WithBase delegate: a small, offline,
-// SOFA-only core.Provider covering the Sun, Moon, the eight major
-// planets, and the Solar System Barycenter — deliberately duplicated
-// from ephemeris's own unexported sofaProvider rather than importing
-// the ephemeris root package, which would cycle (ephemeris imports
-// kepler to re-export Elements/NewFromElements). Pluto has no SOFA
-// analytical source and is not covered here — ephemeris.Default()
-// closes that gap by Register-ing Pluto's own elements on top of a
-// Provider using this as its base, rather than teaching this SOFA-only
-// type about a body SOFA itself has no model for.
-type sofaBase struct{}
+// SOFA-only core.Provider covering the Sun, the Earth, the Moon, the
+// Earth-Moon barycenter, the planets' system barycenters, Pluto's from its
+// elements, and the Solar System Barycenter. It answers each about the centre
+// its series computes it from:
+//
+//	Sun                           about the Solar System barycenter (Epv00)
+//	Earth                         about the Sun (Epv00)
+//	Moon, Earth-Moon barycenter   about the Earth (Moon98)
+//	Mercury to Neptune            about the Sun (Plan94)
+//	Pluto's barycenter            about the Sun ([PlutoElements])
+//
+// so the SOFA planets' geocentric states compose as they always were
+// computed, Plan94's heliocentric planet less Epv00's heliocentric Earth.
+//
+// It lives here rather than in the ephemeris root package, which would
+// cycle: ephemeris imports kepler to re-export Elements and NewFromElements.
+type sofaBase struct {
+	// last is the last Epv00 evaluation: the Sun and the Earth at one epoch
+	// are two Locate calls and one series, the costliest SOFA evaluates
+	// here. Held by value under mu, so keeping it allocates nothing; the
+	// series itself is evaluated outside the lock.
+	mu   sync.Mutex
+	last epv00At
+}
 
-func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
+// epv00At is one Epv00 evaluation: the Earth's heliocentric and barycentric
+// position and velocity at the TDB two-part date d1 + d2.
+type epv00At struct {
+	set      bool
+	d1, d2   float64
+	pvh, pvb [2][3]float64
+}
+
+func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 
-	// Every named body is handled, Pluto included: it has no SOFA
-	// analytical source and is propagated from [PlutoElements] instead.
-	// The suppression that used to sit here existed only because it was
-	// missing, and the linter noticed the moment it stopped being.
+	state := func(pos, vel vector.Vec3, center core.ID) (core.State, error) {
+		return core.State{Pos: pos, Vel: vel, Frame: core.FrameICRS, Center: center}, nil
+	}
+
 	switch id {
+	case core.SolarSystemBarycenter:
+		return state(vector.Vec3{}, vector.Vec3{}, core.SolarSystemBarycenter)
+
 	case core.Sun:
-		pvh, _, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+		e, err := s.epv00(d1, d2)
+		if err != nil {
+			return core.State{}, err
 		}
 
-		return core.State{
-			Pos:    vector.V3(-pvh[0][0], -pvh[0][1], -pvh[0][2]),
-			Vel:    vector.V3(-pvh[1][0], -pvh[1][1], -pvh[1][2]),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
+		// The Earth's barycentric vector less its heliocentric one.
+		return state(
+			vector.V3(e.pvb[0][0]-e.pvh[0][0], e.pvb[0][1]-e.pvh[0][1], e.pvb[0][2]-e.pvh[0][2]),
+			vector.V3(e.pvb[1][0]-e.pvh[1][0], e.pvb[1][1]-e.pvh[1][1], e.pvb[1][2]-e.pvh[1][2]),
+			core.SolarSystemBarycenter)
+
+	case core.Earth:
+		e, err := s.epv00(d1, d2)
+		if err != nil {
+			return core.State{}, err
+		}
+
+		return state(vector.V3(e.pvh[0][0], e.pvh[0][1], e.pvh[0][2]),
+			vector.V3(e.pvh[1][0], e.pvh[1][1], e.pvh[1][2]), core.Sun)
 
 	case core.Moon:
 		pv := gofaext.Moon98(d1, d2)
 
-		return core.State{
-			Pos:    vector.V3(pv[0][0], pv[0][1], pv[0][2]),
-			Vel:    vector.V3(pv[1][0], pv[1][1], pv[1][2]),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
-
-	case core.SolarSystemBarycenter:
-		_, pvb, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
-		}
-
-		// pvb is Earth's barycentric position/velocity (SSB -> Earth), so
-		// the SSB's own geocentric state (SSB - Earth) is its negation.
-		return core.State{
-			Pos:    vector.V3(-pvb[0][0], -pvb[0][1], -pvb[0][2]),
-			Vel:    vector.V3(-pvb[1][0], -pvb[1][1], -pvb[1][2]),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
-
-	case core.Earth:
-		// The geocentre, from the geocentre.
-		return core.State{Frame: core.FrameICRS, Center: core.CenterGeocenter}, nil
+		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]), vector.V3(pv[1][0], pv[1][1], pv[1][2]), core.Earth)
 
 	case core.EarthMoonBarycenter:
-		// The Moon's share of the pair's mass along the Moon's vector, as
-		// ephemeris.Default answers it: exact by definition, where Plan94's
-		// barycenter less SOFA's Earth was up to 1,942 km off (#809).
+		// The Moon's share of the pair's mass along the Moon's vector: exact
+		// by definition, where Plan94's barycenter less SOFA's Earth was up
+		// to 1,942 km off (#809).
 		pv := gofaext.Moon98(d1, d2)
 		mu := constants.Ephemeris.MoonGravitationalParameter.Value /
 			constants.Ephemeris.EarthMoonGravitationalParameter.Value
 
-		return core.State{
-			Pos:    vector.V3(pv[0][0], pv[0][1], pv[0][2]).MulScalar(mu),
-			Vel:    vector.V3(pv[1][0], pv[1][1], pv[1][2]).MulScalar(mu),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
+		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]).MulScalar(mu),
+			vector.V3(pv[1][0], pv[1][1], pv[1][2]).MulScalar(mu), core.Earth)
 
 	case core.MercuryBarycenter, core.Mercury, core.VenusBarycenter, core.Venus,
 		core.MarsBarycenter, core.JupiterBarycenter,
 		core.SaturnBarycenter, core.UranusBarycenter, core.NeptuneBarycenter:
-		pvh, _, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
-		}
-
 		// Plan94's planets are 1 to 8, its Mars to Neptune the system
 		// barycenters, so those are what it answers for; the planets' own
 		// centers are refused below rather than answered with their
@@ -289,35 +245,19 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 			return core.State{}, fmt.Errorf("%w: gofaext.Plan94 status %d", ErrSofaFailure, status)
 		}
 
-		return core.State{
-			Pos:    vector.V3(pv[0][0]-pvh[0][0], pv[0][1]-pvh[0][1], pv[0][2]-pvh[0][2]),
-			Vel:    vector.V3(pv[1][0]-pvh[1][0], pv[1][1]-pvh[1][1], pv[1][2]-pvh[1][2]),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
+		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]), vector.V3(pv[1][0], pv[1][1], pv[1][2]), core.Sun)
 
 	case core.PlutoBarycenter:
 		// SOFA has no Pluto. Two-body propagation of the Standish elements
 		// is an approximation, and documented as one — but it is the
 		// difference between a Charon orbit that can be placed and one that
-		// cannot be, and it is what ephemeris.Default() already offered a
-		// layer up.
-		pos, vel, perr := PlutoElements().StateAt(t)
-		if perr != nil {
-			return core.State{}, fmt.Errorf("kepler: pluto: %w", perr)
+		// cannot be.
+		pos, vel, err := PlutoElements().StateAt(t)
+		if err != nil {
+			return core.State{}, fmt.Errorf("kepler: pluto: %w", err)
 		}
 
-		pvh, _, status := gofaext.Epv00(d1, d2)
-		if status < 0 {
-			return core.State{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
-		}
-
-		return core.State{
-			Pos:    pos.Sub(vector.V3(pvh[0][0], pvh[0][1], pvh[0][2])),
-			Vel:    vel.Sub(vector.V3(pvh[1][0], pvh[1][1], pvh[1][2])),
-			Frame:  core.FrameICRS,
-			Center: core.CenterGeocenter,
-		}, nil
+		return state(pos, vel, core.Sun)
 
 	case core.Mars, core.Jupiter, core.Saturn, core.Uranus, core.Neptune, core.Pluto:
 		// The planets' own centers: SOFA's theory places their system
@@ -331,3 +271,28 @@ func (s *sofaBase) State(id core.ID, t time.Time) (core.State, error) {
 }
 
 func (s *sofaBase) Close() error { return nil }
+
+// epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
+// same date.
+func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
+	s.mu.Lock()
+	e := s.last
+	s.mu.Unlock()
+
+	if e.set && e.d1 == d1 && e.d2 == d2 {
+		return e, nil
+	}
+
+	pvh, pvb, status := gofaext.Epv00(d1, d2)
+	if status < 0 {
+		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	}
+
+	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+
+	s.mu.Lock()
+	s.last = e
+	s.mu.Unlock()
+
+	return e, nil
+}

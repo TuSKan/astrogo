@@ -33,7 +33,7 @@ var (
 // stubProvider is the smallest thing satisfying Provider.
 type stubProvider struct{}
 
-func (stubProvider) State(ID, time.Time) (State, error) {
+func (stubProvider) Locate(ID, time.Time) (State, error) {
 	return State{Pos: vector.Vec3{X: 1}}, nil
 }
 

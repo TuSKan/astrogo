@@ -443,7 +443,7 @@ func (m MeteorShower) zhrAtSolarLongitude(lambda float64) float64 {
 // Against Skyfield's ecliptic_J2000_frame (DE421) it agrees to a thousandth
 // of a degree, about a minute of time.
 func sunLongitudeJ2000(t time.Time, prov eph.Provider) (float64, error) {
-	sun, err := eph.Position(prov, eph.Sun, t)
+	sun, err := geocentric(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: sun position: %w", err)
 	}

@@ -87,8 +87,8 @@ test**. What is under test is everything downstream: light-time iteration, the
 IAU 2006/2000A reduction chain, observer geodesy, and topocentric parallax.
 
 Its intermediate place is measured but deliberately **not** contracted.
-`eph.ApparentState` retards the whole geocentric vector, carrying light-time
-and annual aberration together, while Horizons' astrometric column has
+astrogo's apparent place is the astrometric one deflected and aberrated, in
+SOFA's order (#803), while Horizons' astrometric column has
 light-time only and its apparent column is referred to the true equinox of
 date where `coord.Context.AstrometricToCIRS` produces CIRS. Neither published
 column is the quantity astrogo computes, so the gap is named and quantified —

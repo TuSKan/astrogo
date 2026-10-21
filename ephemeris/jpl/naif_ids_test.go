@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/constants"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/time"
@@ -31,7 +32,7 @@ func TestKernelAnswersTheNAIFCodeAskedFor(t *testing.T) {
 	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	// #809's measurement: 34.93 AU.
-	pluto, err := p.State(core.PlutoBarycenter, at)
+	pluto, err := eph.At(p, at).Geometric(core.PlutoBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("PlutoBarycenter: %v", err)
 	}
@@ -41,7 +42,7 @@ func TestKernelAnswersTheNAIFCodeAskedFor(t *testing.T) {
 	}
 
 	for _, center := range []core.ID{core.Pluto, core.Mars, core.Jupiter} {
-		_, err := p.State(center, at)
+		_, err := eph.At(p, at).Geometric(center, core.Earth)
 		if !errors.Is(err, jpl.ErrUnknownTarget) || errors.Is(err, jpl.ErrNoSegment) {
 			t.Errorf("%v: err = %v, want ErrUnknownTarget alone — de440s holds the barycenter, not the planet", center, err)
 		}
@@ -49,12 +50,12 @@ func TestKernelAnswersTheNAIFCodeAskedFor(t *testing.T) {
 
 	// The Solar System barycenter is answered, and where the Sun's wobble
 	// puts it: within about 2.2 solar radii, 0.0102 AU, of the Sun's center.
-	ssb, err := p.State(core.SolarSystemBarycenter, at)
+	ssb, err := eph.At(p, at).Geometric(core.SolarSystemBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("SolarSystemBarycenter: %v", err)
 	}
 
-	sun, err := p.State(core.Sun, at)
+	sun, err := eph.At(p, at).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("Sun: %v", err)
 	}
@@ -88,12 +89,12 @@ func TestKernelEarthMoonBarycenterIsTheMoonsShare(t *testing.T) {
 		time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC),
 		time.Date(2100, time.March, 3, 0, 0, 0, 0, time.LocationUTC),
 	} {
-		emb, err := p.State(core.EarthMoonBarycenter, at)
+		emb, err := eph.At(p, at).Geometric(core.EarthMoonBarycenter, core.Earth)
 		if err != nil {
 			t.Fatalf("%v: %v", at, err)
 		}
 
-		moon, err := p.State(core.Moon, at)
+		moon, err := eph.At(p, at).Geometric(core.Moon, core.Earth)
 		if err != nil {
 			t.Fatalf("%v: Moon: %v", at, err)
 		}

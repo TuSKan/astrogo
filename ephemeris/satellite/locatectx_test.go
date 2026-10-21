@@ -24,12 +24,12 @@ func paranal(t *testing.T) *coord.Geodetic {
 	return site
 }
 
-// TestStateCtxIsStateAtTheContextInstant: through a Context built at the
-// instant, StateCtx is State — the same SGP4 answer, rotated by one route
+// TestLocateCtxIsStateAtTheContextInstant: through a Context built at the
+// instant, LocateCtx is State — the same SGP4 answer, rotated by one route
 // through the Context's celestial-to-intermediate matrix rather than the other
 // through a fresh bias-precession-nutation matrix, which agree to rounding.
 // Across a pass, so the instants are not all the element set's epoch.
-func TestStateCtxIsStateAtTheContextInstant(t *testing.T) {
+func TestLocateCtxIsStateAtTheContextInstant(t *testing.T) {
 	sat, err := satellite.NewFromTLE("ISS", issLine1, issLine2)
 	if err != nil {
 		t.Fatalf("NewFromTLE: %v", err)
@@ -45,18 +45,18 @@ func TestStateCtxIsStateAtTheContextInstant(t *testing.T) {
 		at := start.Add(unit.Minutes(float64(10 * i)))
 		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
 
-		want, err := sat.State(sat.ID(), at)
+		want, err := sat.Locate(sat.ID(), at)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
 
-		got, err := sat.StateCtx(sat.ID(), ctx)
+		got, err := sat.LocateCtx(sat.ID(), ctx)
 		if err != nil {
-			t.Fatalf("StateCtx: %v", err)
+			t.Fatalf("LocateCtx: %v", err)
 		}
 
 		if got.Frame != want.Frame || got.Center != want.Center {
-			t.Errorf("%v: StateCtx is in %v about %v, State in %v about %v",
+			t.Errorf("%v: LocateCtx is in %v about %v, State in %v about %v",
 				at, got.Frame, got.Center, want.Frame, want.Center)
 		}
 
@@ -70,9 +70,9 @@ func TestStateCtxIsStateAtTheContextInstant(t *testing.T) {
 	}
 }
 
-// TestStateCtxRejectsUnexpectedID holds StateCtx to State's contract: this
+// TestLocateCtxRejectsUnexpectedID holds LocateCtx to State's contract: this
 // provider answers for its own satellite only.
-func TestStateCtxRejectsUnexpectedID(t *testing.T) {
+func TestLocateCtxRejectsUnexpectedID(t *testing.T) {
 	sat, err := satellite.NewFromTLE("ISS", issLine1, issLine2)
 	if err != nil {
 		t.Fatalf("NewFromTLE: %v", err)
@@ -80,7 +80,7 @@ func TestStateCtxRejectsUnexpectedID(t *testing.T) {
 
 	ctx := coord.NewContext(time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC), paranal(t), atmosphere.Refraction{})
 
-	if _, err := sat.StateCtx(eph.Sun, ctx); !errors.Is(err, satellite.ErrUnexpectedID) {
-		t.Errorf("StateCtx(eph.Sun, ...) = %v, want ErrUnexpectedID", err)
+	if _, err := sat.LocateCtx(eph.Sun, ctx); !errors.Is(err, satellite.ErrUnexpectedID) {
+		t.Errorf("LocateCtx(eph.Sun, ...) = %v, want ErrUnexpectedID", err)
 	}
 }

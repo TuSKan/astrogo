@@ -135,7 +135,7 @@ func moonOzoneAirmass(t *testing.T, scene *skybrightness.Scene) float64 {
 
 	at := time.FromGo(scene.Time)
 
-	moon, err := eph.ApparentState(scene.Ephemeris, eph.Moon, at)
+	moon, err := eph.At(scene.Ephemeris, at).Apparent(eph.Moon, eph.Geocenter())
 	if err != nil {
 		t.Fatalf("moon apparent state: %v", err)
 	}

@@ -59,12 +59,14 @@ type bodyGeometry struct {
 // geometryVectors computes the geocentric and heliocentric distances for a body.
 // Returns (bodyGeom, sunGeocentricPos, error).
 func geometryVectors(p eph.Provider, target eph.ID, t time.Time) (bodyGeometry, [3]float64, error) {
-	planetSt, err := p.State(target, t)
+	in := eph.At(p, t)
+
+	planetSt, err := in.Geometric(target, eph.Earth)
 	if err != nil {
 		return bodyGeometry{}, [3]float64{}, fmt.Errorf("magnitude: target state: %w", err)
 	}
 
-	sunSt, err := p.State(eph.Sun, t)
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return bodyGeometry{}, [3]float64{}, fmt.Errorf("magnitude: sun state: %w", err)
 	}

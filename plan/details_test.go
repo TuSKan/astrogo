@@ -423,7 +423,7 @@ type failingProvider struct{}
 
 var errFailingProvider = errors.New("failingProvider: no state")
 
-func (failingProvider) State(eph.ID, time.Time) (core.State, error) {
+func (failingProvider) Locate(eph.ID, time.Time) (core.State, error) {
 	return core.State{}, errFailingProvider
 }
 

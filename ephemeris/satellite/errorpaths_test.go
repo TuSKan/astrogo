@@ -76,12 +76,12 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 	t.Run("State", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := sat.State(sat.ID(), at); !errors.Is(err, satellite.ErrPropagation) {
+		if _, err := sat.Locate(sat.ID(), at); !errors.Is(err, satellite.ErrPropagation) {
 			t.Errorf("State returned %v, want one wrapping ErrPropagation", err)
 		}
 	})
 
-	t.Run("StateCtx", func(t *testing.T) {
+	t.Run("LocateCtx", func(t *testing.T) {
 		t.Parallel()
 
 		site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
@@ -90,8 +90,8 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 		}
 
 		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
-		if _, err := sat.StateCtx(sat.ID(), ctx); !errors.Is(err, satellite.ErrPropagation) {
-			t.Errorf("StateCtx returned %v, want one wrapping ErrPropagation", err)
+		if _, err := sat.LocateCtx(sat.ID(), ctx); !errors.Is(err, satellite.ErrPropagation) {
+			t.Errorf("LocateCtx returned %v, want one wrapping ErrPropagation", err)
 		}
 	})
 
@@ -105,7 +105,7 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 
 	// And the same satellite at its own epoch still answers, so the test above
 	// is measuring the failure rather than a satellite that never worked.
-	if _, err := sat.State(sat.ID(), epoch); err != nil {
+	if _, err := sat.Locate(sat.ID(), epoch); err != nil {
 		t.Errorf("at its own epoch the same element set failed too (%v), so the assertions "+
 			"above prove nothing about decay", err)
 	}
@@ -177,7 +177,7 @@ func TestStateRefusesAnotherBody(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := sat.State(core.Sun, sat.Propagator().Elements().Epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
+	if _, err := sat.Locate(core.Sun, sat.Propagator().Elements().Epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
 		t.Errorf("State(core.Sun) returned %v, want one wrapping ErrUnexpectedID", err)
 	}
 }

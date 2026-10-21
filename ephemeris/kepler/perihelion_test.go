@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -543,7 +544,7 @@ func TestProviderPropagatesAHyperbolicComet(t *testing.T) {
 
 	at := el.Epoch().Add(unit.Days(30))
 
-	st, err := p.State(id, at)
+	st, err := eph.At(p, at).Geometric(id, core.Earth)
 	testutil.AssertNoError(t, err)
 
 	helio, _, err := el.StateAt(at)

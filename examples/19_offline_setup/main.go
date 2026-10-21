@@ -93,9 +93,9 @@ func main() {
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
-		state, err := p.State(eph.MarsBarycenter, time.NowUTC())
+		state, err := eph.At(p, time.NowUTC()).Geometric(eph.MarsBarycenter, eph.Earth)
 		if err != nil {
-			fmt.Printf("    State: %v\n", err)
+			fmt.Printf("    Geometric: %v\n", err)
 		} else {
 			fmt.Printf("    Mars geocentric distance: %.4f AU (from %s, %s)\n",
 				state.Pos.Norm(), lskLoc, spkLoc)

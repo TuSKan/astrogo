@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/sbdb"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -172,14 +173,14 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
 				at := epoch.Add(unit.Days(float64(dt)))
 
-				want, werr := p.State(sbID, at)
+				want, werr := eph.At(p, at).Geometric(sbID, core.Earth)
 				if werr != nil {
 					t.Errorf("%s: kernel State at dt=%+d: %v", body.name, dt, werr)
 
 					continue
 				}
 
-				got, gerr := keplerProvider(t, body.id, el).State(sbID, at)
+				got, gerr := eph.At(keplerProvider(t, body.id, el), at).Geometric(sbID, core.Earth)
 				if gerr != nil {
 					t.Errorf("%s: kepler State at dt=%+d: %v", body.name, dt, gerr)
 

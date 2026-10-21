@@ -196,12 +196,14 @@ func (a *Asteroid) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64,
 // helioGeometry computes heliocentric distance r, geocentric distance Δ,
 // and phase angle α.
 func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, err error) {
-	st, err = a.provider.State(a.id, t)
+	in := eph.At(a.provider, t)
+
+	st, err = in.Geometric(a.id, eph.Earth)
 	if err != nil {
 		return r, delta, alpha, st, fmt.Errorf("asteroid: state: %w", err)
 	}
 
-	sunSt, err := a.provider.State(eph.Sun, t)
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return r, delta, alpha, st, fmt.Errorf("asteroid: sun state: %w", err)
 	}

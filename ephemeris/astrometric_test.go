@@ -30,15 +30,13 @@ func sepArcsec(tb testing.TB, a, b vector.Vec3) float64 {
 	return math.Acos(d) * 180 / math.Pi * 3600
 }
 
-// TestAstrometricDiffersFromApparentByAberration is what makes
-// AstrometricState checkable at all rather than merely plausible.
+// TestAstrometricDiffersFromApparentByAberration is what makes the
+// astrometric place checkable at all rather than merely plausible.
 //
-// The two places differ by exactly the annual aberration and by nothing else:
-//
-//	astrometric = target(t - τ) - earth(t)
-//	apparent    = target(t - τ) - earth(t - τ)
-//
-// so the angle between them is the aberration for that target on that date,
+// The two places differ by the annual aberration and the Sun's deflection of
+// the light, which is milliarcseconds where it is not zero (the Sun's own
+// light is not deflected), so the angle between them is the aberration for
+// that target on that date,
 // which has a known closed form — κ·sin θ, where θ is the angle between the
 // target and the Earth's velocity.
 //
@@ -153,14 +151,16 @@ func TestAstrometricIsNotApparent(t *testing.T) {
 func separationOfPlaces(tb testing.TB, p Provider, id ID, epoch time.Time) float64 {
 	tb.Helper()
 
-	astrometric, err := AstrometricState(p, id, epoch)
+	in := At(p, epoch)
+
+	astrometric, err := in.Astrometric(id, Geocenter())
 	if err != nil {
-		tb.Fatalf("AstrometricState(%s): %v", id, err)
+		tb.Fatalf("Astrometric(%s): %v", id, err)
 	}
 
-	apparent, err := ApparentState(p, id, epoch)
+	apparent, err := in.Apparent(id, Geocenter())
 	if err != nil {
-		tb.Fatalf("ApparentState(%s): %v", id, err)
+		tb.Fatalf("Apparent(%s): %v", id, err)
 	}
 
 	return sepArcsec(tb, astrometric.Pos, apparent.Pos)

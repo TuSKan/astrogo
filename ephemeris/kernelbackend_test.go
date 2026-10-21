@@ -47,7 +47,7 @@ func TestKernelSourcesWithoutABackendSayWhatToImport(t *testing.T) {
 // kernel keeps working in a build that has none. If this failed, the split
 // would have moved the cost rather than removed it.
 func TestSOFAPathNeedsNoBackend(t *testing.T) {
-	st, err := eph.Default().State(eph.MarsBarycenter, time.J2000())
+	st, err := eph.At(eph.Default(), time.J2000()).Geometric(eph.MarsBarycenter, eph.Earth)
 	if err != nil {
 		t.Fatalf("Default().State(Mars): %v", err)
 	}

@@ -204,7 +204,7 @@ var errMoonPhaseTestProvider = errors.New("moon_phase_fraction_test: provider al
 // propagate a provider error rather than swallowing it.
 type errStateProvider struct{}
 
-func (errStateProvider) State(eph.ID, time.Time) (eph.State, error) {
+func (errStateProvider) Locate(eph.ID, time.Time) (eph.State, error) {
 	return eph.State{}, errMoonPhaseTestProvider
 }
 

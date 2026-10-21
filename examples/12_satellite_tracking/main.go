@@ -21,7 +21,7 @@ import (
 // This example demonstrates astrogo's unified Provider API for satellite tracking:
 //
 //  1. Resolve satellite from catalog (NORAD → CelestTrak)
-//  2. SGP4 orbit propagation via Provider.State() — same as JPL planets
+//  2. SGP4 orbit propagation via Provider.Locate — same as JPL planets
 //  3. Height above the WGS84 ellipsoid
 //  4. Topocentric look angle via coord.Context (same API for ISS (Zarya) and Mars)
 //  5. Pass prediction
@@ -71,12 +71,13 @@ func main() {
 		log.Fatalf("a Satellites provider should be a *satellite.Satellite, got %T", prov)
 	}
 
-	// Use the unified State API — same as for JPL planets.
+	// The same composition as for JPL planets: the satellite about the Earth,
+	// at one instant.
 	epoch := target.Epoch
 
-	state, err := prov.State(sat.ID(), epoch)
+	state, err := eph.At(prov, epoch).Geometric(sat.ID(), eph.Earth)
 	if err != nil {
-		log.Fatalf("State failed: %v", err)
+		log.Fatalf("Geometric failed: %v", err)
 	}
 
 	// Derive RA/Dec from GCRS position.

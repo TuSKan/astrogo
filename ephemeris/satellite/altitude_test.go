@@ -52,7 +52,7 @@ func TestAltitudeAgreesWithTheEarthFixedRoute(t *testing.T) {
 			t.Fatalf("Altitude at %v: %v", tm, err)
 		}
 
-		st, err := sat.State(sat.ID(), tm)
+		st, err := sat.Locate(sat.ID(), tm)
 		if err != nil {
 			t.Fatalf("State at %v: %v", tm, err)
 		}

@@ -111,7 +111,7 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 		return nil, ErrNoEphemeris
 	}
 
-	sun, err := scene.Ephemeris.State(eph.Sun, at)
+	sun, err := eph.At(scene.Ephemeris, at).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: sun state: %w", err)
 	}

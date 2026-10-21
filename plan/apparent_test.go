@@ -58,7 +58,7 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 		apparent, err := sun.Position(tm)
 		testutil.AssertNoError(t, err)
 
-		geometric, err := eph.Position(prov, eph.Sun, tm)
+		geometric, err := geocentric(prov, eph.Sun, tm)
 		testutil.AssertNoError(t, err)
 
 		geoICRS, err := eph.ToICRS(geometric)
@@ -125,7 +125,7 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 			continue // near the horizon refraction dominates and swamps the point
 		}
 
-		geometric, err := eph.Position(prov, eph.MarsBarycenter, tm)
+		geometric, err := geocentric(prov, eph.MarsBarycenter, tm)
 		testutil.AssertNoError(t, err)
 
 		wasAA := ctx.GeocentricToObserved(geometric)
@@ -232,7 +232,7 @@ func TestSatellitePositionsAreNotRetarded(t *testing.T) {
 	got, err := sat.GeocentricVec(tm)
 	testutil.AssertNoError(t, err)
 
-	want, err := eph.Position(prov, prov.ID(), tm)
+	want, err := geocentric(prov, prov.ID(), tm)
 	testutil.AssertNoError(t, err)
 
 	if got != want {
@@ -267,29 +267,24 @@ type linearProvider struct {
 	vel   vector.Vec3 // AU/day
 }
 
-func (p linearProvider) State(id eph.ID, t time.Time) (eph.State, error) {
-	// The Sun is answered separately, and where it is matters. eph.ApparentState
-	// asks for it to apply light deflection, and a mock that returned the moving
-	// target for every id would place the Sun on top of the target: a geometry
-	// with no deflection in it, so the term would be silently absent from every
-	// number below rather than small. One au along -x puts it roughly opposite
-	// the target at +2x, which is where the deflection is genuinely smallest.
-	if id == eph.Sun {
-		return eph.State{
-			Pos:    vector.V3(-1, 0, 0),
-			Frame:  eph.FrameICRS,
-			Center: eph.CenterGeocenter,
-		}, nil
+func (p linearProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+	// The Sun is answered separately, and where it is matters. The apparent
+	// place asks for it to apply light deflection, and a mock that returned
+	// the moving target for every id would place the Sun on top of the target:
+	// a geometry with no deflection in it, so the term would be silently
+	// absent from every number below rather than small. One au along -x puts
+	// it roughly opposite the target at +2x, which is where the deflection is
+	// genuinely smallest. The Earth is at rest, so nothing is aberrated.
+	switch id { //nolint:exhaustive // the Earth, the Sun, and the one moving target
+	case eph.Earth:
+		return geocentricMock(id, vector.Vec3{}, vector.Vec3{})
+	case eph.Sun:
+		return geocentricMock(id, vector.V3(-1, 0, 0), vector.Vec3{})
 	}
 
 	dt := t.Sub(p.epoch).Days()
 
-	return eph.State{
-		Pos:    p.pos0.Add(p.vel.MulScalar(dt)),
-		Vel:    p.vel,
-		Frame:  eph.FrameICRS,
-		Center: eph.CenterGeocenter,
-	}, nil
+	return geocentricMock(id, p.pos0.Add(p.vel.MulScalar(dt)), p.vel)
 }
 
 func (linearProvider) Close() error { return nil }
@@ -376,8 +371,8 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 // Pisces with complete confidence.
 type zeroProvider struct{}
 
-func (zeroProvider) State(eph.ID, time.Time) (eph.State, error) {
-	return eph.State{Frame: eph.FrameICRS, Center: eph.CenterGeocenter}, nil
+func (zeroProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+	return geocentricMock(id, vector.Vec3{}, vector.Vec3{})
 }
 
 func (zeroProvider) Close() error { return nil }
@@ -441,37 +436,31 @@ func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
 	}
 }
 
-// TestApparentDirectionRefusesTheGeocenter covers apparentICRS's second
-// failure, which is not a provider failure at all.
+// TestApparentDirectionRefusesTheGeocenter covers the apparent place's
+// failure that is not a provider failure at all.
 //
-// A body reported at the geocenter has a state and no direction. eph.ToICRS
-// refuses it rather than answering RA 0 Dec 0 — a real point in Pisces that a
-// target would rise, transit and set from — and this keeps that refusal from
-// being flattened into a success on the way through.
+// A body reported at the geocenter has a state and no direction, and its
+// apparent place, a direction deflected and aberrated, is not defined. The
+// ephemeris refuses it rather than answering RA 0 Dec 0 — a real point in
+// Pisces that a target would rise, transit and set from — and this keeps that
+// refusal from being flattened into a success on the way through. Until #803
+// the vector was answered, zero, and only the direction refused.
 func TestApparentDirectionRefusesTheGeocenter(t *testing.T) {
 	t.Parallel()
 
 	body := NewPlanet("AtTheCenter", eph.MarsBarycenter, zeroProvider{})
 	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	// The vector itself is fine: zero is a state, just not a direction.
-	vec, err := body.GeocentricVec(when)
-	testutil.AssertNoError(t, err)
+	_, vecErr := body.GeocentricVec(when)
+	_, posErr := body.Position(when)
 
-	if vec != (vector.Vec3{}) {
-		t.Fatalf("GeocentricVec = %v, want the zero vector the provider reported", vec)
+	for _, err := range []error{vecErr, posErr} {
+		if !errors.Is(err, eph.ErrZeroVector) {
+			t.Errorf("err = %v, want eph.ErrZeroVector", err)
+		}
 	}
 
-	_, err = body.Position(when)
-	if err == nil {
-		t.Fatal("Position answered a direction for a body at the geocenter")
-	}
-
-	if !errors.Is(err, eph.ErrZeroVector) {
-		t.Errorf("err = %v, want eph.ErrZeroVector", err)
-	}
-
-	if !strings.Contains(err.Error(), "AtTheCenter") {
+	if err := posErr; err != nil && !strings.Contains(err.Error(), "AtTheCenter") {
 		t.Errorf("err = %v, want the target's name in it", err)
 	}
 }
