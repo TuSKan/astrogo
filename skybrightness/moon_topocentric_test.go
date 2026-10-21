@@ -98,7 +98,7 @@ func TestMoonJustBelowTheSitesHorizonLightsNothing(t *testing.T) {
 	// The premise: placed as a star, from the Earth's center, it is up.
 	at := time.FromGo(scene.Time)
 
-	state, err := scene.Ephemeris.State(eph.Moon, at)
+	state, err := eph.At(scene.Ephemeris, at).Geometric(eph.Moon, eph.Earth)
 	if err != nil {
 		t.Fatalf("State: %v", err)
 	}

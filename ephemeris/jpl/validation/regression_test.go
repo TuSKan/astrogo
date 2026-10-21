@@ -16,27 +16,37 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// mockLinearProvider serves a state that moves linearly from a fixed one.
+// mockLinearProvider serves the target about the Earth on a state that moves
+// linearly from a fixed one, and every other body from rest.
 //
 // It exists so the comparison below touches no kernel at all: Horizons' own
 // geocentric state goes in, and what comes out is astrogo's apparent-place
 // and topocentric arithmetic applied to it. Light-time iteration needs the
 // state at slightly earlier instants, which linear motion supplies exactly
-// enough for over the milliseconds involved.
+// enough for over the milliseconds involved. The apparent place also needs
+// the Earth's barycentric motion, for aberration and for its travel over the
+// light time, and the Sun, for deflection: rest gives those, SOFA's analytical
+// series, whose Earth velocity is good to 1.4 mm/s.
 type mockLinearProvider struct {
 	baseTime time.Time
+	target   eph.ID
 	pos      vector.Vec3
 	vel      vector.Vec3
+	rest     eph.Provider
 }
 
-func (m *mockLinearProvider) State(_ eph.ID, t time.Time) (eph.State, error) {
+func (m *mockLinearProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+	if id != m.target {
+		return m.rest.Locate(id, t)
+	}
+
 	jd1Req, jd2Req := t.JDParts()
 	jd1Base, jd2Base := m.baseTime.JDParts()
 	dtDays := (jd1Req - jd1Base) + (jd2Req - jd2Base)
 
 	p := m.pos.Add(m.vel.MulScalar(dtDays))
 
-	return eph.State{Pos: p, Vel: m.vel}, nil
+	return eph.State{Pos: p, Vel: m.vel, Frame: eph.FrameICRS, Center: eph.Earth}, nil
 }
 
 func (m *mockLinearProvider) Close() error { return nil }
@@ -49,7 +59,7 @@ func (m *mockLinearProvider) Close() error { return nil }
 // Not the ephemeris. The provider above is a linear mock fed with Horizons'
 // own geocentric state, so no SPK kernel is read and no integration is
 // exercised. What is under test is everything downstream of the state:
-// light-time iteration in eph.ApparentState, the IAU 2006/2000A reduction
+// the apparent place of eph.Instant, the IAU 2006/2000A reduction
 // chain in coord.Context, observer geodesy, and the topocentric parallax that
 // turns a geocentric direction into an alt/az.
 //
@@ -70,15 +80,15 @@ func (m *mockLinearProvider) Close() error { return nil }
 // this corpus cannot validate it and saying so is more useful than a number
 // that pretends otherwise:
 //
-//   - astrogo's eph.ApparentState retards the whole geocentric vector, so
-//     what it returns is T(t-tau) - E(t-tau). That carries light-time and
-//     annual aberration together, which is deliberate: coord's observed path
-//     does not apply aberration again, and the 2 arcsecond topocentric
-//     agreement is the evidence that nothing double-counts.
+//   - astrogo's apparent place is the astrometric one, T(t-tau) - E(t),
+//     deflected by the Sun and aberrated by the Earth's motion, in SOFA's
+//     order (#803). coord's observed path does not apply aberration again,
+//     and the 2 arcsecond topocentric agreement is the evidence that nothing
+//     double-counts.
 //   - Horizons' astrometric column is T(t-tau) - E(t), light-time only. The
-//     two therefore differ by Earth's motion over the light time — v/c, the
-//     aberration constant — which is measured below at up to 21.2 arcsec
-//     against a predicted 20.8 at perihelion.
+//     two therefore differ by the aberration, v/c, and the deflection, which
+//     is milliarcseconds; measured below at up to 21.2 arcsec against a
+//     predicted 20.8 at perihelion.
 //   - Horizons' apparent column would carry aberration but is referred to
 //     the true equinox of date, while coord.AstrometricToCIRS produces
 //     CIRS. Those differ by the equation of the origins, which is degrees.
@@ -147,13 +157,15 @@ func TestScientificStability(t *testing.T) {
 
 		mock := &mockLinearProvider{
 			baseTime: obsTime,
+			target:   eph.ID(e.TargetID),
 			pos:      vector.Vec3{X: e.GeoVector[0], Y: e.GeoVector[1], Z: e.GeoVector[2]},
 			vel:      vector.Vec3{X: e.GeoVelocity[0], Y: e.GeoVelocity[1], Z: e.GeoVelocity[2]},
+			rest:     eph.Default(),
 		}
 
-		appState, err := eph.ApparentState(mock, eph.ID(e.TargetID), obsTime)
+		appState, err := eph.At(mock, obsTime).Apparent(eph.ID(e.TargetID), eph.Geocenter())
 		if err != nil {
-			t.Errorf("%s: ApparentState: %v", e.key(), err)
+			t.Errorf("%s: Apparent: %v", e.key(), err)
 
 			continue
 		}

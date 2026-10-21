@@ -41,8 +41,21 @@ var (
 )
 
 // place is a function from provider, target and epoch to a state: the
-// provider's own geometric State, or one of eph's light-time places.
+// geometric state about the Earth, or one of eph's light-time places, each
+// from an Instant of its own.
 type place = func(core.Provider, core.ID, time.Time) (core.State, error)
+
+func geometricPlace(p core.Provider, id core.ID, t time.Time) (core.State, error) {
+	return eph.At(p, t).Geometric(id, eph.Earth) //nolint:wrapcheck // the Instant's error names the body
+}
+
+func astrometricPlace(p core.Provider, id core.ID, t time.Time) (core.State, error) {
+	return eph.At(p, t).Astrometric(id, eph.Geocenter()) //nolint:wrapcheck // the Instant's error names the body
+}
+
+func apparentPlace(p core.Provider, id core.ID, t time.Time) (core.State, error) {
+	return eph.At(p, t).Apparent(id, eph.Geocenter()) //nolint:wrapcheck // the Instant's error names the body
+}
 
 // measure runs op once outside the clock — the first call of anything pays
 // for lazy loads that are not its cost — zeroes the counters, times op, and
@@ -102,7 +115,7 @@ func keplerPluto(b *testing.B, base core.Provider) core.Provider {
 
 func stateOf(p core.Provider, id core.ID) func() error {
 	return func() error {
-		_, err := p.State(id, epoch)
+		_, err := eph.At(p, epoch).Geometric(id, eph.Earth)
 
 		return err //nolint:wrapcheck // the provider's error names the body
 	}
@@ -137,12 +150,27 @@ func BenchmarkOneBodyOneEpoch(b *testing.B) {
 }
 
 // BenchmarkSkyOneEpoch (B2): many bodies at one epoch, a planner's sky at one
-// instant. Every State is geocentric, so each re-derives the Earth.
+// instant, from one Instant: the Earth is located once for the whole sky
+// (#803), where each geocentric State used to re-derive it.
 func BenchmarkSkyOneEpoch(b *testing.B) {
-	sweep := func(cp *countingProvider, at place) func() error {
+	geometric := func(in *eph.Instant, id core.ID) error {
+		_, err := in.Geometric(id, eph.Earth)
+
+		return err //nolint:wrapcheck // the Instant's error names the body
+	}
+
+	apparent := func(in *eph.Instant, id core.ID) error {
+		_, err := in.Apparent(id, eph.Geocenter())
+
+		return err //nolint:wrapcheck // the Instant's error names the body
+	}
+
+	sweep := func(cp *countingProvider, at func(*eph.Instant, core.ID) error) func() error {
 		return func() error {
+			in := eph.At(cp, epoch)
+
 			for _, id := range sky {
-				if _, err := at(cp, id, epoch); err != nil {
+				if err := at(in, id); err != nil {
 					return err
 				}
 			}
@@ -155,24 +183,24 @@ func BenchmarkSkyOneEpoch(b *testing.B) {
 		b.Run("geometric/jpl-"+be.name, func(b *testing.B) {
 			p, f := be.open(b)
 			cp := &countingProvider{Provider: p}
-			measure(b, cp, f, sweep(cp, core.Provider.State))
+			measure(b, cp, f, sweep(cp, geometric))
 		})
 	}
 
 	b.Run("geometric/default", func(b *testing.B) {
 		cp := &countingProvider{Provider: eph.Default()}
-		measure(b, cp, nil, sweep(cp, core.Provider.State))
+		measure(b, cp, nil, sweep(cp, geometric))
 	})
 
 	b.Run("apparent/jpl-bytes", func(b *testing.B) {
 		p, f := openCounted(b)
 		cp := &countingProvider{Provider: p}
-		measure(b, cp, f, sweep(cp, eph.ApparentState))
+		measure(b, cp, f, sweep(cp, apparent))
 	})
 
 	b.Run("apparent/default", func(b *testing.B) {
 		cp := &countingProvider{Provider: eph.Default()}
-		measure(b, cp, nil, sweep(cp, eph.ApparentState))
+		measure(b, cp, nil, sweep(cp, apparent))
 	})
 }
 
@@ -209,7 +237,7 @@ func BenchmarkOneBodyManyEpochs(b *testing.B) {
 					p, f := be.open(b)
 					measure(b, nil, f, func() error {
 						for _, t := range times {
-							if _, err := p.State(core.Moon, t); err != nil {
+							if _, err := eph.At(p, t).Geometric(core.Moon, eph.Earth); err != nil {
 								return err //nolint:wrapcheck // the provider's error names the body
 							}
 						}
@@ -230,8 +258,8 @@ func BenchmarkLightTime(b *testing.B) {
 		name string
 		at   place
 	}{
-		{"astrometric", eph.AstrometricState},
-		{"apparent", eph.ApparentState},
+		{"astrometric", astrometricPlace},
+		{"apparent", apparentPlace},
 	} {
 		for _, id := range []core.ID{core.Moon, core.MarsBarycenter, core.NeptuneBarycenter} {
 			b.Run(pl.name+"/jpl-bytes/"+id.String(), func(b *testing.B) {
@@ -296,12 +324,12 @@ func BenchmarkMoonAboutItsPlanet(b *testing.B) {
 // relativeViaProvider is moon minus planet from two geocentric states, in AU:
 // what a caller has to write today.
 func relativeViaProvider(p core.Provider, moon, planet core.ID) (vector.Vec3, error) {
-	m, err := p.State(moon, epoch)
+	m, err := eph.At(p, epoch).Geometric(moon, eph.Earth)
 	if err != nil {
 		return vector.Vec3{}, err //nolint:wrapcheck // the provider's error names the body
 	}
 
-	pl, err := p.State(planet, epoch)
+	pl, err := eph.At(p, epoch).Geometric(planet, eph.Earth)
 	if err != nil {
 		return vector.Vec3{}, err //nolint:wrapcheck // the provider's error names the body
 	}
@@ -470,7 +498,7 @@ func BenchmarkSatellite(b *testing.B) {
 
 	b.Run("state", func(b *testing.B) {
 		measure(b, nil, nil, func() error {
-			_, err := sat.State(sat.ID(), at)
+			_, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 
 			return err //nolint:wrapcheck // the provider's error is the one to report
 		})
@@ -484,7 +512,7 @@ func BenchmarkSatellite(b *testing.B) {
 
 		measure(b, nil, nil, func() error {
 			for _, t := range times {
-				if _, err := sat.State(sat.ID(), t); err != nil {
+				if _, err := eph.At(sat, t).Geometric(sat.ID(), eph.Earth); err != nil {
 					return err //nolint:wrapcheck // the provider's error is the one to report
 				}
 			}
@@ -506,7 +534,7 @@ func BenchmarkSatellite(b *testing.B) {
 		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
 
 		measure(b, nil, nil, func() error {
-			_, err := sat.StateCtx(sat.ID(), ctx)
+			_, err := sat.LocateCtx(sat.ID(), ctx)
 
 			return err //nolint:wrapcheck // the provider's error is the one to report
 		})
@@ -519,7 +547,7 @@ func BenchmarkSatellite(b *testing.B) {
 			for i := range 360 {
 				ctx.SetTime(at.Add(unit.Minutes(float64(i))))
 
-				if _, err := sat.StateCtx(sat.ID(), ctx); err != nil {
+				if _, err := sat.LocateCtx(sat.ID(), ctx); err != nil {
 					return err //nolint:wrapcheck // the provider's error is the one to report
 				}
 			}
@@ -545,7 +573,7 @@ func BenchmarkConcurrentReaders(b *testing.B) {
 
 				for pb.Next() {
 					t := epoch.Add(unit.Days(3650 * r.Float64()))
-					if _, err := p.State(core.Moon, t); err != nil {
+					if _, err := eph.At(p, t).Geometric(core.Moon, eph.Earth); err != nil {
 						b.Error(err)
 
 						return

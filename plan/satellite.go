@@ -65,7 +65,7 @@ func (s *Satellite) EphID() eph.ID { return s.id }
 
 // Position computes the ICRS position of the satellite at time t.
 func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
-	pos, err := eph.Position(s.provider, s.id, t)
+	pos, err := geocentric(s.provider, s.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("satellite: ephemeris error for %s: %w", s.name, err)
 	}
@@ -80,7 +80,7 @@ func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 
 // GeocentricVec returns the geocentric position vector of the satellite.
 func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
-	v, err := eph.Position(s.provider, s.id, t)
+	v, err := geocentric(s.provider, s.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("satellite: geocentric: %w", err)
 	}
@@ -135,12 +135,12 @@ func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float
 	// ignores the requested ID, so querying it for eph.Sun would silently
 	// return the satellite's own state again — making sunToSat the zero
 	// vector below and this always fail with errDegenerateGeometry.
-	sunSt, err := eph.Default().State(eph.Sun, t)
+	sunSt, err := eph.At(eph.Default(), t).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("satellite magnitude: sun state: %w", err)
 	}
 
-	satSt, err := s.provider.State(s.id, t)
+	satSt, err := eph.At(s.provider, t).Geometric(s.id, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("satellite magnitude: sat state: %w", err)
 	}
@@ -216,12 +216,12 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.
 var defaultAtm = atmosphere.Refraction{}
 
-// contextStater is a provider that can place its body with the
-// precession-nutation of a Context in hand, rather than evaluating it again
-// at the Context's instant: [eph.Satellite], whose State is otherwise
+// contextLocator is a provider that can place its body about the Earth with
+// the precession-nutation of a Context in hand, rather than evaluating it
+// again at the Context's instant: [eph.Satellite], whose Locate is otherwise
 // 99% that evaluation (#812).
-type contextStater interface {
-	StateCtx(id eph.ID, ctx *coord.Context) (eph.State, error)
+type contextLocator interface {
+	LocateCtx(id eph.ID, ctx *coord.Context) (eph.State, error)
 }
 
 // LookAngle computes the topocentric look angle (altitude, azimuth, distance)
@@ -254,10 +254,10 @@ func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, e
 		err error
 	)
 
-	if c, ok := prov.(contextStater); ok {
-		st, err = c.StateCtx(id, ctx)
+	if c, ok := prov.(contextLocator); ok {
+		st, err = c.LocateCtx(id, ctx)
 	} else {
-		st, err = prov.State(id, ctx.Time())
+		st, err = eph.At(prov, ctx.Time()).Geometric(id, eph.Earth)
 	}
 
 	if err != nil {

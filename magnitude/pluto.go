@@ -63,12 +63,14 @@ func plutoCharonGeometry(p eph.Provider, t time.Time) (r, delta, phAng, lon floa
 	// The Pluto–Charon barycenter, which every planetary kernel and
 	// eph.Default have; Pluto's own center needs NAIF's plu kernel, and
 	// is 2,100 km from it, nothing at 40 AU for a distance or a phase.
-	plutoSt, err := p.State(eph.PlutoBarycenter, t)
+	in := eph.At(p, t)
+
+	plutoSt, err := in.Geometric(eph.PlutoBarycenter, eph.Earth)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("magnitude: Pluto state: %w", err)
 	}
 
-	sunSt, err := p.State(eph.Sun, t)
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("magnitude: sun state: %w", err)
 	}

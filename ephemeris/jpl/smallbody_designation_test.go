@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
@@ -93,7 +94,7 @@ func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 
 			t.Cleanup(func() { _ = p.Close() })
 
-			if _, err := p.State(tc.want, start); err != nil {
+			if _, err := eph.At(p, start).Geometric(tc.want, core.Earth); err != nil {
 				t.Errorf("State(%v) after loading %q: %v", tc.want, tc.des, err)
 			}
 		})

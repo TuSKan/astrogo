@@ -311,7 +311,7 @@ func table2Epochs(
 
 			cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
 
-			sun, err := eph.Position(provider, eph.Sun, time.FromGo(when))
+			sun, err := geoPos(eph.At(provider, time.FromGo(when)).Geometric(eph.Sun, eph.Earth))
 			if err != nil {
 				t.Fatalf("Sun at %v: %v", when, err)
 			}

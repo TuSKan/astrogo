@@ -8,6 +8,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/time"
@@ -281,12 +282,12 @@ func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
 
 	when := time.J2000()
 
-	moon, err := p.State(moonID, when)
+	moon, err := eph.At(p, when).Geometric(moonID, core.Earth)
 	if err != nil {
 		t.Fatalf("State(moon): %v", err)
 	}
 
-	parent, err := p.State(core.JupiterBarycenter, when)
+	parent, err := eph.At(p, when).Geometric(core.JupiterBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Jupiter): %v", err)
 	}
@@ -301,7 +302,7 @@ func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
 	// composed against the wrong body would sit an astronomical unit away,
 	// which the separation check above already rules out at 0.0028 AU.
 
-	if moon.Frame != core.FrameICRS || moon.Center != core.CenterGeocenter {
+	if moon.Frame != core.FrameICRS || moon.Center != core.Earth {
 		t.Errorf("satellite state is %v/%v, want ICRS/geocentric", moon.Frame, moon.Center)
 	}
 }
@@ -324,12 +325,12 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 	for day := range 40 {
 		when := time.J2000().Add(unit.Days(float64(day)))
 
-		moon, err := p.State(moonID, when)
+		moon, err := eph.At(p, when).Geometric(moonID, core.Earth)
 		if err != nil {
 			t.Fatalf("State(moon): %v", err)
 		}
 
-		parent, perr := p.State(core.JupiterBarycenter, when)
+		parent, perr := eph.At(p, when).Geometric(core.JupiterBarycenter, core.Earth)
 		if perr != nil {
 			t.Fatalf("State(Jupiter): %v", perr)
 		}
@@ -352,7 +353,7 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 	p := kepler.New()
 
-	st, err := p.State(core.MarsBarycenter, time.J2000())
+	st, err := eph.At(p, time.J2000()).Geometric(core.MarsBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Mars): %v", err)
 	}
@@ -569,8 +570,8 @@ func TestSecularPrecessionZeroIsNoDrift(t *testing.T) {
 // so the error has to say which body was being asked for — otherwise the
 // next occurrence is as hard to read as that one was.
 //
-// mockBaseProvider is reused from provider_test.go: it fails for every id,
-// which is exactly a base that cannot answer for the parent.
+// The base here answers everything but the parent, so it is the parent's
+// failure that has to reach the caller.
 func TestSatelliteFailureNamesItsParent(t *testing.T) {
 	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
@@ -579,12 +580,12 @@ func TestSatelliteFailureNamesItsParent(t *testing.T) {
 
 	const ioID core.ID = 501
 
-	p := kepler.New(kepler.WithBase(&mockBaseProvider{wantErr: errMockBase}))
+	p := kepler.New(kepler.WithBase(&failingFor{id: core.JupiterBarycenter, base: kepler.New()}))
 	if err := p.Register(ioID, circular(t, jupiter, 421_800)); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
-	_, err := p.State(ioID, time.J2000())
+	_, err := eph.At(p, time.J2000()).Geometric(ioID, core.Earth)
 	if err == nil {
 		t.Fatal("State succeeded with a base that cannot answer for the parent")
 	}
@@ -595,11 +596,27 @@ func TestSatelliteFailureNamesItsParent(t *testing.T) {
 
 	// The satellite's own id is not the useful one here — the caller asked
 	// for it and knows it. The parent is what they cannot see.
-	if msg := err.Error(); !strings.Contains(msg, "central body") ||
-		!strings.Contains(msg, core.JupiterBarycenter.String()) {
-		t.Errorf("error %q names neither the role nor the parent body", msg)
+	if msg := err.Error(); !strings.Contains(msg, core.JupiterBarycenter.String()) {
+		t.Errorf("error %q does not name the parent body", msg)
 	}
 }
+
+// failingFor answers as base does, except for one body, which it refuses
+// with errMockBase.
+type failingFor struct {
+	id   core.ID
+	base core.Provider
+}
+
+func (f *failingFor) Locate(id core.ID, t time.Time) (core.State, error) {
+	if id == f.id {
+		return core.State{}, errMockBase
+	}
+
+	return f.base.Locate(id, t)
+}
+
+func (f *failingFor) Close() error { return nil }
 
 // TestCharonNeedsTheSystemParameter is the counter-case
 // [TestCentralBodyForReturnsTheBodyParameter] points at, and the reason this

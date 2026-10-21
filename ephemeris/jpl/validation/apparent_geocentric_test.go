@@ -30,8 +30,9 @@ import (
 // The astrometric comparison above validates the ephemeris, the light-time
 // solution and the frame, and nothing else — quantity 1 carries no aberration
 // and no deflection. Quantity 2 carries both. So this measures exactly what
-// [eph.ApparentState] adds: annual aberration, expressed through the retarded
-// observer, and gravitational light deflection by the Sun.
+// [eph.Instant.Apparent] adds to the astrometric place: gravitational light
+// deflection by the Sun (iauLd) and annual aberration (iauAb), in SOFA's
+// order.
 //
 // Nothing measured the second of those until #263, because until #263
 // astrogo did not apply it.
@@ -54,6 +55,22 @@ import (
 // characterises elsewhere (#260). Before, the tail was the deflection: largest
 // where the geometry put a planet nearest the Sun, and Jupiter's worst case
 // thirteen times what it is now.
+//
+// # What #803 found
+//
+// Until #803 the apparent place was the geocentric state at the retarded
+// epoch, which carries aberration to first order. The comparison stopped at
+// Saturn, and the slow outer planets are where that shortcut showed: with
+// Uranus and Neptune in it, the tail sat 32 mas above the median, Neptune's
+// worst at 0.0808", and declination wandered ±0.013". In SOFA's order every
+// body sits flat again, the worst 2 mas above the median and declination
+// within ±0.001":
+//
+//	body      first order (max)   SOFA order (max)
+//	Mercury         0.0522"           0.0512"
+//	Saturn          0.0609"           0.0513"
+//	Uranus          0.0685"           0.0482"
+//	Neptune         0.0808"           0.0513"
 //
 // # Why the contract is not tighter
 //
@@ -102,6 +119,10 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 		{"499", "Mars", core.MarsBarycenter},
 		{"5", "Jupiter", core.JupiterBarycenter},
 		{"6", "Saturn", core.SaturnBarycenter},
+		// Uranus and Neptune since #803: the comparison stopped at Saturn,
+		// which hid the first-order aberration's scatter.
+		{"7", "Uranus", core.UranusBarycenter},
+		{"8", "Neptune", core.NeptuneBarycenter},
 	}
 
 	reference := metrology.Reference{
@@ -119,8 +140,8 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 				"it showed before solar light deflection was applied, so removing that term "+
 				"again fails this — a bound set by what it must catch rather than by what has "+
 				"already been seen",
-			"measured: 5 bodies x 24 epochs across 2026, p50 0.047-0.050 arcsec with p95 "+
-				"within 0.003 of it; the offset itself is the right-ascension constant "+
+			"measured: 7 bodies x 24 epochs across 2026, p50 0.047-0.051 arcsec with the "+
+				"worst within 0.002 of it; the offset itself is the right-ascension constant "+
 				"characterised in #260"))
 
 	var (
@@ -146,9 +167,9 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 		for _, row := range rows {
 			epoch := time.FromJD(row.jdUT, time.UTC)
 
-			state, err := eph.ApparentState(provider, body.id, epoch)
+			state, err := eph.At(provider, epoch).Apparent(body.id, eph.Geocenter())
 			if err != nil {
-				t.Fatalf("%s: ApparentState: %v", body.name, err)
+				t.Fatalf("%s: Apparent: %v", body.name, err)
 			}
 
 			gotRA, gotDec := apparentEquinoxOfDate(state.Pos, epoch)
@@ -223,6 +244,20 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 		maxRABiasArcsec  = 0.08
 	)
 
+	// Each sample's declination too, not only the mean: the first-order
+	// aberration's error was a function of the geometry and averaged to
+	// nothing, ±0.013" sample by sample; in SOFA's order it is ±0.001".
+	const maxDecArcsec = 0.005
+
+	for _, d := range dDec {
+		if math.Abs(d) > maxDecArcsec {
+			t.Errorf("a declination residual of %+.4f\", over %.3f\": the place carries a "+
+				"term that depends on the geometry", d, maxDecArcsec)
+
+			break
+		}
+	}
+
 	if math.Abs(meanDec) > maxDecBiasArcsec {
 		t.Errorf("declination carries a signed bias of %+.4f\", over %.2f\"; the residual here "+
 			"is supposed to be a right-ascension constant, so a declination offset is a "+
@@ -239,20 +274,20 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 			"band describes", meanRA, minRABiasArcsec, maxRABiasArcsec)
 	}
 
-	// The spread, not the offset, is what says the deflection is there.
+	// The spread, not the offset, is what says the place is right.
 	//
 	// The offset is constant and belongs to right ascension; it is measured
-	// and explained elsewhere. What the deflection produced when it was
-	// missing was *scatter* on top of it, largest for the bodies that pass
-	// nearest the Sun. So the assertion is on how far the tail sits above the
-	// median: within a hundredth of an arcsecond with the term applied, and
-	// six tenths without it for Jupiter.
+	// and explained elsewhere. A term missing or wrong shows as *scatter* on
+	// top of it, a function of the geometry: six tenths of an arcsecond for
+	// Jupiter without the deflection (#263), 32 mas for Neptune with
+	// aberration to first order (#803). So the assertion is on how far the
+	// tail sits above the median: 2 mas measured, held to 10.
 	sorted := append([]float64(nil), separations...)
 	sort.Float64s(sorted)
 
 	p50, worst := sorted[len(sorted)/2], sorted[len(sorted)-1]
 
-	const maxSpreadArcsec = 0.05
+	const maxSpreadArcsec = 0.01
 
 	if spread := worst - p50; spread > maxSpreadArcsec {
 		t.Errorf("the residual spreads %.4f\" between its median (%.4f\") and its worst "+

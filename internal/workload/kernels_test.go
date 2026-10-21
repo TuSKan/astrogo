@@ -223,10 +223,10 @@ type countingProvider struct {
 	calls atomic.Int64
 }
 
-func (c *countingProvider) State(id core.ID, t time.Time) (core.State, error) {
+func (c *countingProvider) Locate(id core.ID, t time.Time) (core.State, error) {
 	c.calls.Add(1)
 
-	return c.Provider.State(id, t) //nolint:wrapcheck // a pass-through: the provider's own error is the one to report
+	return c.Provider.Locate(id, t) //nolint:wrapcheck // a pass-through: the provider's own error is the one to report
 }
 
 // openCachedKernel adds an SPK kernel to p, counting its reads on c, only if

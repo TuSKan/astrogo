@@ -13,7 +13,7 @@ func BenchmarkStateSun(b *testing.B) {
 	tm := time.NowUTC()
 
 	for b.Loop() {
-		_, _ = p.State(eph.Sun, tm)
+		_, _ = eph.At(p, tm).Geometric(eph.Sun, eph.Earth)
 	}
 }
 
@@ -22,7 +22,7 @@ func BenchmarkStateMoon(b *testing.B) {
 	tm := time.NowUTC()
 
 	for b.Loop() {
-		_, _ = p.State(eph.Moon, tm)
+		_, _ = eph.At(p, tm).Geometric(eph.Moon, eph.Earth)
 	}
 }
 

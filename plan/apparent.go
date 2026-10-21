@@ -13,7 +13,7 @@ import (
 // apparentVec returns where a solar-system body is *seen* from the geocenter
 // at t — the apparent place, with light time and annual aberration both in it.
 //
-// # Why this exists rather than eph.Position
+// # Why this exists rather than the geometric state
 //
 // Every ephemeris-backed target in this package used to answer with the
 // geometric vector: where the body is at t, not where it looks to be. Measured
@@ -46,7 +46,7 @@ import (
 // implements [MovingBody] (see observedAltAz), so the two must not be mixed:
 // everything in this file is on the MovingBody side.
 func apparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
-	st, err := eph.ApparentState(p, id, t)
+	st, err := eph.At(p, t).Apparent(id, eph.Geocenter())
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("plan: apparent state: %w", err)
 	}
@@ -76,25 +76,35 @@ func apparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// geocentric is the geometric position of id about the Earth at t, with no
+// light time: where the body is, not where it is seen.
+func geocentric(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
+	st, err := eph.At(p, t).Geometric(id, eph.Earth)
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("plan: geocentric state: %w", err)
+	}
+
+	return st.Pos, nil
+}
+
 // lightAUPerDay is the speed of light in AU per day, the unit of a State's
 // velocity.
 var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
 	constants.Derived.JulianDaySeconds.Value / constants.IAU.AstronomicalUnit.Value
 
-// firstOrderApparentICRS is apparentICRS from a single State call, for a
+// firstOrderApparentICRS is apparentICRS from one geometric state, for a
 // caller that evaluates many instants: the geocentric position less the
-// geocentric velocity times the light time, which is the retarded geocentric
-// vector ApparentState iterates towards, taken to first order. The second
-// order is the body's geocentric acceleration over the light time — for the
-// Sun, the Earth's 6 mm/s² over 8.3 minutes, 750 m — and the two agree to
-// 0.04 mas for the Sun and 0.01 mas for the Moon
-// (TestFirstOrderApparentPlaceAgrees).
+// geocentric velocity times the light time, which is the light time's
+// displacement and the annual aberration together, to first order. What it
+// leaves out is the body's geocentric acceleration over the light time — for
+// the Sun, the Earth's 6 mm/s² over 8.3 minutes, 750 m — and the Sun's
+// deflection of the light (TestFirstOrderApparentPlaceAgrees measures both).
 //
-// It exists for speed. ApparentState converges in four State calls, and for
-// the Sun on the analytical ephemeris each is an Epv00, 34 µs: the lunar
-// elongation built on it cost 2.8 times the geometric one, and a year of
-// MoonPhases 3.3 times, which put plan's race-detector run past CI's ten
-// minutes (#430).
+// It exists for speed. The apparent place locates the target again at each
+// pass of the light time, and the Sun and the Earth besides, and for the Sun
+// on the analytical ephemeris each is an Epv00, 34 µs: the lunar elongation
+// built on it cost 2.8 times the geometric one, and a year of MoonPhases 3.3
+// times, which put plan's race-detector run past CI's ten minutes (#430).
 func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
 	vec, err := firstOrderApparentVec(p, id, t)
 	if err != nil {
@@ -113,7 +123,7 @@ func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS,
 // firstOrderApparentICRS takes the direction of, for a caller that wants the
 // vector: apparentVec to the same first order, from one State call.
 func firstOrderApparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
-	st, err := p.State(id, t)
+	st, err := eph.At(p, t).Geometric(id, eph.Earth)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("plan: state: %w", err)
 	}

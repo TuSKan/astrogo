@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -59,7 +60,7 @@ func TestProvider_State_PropagatedBody(t *testing.T) {
 	p := kepler.New()
 	testutil.AssertNoError(t, p.Register(id, el))
 
-	st, err := p.State(id, el.Epoch())
+	st, err := eph.At(p, el.Epoch()).Geometric(id, core.Earth)
 	testutil.AssertNoError(t, err)
 
 	// Geocentric distance to a body ~2.5 AU from the Sun must be a real,
@@ -99,7 +100,7 @@ func TestProvider_State_DefaultBase_SunMoonPlanets(t *testing.T) {
 
 	for _, b := range bodies {
 		t.Run(b.name, func(t *testing.T) {
-			st, err := p.State(b.id, tm)
+			st, err := eph.At(p, tm).Geometric(b.id, core.Earth)
 			if err != nil {
 				t.Fatalf("State(%s): %v", b.name, err)
 			}
@@ -125,11 +126,11 @@ func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
 	// source for it. The default base now propagates its Standish elements
 	// so that a satellite of Pluto can be placed, so the gap it stood for is
 	// gone; an unnamed body still falls through.
-	if _, err := p.State(core.PlutoBarycenter, tm); err != nil {
+	if _, err := eph.At(p, tm).Geometric(core.PlutoBarycenter, core.Earth); err != nil {
 		t.Errorf("State(Pluto) = %v; the default base answers it now", err)
 	}
 
-	_, err := p.State(core.ID(987_654), tm)
+	_, err := eph.At(p, tm).Geometric(core.ID(987_654), core.Earth)
 	testutil.AssertErrorIs(t, err, kepler.ErrUnsupportedBody)
 }
 
@@ -144,13 +145,13 @@ type mockBaseProvider struct {
 
 var errMockBase = errors.New("mockBaseProvider: intentional test failure")
 
-func (m *mockBaseProvider) State(core.ID, time.Time) (core.State, error) {
+func (m *mockBaseProvider) Locate(core.ID, time.Time) (core.State, error) {
 	m.called = true
 	if m.wantErr != nil {
 		return core.State{}, m.wantErr
 	}
 
-	return core.State{}, nil
+	return core.State{Frame: core.FrameICRS}, nil
 }
 
 func (m *mockBaseProvider) Close() error { return nil }
@@ -165,7 +166,7 @@ func TestProvider_State_WithBase_Override(t *testing.T) {
 
 	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	if _, err := p.State(core.Sun, tm); err != nil {
+	if _, err := eph.At(p, tm).Geometric(core.Sun, core.Earth); err != nil {
 		t.Fatalf("State(Sun): %v", err)
 	}
 
@@ -184,7 +185,7 @@ func TestProvider_State_WithBase_WrapsError(t *testing.T) {
 
 	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	_, err := p.State(core.Sun, tm)
+	_, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	testutil.AssertErrorIs(t, err, errMockBase)
 }
 
@@ -216,10 +217,10 @@ func TestProvider_MultiBody(t *testing.T) {
 	testutil.AssertNoError(t, p.Register(id1, el1))
 	testutil.AssertNoError(t, p.Register(id2, el2))
 
-	st1, err := p.State(id1, el1.Epoch())
+	st1, err := eph.At(p, el1.Epoch()).Geometric(id1, core.Earth)
 	testutil.AssertNoError(t, err)
 
-	st2, err := p.State(id2, el2.Epoch())
+	st2, err := eph.At(p, el2.Epoch()).Geometric(id2, core.Earth)
 	testutil.AssertNoError(t, err)
 
 	// The two bodies have different semi-major axes (2.5 AU vs 4.0 AU)

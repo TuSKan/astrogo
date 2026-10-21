@@ -29,7 +29,7 @@ var secPerDay = constants.Derived.JulianDaySeconds.Value // 86400
 // ErrPropagation indicates an SGP4 propagation failure.
 var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 
-// ErrUnexpectedID indicates State was queried for a body other than the
+// ErrUnexpectedID indicates Locate was asked for a body other than the
 // satellite this provider tracks. A *Satellite is single-purpose (one
 // instance = one object), so id must be its own, [Satellite.ID]; any other
 // id — including a real NAIF ID like a Sun/Moon lookup — used to be silently
@@ -127,7 +127,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 }
 
 // ID is the satellite's NAIF code, −100000 − its NORAD catalog number: the
-// one id its State answers for. It used to answer for zero, which is the
+// one id it locates. It used to answer for zero, which is the
 // Solar System barycenter's code now that an ID is a NAIF code (#809).
 func (s *Satellite) ID() core.ID { return s.id }
 
@@ -139,8 +139,8 @@ func (s *Satellite) ID() core.ID { return s.id }
 // Those callers should not have to reach for a second parse of the same text.
 func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 
-// State returns the geocentric position/velocity in GCRS (AU, AU/day),
-// implementing the [core.Provider] interface contract.
+// Locate returns the satellite's state about the Earth, its centre, in GCRS
+// (AU, AU/day), implementing the [core.Provider] interface contract.
 //
 // id must be [Satellite.ID] — this provider tracks exactly one body — and
 // any other id returns [ErrUnexpectedID] rather than silently answering for
@@ -150,8 +150,8 @@ func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 // the equation of the equinoxes → GCRS (AU) by the transpose of the IAU
 // 2006/2000A bias-precession-nutation matrix (Pnm06a). That matrix is nearly
 // all of the cost; a caller holding a [coord.Context] at t has it already, and
-// [Satellite.StateCtx] uses it.
-func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
+// [Satellite.LocateCtx] uses it.
+func (s *Satellite) Locate(id core.ID, t time.Time) (core.State, error) {
 	if id != s.id {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
 	}
@@ -169,23 +169,23 @@ func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 		Pos:    gcrsPos.MulScalar(1.0 / kmPerAU),
 		Vel:    gcrsVel.MulScalar(secPerDay / kmPerAU),
 		Frame:  core.FrameGCRS,
-		Center: core.CenterGeocenter,
+		Center: core.Earth,
 	}, nil
 }
 
-// StateCtx is [Satellite.State] at ctx's instant, rotated into GCRS with the
+// LocateCtx is [Satellite.Locate] at ctx's instant, rotated into GCRS with the
 // precession-nutation ctx already holds rather than a fresh evaluation of it
 // (see [coord.Context.TEMEToGCRS]).
 //
-// That evaluation is about 99% of a State: 83 µs against SGP4's 0.7 µs, for a
+// That evaluation is about 99% of a Locate: 83 µs against SGP4's 0.7 µs, for a
 // matrix that turns 0.016″ in an hour. This is SGP4 and a rotation, 1.0 µs
 // (i9-11980HK). A look angle through ctx loses nothing by it, since ctx turns
 // the result back to Earth-fixed through the same matrix; the GCRS place
 // itself carries the drift of ctx's window, as every other place ctx computes
 // does.
 //
-// id must be [Satellite.ID], as for State.
-func (s *Satellite) StateCtx(id core.ID, ctx *coord.Context) (core.State, error) {
+// id must be [Satellite.ID], as for Locate.
+func (s *Satellite) LocateCtx(id core.ID, ctx *coord.Context) (core.State, error) {
 	if id != s.id {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
 	}
@@ -199,7 +199,7 @@ func (s *Satellite) StateCtx(id core.ID, ctx *coord.Context) (core.State, error)
 		Pos:    ctx.TEMEToGCRS(pos).MulScalar(1.0 / kmPerAU),
 		Vel:    ctx.TEMEToGCRS(vel).MulScalar(secPerDay / kmPerAU),
 		Frame:  core.FrameGCRS,
-		Center: core.CenterGeocenter,
+		Center: core.Earth,
 	}, nil
 }
 

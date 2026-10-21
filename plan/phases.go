@@ -235,7 +235,7 @@ type SeasonEvent struct {
 // solstices are defined on.
 //
 // Apparent means the Sun as seen, light time and aberration included, which
-// eph.ApparentState applies exactly; this used to subtract the constant of
+// the ephemeris Instant's apparent place applies exactly; this used to subtract the constant of
 // aberration, 20.496″, from the geometric Sun, which is off by up to 0.35″
 // as the Earth's distance from the Sun changes.
 //
@@ -245,7 +245,7 @@ type SeasonEvent struct {
 // ±17.2″ over the 18.6-year nutation cycle, was missing: the seasons were up
 // to 8.5 minutes off, as the USNO's show from 1972 to 2100.
 func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
-	sun, err := eph.ApparentState(prov, eph.Sun, t)
+	sun, err := eph.At(prov, t).Apparent(eph.Sun, eph.Geocenter())
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
 	}
@@ -373,12 +373,16 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 		prov = eph.Default()
 	}
 
-	sun, err := eph.Position(prov, eph.Sun, t)
+	in := eph.At(prov, t)
+
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: sun position: %w", err)
 	}
 
-	moon, err := eph.AstrometricState(prov, eph.Moon, t)
+	sun := sunSt.Pos
+
+	moon, err := in.Astrometric(eph.Moon, eph.Geocenter())
 	if err != nil {
 		return 0, 0, fmt.Errorf("illumination: moon position: %w", err)
 	}
@@ -473,7 +477,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 
 	// Earth-Sun distance evaluator (returns distance in AU)
 	sunDistance := func(t time.Time) (float64, error) {
-		pos, err := eph.Position(prov, eph.Sun, t)
+		pos, err := geocentric(prov, eph.Sun, t)
 		if err != nil {
 			return 0, fmt.Errorf("apsides: sun position: %w", err)
 		}
@@ -607,7 +611,7 @@ type EclipseEvent struct {
 
 // moonEclipticLatitude returns the Moon's ecliptic latitude at time t.
 func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
-	moonPos, err := eph.Position(prov, eph.Moon, t)
+	moonPos, err := geocentric(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon position: %w", err)
 	}

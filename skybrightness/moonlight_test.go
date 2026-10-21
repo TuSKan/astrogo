@@ -109,7 +109,7 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 			t.Fatalf("PhaseAngle: %v", err)
 		}
 
-		moon, err := provider.State(eph.Moon, at)
+		moon, err := eph.At(provider, at).Geometric(eph.Moon, eph.Earth)
 		if err != nil {
 			t.Fatalf("moon state: %v", err)
 		}
@@ -498,7 +498,7 @@ func moonDirection(t *testing.T, scene *skybrightness.Scene) coord.AltAz {
 
 	at := time.FromGo(scene.Time)
 
-	moon, err := scene.Ephemeris.State(eph.Moon, at)
+	moon, err := eph.At(scene.Ephemeris, at).Geometric(eph.Moon, eph.Earth)
 	if err != nil {
 		t.Fatalf("moon state: %v", err)
 	}

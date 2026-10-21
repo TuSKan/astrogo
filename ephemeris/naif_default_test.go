@@ -24,7 +24,7 @@ func TestDefaultAnswersTheCodesItHolds(t *testing.T) {
 
 	// The geocentre, from the geocentre, is the zero vector. It used to be
 	// asked for under Plan94's 3 and came back as the Earth-Moon barycenter.
-	earth, err := p.State(eph.Earth, at)
+	earth, err := eph.At(p, at).Geometric(eph.Earth, eph.Earth)
 	if err != nil {
 		t.Fatalf("Earth: %v", err)
 	}
@@ -35,12 +35,12 @@ func TestDefaultAnswersTheCodesItHolds(t *testing.T) {
 
 	// Mercury and Venus have no moons: each is its own barycenter.
 	for _, pair := range [][2]eph.ID{{eph.Mercury, eph.MercuryBarycenter}, {eph.Venus, eph.VenusBarycenter}} {
-		a, err := p.State(pair[0], at)
+		a, err := eph.At(p, at).Geometric(pair[0], eph.Earth)
 		if err != nil {
 			t.Fatalf("%v: %v", pair[0], err)
 		}
 
-		b, err := p.State(pair[1], at)
+		b, err := eph.At(p, at).Geometric(pair[1], eph.Earth)
 		if err != nil {
 			t.Fatalf("%v: %v", pair[1], err)
 		}
@@ -60,11 +60,11 @@ func TestDefaultAnswersTheCodesItHolds(t *testing.T) {
 		{eph.Neptune, eph.NeptuneBarycenter},
 		{eph.Pluto, eph.PlutoBarycenter},
 	} {
-		if _, err := p.State(c.bary, at); err != nil {
+		if _, err := eph.At(p, at).Geometric(c.bary, eph.Earth); err != nil {
 			t.Errorf("%v: %v", c.bary, err)
 		}
 
-		_, err := p.State(c.center, at)
+		_, err := eph.At(p, at).Geometric(c.center, eph.Earth)
 		if !errors.Is(err, eph.ErrUnsupportedBody) {
 			t.Errorf("%v: err = %v, want ErrUnsupportedBody — answering it would be its barycenter's place", c.center, err)
 		} else if !strings.Contains(err.Error(), c.bary.String()) {
@@ -92,12 +92,12 @@ func TestDefaultPlacesTheEarthMoonBarycenterFromTheMoon(t *testing.T) {
 	for d := 0; d < 730; d += 7 {
 		at := start.Add(unit.Days(float64(d)))
 
-		emb, err := p.State(eph.EarthMoonBarycenter, at)
+		emb, err := eph.At(p, at).Geometric(eph.EarthMoonBarycenter, eph.Earth)
 		if err != nil {
 			t.Fatalf("%v: %v", at, err)
 		}
 
-		moon, err := p.State(eph.Moon, at)
+		moon, err := eph.At(p, at).Geometric(eph.Moon, eph.Earth)
 		if err != nil {
 			t.Fatalf("%v: Moon: %v", at, err)
 		}

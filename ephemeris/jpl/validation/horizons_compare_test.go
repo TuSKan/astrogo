@@ -199,7 +199,7 @@ func TestJPLStateAgainstHorizons(t *testing.T) {
 
 		tm := time.FromJD(2451545.0+sv.ET/86400.0, time.TDB)
 
-		state, err := p.State(hc.id, tm)
+		state, err := eph.At(p, tm).Geometric(hc.id, core.Earth)
 		if err != nil {
 			t.Errorf("%s: State() failed: %v", sv.Body, err)
 

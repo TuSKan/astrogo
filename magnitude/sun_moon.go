@@ -15,7 +15,7 @@ import (
 //
 // where R = Earth–Sun distance in AU.
 func SunApparent(p eph.Provider, t time.Time) (float64, error) {
-	st, err := p.State(eph.Sun, t)
+	st, err := eph.At(p, t).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("magnitude: sun state: %w", err)
 	}

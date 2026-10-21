@@ -26,7 +26,7 @@ var errStubMoonProviderState = errors.New("stubMoonProvider: not implemented")
 // no real ephemeris data is needed to exercise the routing itself.
 type stubMoonProvider struct{}
 
-func (stubMoonProvider) State(eph.ID, time.Time) (eph.State, error) {
+func (stubMoonProvider) Locate(eph.ID, time.Time) (eph.State, error) {
 	return eph.State{}, errStubMoonProviderState
 }
 
@@ -174,12 +174,12 @@ func TestFromCatalog_ElementsHyperbolicFallsThrough(t *testing.T) {
 func perihelionDistanceAt(t *testing.T, obs *plan.Comet, at time.Time) float64 {
 	t.Helper()
 
-	body, err := obs.Provider().State(obs.EphID(), at)
+	body, err := eph.At(obs.Provider(), at).Geometric(obs.EphID(), eph.Earth)
 	if err != nil {
 		t.Fatalf("State(%v): %v", obs.EphID(), err)
 	}
 
-	sun, err := obs.Provider().State(eph.Sun, at)
+	sun, err := eph.At(obs.Provider(), at).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		t.Fatalf("State(Sun): %v", err)
 	}

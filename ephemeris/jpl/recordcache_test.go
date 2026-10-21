@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/time"
@@ -88,11 +89,11 @@ func TestStateFromCachedRecordsAllocatesNothing(t *testing.T) {
 	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for _, id := range []core.ID{core.Sun, core.Moon, core.Mercury, core.MarsBarycenter, core.NeptuneBarycenter} {
-		if _, err := p.State(id, at); err != nil {
+		if _, err := eph.At(p, at).Geometric(id, core.Earth); err != nil {
 			t.Fatalf("%v: %v", id, err)
 		}
 
-		if got := testing.AllocsPerRun(100, func() { _, _ = p.State(id, at) }); got != 0 {
+		if got := testing.AllocsPerRun(100, func() { _, _ = eph.At(p, at).Geometric(id, core.Earth) }); got != 0 {
 			t.Errorf("%v: State from cached records allocates %v times, want 0", id, got)
 		}
 	}

@@ -41,12 +41,14 @@ func newOppositionProvider(targetID eph.ID) *testEphProvider {
 
 var errUnknownTestBody = errors.New("testEphProvider: unknown body id")
 
-func (p *testEphProvider) State(id eph.ID, _ time.Time) (eph.State, error) {
-	switch id { //nolint:exhaustive // a stub serving the Sun and one target; the default rejects the rest
+func (p *testEphProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+	switch id { //nolint:exhaustive // a stub serving the Earth, the Sun and one target; the default rejects the rest
+	case eph.Earth:
+		return geocentricMock(id, vector.Vec3{}, vector.Vec3{})
 	case eph.Sun:
-		return eph.State{Pos: p.sunPos}, nil
+		return geocentricMock(id, p.sunPos, vector.Vec3{})
 	case p.targetID:
-		return eph.State{Pos: p.targetPos}, nil
+		return geocentricMock(id, p.targetPos, vector.Vec3{})
 	default:
 		return eph.State{}, fmt.Errorf("%w: %d", errUnknownTestBody, id)
 	}

@@ -146,13 +146,13 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 			t.Run(p.name+"/"+body, func(t *testing.T) {
 				t.Parallel()
 
-				base, err := p.prov.State(id, utc)
+				base, err := eph.At(p.prov, utc).Geometric(id, eph.Earth)
 				if err != nil {
 					t.Fatalf("State at the reference epoch: %v", err)
 				}
 
 				for _, s := range scales {
-					got, err := p.prov.State(id, s.at(utc))
+					got, err := eph.At(p.prov, s.at(utc)).Geometric(id, eph.Earth)
 					if err != nil {
 						t.Fatalf("State with a %s-labeled instant: %v", s.label, err)
 					}

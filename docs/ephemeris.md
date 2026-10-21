@@ -12,7 +12,11 @@ confirm it and change one detail of it (§7.4).
 
 **Since then: the first change has shipped** (#802, §6.1). The record cache
 is in `spk.Reader`, the prototype it replaces is deleted, and the measured
-production numbers are in §6.1 beside the prototype's.
+production numbers are in §6.1 beside the prototype's. **And #803's first
+half** (§9, phases 3 and 4): a provider `Locate`s a body about its natural
+centre, `State.Center` is an `ID`, and `ephemeris.At` composes an `Instant`
+whose places follow SOFA's order, seen from the geocentre. The site as an
+observer is the next change.
 
 **Recommendation in one paragraph.** First, make SPK evaluation read nothing
 it has read before — each segment's directory at open, its last decoded record
@@ -36,8 +40,8 @@ them — **1.58 µs** for the same sky — and SOFA's order for apparent places.
 
 And the places built on them:
 
-- `eph.ApparentState` (`ephemeris/ephemeris.go:431`) — the light-time-retarded *geocentric* state, which carries first-order aberration because the Earth moves back with the target, plus solar deflection.
-- `eph.AstrometricState` (`:751`) — the same with the Earth's displacement over the light time put back, from SOFA's `Epv00`.
+- `eph.ApparentState` — the light-time-retarded *geocentric* state, which carried first-order aberration because the Earth moves back with the target, plus solar deflection. Replaced by `Instant.Apparent` (#803).
+- `eph.AstrometricState` — the same with the Earth's displacement over the light time put back, from SOFA's `Epv00`. Replaced by `Instant.Astrometric` (#803).
 - `coord.Context.GeocentricToObserved` (`coord/context.go:277`) — subtracts the site, rotates to the horizon, applies diurnal aberration and refraction.
 
 ## 2. Audit findings
@@ -145,13 +149,16 @@ the Earth's plus the site's GCRS position, so for a site τ is the light time
 relative size is |ṙ|/c ≤ 10⁻⁴. The Shapiro delay is omitted: a few hundred
 microseconds at worst, metres of motion, microarcseconds of direction.
 
-Two places astrogo produces today depart from these definitions:
+One place astrogo produces departs from these definitions:
 
-- The apparent place applies aberration to first order, through the retarded
-  geocentric state. Against Horizons' quantity 2 its scatter is 9.8 mas in RA,
-  against 1.7 mas in SOFA's order (#803's measurement).
 - The observed place subtracts the site *after* aberration has been applied
   to the geocentric direction. Measured in §5.3: at most 0.035″ for the Moon.
+  The site as an observer of `Instant.Apparent` removes it.
+
+The apparent place did too until #803, applying aberration to first order
+through the retarded geocentric state: against Horizons' quantity 2, with
+Uranus and Neptune in the comparison, its tail sat 32 mas above the median.
+In SOFA's order it sits 2 mas above.
 
 ## 4. Measured baseline
 
@@ -544,12 +551,12 @@ Performance is reported and never gates (CLAUDE.md); these gate.
    - **Gates.** 1, 3 and 4.
    - **Measured** (§6.1): the sky from disk 355 → 7.6 µs, a minute track 2.5 → 0.92 µs per state, all three backends equal.
    - **No API change.**
-3. **Identity, centre and frame (#809, #813, the first half of #803).** `ID`
-   as a NAIF code, `State.Center` as an `ID`, `Locate`, segments checked for
-   their frame. Breaking.
-4. **`Instant` and SOFA-order places (the rest of #803's first PR).** The
-   observer as geocentre or site; #791 and #792's repeated Earth go with it,
-   and #810 is fixed by composition if it has not been fixed locally first.
+3. **Identity, centre and frame (#809, #813, the first half of #803) — done.**
+   `ID` as a NAIF code, `State.Center` as an `ID`, `Locate`, segments checked
+   for their frame. Breaking.
+4. **`Instant` and SOFA-order places (the rest of #803's first PR).** Done
+   for the geocentre, with #791 and #792's repeated Earth and #810, by
+   composition. The site as an observer is next, and with it §5.3.
    Gates 2 and 3.
 5. **Kepler (#803's second PR, docs/kepler.md).**
 6. **In parallel, independent of 3–5:** the observer context (#790), the

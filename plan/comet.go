@@ -104,12 +104,14 @@ func (c *Comet) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, er
 
 // distances returns heliocentric and geocentric distances.
 func (c *Comet) distances(t time.Time) (r, delta float64, err error) {
-	st, err := c.provider.State(c.id, t)
+	in := eph.At(c.provider, t)
+
+	st, err := in.Geometric(c.id, eph.Earth)
 	if err != nil {
 		return 0, 0, fmt.Errorf("comet: state: %w", err)
 	}
 
-	sunSt, err := c.provider.State(eph.Sun, t)
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, 0, fmt.Errorf("comet: sun state: %w", err)
 	}

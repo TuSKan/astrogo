@@ -35,7 +35,7 @@ type stubProvider struct {
 	closed bool
 }
 
-func (s *stubProvider) State(id core.ID, _ time.Time) (State, error) {
+func (s *stubProvider) Locate(id core.ID, _ time.Time) (State, error) {
 	s.calls++
 
 	if id != s.id {
@@ -45,7 +45,7 @@ func (s *stubProvider) State(id core.ID, _ time.Time) (State, error) {
 	return State{
 		Pos:    vec(s.pos),
 		Frame:  core.FrameICRS,
-		Center: core.CenterGeocenter,
+		Center: core.Earth,
 	}, nil
 }
 
@@ -116,7 +116,7 @@ func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
 			t.Fatalf("e = %v: NewFromElements: %v", e, err)
 		}
 
-		st, err := p.State(id, tp.Add(unit.Days(30)))
+		st, err := At(p, tp.Add(unit.Days(30))).Geometric(id, core.Earth)
 		_ = p.Close()
 
 		if err != nil {
@@ -157,7 +157,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	st, err := p.State(ceres, time.J2000())
+	st, err := At(p, time.J2000()).Geometric(ceres, core.Earth)
 	if err != nil {
 		t.Fatalf("State(registered body): %v", err)
 	}
@@ -172,7 +172,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 	// A body it does not propagate must still be answerable, through the
 	// default SOFA base — that is what makes the returned Provider a drop-in
 	// for a kernel-backed one.
-	if _, err := p.State(core.Sun, time.J2000()); err != nil {
+	if _, err := At(p, time.J2000()).Geometric(core.Sun, core.Earth); err != nil {
 		t.Errorf("State(Sun) through the default base: %v", err)
 	}
 }
@@ -192,7 +192,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 
 	p := NewMovingBodyProvider(WithKeplerBase(base))
 
-	st, err := p.State(core.Sun, time.J2000())
+	st, err := At(p, time.J2000()).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Sun): %v", err)
 	}
@@ -217,7 +217,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	p := NewMovingBodyProvider()
 
-	st, err := p.State(core.PlutoBarycenter, time.J2000())
+	st, err := At(p, time.J2000()).Geometric(core.PlutoBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Pluto): %v", err)
 	}
@@ -230,7 +230,7 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	}
 
 	// Every SOFA-covered body still works, which is the other half.
-	if _, err := p.State(core.MarsBarycenter, time.J2000()); err != nil {
+	if _, err := At(p, time.J2000()).Geometric(core.MarsBarycenter, core.Earth); err != nil {
 		t.Errorf("State(Mars): %v", err)
 	}
 }
@@ -252,7 +252,7 @@ func TestDefaultAnswersEveryNamedBody(t *testing.T) {
 	}
 
 	for _, id := range named {
-		st, err := p.State(id, time.J2000())
+		st, err := At(p, time.J2000()).Geometric(id, core.Earth)
 		if err != nil {
 			t.Errorf("Default().State(%s) = %v; the doc comment says every named body is answerable", id, err)
 
@@ -319,7 +319,7 @@ func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
 	// State with the satellite's own NAIF code: a satellite provider tracks
 	// exactly one object and refuses any other id, so that a Sun lookup
 	// cannot be silently answered with the satellite's own state.
-	if _, err := p.State(sat.ID(), when); err != nil {
+	if _, err := At(p, when).Geometric(sat.ID(), core.Earth); err != nil {
 		t.Fatalf("State: %v", err)
 	}
 
@@ -374,52 +374,6 @@ func TestOptionsRecordWhatTheySay(t *testing.T) {
 	if len(cfg.ExtraKernels) != 2 ||
 		cfg.ExtraKernels[0] != "de441_part-2" || cfg.ExtraKernels[1] != "de441_part-3" {
 		t.Errorf("WithKernel recorded %v, want both kernels in order", cfg.ExtraKernels)
-	}
-}
-
-func TestPositionAndVelocityAgreeWithState(t *testing.T) {
-	p := Default()
-
-	defer func() { _ = p.Close() }()
-
-	st, err := p.State(core.MarsBarycenter, time.J2000())
-	if err != nil {
-		t.Fatalf("State: %v", err)
-	}
-
-	pos, err := Position(p, core.MarsBarycenter, time.J2000())
-	if err != nil {
-		t.Fatalf("Position: %v", err)
-	}
-
-	vel, err := Velocity(p, core.MarsBarycenter, time.J2000())
-	if err != nil {
-		t.Fatalf("Velocity: %v", err)
-	}
-
-	if pos != st.Pos {
-		t.Errorf("Position = %v, State.Pos = %v", pos, st.Pos)
-	}
-
-	if vel != st.Vel {
-		t.Errorf("Velocity = %v, State.Vel = %v", vel, st.Vel)
-	}
-}
-
-// TestHelpersPropagateTheProviderError keeps the two helpers from turning a
-// failure into a zero value, which for a position is indistinguishable from
-// the geocenter.
-func TestHelpersPropagateTheProviderError(t *testing.T) {
-	p := &stubProvider{id: core.Sun}
-
-	const absent = core.ID(999999)
-
-	if _, err := Position(p, absent, time.J2000()); err == nil {
-		t.Error("Position returned nil error for an unsupported body")
-	}
-
-	if _, err := Velocity(p, absent, time.J2000()); err == nil {
-		t.Error("Velocity returned nil error for an unsupported body")
 	}
 }
 
@@ -479,16 +433,5 @@ func TestDefaultCloseIsSafe(t *testing.T) {
 	// holds an OS resource.
 	if err := p.Close(); err != nil {
 		t.Errorf("second Close: %v", err)
-	}
-}
-
-// TestSofaProviderCloseIsANoOp: the internal SOFA source holds no kernel,
-// no file and no connection, so closing it must succeed rather than being
-// left unimplemented — Default wraps it, and a caller closing the wrapper
-// should not have to know which layer owns a resource.
-func TestSofaProviderCloseIsANoOp(t *testing.T) {
-	s := &sofaProvider{}
-	if err := s.Close(); err != nil {
-		t.Fatalf("sofaProvider.Close: %v", err)
 	}
 }

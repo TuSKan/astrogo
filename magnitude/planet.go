@@ -26,12 +26,14 @@ func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error)
 		return MoonApparent(p, t)
 	}
 
-	planetSt, err := p.State(target, t)
+	in := eph.At(p, t)
+
+	planetSt, err := in.Geometric(target, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("magnitude: planet state: %w", err)
 	}
 
-	sunSt, err := p.State(eph.Sun, t)
+	sunSt, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("magnitude: sun state: %w", err)
 	}

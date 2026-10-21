@@ -267,7 +267,7 @@ func geocentricApparent(t *testing.T, p eph.Provider, id eph.ID, epoch time.Time
 ) (decDeg, ghaDeg float64) {
 	t.Helper()
 
-	state, err := eph.AstrometricState(p, id, epoch)
+	state, err := eph.At(p, epoch).Astrometric(id, eph.Geocenter())
 	if err != nil {
 		t.Fatalf("AstrometricState(%s): %v", id, err)
 	}

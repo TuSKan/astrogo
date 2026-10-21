@@ -24,12 +24,12 @@ type failingWhenProvider struct {
 	fails func(id eph.ID, t time.Time) bool
 }
 
-func (p failingWhenProvider) State(id eph.ID, t time.Time) (eph.State, error) {
+func (p failingWhenProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
 	if p.fails(id, t) {
 		return eph.State{}, errFailingWhen
 	}
 
-	st, err := p.Provider.State(id, t)
+	st, err := p.Provider.Locate(id, t)
 	if err != nil {
 		return eph.State{}, fmt.Errorf("failingWhenProvider: %w", err)
 	}
@@ -44,10 +44,10 @@ type countingProvider struct {
 	calls int
 }
 
-func (p *countingProvider) State(id eph.ID, t time.Time) (eph.State, error) {
+func (p *countingProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
 	p.calls++
 
-	st, err := p.Provider.State(id, t)
+	st, err := p.Provider.Locate(id, t)
 	if err != nil {
 		return eph.State{}, fmt.Errorf("countingProvider: %w", err)
 	}
@@ -189,12 +189,12 @@ type twoBodyProvider struct {
 	sun, moon vector.Vec3
 }
 
-func (p twoBodyProvider) State(id eph.ID, _ time.Time) (eph.State, error) {
+func (p twoBodyProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
 	if id == eph.Moon {
-		return eph.State{Pos: p.moon}, nil
+		return geocentricMock(id, p.moon, vector.Vec3{})
 	}
 
-	return eph.State{Pos: p.sun}, nil
+	return geocentricMock(id, p.sun, vector.Vec3{})
 }
 
 func (twoBodyProvider) Close() error { return nil }

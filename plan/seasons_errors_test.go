@@ -20,14 +20,14 @@ type failingNearProvider struct {
 	failed bool
 }
 
-func (p *failingNearProvider) State(id eph.ID, t time.Time) (core.State, error) {
+func (p *failingNearProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
 	if !p.failed && t.Sub(p.around).Abs() < unit.Hours(1) {
 		p.failed = true
 
 		return core.State{}, errFailingOnce
 	}
 
-	st, err := p.Provider.State(id, t)
+	st, err := p.Provider.Locate(id, t)
 	if err != nil {
 		return core.State{}, fmt.Errorf("failingNearProvider: %w", err)
 	}

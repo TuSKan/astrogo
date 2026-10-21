@@ -332,12 +332,14 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 
 	at := time.FromGo(scene.Time)
 
-	moon, err := scene.Ephemeris.State(eph.Moon, at)
+	in := eph.At(scene.Ephemeris, at)
+
+	moon, err := in.Geometric(eph.Moon, eph.Earth)
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: moon state: %w", err)
 	}
 
-	sun, err := scene.Ephemeris.State(eph.Sun, at)
+	sun, err := in.Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: sun state: %w", err)
 	}
@@ -348,7 +350,7 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	// parallax, about 0.95 degrees, above where the site sees it: a Moon at
 	// 9.2 degrees was charged 5.50 airmasses instead of 6.02, and one just
 	// below the site's horizon lit its sky (#646).
-	apparent, err := eph.ApparentState(scene.Ephemeris, eph.Moon, at)
+	apparent, err := in.Apparent(eph.Moon, eph.Geocenter())
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: moon apparent state: %w", err)
 	}

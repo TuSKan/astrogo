@@ -43,7 +43,7 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 		derived := coord.NewContext(base, site, defaultAtm)
 		derived.SetTime(at)
 
-		st, err := sat.StateCtx(sat.ID(), derived)
+		st, err := sat.LocateCtx(sat.ID(), derived)
 		if err != nil {
 			t.Fatalf("StateCtx: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		derived := coord.NewContext(base, site, defaultAtm)
 		derived.SetTime(at)
 
-		st, err := sat.State(sat.ID(), at)
+		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
@@ -173,7 +173,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		at := time.Date(2026, time.April, 20, hour, 0, 0, 0, time.LocationUTC)
 		ctx := coord.NewContext(at, site, defaultAtm)
 
-		st, err := sat.State(sat.ID(), at)
+		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}

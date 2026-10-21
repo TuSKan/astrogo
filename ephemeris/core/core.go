@@ -20,15 +20,9 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// Errors reported by [State.Require].
-var (
-	// ErrWrongFrame marks a state expressed in a different reference frame
-	// from the one the caller needs.
-	ErrWrongFrame = errors.New("ephemeris: state is in the wrong reference frame")
-
-	// ErrWrongCenter marks a state measured from a different origin.
-	ErrWrongCenter = errors.New("ephemeris: state is measured from the wrong origin")
-)
+// ErrWrongFrame marks states whose axes cannot be composed: a chain of
+// [Provider.Locate] answers that are not all on the ICRS axes.
+var ErrWrongFrame = errors.New("ephemeris: state is in the wrong reference frame")
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -37,11 +31,14 @@ var (
 // It exists because "ICRS-like" is not a specification. That was the whole of
 // the frame contract on State until this type: a comment, hedged, on a struct
 // that several providers fill in differently. [github.com/TuSKan/astrogo/ephemeris/jpl]
-// and the SOFA analytical provider produce ICRS; the SGP4 provider in
-// ephemeris/satellite converts TEME to GCRS and produces that. Those differ by
-// frame bias — about 23 milliarcseconds — and nothing in the type distinguished
-// them, so a value from one could be used where the other was meant and remain
-// mathematically valid while being physically wrong.
+// and the SOFA analytical series produce ICRS; the SGP4 provider in
+// ephemeris/satellite converts TEME to GCRS and produces that.
+//
+// The ICRS and the GCRS share their axes: the GCRS is the ICRS's geocentric
+// counterpart, kinematically non-rotating and aligned with it (IAU 2000
+// Resolution B1.3), which is why a geocentric state in one composes with a
+// barycentric chain in the other. What the frames do not share is TEME or the
+// ITRS, which turn with the equinox or the Earth.
 type Frame uint8
 
 // The frames astrogo's providers actually produce.
@@ -86,75 +83,27 @@ func (f Frame) String() string {
 	}
 }
 
-// Center names the origin a [State]'s vectors are measured from.
-type Center uint8
-
-// The origins astrogo's providers actually use.
-const (
-	// CenterUnspecified is the zero value, and asserts nothing. See
-	// [FrameUnspecified] for why that is not the same as assuming a default.
-	CenterUnspecified Center = iota
-
-	// CenterGeocenter is the center of the Earth.
-	CenterGeocenter
-
-	// CenterBarycenter is the solar system barycenter.
-	CenterBarycenter
-
-	// CenterHeliocenter is the center of the Sun.
-	CenterHeliocenter
-)
-
-func (c Center) String() string {
-	switch c {
-	case CenterUnspecified:
-		return "unspecified"
-	case CenterGeocenter:
-		return "geocenter"
-	case CenterBarycenter:
-		return "barycenter"
-	case CenterHeliocenter:
-		return "heliocenter"
-	default:
-		return fmt.Sprintf("Center(%d)", uint8(c))
-	}
-}
-
-// State represents the kinematic state of a celestial body.
+// State is a body's position and velocity relative to another body, its
+// Center.
 //
 // Units stay contractual — AU and AU/day — because putting them in the type
 // would cost the hot path more than it is worth. Frame and origin do not:
-// they are one byte each, they are read once at a boundary rather than in a
-// loop, and getting them wrong produces a number that looks entirely
-// reasonable.
+// they are read at a boundary rather than in a loop, and getting them wrong
+// produces a number that looks entirely reasonable.
 type State struct {
-	Pos vector.Vec3 // position in AU, in Frame, measured from Center
-	Vel vector.Vec3 // velocity in AU/day, in Frame, measured from Center
+	Pos vector.Vec3 // position in AU, on Frame's axes, from Center
+	Vel vector.Vec3 // velocity in AU/day, on Frame's axes, relative to Center
 
-	// Frame and Center describe the vectors above. Both zero values assert
-	// nothing rather than defaulting, so a provider that has not been taught
-	// to label its output says so instead of claiming ICRS geocentric.
-	Frame  Frame
-	Center Center
-}
+	// Frame is the axes the vectors are expressed on. Its zero value asserts
+	// nothing, so a provider that has not been taught to label its output
+	// says so instead of claiming the ICRS.
+	Frame Frame
 
-// Require reports whether the state is expressed in the frame and origin the
-// caller needs, and returns an error naming the mismatch when it is not.
-//
-// An unspecified frame or center passes: this is a check against a wrong
-// label, not a demand that every producer be labeled. Tightening it to
-// reject unspecified would turn "we do not know" into a failure at every call
-// site that has not been updated, which is a migration and not a safeguard.
-func (s State) Require(frame Frame, center Center) error {
-	if frame != FrameUnspecified && s.Frame != FrameUnspecified && s.Frame != frame {
-		return fmt.Errorf("%w: state is %s, caller needs %s", ErrWrongFrame, s.Frame, frame)
-	}
-
-	if center != CenterUnspecified && s.Center != CenterUnspecified && s.Center != center {
-		return fmt.Errorf("%w: state is %s, caller needs %s", ErrWrongCenter, s.Center, center)
-	}
-
-	return nil
+	// Center is the body the vectors are measured from, as a NAIF code (see
+	// [ID]): what [Provider.Locate] names as the centre it computes a body
+	// from. Unlike Frame it has no "unspecified": its zero value is the Solar
+	// System barycenter.
+	Center ID
 }
 
 // kmPerAU is the number of kilometers in one Astronomical Unit.
@@ -163,10 +112,10 @@ func (s State) Require(frame Frame, center Center) error {
 // permit selecting a struct field inside a constant expression.
 var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
-// Distance returns the geocentric distance in AU.
+// Distance returns the distance from Center in AU.
 func (s State) Distance() float64 { return s.Pos.Norm() }
 
-// DistanceKm returns the geocentric distance in kilometers.
+// DistanceKm returns the distance from Center in kilometers.
 func (s State) DistanceKm() float64 { return s.Pos.Norm() * kmPerAU }
 
 // Speed returns the velocity magnitude in AU/day.
@@ -174,9 +123,19 @@ func (s State) Speed() float64 { return s.Vel.Norm() }
 
 // Provider is the interface for celestial ephemeris sources.
 type Provider interface {
-	// State returns the geocentric state (position and velocity) of the given
-	// body at time t. The vectors are typically in an inertial frame like ICRS.
-	State(id ID, t time.Time) (State, error)
+	// Locate returns the state of id at t about the centre the provider
+	// computes it from, and names that centre in State.Center: the centre of
+	// the segment a JPL kernel holds the body in, the Sun for the SOFA
+	// planets, the Earth for the SOFA Moon and an SGP4 satellite, the Sun or
+	// a planet for a Kepler orbit. Any centre a provider names, it also
+	// locates, down to the Solar System barycenter, which is located about
+	// itself.
+	//
+	// It is not geocentric. ephemeris.At composes Locate answers into a state
+	// about any centre, the Earth among them. The method replaced a geocentric
+	// State rather than redefining it, so that a caller still expecting a
+	// geocentric answer fails to compile instead of being an AU wrong (#803).
+	Locate(id ID, t time.Time) (State, error)
 
 	// Close releases any resources held by the provider (files, caches).
 	// Providers with no resources may return nil.

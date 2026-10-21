@@ -67,6 +67,12 @@ const goldenTol = 1e-12
 // instant read as TT, where it used to read this fixed UTC instant's Julian
 // Date as TT, 69 seconds early.
 //
+// #803 moved Observatory's moonlight rows by 3e-10 to 4e-8 relative, and its
+// totals with them by up to 1.3e-9. The Moon's apparent place is now SOFA's,
+// the astrometric place deflected and aberrated relativistically, where it
+// was the geocentric state at the retarded epoch: milliarcseconds of the
+// Moon's direction, which its scattered light follows.
+//
 // #592 moved every component row by up to 0.2 per cent, Observatory's
 // moonlight by 0.81, and the totals by at most 1.3e-4 relative. The Rayleigh
 // optical depth is Bodhaine et al.'s (1999) now, 0.7 per cent below the
@@ -352,36 +358,36 @@ var observatoryGolden = []goldenRow{
 	{90, skybrightness.Extragalactic, 1.2565010926711747e-11},
 	{90, skybrightness.Zodiacal, 1.6932342549546409e-09},
 	{90, skybrightness.AirglowContinuum, 2.6468258597986148e-09},
-	{90, skybrightness.Moonlight, 1.0244785074413282e-07},
+	{90, skybrightness.Moonlight, 1.0244784683399866e-07},
 	{90, skybrightness.Artificial, 8.4719605297296167e-08},
-	{90, totalSurfaceBrightness, 17.275891308986225},
+	{90, totalSurfaceBrightness, 17.275891330770328},
 
 	{60, skybrightness.Starlight, 1.0062414465784372e-09},
 	{60, skybrightness.DiffuseGalactic, 4.3465884916811611e-11},
 	{60, skybrightness.Extragalactic, 1.2560383201151721e-11},
 	{60, skybrightness.Zodiacal, 1.7406086097754482e-09},
 	{60, skybrightness.AirglowContinuum, 3.0331446089703345e-09},
-	{60, skybrightness.Moonlight, 8.9325085769980866e-08},
+	{60, skybrightness.Moonlight, 8.9325085795414407e-08},
 	{60, skybrightness.Artificial, 1.1758632803258909e-07},
-	{60, totalSurfaceBrightness, 17.166795544706172},
+	{60, totalSurfaceBrightness, 17.166795544593661},
 
 	{30, skybrightness.Starlight, 1.0023751568576856e-09},
 	{30, skybrightness.DiffuseGalactic, 4.3298875592529957e-11},
 	{30, skybrightness.Extragalactic, 1.2512122338289786e-11},
 	{30, skybrightness.Zodiacal, 1.0929706713183126e-09},
 	{30, skybrightness.AirglowContinuum, 4.924201610094471e-09},
-	{30, skybrightness.Moonlight, 7.4884755615075499e-08},
+	{30, skybrightness.Moonlight, 7.4884756193961823e-08},
 	{30, skybrightness.Artificial, 2.6080072391243097e-07},
-	{30, totalSurfaceBrightness, 16.65023441482003},
+	{30, totalSurfaceBrightness, 16.650234412986332},
 
 	{10, skybrightness.Starlight, 9.671998615786218e-10},
 	{10, skybrightness.DiffuseGalactic, 4.1779433770973605e-11},
 	{10, skybrightness.Extragalactic, 1.2073047611820291e-11},
 	{10, skybrightness.Zodiacal, 9.1684283378512596e-10},
 	{10, skybrightness.AirglowContinuum, 9.2301364630354105e-09},
-	{10, skybrightness.Moonlight, 1.3113286331699471e-07},
+	{10, skybrightness.Moonlight, 1.311328641596625e-07},
 	{10, skybrightness.Artificial, 7.8275133537989355e-07},
-	{10, totalSurfaceBrightness, 15.576595001898006},
+	{10, totalSurfaceBrightness, 15.576595000913994},
 }
 
 // checkPresetGolden compares one preset against its own locked table.

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/gofaext"
@@ -14,30 +15,31 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// A heliocentric orbit is made geocentric with its base provider's Sun, not
-// a model of the package's own (#810).
+// A heliocentric orbit is located about the Sun and meets the Earth only
+// where an Instant composes it with the base provider's chain: the base's
+// Earth, not a model of the package's own (#810, #803).
 
-// fixedSunBase answers the Sun with one state, counts the asks, and answers
-// nothing else.
-type fixedSunBase struct {
-	sun   core.State
+// fixedEarthBase answers the Earth about the Sun with one state, counts the
+// asks, and answers nothing else.
+type fixedEarthBase struct {
+	earth core.State
 	err   error
 	asked int
 }
 
 var errNotHere = errors.New("not in this base")
 
-func (b *fixedSunBase) State(id core.ID, _ time.Time) (core.State, error) {
-	if id != core.Sun {
+func (b *fixedEarthBase) Locate(id core.ID, _ time.Time) (core.State, error) {
+	if id != core.Earth {
 		return core.State{}, errNotHere
 	}
 
 	b.asked++
 
-	return b.sun, b.err
+	return b.earth, b.err
 }
 
-func (*fixedSunBase) Close() error { return nil }
+func (*fixedEarthBase) Close() error { return nil }
 
 // smallBody is a registered ID no base answers for itself.
 const smallBody = core.ID(core.SmallBodyBase + 4179)
@@ -60,16 +62,16 @@ func sameBits(a, b vector.Vec3) bool {
 		math.Float64bits(a.Z) == math.Float64bits(b.Z)
 }
 
-// TestHeliocentricOrbitIsPlacedWithTheBaseSun: the geocentric state is the
-// heliocentric one plus whatever Sun the base answers, so a kernel base puts
+// TestHeliocentricOrbitIsPlacedWithTheBaseEarth: the geocentric state is the
+// heliocentric one less whatever Earth the base answers, so a kernel base puts
 // the orbit against the kernel's Earth. Before #810 the base was never asked.
-func TestHeliocentricOrbitIsPlacedWithTheBaseSun(t *testing.T) {
+func TestHeliocentricOrbitIsPlacedWithTheBaseEarth(t *testing.T) {
 	el := asteroid(t)
-	base := &fixedSunBase{sun: core.State{
-		Pos:    vector.V3(0.3, -0.9, -0.4),
-		Vel:    vector.V3(0.016, 0.005, 0.002),
+	base := &fixedEarthBase{earth: core.State{
+		Pos:    vector.V3(-0.3, 0.9, 0.4),
+		Vel:    vector.V3(-0.016, -0.005, -0.002),
 		Frame:  core.FrameICRS,
-		Center: core.CenterGeocenter,
+		Center: core.Sun,
 	}}
 
 	p := kepler.New(kepler.WithBase(base))
@@ -85,25 +87,25 @@ func TestHeliocentricOrbitIsPlacedWithTheBaseSun(t *testing.T) {
 			t.Fatalf("StateAt: %v", err)
 		}
 
-		got, err := p.State(smallBody, at)
+		got, err := eph.At(p, at).Geometric(smallBody, core.Earth)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
 
-		if !sameBits(got.Pos, helio.Add(base.sun.Pos)) || !sameBits(got.Vel, helioV.Add(base.sun.Vel)) {
-			t.Errorf("day %d: State %+v %+v, want heliocentric plus the base's Sun", 37*d, got.Pos, got.Vel)
+		if !sameBits(got.Pos, helio.Sub(base.earth.Pos)) || !sameBits(got.Vel, helioV.Sub(base.earth.Vel)) {
+			t.Errorf("day %d: %+v %+v, want heliocentric less the base's Earth", 37*d, got.Pos, got.Vel)
 		}
 	}
 
 	if base.asked != 10 {
-		t.Errorf("the base was asked for the Sun %d times, want 10", base.asked)
+		t.Errorf("the base was asked for the Earth %d times, want 10, one per instant", base.asked)
 	}
 }
 
-// TestDefaultBaseIsUnchangedToTheBit: without WithBase, the Sun is the SOFA
-// base's, minus Epv00's heliocentric Earth — what State used to subtract
-// directly. Adding its negation is the same arithmetic, so a default Provider
-// answers what it did before #810 to the last bit.
+// TestDefaultBaseIsUnchangedToTheBit: without WithBase, the Earth is the SOFA
+// base's, Epv00's heliocentric Earth, located about the Sun as the orbit is,
+// so the Instant subtracts it directly, as State did before #810: the same
+// answer to the last bit.
 func TestDefaultBaseIsUnchangedToTheBit(t *testing.T) {
 	el := asteroid(t)
 
@@ -130,7 +132,7 @@ func TestDefaultBaseIsUnchangedToTheBit(t *testing.T) {
 		wantPos := helio.Sub(vector.V3(pvh[0][0], pvh[0][1], pvh[0][2]))
 		wantVel := helioV.Sub(vector.V3(pvh[1][0], pvh[1][1], pvh[1][2]))
 
-		got, err := p.State(smallBody, at)
+		got, err := eph.At(p, at).Geometric(smallBody, core.Earth)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
@@ -141,29 +143,18 @@ func TestDefaultBaseIsUnchangedToTheBit(t *testing.T) {
 	}
 }
 
-// TestBaseSunFailureIsReported: a base that cannot place the Sun cannot
-// place the orbit, and says so rather than falling back to a second model.
-func TestBaseSunFailureIsReported(t *testing.T) {
+// TestBaseEarthFailureIsReported: a base that cannot place the Earth cannot
+// place the orbit about it, and says so rather than falling back to a second
+// model.
+func TestBaseEarthFailureIsReported(t *testing.T) {
 	el := asteroid(t)
 
-	failing := &fixedSunBase{err: errNotHere}
-	heliocentric := &fixedSunBase{sun: core.State{Center: core.CenterHeliocenter}}
+	p := kepler.New(kepler.WithBase(&fixedEarthBase{err: errNotHere}))
+	if err := p.Register(smallBody, el); err != nil {
+		t.Fatalf("register: %v", err)
+	}
 
-	for _, c := range []struct {
-		name string
-		base *fixedSunBase
-		want error
-	}{
-		{"a base with no Sun", failing, errNotHere},
-		{"a base whose Sun is not geocentric", heliocentric, core.ErrWrongCenter},
-	} {
-		p := kepler.New(kepler.WithBase(c.base))
-		if err := p.Register(smallBody, el); err != nil {
-			t.Fatalf("register: %v", err)
-		}
-
-		if _, err := p.State(smallBody, el.Epoch()); !errors.Is(err, c.want) {
-			t.Errorf("%s: err = %v, want %v", c.name, err, c.want)
-		}
+	if _, err := eph.At(p, el.Epoch()).Geometric(smallBody, core.Earth); !errors.Is(err, errNotHere) {
+		t.Errorf("a base with no Earth: err = %v, want errNotHere", err)
 	}
 }
