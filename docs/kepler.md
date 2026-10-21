@@ -298,6 +298,24 @@ construction; it carries the prepared quantities in unexported fields set by
 An orbit with secular apsidal precession rotates P and Q about the orbit
 normal by Δω = ω̇·Δt: one `Sincos` on the calls that need it.
 
+Shipped in phase 3, for both forms — the perihelion form prepares its mass
+parameter, its period and its speed at perihelion the same way. Interleaved,
+six runs each, on `BenchmarkStateAt` (a main-belt orbit, 400 phases):
+
+| | per state |
+| --- | ---: |
+| `StateAt` after #827 | 773 ns ±20% |
+| `StateAt` prepared | 426 ns ±29% |
+
+−45% (p = 0.002), no allocations either way. The four `With` methods prepare
+again, and a set built as a bare literal is prepared by `StateAt` itself, to
+the same bits as the constructor's. The gate is
+`TestPreparedOrientationIsTheRotation`: P and Q against the three rotations
+they replace, on the ecliptic and a Laplace plane, with the apsis fixed and
+turning, over a decade, to eight ulps plus the turning angle's own rounding.
+Canaried by a `WithLaplacePlane` that does not prepare, it fails at 3×10¹³
+times its bound.
+
 **No batch method.** Once prepared, a state is the solve and a few
 multiply-adds; a batch would save a function call per element and add a second
 entry point to keep identical with the first. The same conclusion as the
@@ -329,7 +347,8 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    `TestSolveKeplerContract`; the "production" rows above are what it
    replaced, and `internal/keplerlab` keeps that solver so §3.2 reproduces.
 3. **Prepared `Elements`.** The derived quantities at construction, the
-   orientation as P and Q, the phase by one fused multiply-add.
+   orientation as P and Q, the phase by one fused multiply-add. The phase
+   came with #827; the rest is **done in #832**, measured in §5.
 4. **The Earth from the base (#810),** then the per-orbit centre (#803).
 5. **The universal path's own audit.** It is the stable form already and is
    not measured here: the oracle gains the universal anomaly and the Stumpff
