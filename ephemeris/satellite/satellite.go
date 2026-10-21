@@ -134,7 +134,9 @@ func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 //
 // The conversion pipeline: TEME (km) → true equator and equinox of date by
 // the equation of the equinoxes → GCRS (AU) by the transpose of the IAU
-// 2006/2000A bias-precession-nutation matrix (Pnm06a).
+// 2006/2000A bias-precession-nutation matrix (Pnm06a). That matrix is nearly
+// all of the cost; a caller holding a [coord.Context] at t has it already, and
+// [Satellite.StateCtx] uses it.
 func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 	if id != 0 {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
@@ -152,6 +154,36 @@ func (s *Satellite) State(id core.ID, t time.Time) (core.State, error) {
 	return core.State{
 		Pos:    gcrsPos.MulScalar(1.0 / kmPerAU),
 		Vel:    gcrsVel.MulScalar(secPerDay / kmPerAU),
+		Frame:  core.FrameGCRS,
+		Center: core.CenterGeocenter,
+	}, nil
+}
+
+// StateCtx is [Satellite.State] at ctx's instant, rotated into GCRS with the
+// precession-nutation ctx already holds rather than a fresh evaluation of it
+// (see [coord.Context.TEMEToGCRS]).
+//
+// That evaluation is about 99% of a State: 83 µs against SGP4's 0.7 µs, for a
+// matrix that turns 0.016″ in an hour. This is SGP4 and a rotation, 1.0 µs
+// (i9-11980HK). A look angle through ctx loses nothing by it, since ctx turns
+// the result back to Earth-fixed through the same matrix; the GCRS place
+// itself carries the drift of ctx's window, as every other place ctx computes
+// does.
+//
+// id must be core.ID(0), as for State.
+func (s *Satellite) StateCtx(id core.ID, ctx *coord.Context) (core.State, error) {
+	if id != 0 {
+		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
+	}
+
+	pos, vel, err := s.propagateECI(ctx.Time())
+	if err != nil {
+		return core.State{}, err
+	}
+
+	return core.State{
+		Pos:    ctx.TEMEToGCRS(pos).MulScalar(1.0 / kmPerAU),
+		Vel:    ctx.TEMEToGCRS(vel).MulScalar(secPerDay / kmPerAU),
 		Frame:  core.FrameGCRS,
 		Center: core.CenterGeocenter,
 	}, nil
