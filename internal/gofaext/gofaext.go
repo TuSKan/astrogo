@@ -191,6 +191,27 @@ func Gst06a(uta, utb, tta, ttb float64) float64 {
 	return gofa.Gst06a(uta, utb, tta, ttb)
 }
 
+// MeanEquinoxFromCIO returns GMST minus the Earth rotation angle (IAU 2006) for
+// the TT Julian date tta+ttb, in radians: the right ascension of the CIO
+// measured from the mean equinox of date, which is the precession in right
+// ascension accumulated since J2000.0.
+//
+// It is the polynomial iauGmst06 adds to Era00, term for term (Capitaine et
+// al. 2005), evaluated alone. iauEe06a isolates it by evaluating Gmst06 at
+// UT1 = 0 and letting the Earth rotation angles cancel, which costs two
+// angle normalizations per call; a satellite's look angle needs it twice per
+// state (#812).
+func MeanEquinoxFromCIO(tta, ttb float64) float64 {
+	t := ((tta - gofa.DJ00) + ttb) / gofa.DJC
+
+	return (0.014506 +
+		(4612.156534+
+			(1.3915817+
+				(-0.00000044+
+					(-0.000029956+
+						(-0.0000000368)*t)*t)*t)*t)*t) * gofa.DAS2R
+}
+
 // C2t06a returns the IAU 2006/2000A celestial-to-terrestrial matrix, mapping
 // GCRS to ITRS: frame bias, precession and nutation, Earth rotation, and the
 // polar motion xp, yp. Its transpose maps ITRS back to GCRS.

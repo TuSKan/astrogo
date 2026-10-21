@@ -108,7 +108,9 @@ ICRF axes, labeled. A geocentric place is in the GCRS, kinematically
 non-rotating and aligned with the ICRF. An SPK segment is used only if its
 frame is NAIF 1 ("J2000", which DE4xx and every kernel astrogo fetches mean as
 the ICRF) — or a fixed inertial frame it knows how to rotate — and refused
-otherwise (#813). TEME exists only inside the satellite package.
+otherwise (#813). TEME exists only inside the satellite package and in
+`coord.Context.TEMEToGCRS`, which turns it to GCRS through the Context's own
+precession-nutation rather than a fresh evaluation of it (#812).
 
 ### 3.4 Epoch and time scale
 
