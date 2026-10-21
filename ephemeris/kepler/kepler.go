@@ -830,17 +830,21 @@ func (el Elements) perifocalUniversal(dtDays float64) (posPf, velPf vector.Vec3,
 		return vector.Zero(), vector.Zero(), err
 	}
 
-	c, s := stumpff(alpha * chi * chi)
-	r := q + e*chi*chi*c
+	c0, c1, c2, _ := stumpff(alpha * chi * chi)
+	r := q + e*chi*chi*c2
 	v0 := el.prep.v0
 
-	f := 1 - chi*chi*c/q
-	g := dt - chi*chi*chi*s/sqrtMu
-	fDot := sqrtMu / (r * q) * (alpha*chi*chi*chi*s - chi)
-	gDot := 1 - chi*chi*c/r
-
-	// The perihelion state is (q, 0, 0) with velocity (0, v0, 0).
-	return vector.V3(f*q, g*v0, 0), vector.V3(fDot*q, gDot*v0, 0), nil
+	// The Lagrange coefficients carry the perihelion state, (q, 0, 0) moving
+	// at (0, v0, 0), to Δt. As usually written, g = Δt − χ³c₃/√μ and
+	// ġ = 1 − χ²c₂/r are differences of nearly equal terms once r ≫ q: on a
+	// parabola at r = 100q, ġ keeps q/r of its bits, and the position lost
+	// 317 ulps on a near-parabolic hyperbola (#833). The universal Kepler
+	// equation and the identities 1 − z·c₃ = c₁ and 1 − z·c₂ = c₀ make each a
+	// product:
+	//
+	//	f·q = q − χ²c₂      g·v₀ = v₀·q·χ·c₁/√μ
+	//	ḟ·q = −√μ·χ·c₁/r    ġ·v₀ = v₀·q·c₀/r
+	return vector.V3(q-chi*chi*c2, v0*q*chi*c1/sqrtMu, 0), vector.V3(-sqrtMu*chi*c1/r, v0*q*c0/r, 0), nil
 }
 
 // solveUniversal solves the universal Kepler equation of perifocalUniversal
@@ -892,7 +896,7 @@ func solveUniversal(q, e, alpha, sqrtMu, dt float64) (float64, error) {
 	}
 
 	for range maxIter {
-		c, s := stumpff(alpha * chi * chi)
+		_, _, c, s := stumpff(alpha * chi * chi)
 		f := e*chi*chi*chi*s + q*chi - target
 		fp := e*chi*chi*c + q
 
@@ -924,39 +928,61 @@ func solveUniversal(q, e, alpha, sqrtMu, dt float64) (float64, error) {
 		ErrKeplerNoConverge, maxIter, q, e, dt)
 }
 
-// stumpff returns the Stumpff functions C(z) and S(z).
+// stumpff returns Danby's Stumpff functions c₀ … c₃ at z,
 //
-// The closed forms cancel for small |z|, with a relative error near 6ε/|z|,
-// and small |z| is exactly where a near-parabolic comet spends a year either
-// side of perihelion: |z| is about 1e-3 for C/2022 E3. Below |z| = 0.1 the
-// Maclaurin series is used instead, which reaches full double precision well
-// within twenty terms:
+//	c_k(z) = Σ_j (−z)^j / (2j + k)!
 //
-//	C(z) = Σ (−z)^k / (2k+2)!,   S(z) = Σ (−z)^k / (2k+3)!
-func stumpff(z float64) (c, s float64) {
-	if math.Abs(z) < 0.1 {
-		tc, ts := 0.5, 1.0/6
-		c, s = tc, ts
+// so that, with x = √z, c₀ = cos x, c₁ = sin x / x, c₂ = C(z) = (1 − cos x)/z
+// and c₃ = S(z) = (x − sin x)/x³, and their hyperbolic counterparts for
+// z < 0.
+//
+// The closed forms of c₂ and c₃ subtract nearly equal quantities for small
+// |z|: measured against a 256-bit oracle, c₃'s lost 23 ulps at z = 0.1 and
+// 75 at z = −0.1 (#833). So the series is summed below |z| = 4, where c₃'s
+// closed form would still lose a bit or two; there it reaches double
+// precision in under twenty terms, and its terms, which alternate for z > 0,
+// exceed the sum by at most a factor of five, at c₀(4) = cos 2. Each function
+// comes out within 2.5 ulps of the oracle (c₀ and c₁, which cross zero, in
+// ulps of max(|c|, 1)). Above it, 1 − cos x is written 2·sin²(x/2), and
+// x − sin x no longer cancels. Every closed form divides by powers of the same
+// rounded x, so the four are the functions of one argument. On a hyperbola
+// cosh and sinh amplify that rounding x/2 times, to 7.5 ulps at z = −400;
+// the state built from them stays inside its contract
+// (TestUniversalContract).
+func stumpff(z float64) (c0, c1, c2, c3 float64) {
+	if math.Abs(z) < 4 {
+		t0, t1, t2, t3 := 1.0, 1.0, 0.5, 1.0/6
+		c0, c1, c2, c3 = t0, t1, t2, t3
 
-		for k := 1; k < 20; k++ {
-			tc *= -z / float64((2*k+1)*(2*k+2))
-			ts *= -z / float64((2*k+2)*(2*k+3))
-			c += tc
-			s += ts
+		for j := 1; j < 30; j++ {
+			fj := float64(j)
+			t0 *= -z / ((2*fj - 1) * (2 * fj))
+			t1 *= -z / ((2 * fj) * (2*fj + 1))
+			t2 *= -z / ((2*fj + 1) * (2*fj + 2))
+			t3 *= -z / ((2*fj + 2) * (2*fj + 3))
+			c0, c1, c2, c3 = c0+t0, c1+t1, c2+t2, c3+t3
+
+			if math.Abs(t0) < 0x1p-60*math.Abs(c0) && math.Abs(t3) < 0x1p-60*c3 {
+				break
+			}
 		}
 
-		return c, s
+		return c0, c1, c2, c3
 	}
 
 	if z > 0 {
-		sz := math.Sqrt(z)
+		x := math.Sqrt(z)
+		s, c := math.Sincos(x)
+		h := math.Sin(x / 2)
 
-		return (1 - math.Cos(sz)) / z, (sz - math.Sin(sz)) / (sz * sz * sz)
+		return c, s / x, 2 * h * h / (x * x), (x - s) / (x * x * x)
 	}
 
-	sz := math.Sqrt(-z)
+	x := math.Sqrt(-z)
+	h := math.Sinh(x / 2)
+	sh := math.Sinh(x)
 
-	return (math.Cosh(sz) - 1) / -z, (math.Sinh(sz) - sz) / (sz * sz * sz)
+	return math.Cosh(x), sh / x, 2 * h * h / (x * x), (sh - x) / (x * x * x)
 }
 
 // orient carries a perifocal state into the ICRS-aligned equatorial frame,

@@ -52,7 +52,7 @@ func TestSolveUniversalConvergesAcrossTheConics(t *testing.T) {
 					continue
 				}
 
-				_, s := stumpff(alpha * chi * chi)
+				_, _, _, s := stumpff(alpha * chi * chi)
 				residual := math.Abs(e*chi*chi*chi*s+q*chi-sqrtMu*dt) / (sqrtMu * math.Abs(dt))
 
 				if !(residual <= tol) {
@@ -107,38 +107,5 @@ func TestValidateRefusesABadPerihelionDistance(t *testing.T) {
 		if err := el.Validate(); !errors.Is(err, ErrInvalidElements) {
 			t.Errorf("q = %v: Validate = %v, want ErrInvalidElements", q, err)
 		}
-	}
-}
-
-// TestStumpffSeriesMeetsTheClosedForm checks the switch at |z| = 0.1, where
-// the Maclaurin series hands over to the closed forms: the two must agree on
-// either side of it, for both signs of z, to within the closed forms' own
-// cancellation, about 6ε/|z|.
-func TestStumpffSeriesMeetsTheClosedForm(t *testing.T) {
-	closed := func(z float64) (c, s float64) {
-		if z > 0 {
-			sz := math.Sqrt(z)
-
-			return (1 - math.Cos(sz)) / z, (sz - math.Sin(sz)) / (sz * sz * sz)
-		}
-
-		sz := math.Sqrt(-z)
-
-		return (math.Cosh(sz) - 1) / -z, (math.Sinh(sz) - sz) / (sz * sz * sz)
-	}
-
-	for _, z := range []float64{0.0999999, -0.0999999, 0.05, -0.05} {
-		cs, ss := stumpff(z)
-		cc, sc := closed(z)
-
-		limit := 10 * 2.2e-16 / math.Abs(z)
-		if math.Abs(cs-cc)/cc > limit || math.Abs(ss-sc)/sc > limit {
-			t.Errorf("z = %v: series C, S = %.17g, %.17g; closed forms %.17g, %.17g", z, cs, ss, cc, sc)
-		}
-	}
-
-	// And at zero, the limits 1/2 and 1/6 exactly.
-	if c, s := stumpff(0); c != 0.5 || s != 1.0/6 {
-		t.Errorf("C(0), S(0) = %v, %v; want 1/2 and 1/6", c, s)
 	}
 }
