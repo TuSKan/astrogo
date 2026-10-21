@@ -632,19 +632,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 		case EventConjunction:
 			return raOfDateDifference(pos1, pos2, t), nil
 		case EventConjunctionEcliptic, EventOpposition:
-			// Difference in ecliptic longitude, and for an opposition its
-			// distance from 180°.
-			diff := wrap180(coord.ICRSToEcliptic(pos1, t).Lon().Degrees() - coord.ICRSToEcliptic(pos2, t).Lon().Degrees())
-
-			if spec.Kind == EventOpposition {
-				if diff > 0 {
-					diff -= 180
-				} else {
-					diff += 180
-				}
-			}
-
-			return diff, nil
+			return eclipticDifference(spec.Kind, pos1, pos2, t), nil
 		case EventAppulse:
 			// Angular separation (for minimum-finding)
 			sep := coord.Separation(pos1, pos2).Degrees()
@@ -697,11 +685,19 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 						return nil, err
 					}
 
-					events = append(events, Event{
-						Kind:  spec.Kind,
-						Time:  resTime,
-						Value: val,
-					})
+					// A step longer than the value takes to run from a
+					// crossing to its wrap can hold both, and pass the test
+					// above with the wrap's sign change. The solver then
+					// closes on the wrap, where the value is near ±180, not
+					// on a crossing, where it is near zero; 90 lies between
+					// (#787).
+					if math.Abs(val) < 90 {
+						events = append(events, Event{
+							Kind:  spec.Kind,
+							Time:  resTime,
+							Value: val,
+						})
+					}
 				}
 			}
 		}
@@ -1175,33 +1171,6 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 	return solver.Find(spec, start, end)
 }
 
-// Oppositions returns all opposition events between target and other in the
-// given interval: the instants their geocentric ecliptic longitudes differ by
-// 180° (see EventOpposition). With DE440s the oppositions of Mars in 2003 and
-// 2027 and of Saturn in 2026 fall within a minute of JPL Horizons'.
-//
-// It samples once a day. The Sun gains at least 0.95° a day on every planet,
-// and at most 1.42° on Mars, the fastest, so the longitude difference passes
-// 180° once a synodic period and a day holds one crossing at most; the Moon's
-// 12° a day is as safe. An opposition is never mistaken for the wrap at
-// conjunction, which jumps by 358° or more against a day's 1.42°. The 6-hour
-// step this used found the same instants, to 0.3 s, at nearly four times the
-// cost — each sample is an apparent place, light time and aberration, for
-// both bodies (#432). A body whose longitude can turn about within a day, an
-// asteroid passing close to the Earth, is the one case to search with a
-// shorter step of its own.
-func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
-	solver := NewEventSolver(unit.Days(1), unit.Seconds(1))
-	spec := EventSpec{
-		Family: EventFamilyRelativeGeometry,
-		Kind:   EventOpposition,
-		Target: target,
-		Other:  other,
-	}
-
-	return solver.Find(spec, start, end)
-}
-
 // GreatestElongations returns all Greatest Elongation events (both East and West) for a planet relative to the Sun.
 func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event, error) {
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
@@ -1241,26 +1210,6 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 	})
 
 	return allEvents, nil
-}
-
-// FullMoonOppositions returns the full moons (Sun-Moon Oppositions) in the given interval:
-// the Moon's apparent ecliptic longitude 180° from the Sun's. With DE440s the
-// Full Moon of 2026-09-26 falls within a second of Skyfield's.
-// For eclipses, use LunarEclipses, which decides each Full Moon by Earth's shadow.
-func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, error) {
-	sun := NewSun(provider)
-	moon := NewMoon(provider)
-
-	// Moon moves very fast, so we use a higher resolution solver
-	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
-	spec := EventSpec{
-		Family: EventFamilyRelativeGeometry,
-		Kind:   EventOpposition,
-		Target: moon,
-		Other:  sun,
-	}
-
-	return solver.Find(spec, start, end)
 }
 
 // VisibilityEvents returns all rise, transit, and set events for a target at the given site.

@@ -147,6 +147,16 @@ func Eqec06(date1, date2, ra, dec float64) (elon, elat float64) {
 	return elon, elat
 }
 
+// Ecm06 returns the matrix from ICRS equatorial to ecliptic coordinates
+// (IAU 2006): the mean ecliptic and equinox of date, the frame [Eqec06]
+// converts into, for the given TT two-part Julian date.
+func Ecm06(date1, date2 float64) [3][3]float64 {
+	var rm [3][3]float64
+	gofa.Ecm06(date1, date2, &rm)
+
+	return rm
+}
+
 // Atic13 converts CIRS to ICRS coordinates.
 func Atic13(ri, di, date1, date2 float64) (rc, dc float64) {
 	var eo float64

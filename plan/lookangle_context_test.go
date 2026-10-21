@@ -70,12 +70,11 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 //
 // # Why a moved Context is the fixture
 //
-// A Context moved by Context.SetTime within the hour holds precession-nutation
-// and aberration from its epoch, deliberately, because recomputing them is the
-// full SOFA evaluation it exists to avoid. So it differs slightly from what
-// NewContext would produce at the same instant — measured here at 0.0005
-// arcsec after an hour. Past the hour SetTime rebuilds, and its answer is
-// NewContext's, so the probes stay inside it.
+// A Context moved by Context.SetTime interpolates its precession-nutation
+// across a day-long bracket rather than evaluating it, deliberately, because
+// evaluating it is the full SOFA computation it exists to avoid (#822). So it
+// differs slightly from what NewContext would produce at the same instant:
+// measured here at up to 0.00046 arcsec, an hour from the build.
 //
 // That difference is the probe. The old implementation called
 // coord.NewReducer(ctx.Site(), ctx.Time(), ctx.Refraction()), which rebuilt a

@@ -245,9 +245,10 @@ type contextLocator interface {
 // range needs. So there is nothing to rebuild.
 //
 // Using the given Context is also what the signature promises. A caller who
-// moved it with Context.SetTime — the cheap Earth-rotation-only update —
-// previously had that quietly discarded and a full rebuild substituted, which
-// is the opposite of what they asked for.
+// moved it with Context.SetTime — the cheap update, which interpolates the
+// precession-nutation rather than evaluating it — previously had that quietly
+// discarded and a full rebuild substituted, which is the opposite of what
+// they asked for.
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
 	var (
 		st  eph.State
@@ -316,13 +317,15 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 	// call. Decomposed on the ISS at Paranal, a rebuild is 145.5 µs against
 	// 94.8 µs for the satellite's State and 24 ns for the transform itself, so
 	// 61% of every 30-second sample went on rebuilding state that barely
-	// changes. The reuse window's ≲0.1″ is three to four orders of magnitude
-	// inside SGP4's own kilometer-scale along-track error, which at a few
-	// hundred km of range is minutes of arc — see movingContext and #166.
+	// changes — see movingContext and #166.
 	//
 	// That State was itself 99% the same thing: a fresh precession-nutation
 	// evaluation, at every sample. LookAngle now places the satellite with
-	// the Context's own (#812), and the sample is SGP4 and a rotation.
+	// the Context's own (#812), and the sample is SGP4 and a rotation. It
+	// also makes the reuse free of error: the moving Context's interpolated
+	// precession-nutation turns the satellite and the observer alike, and
+	// cancels from the look angle, under 0.01 mas from a fresh Context's
+	// (TestMovingContextStaysInsideItsStatedBound).
 	//
 	// The satellite is asked for by its own NAIF code. It used to be asked
 	// for as 0, which a satellite provider answered and which is the Solar

@@ -55,7 +55,8 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 // ── Event Solver ────────────────────────────────────────────────────────────
 
 // BenchmarkOppositions is a year of Mars against the Sun on the analytical
-// ephemeris: the daily sweep (#432), each sample two apparent places.
+// ephemeris: the scan of their alignment at the step its bound sets, and the
+// one opposition it finds refined on the apparent places (#787).
 func BenchmarkOppositions(b *testing.B) {
 	prov := eph.Default()
 	mars, sun := NewMars(prov), NewSun(prov)
