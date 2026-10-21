@@ -57,6 +57,38 @@ type Elements struct {
 	// periodDays overrides the mean motion implied by the semi-major axis
 	// and the central body's mass parameter. Zero means derive it.
 	periodDays float64
+
+	// prep is what StateAt derives from the elements and not from the epoch,
+	// computed once by the constructors and the With methods (docs/kepler.md
+	// §5).
+	prep prepared
+}
+
+// prepared holds an orbit's epoch-independent quantities: for the
+// mean-anomaly form its mean motion and semi-minor axis, for the perihelion
+// form its mass parameter in the propagation's units and what follows from it,
+// and for both the orientation, as the unit vectors P and Q along which the
+// perifocal x and y lie in the ICRF. A state is then the phase, the solve, the
+// construction, and r = x·P + y·Q, rather than each state rotated through the
+// three angles and the frame.
+type prepared struct {
+	// ok is whether the elements were valid when the rest was computed. A
+	// bare struct literal has it false, and StateAt validates and prepares
+	// such a set itself.
+	ok bool
+
+	// n is the mean motion in rad/day, a the semi-major axis and b the
+	// semi-minor, in AU: the mean-anomaly form.
+	n, a, b float64
+
+	// mu is the central body's mass parameter in AU³/day², alpha = 1/a,
+	// sqrtMu its root, v0 the speed at perihelion and period the orbit's in
+	// days, zero when it does not close: the perihelion form.
+	mu, alpha, sqrtMu, v0, period float64
+
+	// p and q are the perifocal x and y in the ICRF, at the epoch's argument
+	// of periapsis.
+	p, q vector.Vec3
 }
 
 // CentralBody is the body an element set orbits, and the mass parameter
@@ -259,6 +291,8 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 		return Elements{}, err
 	}
 
+	el.prepare()
+
 	return el, nil
 }
 
@@ -300,7 +334,75 @@ func FromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, ec
 		return Elements{}, err
 	}
 
+	el.prepare()
+
 	return el, nil
+}
+
+// prepare computes el.prep, or clears it if el is not valid: StateAt then
+// reports why.
+func (el *Elements) prepare() {
+	el.prep = prepared{}
+	if el.Validate() != nil {
+		return
+	}
+
+	pr := prepared{ok: true}
+
+	day := constants.Derived.JulianDaySeconds.Value
+	e := el.eccentricity
+
+	if el.perihelion == 0 {
+		gm := el.CentralBody().GM // m³/s²
+		aMeters := el.semiMajorAxis.Meters()
+
+		pr.n = math.Sqrt(gm/(aMeters*aMeters*aMeters)) * day
+		if el.periodDays != 0 {
+			pr.n = 2 * math.Pi / el.periodDays
+		}
+
+		pr.a = el.semiMajorAxis.AU()
+		pr.b = pr.a * math.Sqrt((1-e)*(1+e))
+	} else {
+		q := el.perihelion.AU()
+		pr.alpha = (1 - e) / q
+
+		auMeters := unit.AU(1).Meters()
+		pr.mu = el.CentralBody().GM * day * day / (auMeters * auMeters * auMeters)
+
+		if el.periodDays != 0 {
+			// Validate admits a period only for a closed orbit. Holding it
+			// means the mass parameter that gives an orbit of this size that
+			// period.
+			n := 2 * math.Pi / el.periodDays
+			pr.mu = n * n / (pr.alpha * pr.alpha * pr.alpha)
+		}
+
+		if pr.alpha > 0 {
+			pr.period = 2 * math.Pi / math.Sqrt(pr.mu*pr.alpha*pr.alpha*pr.alpha)
+		}
+
+		pr.sqrtMu = math.Sqrt(pr.mu)
+		pr.v0 = math.Sqrt(pr.mu * (1 + e) / q) // speed at perihelion, from vis-viva
+	}
+
+	pr.p = el.toICRF(vector.V3(1, 0, 0))
+	pr.q = el.toICRF(vector.V3(0, 1, 0))
+
+	el.prep = pr
+}
+
+// toICRF carries a perifocal vector at the epoch's argument of periapsis into
+// the ICRS-aligned equatorial frame: through the orbit's three angles, then
+// from whatever plane they are measured in.
+func (el Elements) toICRF(v vector.Vec3) vector.Vec3 {
+	ref := rotatePerifocalToEcliptic(v, el.inclination, el.ascendingNode, el.argPeriapsis)
+
+	if lp := el.plane; lp != nil {
+		return lp.rotateToICRF(ref)
+	}
+
+	return rotateEclipticToEquatorialJ2000(ref)
 }
 
 // CentralBody reports the body these elements are referred to, defaulting to
@@ -322,6 +424,7 @@ func (el Elements) CentralBody() CentralBody {
 // out in the orientation of its own long axis.
 func (el Elements) WithSecularPrecession(p SecularPrecession) Elements {
 	el.precession = p
+	el.prepare()
 
 	return el
 }
@@ -342,6 +445,7 @@ func (el Elements) SecularPrecession() SecularPrecession { return el.precession 
 // Zero restores the derived mean motion.
 func (el Elements) WithPeriod(days float64) Elements {
 	el.periodDays = days
+	el.prepare()
 
 	return el
 }
@@ -365,6 +469,7 @@ func (el Elements) Period() float64 { return el.periodDays }
 // Ganymede. See this package's doc comment.
 func (el Elements) WithLaplacePlane(plane LaplacePlane) Elements {
 	el.plane = &plane
+	el.prepare()
 
 	return el
 }
@@ -390,6 +495,7 @@ func (el Elements) LaplacePlane() (LaplacePlane, bool) {
 // plane. See ephemeris/kepler's package doc.
 func (el Elements) WithCentralBody(body CentralBody) Elements {
 	el.central = body
+	el.prepare()
 
 	return el
 }
@@ -583,8 +689,14 @@ const elementsEclipticObliquity = 84381.448 * math.Pi / 648000
 // positions over longer spans, use a real SPK-kernel-backed provider
 // instead (ephemeris.NewProvider with eph.SmallBody).
 func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
-	if err := el.Validate(); err != nil {
-		return vector.Zero(), vector.Zero(), err
+	if !el.prep.ok {
+		// A set the constructors did not build, or one a With method made
+		// invalid: say why, or prepare it here.
+		if err := el.Validate(); err != nil {
+			return vector.Zero(), vector.Zero(), err
+		}
+
+		el.prepare()
 	}
 
 	dtDays := t.Sub(el.epoch).Days()
@@ -642,13 +754,7 @@ func (el Elements) validateAngles() error {
 // perifocalClassical is the state dtDays after epoch in the perifocal frame
 // (AU, AU/day), from Kepler's equation in the eccentric anomaly.
 func (el Elements) perifocalClassical(dtDays float64) (posPf, velPf vector.Vec3, err error) {
-	gm := el.CentralBody().GM // m^3/s^2
-	aMeters := el.semiMajorAxis.Meters()
-
-	nRadPerDay := math.Sqrt(gm/(aMeters*aMeters*aMeters)) * constants.Derived.JulianDaySeconds.Value
-	if el.periodDays != 0 {
-		nRadPerDay = 2 * math.Pi / el.periodDays
-	}
+	nRadPerDay := el.prep.n
 
 	// The phase in one rounding: what is left is the inputs' own.
 	m := math.FMA(nRadPerDay, dtDays, el.meanAnomaly.Radians())
@@ -671,7 +777,7 @@ func (el Elements) perifocalClassical(dtDays float64) (posPf, velPf vector.Vec3,
 	// 882 m of a near-parabolic comet's position at e = 0.999999, against
 	// 4 m now, from an exact solution of the same two-body problem.
 	e := el.eccentricity
-	a := el.semiMajorAxis.AU()
+	a, b := el.prep.a, el.prep.b
 	s, c := math.Sincos(ea.Radians())
 
 	omc := 1 - c
@@ -680,7 +786,6 @@ func (el Elements) perifocalClassical(dtDays float64) (posPf, velPf vector.Vec3,
 	}
 
 	delta := 1 - e
-	b := a * math.Sqrt(delta*(1+e))
 
 	posPf = vector.V3(a*(delta-omc), b*s, 0)
 
@@ -708,18 +813,7 @@ func (el Elements) perifocalClassical(dtDays float64) (posPf, velPf vector.Vec3,
 func (el Elements) perifocalUniversal(dtDays float64) (posPf, velPf vector.Vec3, err error) {
 	q := el.perihelion.AU()
 	e := el.eccentricity
-	alpha := (1 - e) / q
-
-	auMeters := unit.AU(1).Meters()
-	day := constants.Derived.JulianDaySeconds.Value
-	mu := el.CentralBody().GM * day * day / (auMeters * auMeters * auMeters) // AU³/day²
-
-	if el.periodDays != 0 {
-		// Validate admits a period only for a closed orbit. Holding it means
-		// the mass parameter that gives an orbit of this size that period.
-		n := 2 * math.Pi / el.periodDays
-		mu = n * n / (alpha * alpha * alpha)
-	}
+	alpha, sqrtMu := el.prep.alpha, el.prep.sqrtMu
 
 	// A closed orbit repeats, so fold the interval to within half a period of
 	// perihelion. The universal anomaly then stays within ±π·√a, where the
@@ -727,12 +821,9 @@ func (el Elements) perifocalUniversal(dtDays float64) (posPf, velPf vector.Vec3,
 	// t is.
 	dt := dtDays
 
-	if alpha > 0 {
-		period := 2 * math.Pi / math.Sqrt(mu*alpha*alpha*alpha)
+	if period := el.prep.period; period > 0 {
 		dt -= period * math.Round(dt/period)
 	}
-
-	sqrtMu := math.Sqrt(mu)
 
 	chi, err := solveUniversal(q, e, alpha, sqrtMu, dt)
 	if err != nil {
@@ -741,7 +832,7 @@ func (el Elements) perifocalUniversal(dtDays float64) (posPf, velPf vector.Vec3,
 
 	c, s := stumpff(alpha * chi * chi)
 	r := q + e*chi*chi*c
-	v0 := math.Sqrt(mu * (1 + e) / q) // speed at perihelion, from vis-viva
+	v0 := el.prep.v0
 
 	f := 1 - chi*chi*c/q
 	g := dt - chi*chi*chi*s/sqrtMu
@@ -869,22 +960,22 @@ func stumpff(z float64) (c, s float64) {
 }
 
 // orient carries a perifocal state into the ICRS-aligned equatorial frame,
-// advancing the apsis by any secular precession over dtDays first.
+// along the prepared P and Q, turned first by any secular precession of the
+// apsis over dtDays. The apsis turns within the orbit's plane, so advancing
+// the argument of periapsis by Δω is turning P and Q about the plane's
+// normal: P cos Δω + Q sin Δω and Q cos Δω − P sin Δω, one Sincos. Only the
+// orientation drifts; the orbit's size and shape are unchanged, which is what
+// makes a secular rate a rate rather than a re-fit.
 func (el Elements) orient(posPf, velPf vector.Vec3, dtDays float64) (pos, vel vector.Vec3) {
-	// The apsis and node are advanced to the requested epoch before the
-	// orientation is applied. Only the orbit's orientation drifts; its size
-	// and shape are unchanged, which is what makes a secular rate a rate
-	// rather than a re-fit.
-	argp := angle.Rad(el.argPeriapsis.Radians() + el.precession.rate()*dtDays)
+	p, q := el.prep.p, el.prep.q
 
-	posRef := rotatePerifocalToEcliptic(posPf, el.inclination, el.ascendingNode, argp)
-	velRef := rotatePerifocalToEcliptic(velPf, el.inclination, el.ascendingNode, argp)
-
-	// Both paths end in the ICRF equatorial frame; they differ only in what
-	// the orbit's angles were measured against.
-	if lp := el.plane; lp != nil {
-		return lp.rotateToICRF(posRef), lp.rotateToICRF(velRef)
+	if rate := el.precession.rate(); rate != 0 {
+		s, c := math.Sincos(rate * dtDays)
+		p, q = p.MulScalar(c).Add(q.MulScalar(s)), q.MulScalar(c).Sub(p.MulScalar(s))
 	}
 
-	return rotateEclipticToEquatorialJ2000(posRef), rotateEclipticToEquatorialJ2000(velRef)
+	pos = p.MulScalar(posPf.X).Add(q.MulScalar(posPf.Y))
+	vel = p.MulScalar(velPf.X).Add(q.MulScalar(velPf.Y))
+
+	return pos, vel
 }
