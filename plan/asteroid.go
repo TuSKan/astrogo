@@ -102,10 +102,10 @@ func NewAsteroid(name string, id eph.ID, provider eph.Provider, opts ...Asteroid
 // arbitrary elements-only body in that case, and none is needed: the
 // provider FromCatalog builds is dedicated to that one Observable and
 // only ever compares this ID against itself, so a fixed sentinel —
-// chosen well above the major-body ID range (1-12, see
-// ephemeris/core.ID's consts) so it can never be mistaken for
-// Sun/Earth/etc. — is safe regardless of how many such bodies exist
-// side by side.
+// chosen above every planet and planetary satellite NAIF numbers (≤ 999)
+// and below the first comet SPK-ID Horizons issues (1000001), so it can
+// never be mistaken for a real body — is safe regardless of how many
+// such bodies exist side by side.
 const keplerSyntheticID eph.ID = 1_000_000
 
 // Name returns the asteroid's display name.

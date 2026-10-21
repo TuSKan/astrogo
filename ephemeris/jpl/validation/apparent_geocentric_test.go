@@ -99,9 +99,9 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 	}{
 		{"199", "Mercury", core.Mercury},
 		{"299", "Venus", core.Venus},
-		{"499", "Mars", core.Mars},
-		{"5", "Jupiter", core.Jupiter},
-		{"6", "Saturn", core.Saturn},
+		{"499", "Mars", core.MarsBarycenter},
+		{"5", "Jupiter", core.JupiterBarycenter},
+		{"6", "Saturn", core.SaturnBarycenter},
 	}
 
 	reference := metrology.Reference{

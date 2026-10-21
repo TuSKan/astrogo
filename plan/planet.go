@@ -63,34 +63,42 @@ func NewEarth(provider eph.Provider) *Planet {
 	return NewPlanet("Earth", eph.Earth, provider)
 }
 
-// NewMars creates a Mars target.
+// NewMars creates a Mars target: the Mars system barycenter, NAIF 4,
+// centimeters from the planet, which every planetary kernel holds.
 func NewMars(provider eph.Provider) *Planet {
-	return NewPlanet("Mars", eph.Mars, provider)
+	return NewPlanet("Mars", eph.MarsBarycenter, provider)
 }
 
-// NewJupiter creates a Jupiter target.
+// NewJupiter creates a Jupiter target: the Jupiter system barycenter, NAIF
+// 5, about 0.03″ from the planet's center as seen from Earth. A planetary
+// kernel holds the barycenter and not the planet; see [eph.ID].
 func NewJupiter(provider eph.Provider) *Planet {
-	return NewPlanet("Jupiter", eph.Jupiter, provider)
+	return NewPlanet("Jupiter", eph.JupiterBarycenter, provider)
 }
 
-// NewSaturn creates a Saturn target.
+// NewSaturn creates a Saturn target: the Saturn system barycenter, NAIF 6,
+// about 0.03″ from the planet. See [NewJupiter].
 func NewSaturn(provider eph.Provider) *Planet {
-	return NewPlanet("Saturn", eph.Saturn, provider)
+	return NewPlanet("Saturn", eph.SaturnBarycenter, provider)
 }
 
-// NewUranus creates an Uranus target.
+// NewUranus creates an Uranus target: the Uranus system barycenter, NAIF 7,
+// about 0.05″ from the planet. See [NewJupiter].
 func NewUranus(provider eph.Provider) *Planet {
-	return NewPlanet("Uranus", eph.Uranus, provider)
+	return NewPlanet("Uranus", eph.UranusBarycenter, provider)
 }
 
-// NewNeptune creates a Neptune target.
+// NewNeptune creates a Neptune target: the Neptune system barycenter, NAIF
+// 8, about 0.01″ from the planet. See [NewJupiter].
 func NewNeptune(provider eph.Provider) *Planet {
-	return NewPlanet("Neptune", eph.Neptune, provider)
+	return NewPlanet("Neptune", eph.NeptuneBarycenter, provider)
 }
 
-// NewPluto creates a Pluto target.
+// NewPluto creates a Pluto target: the Pluto–Charon barycenter, NAIF 9,
+// which a planetary kernel holds and eph.Default propagates from JPL's
+// approximate elements. Pluto's own center, 999, needs NAIF's plu kernel.
 func NewPluto(provider eph.Provider) *Planet {
-	return NewPlanet("Pluto", eph.Pluto, provider)
+	return NewPlanet("Pluto", eph.PlutoBarycenter, provider)
 }
 
 // Name returns the planet's name.

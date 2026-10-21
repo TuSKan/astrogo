@@ -302,7 +302,7 @@ func usnoNavigationalBody(name string) (eph.ID, bool) {
 	switch name {
 	case "Sun", "Jupiter", "Saturn":
 		return map[string]eph.ID{
-			"Sun": eph.Sun, "Jupiter": eph.Jupiter, "Saturn": eph.Saturn,
+			"Sun": eph.Sun, "Jupiter": eph.JupiterBarycenter, "Saturn": eph.SaturnBarycenter,
 		}[name], true
 	default:
 		// Venus and Mars are deliberately absent, and finding out why is most

@@ -64,7 +64,7 @@ func TestAngularDiameter_KnownValues(t *testing.T) {
 		// against Horizons at every distance.
 		{"Sun, Horizons 2026-01-03", eph.Sun, 0.98330377810852, 1951.038, 0.002},
 		{"Moon at mean distance", eph.Moon, 384_400_000.0 / 1.495978707e11, 31.1 * 60, 5.0},
-		{"Jupiter at 4.2 AU", eph.Jupiter, 4.2, 47.0, 0.5},
+		{"Jupiter at 4.2 AU", eph.JupiterBarycenter, 4.2, 47.0, 0.5},
 	}
 
 	for _, c := range cases {

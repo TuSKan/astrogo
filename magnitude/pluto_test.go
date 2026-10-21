@@ -197,7 +197,7 @@ func TestPlutoCharonDisagreesWithTheHistoricalLawAsDocumented(t *testing.T) {
 			t.Fatalf("%v: %v", d, err)
 		}
 
-		historical, err := magnitude.PlanetApparent(p, eph.Pluto, d)
+		historical, err := magnitude.PlanetApparent(p, eph.PlutoBarycenter, d)
 		if err != nil {
 			t.Fatalf("%v: %v", d, err)
 		}

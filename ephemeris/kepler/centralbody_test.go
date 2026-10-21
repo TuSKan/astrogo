@@ -140,12 +140,12 @@ func TestCentralBodyDefaultsToTheSun(t *testing.T) {
 func TestPeriodFollowsKeplersThirdLaw(t *testing.T) {
 	const radiusKM = 421_800 // roughly Io's distance, used for both
 
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
 
-	saturn, ok := kepler.CentralBodyFor(core.Saturn)
+	saturn, ok := kepler.CentralBodyFor(core.SaturnBarycenter)
 	if !ok {
 		t.Fatal("no central body for Saturn")
 	}
@@ -221,8 +221,8 @@ func TestCentralBodyForRefusesABodyWithNoSystem(t *testing.T) {
 		}
 	}
 
-	for _, id := range []core.ID{core.Earth, core.Mars, core.Jupiter, core.Saturn,
-		core.Uranus, core.Neptune, core.Pluto} {
+	for _, id := range []core.ID{core.Earth, core.MarsBarycenter, core.JupiterBarycenter, core.SaturnBarycenter,
+		core.UranusBarycenter, core.NeptuneBarycenter, core.PlutoBarycenter} {
 		body, ok := kepler.CentralBodyFor(id)
 		if !ok {
 			t.Errorf("CentralBodyFor(%s) reported false", id)
@@ -246,7 +246,7 @@ func TestCentralBodyForRefusesABodyWithNoSystem(t *testing.T) {
 // is what this returns; for Charon it is not — see
 // TestCharonNeedsTheSystemParameter.
 func TestCentralBodyForReturnsTheBodyParameter(t *testing.T) {
-	pluto, ok := kepler.CentralBodyFor(core.Pluto)
+	pluto, ok := kepler.CentralBodyFor(core.PlutoBarycenter)
 	if !ok {
 		t.Fatal("no central body for Pluto")
 	}
@@ -261,7 +261,7 @@ func TestCentralBodyForReturnsTheBodyParameter(t *testing.T) {
 // provider does: a satellite's state is its parent's plus the small offset,
 // so the two must differ by the orbit's radius and no more.
 func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
@@ -286,7 +286,7 @@ func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
 		t.Fatalf("State(moon): %v", err)
 	}
 
-	parent, err := p.State(core.Jupiter, when)
+	parent, err := p.State(core.JupiterBarycenter, when)
 	if err != nil {
 		t.Fatalf("State(Jupiter): %v", err)
 	}
@@ -310,7 +310,7 @@ func TestProviderPlacesASatelliteBesideItsParent(t *testing.T) {
 // year but long against the satellite's month, the satellite must orbit the
 // parent while the parent carries it along.
 func TestSatelliteMovesWithItsParent(t *testing.T) {
-	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, _ := kepler.CentralBodyFor(core.JupiterBarycenter)
 
 	const moonID = core.ID(501)
 
@@ -329,7 +329,7 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 			t.Fatalf("State(moon): %v", err)
 		}
 
-		parent, perr := p.State(core.Jupiter, when)
+		parent, perr := p.State(core.JupiterBarycenter, when)
 		if perr != nil {
 			t.Fatalf("State(Jupiter): %v", perr)
 		}
@@ -352,7 +352,7 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 	p := kepler.New()
 
-	st, err := p.State(core.Mars, time.J2000())
+	st, err := p.State(core.MarsBarycenter, time.J2000())
 	if err != nil {
 		t.Fatalf("State(Mars): %v", err)
 	}
@@ -373,7 +373,7 @@ func TestUnregisteredBodyStillReachesTheBase(t *testing.T) {
 // which is what separates an override that took effect from one silently
 // ignored.
 func TestPeriodOverridesTheDerivedMeanMotion(t *testing.T) {
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
@@ -426,7 +426,7 @@ func TestPeriodOverridesTheDerivedMeanMotion(t *testing.T) {
 // silently meant "a period of zero days" would divide by zero rather than
 // fall back, and nothing else in the suite would notice.
 func TestPeriodZeroRestoresTheDerivedMeanMotion(t *testing.T) {
-	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, _ := kepler.CentralBodyFor(core.JupiterBarycenter)
 
 	derived := circular(t, jupiter, 421_800)
 	cleared := derived.WithPeriod(3).WithPeriod(0)
@@ -462,7 +462,7 @@ func TestPeriodZeroRestoresTheDerivedMeanMotion(t *testing.T) {
 // carry no precession must propagate to the same state as elements that
 // carry the precession and let it do the advancing.
 func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
-	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, _ := kepler.CentralBodyFor(core.JupiterBarycenter)
 
 	// Io's apsis period, in Julian years, from the same JPL table as its
 	// elements. An eccentric, inclined orbit, so that moving the apsis moves
@@ -538,7 +538,7 @@ func TestSecularPrecessionTurnsTheApsisBackwards(t *testing.T) {
 // so that an Elements built from a table with no apsis column propagates
 // exactly as one that never mentioned precession.
 func TestSecularPrecessionZeroIsNoDrift(t *testing.T) {
-	jupiter, _ := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, _ := kepler.CentralBodyFor(core.JupiterBarycenter)
 
 	base := circular(t, jupiter, 421_800)
 	zeroed := base.WithSecularPrecession(kepler.SecularPrecession{})
@@ -572,7 +572,7 @@ func TestSecularPrecessionZeroIsNoDrift(t *testing.T) {
 // mockBaseProvider is reused from provider_test.go: it fails for every id,
 // which is exactly a base that cannot answer for the parent.
 func TestSatelliteFailureNamesItsParent(t *testing.T) {
-	jupiter, ok := kepler.CentralBodyFor(core.Jupiter)
+	jupiter, ok := kepler.CentralBodyFor(core.JupiterBarycenter)
 	if !ok {
 		t.Fatal("no central body for Jupiter")
 	}
@@ -596,7 +596,7 @@ func TestSatelliteFailureNamesItsParent(t *testing.T) {
 	// The satellite's own id is not the useful one here — the caller asked
 	// for it and knows it. The parent is what they cannot see.
 	if msg := err.Error(); !strings.Contains(msg, "central body") ||
-		!strings.Contains(msg, core.Jupiter.String()) {
+		!strings.Contains(msg, core.JupiterBarycenter.String()) {
 		t.Errorf("error %q names neither the role nor the parent body", msg)
 	}
 }

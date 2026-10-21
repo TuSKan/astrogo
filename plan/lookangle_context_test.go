@@ -43,14 +43,14 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 		derived := coord.NewContext(base, site, defaultAtm)
 		derived.SetTime(at)
 
-		st, err := sat.StateCtx(0, derived)
+		st, err := sat.StateCtx(sat.ID(), derived)
 		if err != nil {
 			t.Fatalf("StateCtx: %v", err)
 		}
 
 		want := derived.GeocentricToObserved(st.Pos)
 
-		got, err := LookAngle(sat, 0, derived)
+		got, err := LookAngle(sat, sat.ID(), derived)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		derived := coord.NewContext(base, site, defaultAtm)
 		derived.SetTime(at)
 
-		st, err := sat.State(0, at)
+		st, err := sat.State(sat.ID(), at)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
@@ -118,7 +118,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 			t.Fatalf("dt=%v: the moved Context answers exactly as a fresh one, so this probe cannot tell them apart", dt)
 		}
 
-		got, err := LookAngle(stateOnly{sat}, 0, derived)
+		got, err := LookAngle(stateOnly{sat}, sat.ID(), derived)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}
@@ -173,7 +173,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		at := time.Date(2026, time.April, 20, hour, 0, 0, 0, time.LocationUTC)
 		ctx := coord.NewContext(at, site, defaultAtm)
 
-		st, err := sat.State(0, at)
+		st, err := sat.State(sat.ID(), at)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
@@ -181,7 +181,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		reduction := coord.NewReducer(site, at, defaultAtm).Reduce(st.Pos)
 		reduction.Observed.SetDist(unit.Km(reduction.Topocentric.Norm() * kmPerAU))
 
-		got, err := LookAngle(stateOnly{sat}, 0, ctx)
+		got, err := LookAngle(stateOnly{sat}, sat.ID(), ctx)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}

@@ -42,8 +42,11 @@ var bodyEquatorialRadius = map[eph.ID]unit.Length{
 // one — asteroids, comets, and satellites report ok=false, since this library
 // has no general-purpose physical-size catalog for them (see
 // AngularDiameter's doc comment for that case).
+//
+// A planet's system barycenter, which plan observes from Mars out, has the
+// planet's radius (#809).
 func BodyEquatorialRadius(id eph.ID) (unit.Length, bool) {
-	r, ok := bodyEquatorialRadius[id]
+	r, ok := bodyEquatorialRadius[id.Body()]
 
 	return r, ok
 }

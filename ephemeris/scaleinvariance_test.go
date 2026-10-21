@@ -112,8 +112,8 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 			ids: map[string]core.ID{
 				"Sun":     eph.Sun,
 				"Moon":    eph.Moon,
-				"Mars":    eph.Mars,
-				"Jupiter": eph.Jupiter,
+				"Mars":    eph.MarsBarycenter,
+				"Jupiter": eph.JupiterBarycenter,
 			},
 		},
 		{
@@ -122,7 +122,7 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 			// second of error into 7.66 km.
 			name: "sgp4",
 			prov: sat,
-			ids:  map[string]core.ID{"ISS": core.ID(0)},
+			ids:  map[string]core.ID{"ISS": sat.ID()},
 		},
 		{
 			name: "kepler",

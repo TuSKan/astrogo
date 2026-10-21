@@ -75,7 +75,7 @@ func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
 			return errOf(planner.RankObservable([]plan.Observable{star}, s, e))
 		},
 		"SatellitePasses": func(s, e time.Time) error {
-			return errOf(plan.SatellitePasses(prov, "ISS", s, e, site.Location(), angle.Deg(10)))
+			return errOf(plan.SatellitePasses(prov, eph.Moon, "ISS", s, e, site.Location(), angle.Deg(10)))
 		},
 		"TransitEstimate":     func(s, e time.Time) error { return errOf2(plan.TransitEstimate(vega, site, s, e)) },
 		"MaxAltitudeInWindow": func(s, e time.Time) error { return errOf(plan.MaxAltitudeInWindow(vega, site, s, e)) },

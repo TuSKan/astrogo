@@ -77,7 +77,7 @@ func TestSatelliteShadowAgreesWithSkyfield(t *testing.T) {
 	sun := eph.Default()
 
 	eclipsed := func(tm time.Time) bool {
-		satSt, err := prov.State(eph.ID(0), tm)
+		satSt, err := prov.State(prov.ID(), tm)
 		if err != nil {
 			t.Fatalf("satellite state at %v: %v", tm, err)
 		}
@@ -199,7 +199,7 @@ func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Cont
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	sat := NewSatellite("ISS", eph.ID(0), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
+	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
 	return sat, site, coord.NewContext(tm, site.Location(), site.Refraction())
 }

@@ -37,9 +37,9 @@ func TestApparentStateHasConverged(t *testing.T) {
 		{"Moon", eph.Moon},
 		{"Sun", eph.Sun},
 		{"Venus", eph.Venus},
-		{"Mars", eph.Mars},
-		{"Jupiter", eph.Jupiter},
-		{"Neptune", eph.Neptune},
+		{"Mars", eph.MarsBarycenter},
+		{"Jupiter", eph.JupiterBarycenter},
+		{"Neptune", eph.NeptuneBarycenter},
 	} {
 		t.Run(body.name, func(t *testing.T) {
 			t.Parallel()

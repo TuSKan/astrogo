@@ -60,11 +60,11 @@ func planetSeriesTable() []planetSeries {
 	return []planetSeries{
 		{core.Mercury, 7, 1, 500, 0.4667},
 		{core.Venus, 7, 1, 1100, 0.7282},
-		{core.Mars, 26, 1, 9000, 1.6660},
-		{core.Jupiter, 78, 6, 82_000, 5.4547},
-		{core.Saturn, 87, 14, 263_000, 10.0536},
-		{core.Uranus, 86, 7, 661_000, 20.1972},
-		{core.Neptune, 11, 2, 248_000, 30.3276},
+		{core.MarsBarycenter, 26, 1, 9000, 1.6660},
+		{core.JupiterBarycenter, 78, 6, 82_000, 5.4547},
+		{core.SaturnBarycenter, 87, 14, 263_000, 10.0536},
+		{core.UranusBarycenter, 86, 7, 661_000, 20.1972},
+		{core.NeptuneBarycenter, 11, 2, 248_000, 30.3276},
 	}
 }
 

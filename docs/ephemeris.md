@@ -32,7 +32,7 @@ them — **1.58 µs** for the same sky — and SOFA's order for apparent places.
 | `jpl.Provider` | geocentric `State`, ICRF, AU and AU/day | SPK types 2, 3, 21 | each `State` sums the target's chain to the barycenter and the Earth's, and differences them |
 | `eph.Default()` | the same | `kepler` over a SOFA base: `Epv00`, `Plan94`, `Moon98`; Pluto by two-body elements | analytical; no kernel |
 | `kepler.Provider` | the same | two-body propagation, classical or universal variables | delegates every other body to its base |
-| `satellite.Satellite` | GCRS, geocentric | SGP4, then TEME → GCRS | `id` must be 0 |
+| `satellite.Satellite` | GCRS, geocentric | SGP4, then TEME → GCRS | `id` is its NAIF code, −100000 − NORAD number (#809); it was 0 |
 
 And the places built on them:
 
@@ -65,10 +65,10 @@ produces it. A contract the code cannot meet is a defect, not a footnote.
 
 ### 3.1 Target identity
 
-**An `ID` is a NAIF integer code, and nothing else.** Today one `uint32` holds
-an astrogo enumeration (1–12) and NAIF codes above it, and the two overlap
-exactly where NAIF puts the system barycenters (#809, after #636 and the
-small-body overlap `SmallBodyBase` already removed). The constants become
+**An `ID` is a NAIF integer code, and nothing else** (#809). It was one
+`uint32` holding an astrogo enumeration (1–12) and NAIF codes above it, and
+the two overlapped exactly where NAIF puts the system barycenters (after #636
+and the small-body overlap `SmallBodyBase` already removed). The constants are
 names for codes:
 
 ```go
@@ -94,7 +94,8 @@ different names; which one a planner observes is the planner's choice, made
 visibly (`plan.NewJupiter` keeps the barycenter it uses today, whose distance
 from the body centre is measured in `core.ID`'s doc, 0.05″ at worst). A
 provider never substitutes one for the other. Small bodies keep astrogo's
-`SmallBodyBase + n`, the Horizons convention.
+`SmallBodyBase + n`, the Horizons convention, and an Earth satellite is
+−100000 − its NORAD number, NAIF's code for a satellite with no DSN number.
 
 ### 3.2 Origin
 

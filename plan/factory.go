@@ -52,9 +52,9 @@ func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	// ── A NAIF major body, as catalog/jpl reports one ──
 	//
-	// Its SPK-ID is a NAIF ID, which astrogo numbers differently, so it is
-	// translated rather than read as an eph.ID: read as one, the JPL Sun
-	// (NAIF 10) was astrogo's body 10, the Moon (#636).
+	// Its SPK-ID is a NAIF code, as an eph.ID is (#809), and is translated
+	// only to the point plan observes for that body: a planet's system
+	// barycenter from Mars out (see majorBodyForNAIF).
 	if naif, ok := naifMajorRangeID(c.SPKID); ok {
 		if body, ok := majorBodyForNAIF(naif); ok {
 			return NewPlanet(c.Name, body, p), nil
@@ -71,16 +71,24 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 		}
 	}
 
-	id := parseEphID(c.ID)
+	id, idOK := ephIDOf(c)
 
 	// ── Satellite ──
+	//
+	// Its ID is a NORAD catalog number, which names it as NAIF does,
+	// −100000 − n (#809). Read as an eph.ID, 25544 was a body no satellite
+	// provider answers for, so every position of the ISS failed.
 	if c.Kind == "Satellite" && p != nil {
-		return NewSatellite(c.Name, id, p), nil
+		if norad, err := strconv.Atoi(c.ID); err == nil {
+			if sid, ok := eph.SatelliteID(norad); ok {
+				return NewSatellite(c.Name, sid, p), nil
+			}
+		}
 	}
 
 	// ── Sun/Moon/planets — always have a real ephemeris, provider or not ──
 	//
-	// isPlanetID(id) means this target really is a major named body (the
+	// majorBodyForNAIF(id) means this target really is a major named body (the
 	// resolver tags the Sun with KindStar, not KindPlanet, hence checking
 	// all three Kinds here). NewPlanet itself defaults a nil provider to
 	// eph.Default() — which answers every one of these bodies (Sun, Moon,
@@ -90,8 +98,10 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	// Observable built from whatever (or no) fixed coordinate happened to
 	// be on c.Coord. A caller-supplied provider (a real kernel, for
 	// perturbation-aware accuracy) always takes precedence, unchanged.
-	if (c.Kind == resolve.KindPlanet || c.Kind == resolve.KindMoon || c.Kind == resolve.KindStar) && isPlanetID(id) {
-		return NewPlanet(c.Name, id, p), nil
+	if c.Kind == resolve.KindPlanet || c.Kind == resolve.KindMoon || c.Kind == resolve.KindStar {
+		if body, ok := majorBodyForNAIF(int(id)); idOK && ok {
+			return NewPlanet(c.Name, body, p), nil
+		}
 	}
 
 	// ── Moving body with provider ──
@@ -142,7 +152,7 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	if c.HasElements && needsSmallBodyEphemeris(c.Kind) {
 		if el, err := elementsFromTarget(c); err == nil {
 			keplerID := id
-			if keplerID == 0 {
+			if !idOK {
 				keplerID = keplerSyntheticID
 			}
 
@@ -308,11 +318,12 @@ func naifMajorRangeID(spkID string) (int, bool) {
 	return n, true
 }
 
-// majorBodyForNAIF returns the astrogo body a NAIF ID names. A planet's
-// body center and its system barycenter both name the planet: astrogo's
-// Mars through Neptune are the barycenters, a few hundredths of an
-// arcsecond from the planets (see eph.ID). The Earth-Moon barycenter (3)
-// names no astrogo body.
+// majorBodyForNAIF returns the point plan observes for the major body a
+// NAIF code names: the code itself for the Sun, the Moon, the Earth, Mercury
+// and Venus, and from Mars out the system barycenter for either the
+// barycenter or the planet's center, since a planetary kernel holds only the
+// barycenter, a few hundredths of an arcsecond from the planet (see eph.ID).
+// The Earth-Moon barycenter (3) names no body to observe.
 func majorBodyForNAIF(naif int) (eph.ID, bool) {
 	switch naif {
 	case 10:
@@ -326,39 +337,51 @@ func majorBodyForNAIF(naif int) (eph.ID, bool) {
 	case 399:
 		return eph.Earth, true
 	case 4, 499:
-		return eph.Mars, true
+		return eph.MarsBarycenter, true
 	case 5, 599:
-		return eph.Jupiter, true
+		return eph.JupiterBarycenter, true
 	case 6, 699:
-		return eph.Saturn, true
+		return eph.SaturnBarycenter, true
 	case 7, 799:
-		return eph.Uranus, true
+		return eph.UranusBarycenter, true
 	case 8, 899:
-		return eph.Neptune, true
+		return eph.NeptuneBarycenter, true
 	case 9, 999:
-		return eph.Pluto, true
+		return eph.PlutoBarycenter, true
 	default:
 		return 0, false
 	}
 }
 
-// parseEphID converts a string ID to an eph.ID, returning 0 on failure.
-//
-// Bounded to 31 bits, not 32. eph.ID is unsigned and a NAIF id is signed
-// 32-bit, so anything above MaxInt32 is not an id at all — and converting one
-// wraps it to a negative value, which NAIF uses for spacecraft. Parsing it as
-// a failure keeps a garbage designation from arriving downstream as a
-// plausible different body.
-func parseEphID(id string) eph.ID {
-	n, err := strconv.ParseUint(id, 10, 31)
-	if err != nil {
-		return 0
+// ephIDOf is the NAIF code a catalog target names, and whether it names one.
+// An SPK-ID is a NAIF code (JPL, SBDB). A small body a catalog gives by its
+// number instead — FINK's asteroids, MPCORB's packed "00433" — is NAIF's
+// 20000000 + n: every small-body code NAIF issues is above 1,000,000, so a
+// positive number below that can only be a catalog number. Read as a NAIF
+// code, 433 named no body and 301 would have been the Moon; a lookup used to
+// retry a missing code as a small body's, and no longer does (#809).
+func ephIDOf(c catalog.Target) (eph.ID, bool) {
+	if c.SPKID != "" {
+		return parseEphID(c.SPKID)
 	}
 
-	return eph.ID(n)
+	switch c.Kind { //nolint:exhaustive // only small bodies are numbered by their catalogs
+	case resolve.KindAsteroid, resolve.KindDwarfPlanet, resolve.KindComet:
+		if n, err := strconv.Atoi(c.ID); err == nil && n > 0 && n < 1000000 {
+			return eph.SmallBodyID(n)
+		}
+	}
+
+	return parseEphID(c.ID)
 }
 
-// isPlanetID returns true for NAIF IDs that correspond to Sun/Moon/planets.
-func isPlanetID(id eph.ID) bool {
-	return id >= 1 && id <= 11
+// parseEphID reads a NAIF code, and whether id is one. Zero is the Solar
+// System barycenter, so a failure is the bool, not a value of the ID.
+func parseEphID(id string) (eph.ID, bool) {
+	n, err := strconv.ParseInt(id, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+
+	return eph.ID(n), true
 }

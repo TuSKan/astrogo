@@ -90,11 +90,11 @@ func TestProvider_State_DefaultBase_SunMoonPlanets(t *testing.T) {
 		{"Mercury", core.Mercury},
 		{"Venus", core.Venus},
 		{"Earth", core.Earth},
-		{"Mars", core.Mars},
-		{"Jupiter", core.Jupiter},
-		{"Saturn", core.Saturn},
-		{"Uranus", core.Uranus},
-		{"Neptune", core.Neptune},
+		{"Mars", core.MarsBarycenter},
+		{"Jupiter", core.JupiterBarycenter},
+		{"Saturn", core.SaturnBarycenter},
+		{"Uranus", core.UranusBarycenter},
+		{"Neptune", core.NeptuneBarycenter},
 	}
 
 	for _, b := range bodies {
@@ -125,7 +125,7 @@ func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
 	// source for it. The default base now propagates its Standish elements
 	// so that a satellite of Pluto can be placed, so the gap it stood for is
 	// gone; an unnamed body still falls through.
-	if _, err := p.State(core.Pluto, tm); err != nil {
+	if _, err := p.State(core.PlutoBarycenter, tm); err != nil {
 		t.Errorf("State(Pluto) = %v; the default base answers it now", err)
 	}
 

@@ -36,7 +36,7 @@ func TestLowNumberedAsteroidsLoad(t *testing.T) {
 	}{
 		{1, "1;", "Ceres", core.Mercury},
 		{2, "2;", "Pallas", core.Venus},
-		{4, "4;", "Vesta", core.Mars},
+		{4, "4;", "Vesta", core.MarsBarycenter},
 	}
 
 	for _, c := range cases {
@@ -50,7 +50,7 @@ func TestLowNumberedAsteroidsLoad(t *testing.T) {
 
 			defer func() { _ = p.Close() }()
 
-			want := core.SmallBodyID(c.number)
+			want, _ := core.SmallBodyID(c.number)
 
 			var found bool
 

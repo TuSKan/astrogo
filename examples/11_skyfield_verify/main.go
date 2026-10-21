@@ -78,7 +78,9 @@ func main() {
 	fmt.Println("┌─ Method 1: Built-in SOFA Provider (Plan94) ─────────────────────┐")
 
 	sofaProv := eph.Default()
-	computeAndPrint(sofaProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
+	// Plan94 places the Mars system barycenter, NAIF 4, centimeters from the
+	// planet, as a DE kernel does; neither holds Mars's own center, 499.
+	computeAndPrint(sofaProv, eph.MarsBarycenter, t, horizonsRA, horizonsDec, horizonsDist)
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 
@@ -104,7 +106,7 @@ func main() {
 			}
 		}()
 
-		computeAndPrint(jplProv, eph.Mars, t, horizonsRA, horizonsDec, horizonsDist)
+		computeAndPrint(jplProv, eph.MarsBarycenter, t, horizonsRA, horizonsDec, horizonsDist)
 	}
 
 	fmt.Println("└──────────────────────────────────────────────────────────────────┘")

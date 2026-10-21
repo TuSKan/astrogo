@@ -87,7 +87,7 @@ func TestStateFromCachedRecordsAllocatesNothing(t *testing.T) {
 
 	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	for _, id := range []core.ID{core.Sun, core.Moon, core.Mercury, core.Mars, core.Neptune} {
+	for _, id := range []core.ID{core.Sun, core.Moon, core.Mercury, core.MarsBarycenter, core.NeptuneBarycenter} {
 		if _, err := p.State(id, at); err != nil {
 			t.Fatalf("%v: %v", id, err)
 		}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/time"
@@ -35,7 +34,7 @@ func newISSProvider(t *testing.T) *satellite.Satellite {
 
 func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 	prov := newISSProvider(t)
-	sat := NewSatellite("ISS", eph.ID(0), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
+	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
 	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 
@@ -65,8 +64,8 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Errorf("Name() = %q, want ISS", sat.Name())
 	}
 
-	if sat.EphID() != eph.ID(0) {
-		t.Errorf("EphID() = %v, want 0", sat.EphID())
+	if sat.EphID() != prov.ID() {
+		t.Errorf("EphID() = %v, want the satellite's own NAIF code %v", sat.EphID(), prov.ID())
 	}
 
 	if sat.Provider() != prov {
@@ -92,7 +91,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 
 func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 	prov := newISSProvider(t)
-	sat := NewSatellite("ISS", eph.ID(0), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
+	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
 	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 
@@ -133,7 +132,7 @@ func TestLookAngle_ISS(t *testing.T) {
 	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
 	ctx := coord.NewContext(tm, loc, defaultAtm)
 
-	altaz, err := LookAngle(prov, 0, ctx)
+	altaz, err := LookAngle(prov, prov.ID(), ctx)
 	if err != nil {
 		t.Fatalf("LookAngle: %v", err)
 	}
@@ -161,7 +160,7 @@ func TestSatellitePasses_ISS(t *testing.T) {
 	start := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Hours(24))
 
-	passes, err := SatellitePasses(prov, "ISS", start, end, loc, angle.Deg(10))
+	passes, err := SatellitePasses(prov, prov.ID(), "ISS", start, end, loc, angle.Deg(10))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
@@ -205,12 +204,12 @@ const minElevationTolerance = 9.9
 func TestPlanSatellite_StaticMagnitudeAndPhaseModel(t *testing.T) {
 	prov := newISSProvider(t)
 
-	noStdMag := NewSatellite("ISS", eph.ID(0), prov)
+	noStdMag := NewSatellite("ISS", prov.ID(), prov)
 	if _, ok := noStdMag.StaticMagnitude(); ok {
 		t.Error("expected StaticMagnitude ok=false when WithStdMag was not set")
 	}
 
-	withStdMag := NewSatellite("ISS", eph.ID(0), prov,
+	withStdMag := NewSatellite("ISS", prov.ID(), prov,
 		WithStdMag(-1.3, magnitude.ConventionMcCants), WithPhaseModel(magnitude.PhaseCylinder))
 
 	m, ok := withStdMag.StaticMagnitude()

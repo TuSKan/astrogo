@@ -45,12 +45,12 @@ func TestStateCtxIsStateAtTheContextInstant(t *testing.T) {
 		at := start.Add(unit.Minutes(float64(10 * i)))
 		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
 
-		want, err := sat.State(eph.ID(0), at)
+		want, err := sat.State(sat.ID(), at)
 		if err != nil {
 			t.Fatalf("State: %v", err)
 		}
 
-		got, err := sat.StateCtx(eph.ID(0), ctx)
+		got, err := sat.StateCtx(sat.ID(), ctx)
 		if err != nil {
 			t.Fatalf("StateCtx: %v", err)
 		}

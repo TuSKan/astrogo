@@ -297,7 +297,10 @@ type PassEvent struct {
 // The function uses a grid-sampling approach with 30-second steps (appropriate
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
 // for sub-second rise/set boundary refinement.
-func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
+//
+// id is the satellite's NAIF code, the one prov answers for — for a
+// satellite.Satellite, its ID(). name labels the returned passes.
+func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.Time,
 	observer *coord.Geodetic, minElevation angle.Angle,
 ) ([]SatellitePass, error) {
 	if err := checkInterval(start, end); err != nil {
@@ -321,14 +324,13 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 	// evaluation, at every sample. LookAngle now places the satellite with
 	// the Context's own (#812), and the sample is SGP4 and a rotation.
 	//
-	// Body id 0 is not a placeholder: satellite.Satellite carries one TLE and
-	// its State rejects any other id with ErrUnexpectedID, so 0 is the only
-	// one a satellite provider accepts. The name parameter is a label for the
-	// returned pass, not a lookup key.
+	// The satellite is asked for by its own NAIF code. It used to be asked
+	// for as 0, which a satellite provider answered and which is the Solar
+	// System barycenter's code now that an ID is a NAIF code (#809).
 	ctxAt := movingContext(observer, defaultAtm)
 
 	lookAt := func(t time.Time) (coord.AltAz, error) {
-		return LookAngle(prov, 0, ctxAt(t))
+		return LookAngle(prov, id, ctxAt(t))
 	}
 
 	// Elevation evaluation function.
@@ -427,7 +429,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 			currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
 
 			// Find culmination (max elevation) between rise and set.
-			if currentPass.Culmination, err = findCulmination(prov, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
+			if currentPass.Culmination, err = findCulmination(prov, id, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
 				return nil, fmt.Errorf("satellite passes: culmination: %w", err)
 			}
 
@@ -449,7 +451,7 @@ func SatellitePasses(prov eph.Provider, name string, start, end time.Time,
 // (#476). The culmination it reports is computed from a full Context at the
 // chosen instant, as rise and set are, so the moving Context decides only
 // which sample wins.
-func findCulmination(prov eph.Provider, observer *coord.Geodetic,
+func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 	ctxAt func(time.Time) *coord.Context, start, end time.Time,
 ) (PassEvent, error) {
 	step := unit.Seconds(5)
@@ -457,7 +459,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	bestEl := -90.0
 
 	for t := start; !t.After(end); t = t.Add(step) {
-		altaz, err := LookAngle(prov, 0, ctxAt(t))
+		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
 			return PassEvent{}, err
 		}
@@ -480,7 +482,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 	}
 
 	for t := refineStart; !t.After(refineEnd); t = t.Add(unit.Seconds(1)) {
-		altaz, err := LookAngle(prov, 0, ctxAt(t))
+		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
 			return PassEvent{}, err
 		}
@@ -493,7 +495,7 @@ func findCulmination(prov eph.Provider, observer *coord.Geodetic,
 
 	ctx := coord.NewContext(bestTime, observer, defaultAtm)
 
-	altaz, err := LookAngle(prov, 0, ctx)
+	altaz, err := LookAngle(prov, id, ctx)
 	if err != nil {
 		return PassEvent{}, err
 	}

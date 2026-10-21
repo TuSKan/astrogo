@@ -125,7 +125,7 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 			continue // near the horizon refraction dominates and swamps the point
 		}
 
-		geometric, err := eph.Position(prov, eph.Mars, tm)
+		geometric, err := eph.Position(prov, eph.MarsBarycenter, tm)
 		testutil.AssertNoError(t, err)
 
 		wasAA := ctx.GeocentricToObserved(geometric)
@@ -225,14 +225,14 @@ func TestSatellitePositionsAreNotRetarded(t *testing.T) {
 	prov, err := satellite.NewFromTLE("ISS (ZARYA)", issLine1, issLine2)
 	testutil.AssertNoError(t, err)
 
-	sat := NewSatellite("ISS", eph.ID(0), prov)
+	sat := NewSatellite("ISS", prov.ID(), prov)
 
 	tm := time.Date(2026, time.January, 1, 12, 0, 0, 0, time.LocationUTC)
 
 	got, err := sat.GeocentricVec(tm)
 	testutil.AssertNoError(t, err)
 
-	want, err := eph.Position(prov, eph.ID(0), tm)
+	want, err := eph.Position(prov, prov.ID(), tm)
 	testutil.AssertNoError(t, err)
 
 	if got != want {
@@ -329,7 +329,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 		name string
 		obj  Observable
 	}{
-		{"Planet", NewPlanet("stub", eph.Mars, prov)},
+		{"Planet", NewPlanet("stub", eph.MarsBarycenter, prov)},
 		{"Asteroid", NewAsteroid("stub", eph.ID(2000001), prov)},
 		{"Comet", NewComet("stub", eph.ID(1000001), prov, 10, 4)},
 		{"GenericBody", NewGenericBody("stub", eph.ID(2000002), prov)},
@@ -405,7 +405,7 @@ func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
 		{"Vesta", NewAsteroid("Vesta", eph.ID(2000004), prov)},
 		{"Halley", NewComet("Halley", eph.ID(1000036), prov, 5.5, 8)},
 		{"Chiron", NewGenericBody("Chiron", eph.ID(2002060), prov)},
-		{"Neptune", NewPlanet("Neptune", eph.Neptune, prov)},
+		{"Neptune", NewPlanet("Neptune", eph.NeptuneBarycenter, prov)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -451,7 +451,7 @@ func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
 func TestApparentDirectionRefusesTheGeocenter(t *testing.T) {
 	t.Parallel()
 
-	body := NewPlanet("AtTheCenter", eph.Mars, zeroProvider{})
+	body := NewPlanet("AtTheCenter", eph.MarsBarycenter, zeroProvider{})
 	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	// The vector itself is fine: zero is a state, just not a direction.

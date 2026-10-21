@@ -60,7 +60,7 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 
 	bodies := map[string]eph.ID{
 		"Moon": eph.Moon,
-		"Mars": eph.Mars,
+		"Mars": eph.MarsBarycenter,
 		"Sun":  eph.Sun,
 	}
 

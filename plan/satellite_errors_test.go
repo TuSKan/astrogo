@@ -26,7 +26,7 @@ func TestSatellitePassesReturnEveryPropagationFailure(t *testing.T) {
 	// are few enough to fail in turn.
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
 
-	passes, err := SatellitePasses(sat, "ISS", start, start.Add(unit.Hours(6)), site, minEl)
+	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Hours(6)), site, minEl)
 	if err != nil || len(passes) == 0 {
 		t.Fatalf("%d passes, err %v; want at least one", len(passes), err)
 	}
@@ -35,7 +35,7 @@ func TestSatellitePassesReturnEveryPropagationFailure(t *testing.T) {
 	to := passes[0].Set.Time.Add(unit.Minutes(2))
 
 	counting := &failingOnceProvider{Provider: sat, on: -1}
-	if got, err := SatellitePasses(counting, "ISS", from, to, site, minEl); err != nil || len(got) != 1 {
+	if got, err := SatellitePasses(counting, sat.ID(), "ISS", from, to, site, minEl); err != nil || len(got) != 1 {
 		t.Fatalf("%d passes around the first, err %v; want 1", len(got), err)
 	}
 
@@ -54,7 +54,7 @@ func TestSatellitePassesReturnEveryPropagationFailure(t *testing.T) {
 	for _, call := range calls {
 		prov := &failingOnceProvider{Provider: sat, on: call}
 
-		if _, err := SatellitePasses(prov, "ISS", from, to, site, minEl); !errors.Is(err, errFailingOnce) {
+		if _, err := SatellitePasses(prov, sat.ID(), "ISS", from, to, site, minEl); !errors.Is(err, errFailingOnce) {
 			if missed++; missed <= 3 {
 				t.Errorf("provider failing on call %d of %d: err %v, want errFailingOnce", call, counting.calls, err)
 			}

@@ -98,7 +98,7 @@ func TestAstrometricDiffersFromApparentByAberration(t *testing.T) {
 	t.Run("a planet's aberration reaches the constant and never exceeds it", func(t *testing.T) {
 		t.Parallel()
 
-		for _, id := range []ID{Jupiter, Mars} {
+		for _, id := range []ID{JupiterBarycenter, MarsBarycenter} {
 			var maxSep float64
 
 			for day := range 73 {

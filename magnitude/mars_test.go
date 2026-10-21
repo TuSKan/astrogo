@@ -155,7 +155,7 @@ func TestMarsGeometryAgreesWithHorizons(t *testing.T) {
 func marsVectors(t *testing.T, p eph.Provider, tm time.Time) (sunToPlanet, observerToPlanet [3]float64, delta float64) {
 	t.Helper()
 
-	mars, err := p.State(eph.Mars, tm)
+	mars, err := p.State(eph.MarsBarycenter, tm)
 	if err != nil {
 		t.Fatalf("Mars state at %s: %v", tm, err)
 	}

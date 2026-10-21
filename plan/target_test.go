@@ -132,7 +132,7 @@ func TestFromCatalog(t *testing.T) {
 
 	// Planet
 	planet := mustFromCatalog(t, catalog.Target{
-		ID: "11", Name: "Sun", Kind: resolve.KindStar,
+		ID: "10", Name: "Sun", Kind: resolve.KindStar,
 	}, eph.Default())
 	if p, ok := planet.(*Planet); !ok {
 		t.Errorf("FromCatalog Planet returned %T, want *Planet", planet)

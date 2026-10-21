@@ -39,7 +39,7 @@ func NewPlanetaryMoon(name string, provider eph.Provider, opts ...AsteroidOption
 	base[0] = WithHG(spec.h, moonDefaultG)
 
 	return &PlanetaryMoon{
-		Asteroid: NewAsteroid(spec.name, eph.ID(spec.naifID), provider, append(base, opts...)...), //nolint:gosec // naifID is a fixed, small, positive NAIF body ID (401-901)
+		Asteroid: NewAsteroid(spec.name, eph.ID(spec.naifID), provider, append(base, opts...)...),
 		parent:   spec.parent,
 	}, nil
 }
