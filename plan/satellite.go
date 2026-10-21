@@ -216,6 +216,14 @@ var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 // defaultAtm is used for satellite pass prediction when no atmosphere is specified.
 var defaultAtm = atmosphere.Refraction{}
 
+// contextStater is a provider that can place its body with the
+// precession-nutation of a Context in hand, rather than evaluating it again
+// at the Context's instant: [eph.Satellite], whose State is otherwise
+// 99% that evaluation (#812).
+type contextStater interface {
+	StateCtx(id eph.ID, ctx *coord.Context) (eph.State, error)
+}
+
 // LookAngle computes the topocentric look angle (altitude, azimuth, distance)
 // from an observer to any celestial body at the Context's time.
 //
@@ -241,7 +249,17 @@ var defaultAtm = atmosphere.Refraction{}
 // previously had that quietly discarded and a full rebuild substituted, which
 // is the opposite of what they asked for.
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
-	st, err := prov.State(id, ctx.Time())
+	var (
+		st  eph.State
+		err error
+	)
+
+	if c, ok := prov.(contextStater); ok {
+		st, err = c.StateCtx(id, ctx)
+	} else {
+		st, err = prov.State(id, ctx.Time())
+	}
+
 	if err != nil {
 		return coord.AltAz{}, fmt.Errorf("satellite: look angle state: %w", err)
 	}
@@ -296,11 +314,15 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 	//
 	// The Context comes from a cache rather than a fresh coord.NewContext per
 	// call. Decomposed on the ISS at Paranal, a rebuild is 145.5 µs against
-	// 94.8 µs for the SGP4 propagation and 24 ns for the transform itself, so
+	// 94.8 µs for the satellite's State and 24 ns for the transform itself, so
 	// 61% of every 30-second sample went on rebuilding state that barely
 	// changes. The reuse window's ≲0.1″ is three to four orders of magnitude
 	// inside SGP4's own kilometer-scale along-track error, which at a few
 	// hundred km of range is minutes of arc — see movingContext and #166.
+	//
+	// That State was itself 99% the same thing: a fresh precession-nutation
+	// evaluation, at every sample. LookAngle now places the satellite with
+	// the Context's own (#812), and the sample is SGP4 and a rotation.
 	//
 	// The satellite is asked for by its own NAIF code. It used to be asked
 	// for as 0, which a satellite provider answered and which is the Solar

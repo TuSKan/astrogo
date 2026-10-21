@@ -197,13 +197,9 @@ func windowsOf(intervals []Interval) []Window {
 // maxBoundaryShift is how far a cached-Context window boundary may sit from
 // the full-Context one.
 //
-// Measured over samplingCases, the largest shift is 3.1 ms, on a star at the
-// high-latitude site; the Moon and Sun move by microseconds, since what SetTime
-// holds fixed that matters most here is the direction of annual aberration,
-// which their geocentric vectors do not pass through. The bound is the 0.01 s
-// of rise/set bias SetTime's own doc comment promises, three times the
-// measurement. It is also a test of SetTime's rebuild hour: stretched to a
-// day, the same cases shift by up to 32 ms and fail.
+// Measured over samplingCases, the largest shift is 0.57 ms, on a star. It
+// was 3.1 ms while SetTime held its series' state fixed for an hour at a time
+// (#790), and the bound, 0.01 s of rise/set bias, was set at three times that.
 const maxBoundaryShift = 0.01
 
 func compareIntervals(t *testing.T, name string, got, want []Window) {

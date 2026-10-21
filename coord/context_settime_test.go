@@ -85,62 +85,87 @@ func TestSetTime_ZeroDeltaMatchesNewContext(t *testing.T) {
 	}
 }
 
-// TestSetTime_WithinTheHourIsTheCheapPath holds SetTime's error inside the
-// hour to its documented ≲0.1″ per hour, and requires it to be non-zero: a
-// result identical to a fresh NewContext means SetTime rebuilt, and the cheap
-// path is not being tested at all.
-func TestSetTime_WithinTheHourIsTheCheapPath(t *testing.T) {
+// settimeBoundArcsec is SetTime's documented bound against NewContext at the
+// same instant: linear interpolation of the series' state across a day,
+// limited by nutation's 13.66-day term (see SetTime). Measured ≤0.0049″ over
+// 30 days at three latitudes and two epochs.
+const settimeBoundArcsec = 0.007
+
+// TestSetTime_IsNewContextAtANode: where SetTime evaluated the series, it is
+// what NewContext builds there — at the instant ctx was built, and at the far
+// end of the bracket a later move evaluated. Interpolation is exact at its
+// ends, and the decomposition (series, then SOFA's Apco at t's Earth rotation
+// angle) is NewContext's own.
+func TestSetTime_IsNewContextAtANode(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	const boundArcsecPerHour = 0.1
+	ctx := coord.NewContext(base, site, atm)
+	ctx.SetTime(base.Add(unit.Hours(12))) // evaluates the bracket's far end, a day out
 
-	for _, hours := range []float64{0.25, 0.5, 1} {
-		ctx := coord.NewContext(base, site, atm)
-		ctx.SetTime(base.Add(unit.Hours(hours)))
+	for _, at := range []time.Time{base.Add(unit.Days(1)), base} {
+		ctx.SetTime(at)
 
-		d := sameAsNewContext(t, ctx, site, atm, star) * 3600
-		if bound := boundArcsecPerHour * hours; d > bound {
-			t.Errorf("Δt=%gh: SetTime is %g″ from NewContext, want <= %g″ (documented bound)", hours, d, bound)
-		}
-
-		// A floor, not an exact zero (#731). A rebuild through SetTime's own
-		// decomposition differs from NewContext by up to the 1e-12° that
-		// TestSetTime_ZeroDeltaMatchesNewContext allows (3.6e-9″), not by 0,
-		// and would pass `d == 0`. The cheap path measures 9.3 mas at a
-		// quarter hour, so a microarcsecond separates the two by four orders
-		// either side.
-		const cheapPathFloorArcsec = 1e-6
-
-		if d < cheapPathFloorArcsec {
-			t.Errorf("Δt=%gh: SetTime is %g″ from NewContext, under %g″, so it rebuilt inside the hour",
-				hours, d, cheapPathFloorArcsec)
+		if d := sameAsNewContext(t, ctx, site, atm, star); d > 1e-12 {
+			t.Errorf("%v: SetTime to a node is %g° from NewContext, want 1e-12", at, d)
 		}
 	}
 }
 
-// TestSetTime_RebuildsAnHourOut is what SetTime adds to AtTime: past the
-// hour it builds the Context again for t, so it matches NewContext exactly,
-// in either direction, and then works from the new epoch. AtTime held the
-// first epoch forever, and a whole night stepped from one root drifted to
-// ≲0.8″ (#675).
-func TestSetTime_RebuildsAnHourOut(t *testing.T) {
+// TestSetTime_StaysWithinItsBound walks a Context three days forward and two
+// back in 37-minute steps, through holding, a first bracket, moving brackets
+// and a rebuild, and holds every step to NewContext at the documented bound.
+// It used to drift to 0.07″ before an hourly rebuild, most of it the
+// observer's velocity held at the epoch's Earth rotation angle (#790).
+//
+// And at an instant between nodes the answer must differ from NewContext's:
+// identical everywhere would mean SetTime evaluated the series at every
+// step, which is right but is the cost it exists to avoid.
+func TestSetTime_StaysWithinItsBound(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
 	ctx := coord.NewContext(base, site, atm)
 
-	for _, hours := range []float64{6, 24, -3} {
-		ctx.SetTime(base.Add(unit.Hours(hours)))
+	var worst float64
 
-		if d := sameAsNewContext(t, ctx, site, atm, star); d > 1e-12 {
-			t.Errorf("Δt=%gh: SetTime is %g° from NewContext, want a rebuild (1e-12)", hours, d)
-		}
+	step := unit.Minutes(37)
+	for i := 1; i <= 117; i++ { // three days out
+		ctx.SetTime(base.Add(step * unit.Duration(i)))
+		worst = max(worst, sameAsNewContext(t, ctx, site, atm, star)*3600)
 	}
 
-	// Half an hour from the last epoch, −3 h: the cheap path again.
-	ctx.SetTime(base.Add(unit.Hours(-2.5)))
+	for i := 117; i >= 39; i-- { // two days back
+		ctx.SetTime(base.Add(step * unit.Duration(i)))
+		worst = max(worst, sameAsNewContext(t, ctx, site, atm, star)*3600)
+	}
 
-	if d := sameAsNewContext(t, ctx, site, atm, star); d == 0 {
-		t.Error("half an hour from the rebuilt epoch, SetTime matches NewContext exactly: it rebuilt again")
+	if worst > settimeBoundArcsec {
+		t.Errorf("SetTime is %.4g″ from NewContext at worst, want <= %g″", worst, settimeBoundArcsec)
+	}
+
+	ctx.SetTime(base.Add(unit.Hours(36))) // mid-bracket
+
+	// A rebuild through SetTime's own decomposition differs from NewContext
+	// by up to the 1e-12° TestSetTime_IsNewContextAtANode allows, 3.6e-9″;
+	// interpolation, by milliarcseconds mid-bracket (#731).
+	if d := sameAsNewContext(t, ctx, site, atm, star) * 3600; d < 1e-6 {
+		t.Errorf("mid-bracket, SetTime is %g″ from NewContext: it evaluated the series rather than interpolating", d)
+	}
+}
+
+// TestSetTime_RebuildsFarAway: a move beyond the bracket next to the one ctx
+// has evaluates the series at t, as NewContext does, in either direction, and
+// works from there — so a jump costs one evaluation however far it goes.
+func TestSetTime_RebuildsFarAway(t *testing.T) {
+	site, atm, base, star := setTimeFixture(t)
+
+	ctx := coord.NewContext(base, site, atm)
+
+	for _, days := range []float64{5, 40, -3} {
+		ctx.SetTime(base.Add(unit.Days(days)))
+
+		if d := sameAsNewContext(t, ctx, site, atm, star); d > 1e-12 {
+			t.Errorf("Δt=%g d: SetTime is %g° from NewContext, want a rebuild (1e-12)", days, d)
+		}
 	}
 }
 
@@ -196,14 +221,11 @@ func TestContextIsAValue(t *testing.T) {
 // TestSetTime_StepsANightAsNewContextDoes sweeps the night the way #675's
 // samplers do, one Context through 96 five-minute steps, and holds every
 // step to a fresh NewContext at the documented bound. AtTime held the first
-// epoch for all eight hours; SetTime rebuilds each hour, so no step is ever
-// more than an hour from its epoch.
+// epoch for all eight hours, and drifted to ≲0.8″ (#675).
 func TestSetTime_StepsANightAsNewContextDoes(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
 	ctx := coord.NewContext(base, site, atm)
-
-	const boundArcsec = 0.1 // an hour's worth: the most any step can be from its epoch
 
 	var worst float64
 
@@ -212,7 +234,8 @@ func TestSetTime_StepsANightAsNewContextDoes(t *testing.T) {
 		worst = max(worst, sameAsNewContext(t, ctx, site, atm, star)*3600)
 	}
 
-	if worst > boundArcsec {
-		t.Errorf("over 8 h in 5 min steps, SetTime is %g″ from NewContext at worst, want <= %g″", worst, boundArcsec)
+	if worst > settimeBoundArcsec {
+		t.Errorf("over 8 h in 5 min steps, SetTime is %g″ from NewContext at worst, want <= %g″",
+			worst, settimeBoundArcsec)
 	}
 }

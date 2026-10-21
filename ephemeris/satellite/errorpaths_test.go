@@ -5,6 +5,9 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
@@ -75,6 +78,20 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 
 		if _, err := sat.State(sat.ID(), at); !errors.Is(err, satellite.ErrPropagation) {
 			t.Errorf("State returned %v, want one wrapping ErrPropagation", err)
+		}
+	})
+
+	t.Run("StateCtx", func(t *testing.T) {
+		t.Parallel()
+
+		site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+		if err != nil {
+			t.Fatalf("NewGeodetic: %v", err)
+		}
+
+		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+		if _, err := sat.StateCtx(sat.ID(), ctx); !errors.Is(err, satellite.ErrPropagation) {
+			t.Errorf("StateCtx returned %v, want one wrapping ErrPropagation", err)
 		}
 	})
 

@@ -73,7 +73,7 @@ func TestNewTransitionReportsAnEndItCannotObserve(t *testing.T) {
 // Both read the two ends through one moving Context, so the order matters:
 // FromAltAz has to be taken before the Context moves to ToTime. Three minutes
 // apart, a position read at the wrong instant is 45′ off, and the bound here
-// is SetTime's ≲0.1″. The strategy's Context is left forty minutes away first,
+// is SetTime's ≲0.007″. The strategy's Context is left forty minutes away first,
 // as constraint checks leave it. The slew BasicTransitionModel prices from
 // the positions is held to the one full Contexts give.
 func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {

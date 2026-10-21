@@ -1,13 +1,14 @@
 package file
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"slices"
 	"sync"
+	"sync/atomic"
 )
 
 // Defaults for [Open]: 64 KiB chunks, 16 resident, so a reader holds at most
@@ -79,13 +80,33 @@ func WithCachedChunks(n int) ReaderAtOption {
 // no call site can get it wrong, which is the same reason remote is the only
 // door to this package.
 //
-// Reads of whole aligned chunks are cached and evicted least-recently-used.
-// Memory is bounded by chunk size times resident chunks and never scales with
-// the object; the object is not buffered. Sequential Read and Seek pass through
-// to the underlying file untouched, so a whole-object download stays one
-// request rather than being reassembled from chunks.
+// Reads of whole aligned chunks are cached and evicted by CLOCK, the
+// second-chance approximation of least-recently-used. Memory is bounded by
+// chunk size times resident chunks and never scales with the object; the
+// object is not buffered. Sequential Read and Seek pass through to the
+// underlying file untouched, so a whole-object download stays one request
+// rather than being reassembled from chunks.
 //
-// Safe for concurrent use.
+// # Concurrency
+//
+// Safe for concurrent use, and built for it: a jpl.Provider is shared by every
+// goroutine of a scheduler or a service, and all of them read its kernels
+// through one of these. A read of a resident chunk takes no lock at all — a
+// lock-free map lookup and, at most, setting the chunk's referenced bit. A
+// read that misses claims the chunk under a short lock, then reads it with no
+// lock held; any other reader wanting that chunk meanwhile waits for that one
+// read rather than issuing its own.
+//
+// It used to hold one mutex across every lookup and across the backend read
+// of every miss — a pread, or a ranged GET over HTTP — so sixteen goroutines
+// evaluating the Moon at random epochs got less done in aggregate than one
+// (#811). Measured on de440s, sixteen now take 481 ns per state in aggregate
+// against 2,052 before, and against 457 for the same kernel held in a byte
+// slice with no cache in front of it: the cache no longer costs concurrency
+// anything. Eviction still takes the lock, which is cheap: it only runs when a
+// chunk is claimed. Memory stays bounded at resident chunks, plus — only while
+// every resident chunk is itself still being read — the chunks being read
+// beyond them, each held by a ReadAt in flight.
 type ReaderAt struct {
 	src  File
 	name string
@@ -94,11 +115,31 @@ type ReaderAt struct {
 	chunkSize int64
 	maxChunks int
 
+	// chunks maps a chunk index to its *chunk. Reads look a chunk up without
+	// any lock; mu is taken only to add one or evict one.
+	chunks sync.Map
+
 	mu     sync.Mutex
 	closed bool
-	chunks map[int64][]byte
-	lru    *list.List              // front = most recently used; values are int64 chunk indexes
-	elems  map[int64]*list.Element // chunk index -> its lru element
+	ring   []int64        // the indexes of the chunks in chunks, in CLOCK order
+	hand   int            // the CLOCK hand: the next index in ring to consider
+	loads  sync.WaitGroup // chunk reads in flight, which Close waits for
+}
+
+// chunk is one aligned chunk of the object: being read until done, then
+// holding the bytes or the error the read returned.
+//
+// A hit checks done, one atomic load; only a reader that arrives while the
+// read is in flight waits on reading. That was a channel, received from on
+// every hit, and a receive that blocks takes the channel's lock even once the
+// channel is closed, which put every reader of a hot chunk back on one lock.
+// A WaitGroup is also part of the chunk rather than an allocation beside it.
+type chunk struct {
+	reading sync.WaitGroup
+	done    atomic.Bool
+	data    []byte
+	err     error
+	ref     atomic.Bool // read since the CLOCK hand last passed it
 }
 
 // Sentinel errors returned by ReaderAt. Match with errors.Is.
@@ -151,9 +192,7 @@ func Open(ctx context.Context, fsys fs.FS, name string, opts ...ReaderAtOption) 
 		size:      info.Size(),
 		chunkSize: cfg.chunkSize,
 		maxChunks: cfg.cachedChunks,
-		chunks:    make(map[int64][]byte, cfg.cachedChunks),
-		lru:       list.New(),
-		elems:     make(map[int64]*list.Element, cfg.cachedChunks),
+		ring:      make([]int64, 0, cfg.cachedChunks),
 	}, nil
 }
 
@@ -224,12 +263,18 @@ func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 // or a held HTTP connection.
 func (r *ReaderAt) Close() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	r.closed = true
-	r.chunks = nil
-	r.elems = nil
-	r.lru = list.New()
+	r.mu.Unlock()
+
+	// No chunk can be claimed once closed is set, so the reads in flight are
+	// all the reads there will be; they finish before the file they read from
+	// is closed under them.
+	r.loads.Wait()
+
+	r.mu.Lock()
+	r.chunks.Clear()
+	r.ring, r.hand = nil, 0
+	r.mu.Unlock()
 
 	if err := r.src.Close(); err != nil {
 		return fmt.Errorf("remote/file: close %s: %w", r.name, err)
@@ -238,48 +283,165 @@ func (r *ReaderAt) Close() error {
 	return nil
 }
 
-// chunk returns chunk idx, fetching and caching it on a miss.
+// chunk returns chunk idx: resident, or being read by another reader and
+// waited for, or claimed and read by this one.
 func (r *ReaderAt) chunk(idx int64) ([]byte, error) {
+	if v, ok := r.chunks.Load(idx); ok {
+		c, _ := v.(*chunk)
+
+		return c.wait()
+	}
+
+	c, mine, err := r.claim(idx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !mine {
+		return c.wait() // another reader claimed it between the lookup and the lock
+	}
+
+	return r.load(idx, c)
+}
+
+// wait returns the chunk's bytes once its read has finished, marking it
+// referenced for CLOCK.
+func (c *chunk) wait() ([]byte, error) {
+	if !c.done.Load() {
+		c.reading.Wait()
+	}
+
+	if c.err != nil {
+		return nil, c.err
+	}
+
+	// Most reads find the bit set already; reading before writing keeps a hot
+	// chunk's cache line shared across cores.
+	if !c.ref.Load() {
+		c.ref.Store(true)
+	}
+
+	return c.data, nil
+}
+
+// claim adds an unread chunk idx to the cache, evicting to make room, and
+// returns it for the caller to read — or, when another reader has claimed it
+// first, returns that reader's chunk with mine false.
+func (r *ReaderAt) claim(idx int64) (c *chunk, mine bool, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if r.closed {
-		return nil, ErrReaderAtClosed
+		return nil, false, ErrReaderAtClosed
 	}
 
-	if c, ok := r.chunks[idx]; ok {
-		r.lru.MoveToFront(r.elems[idx])
+	if v, ok := r.chunks.Load(idx); ok {
+		c, _ = v.(*chunk)
 
-		return c, nil
+		return c, false, nil
 	}
+
+	r.evictLocked()
+
+	c = new(chunk)
+	c.reading.Add(1)
+	r.chunks.Store(idx, c)
+
+	// The new chunk goes just behind the hand, so it is the last one the hand
+	// reaches: a full revolution before it can be evicted.
+	r.ring = slices.Insert(r.ring, r.hand, idx)
+	r.hand = (r.hand + 1) % len(r.ring)
+
+	r.loads.Add(1)
+
+	return c, true, nil
+}
+
+// evictLocked makes room for one chunk by CLOCK: the hand sweeps the ring,
+// giving each referenced chunk a second chance by clearing its bit, and
+// evicts the first unreferenced chunk that is no longer being read. A chunk
+// being read is passed over; when every chunk is, nothing is evicted and the
+// cache holds one more until a read finishes.
+func (r *ReaderAt) evictLocked() {
+	for range 2 * len(r.ring) {
+		if len(r.ring) < r.maxChunks {
+			return
+		}
+
+		k := r.ring[r.hand]
+		v, _ := r.chunks.Load(k)
+		c, _ := v.(*chunk)
+
+		if !c.done.Load() {
+			r.hand = (r.hand + 1) % len(r.ring)
+
+			continue // still being read
+		}
+
+		if c.ref.Swap(false) {
+			r.hand = (r.hand + 1) % len(r.ring)
+
+			continue // a second chance
+		}
+
+		r.chunks.Delete(k)
+		r.ring = slices.Delete(r.ring, r.hand, r.hand+1)
+
+		if len(r.ring) > 0 {
+			r.hand %= len(r.ring)
+		} else {
+			r.hand = 0
+		}
+	}
+}
+
+// load reads the claimed chunk c with no lock held and publishes the result
+// to every reader waiting on it. A failed read is not kept: the next reader
+// of that chunk reads it again.
+func (r *ReaderAt) load(idx int64, c *chunk) ([]byte, error) {
+	defer r.loads.Done()
 
 	offset := idx * r.chunkSize
-
-	length := r.chunkSize
-	if rest := r.size - offset; rest < length {
-		length = rest
-	}
-
+	length := min(r.chunkSize, r.size-offset)
 	buf := make([]byte, length)
 
 	// The underlying ReadAt, not Read: io.ReaderAt is contractually safe for
 	// concurrent use and moves no cursor, which is what lets this type be safe
 	// for concurrent use while Read and Seek pass through to the same file.
 	if _, err := r.src.ReadAt(buf, offset); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("remote/file: read %s at %d: %w", r.name, offset, err)
+		c.err = fmt.Errorf("remote/file: read %s at %d: %w", r.name, offset, err)
+		r.forget(idx, c)
+	} else {
+		c.data = buf
 	}
 
-	r.chunks[idx] = buf
-	r.elems[idx] = r.lru.PushFront(idx)
+	c.done.Store(true)
+	c.reading.Done()
 
-	for r.lru.Len() > r.maxChunks {
-		oldest := r.lru.Back()
-		evict, _ := oldest.Value.(int64)
+	return c.data, c.err
+}
 
-		r.lru.Remove(oldest)
-		delete(r.chunks, evict)
-		delete(r.elems, evict)
+// forget removes chunk idx from the cache if c is still the chunk held there.
+func (r *ReaderAt) forget(idx int64, c *chunk) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if v, ok := r.chunks.Load(idx); !ok || v != c {
+		return
 	}
 
-	return buf, nil
+	r.chunks.Delete(idx)
+
+	if i := slices.Index(r.ring, idx); i >= 0 {
+		r.ring = slices.Delete(r.ring, i, i+1)
+
+		switch {
+		case len(r.ring) == 0:
+			r.hand = 0
+		case i < r.hand:
+			r.hand--
+		default:
+			r.hand %= len(r.ring)
+		}
+	}
 }

@@ -64,6 +64,7 @@ func TestCachedContextTransformsDoNotAllocate(t *testing.T) {
 	}{
 		{"ICRSToAltAz", func() { _, _ = ctx.ICRSToAltAz(pos) }},
 		{"GeocentricToObserved", func() { _ = ctx.GeocentricToObserved(vec) }},
+		{"TEMEToGCRS", func() { _ = ctx.TEMEToGCRS(vec) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := testing.AllocsPerRun(1000, tc.f); got != 0 {
