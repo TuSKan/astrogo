@@ -799,9 +799,13 @@ func AstrometricState(p Provider, target ID, obsTime time.Time) (State, error) {
 //
 // Epv00 is an analytical model rather than the JPL integration the target may
 // have come from, which is fine here and would not be if this were the answer
-// rather than a correction: it is accurate to about 100 m over 1900-2100, and
-// only the *difference* over a light time is used — at most a few hundred
-// seconds of Earth's travel, where the model's own error very largely cancels.
+// rather than a correction. As a position it is 4.6 km rms and 13.4 km at
+// worst from DE405 over 1900–2100 (SOFA's own note), and 4.0 km rms and 11.7
+// km at worst from de440s's heliocentric Earth (#810) — but only the
+// *difference* over a light time is used, hours at most for the outer
+// planets, and that difference carries the velocity's error, 1.4 mm/s rms,
+// times the light time: tens of meters at Neptune, against the kilometers of
+// either position.
 func earthBarycentric(t time.Time) (vector.Vec3, error) {
 	d1, d2 := t.TDB().JDParts()
 
