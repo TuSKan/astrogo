@@ -28,6 +28,11 @@ var (
 	ErrBodyIDOutOfRange      = errors.New("jpl: body id outside the signed 32-bit NAIF range")
 	ErrKernelIndexOutOfRange = errors.New("jpl: kernel index out of range")
 
+	// ErrUnsupportedFrame refuses a kernel holding a segment in a reference
+	// frame other than NAIF 1 (J2000), whose vectors would otherwise be summed
+	// into the ICRF chain unrotated (#813).
+	ErrUnsupportedFrame = errors.New("jpl: segment in a reference frame other than J2000")
+
 	// ErrNoSmallBodyKernel indicates Horizons matched no small body for the
 	// requested designation, so the provider would carry only its planetary
 	// base kernel.
@@ -67,6 +72,11 @@ var (
 // var, not const: constants.IAU.AstronomicalUnit is a struct, and Go does not
 // permit selecting a struct field inside a constant expression.
 var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
+
+// naifJ2000 is NAIF's integer code for the "J2000" inertial frame, the only
+// frame a segment may be in to join this provider's chains (see
+// addKernelLocked).
+const naifJ2000 = 1
 
 // NAIFFor returns the NAIF integer identifier for a body, and whether the
 // body is one this package has a mapping for.
@@ -377,6 +387,10 @@ func (p *Provider) State(id core.ID, t time.Time) (core.State, error) {
 }
 
 // AddKernel opens an SPK file and adds its segments to the provider index.
+//
+// A kernel that cannot be added — its summaries do not parse, or one of its
+// segments is in a frame other than J2000 (ErrUnsupportedFrame) — is not
+// added, and stays the caller's to close.
 func (p *Provider) AddKernel(k *spk.Reader) error {
 	if k == nil {
 		return ErrNilKernel
@@ -405,7 +419,13 @@ func (p *Provider) AddKernelFrom(ctx context.Context, fsys remote.FS, key string
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.addKernelLocked(r, key)
+	// A kernel this call opened and then could not add is closed here: the
+	// caller never held it.
+	if err := p.addKernelLocked(r, key); err != nil {
+		return errors.Join(err, r.Close())
+	}
+
+	return nil
 }
 
 // RemoveKernel closes and unloads the kernel at index i (as positioned in
@@ -502,13 +522,15 @@ func Open(ctx context.Context, fsys remote.FS, lskKey string, spkKeys ...string)
 
 	for _, key := range spkKeys {
 		if err := p.AddKernelFrom(ctx, fsys, key); err != nil {
-			return nil, fmt.Errorf("jpl: open: %w", err)
+			// The kernels already added are closed with it, so a failed Open
+			// leaves nothing open behind the error.
+			return nil, errors.Join(fmt.Errorf("jpl: open: %w", err), p.Close())
 		}
 	}
 
 	f, err := fsys.Open(lskKey)
 	if err != nil {
-		return nil, fmt.Errorf("jpl: open LSK %s: %w", lskKey, err)
+		return nil, errors.Join(fmt.Errorf("jpl: open LSK %s: %w", lskKey, err), p.Close())
 	}
 
 	// lsk.NewReader takes ownership of f and stores it, so Provider.Close
@@ -516,7 +538,7 @@ func Open(ctx context.Context, fsys remote.FS, lskKey string, spkKeys ...string)
 	// here as well would double-close the reader.
 	l, err := lsk.NewReader(f)
 	if err != nil {
-		return nil, errors.Join(fmt.Errorf("jpl: read LSK %s: %w", lskKey, err), f.Close())
+		return nil, errors.Join(fmt.Errorf("jpl: read LSK %s: %w", lskKey, err), f.Close(), p.Close())
 	}
 
 	p.LSK = l
@@ -673,7 +695,13 @@ func (p *Provider) addKernelPath(k *spk.Reader, path string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.addKernelLocked(k, path)
+	// addKernelPath adds kernels NewProvider opened, so one it cannot add is
+	// closed here rather than left open behind the returned error.
+	if err := p.addKernelLocked(k, path); err != nil {
+		return errors.Join(err, k.Close())
+	}
+
+	return nil
 }
 
 // addKernelLocked is AddKernel/AddKernelFile/addKernelPath's shared body.
@@ -686,6 +714,19 @@ func (p *Provider) addKernelLocked(k *spk.Reader, path string) error {
 
 	segments := make([]spk.Segment, 0, len(summaries))
 	for _, s := range summaries {
+		// Every state this provider returns is labeled ICRF and every chain is
+		// a plain sum of segment vectors, so a segment is usable only in the
+		// frame that sum assumes: NAIF frame 1, "J2000", which for the DE
+		// kernels and every kernel astrogo fetches is the ICRF (NAIF Frames
+		// Required Reading). The frame used to be parsed and never read, so a
+		// caller's ECLIPJ2000 kernel (NAIF 17) was chained 23.4° off and still
+		// labeled ICRS (#813). A kernel holding any other frame is refused
+		// whole: half a kernel loaded is a provider that answers some targets
+		// and silently not others.
+		if frame := s.Integers[2]; frame != naifJ2000 {
+			return fmt.Errorf("%w: the segment for target %d is in NAIF frame %d", ErrUnsupportedFrame, s.Integers[0], frame)
+		}
+
 		segments = append(segments, spk.Segment{
 			StartET:   s.Doubles[0],
 			EndET:     s.Doubles[1],
