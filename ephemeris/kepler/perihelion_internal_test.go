@@ -66,8 +66,9 @@ func TestSolveUniversalConvergesAcrossTheConics(t *testing.T) {
 
 // TestStateAtRefusesAnInstantThatIsNotANumber checks both paths fail rather
 // than hand back a position of NaNs. An instant that is not a number makes
-// every anomaly one too; Kepler's equation cannot be solved for it, in either
-// form, and StateAt says so.
+// every anomaly one too, and StateAt says so: as a phase that cannot be
+// resolved in the eccentric anomaly, which does not iterate, and as a
+// universal anomaly that cannot converge.
 func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
 	epoch := time.FromJDParts(2460000.5, 0, time.TT)
 
@@ -81,10 +82,17 @@ func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
 		t.Fatalf("FromPerihelion: %v", err)
 	}
 
-	for name, el := range map[string]Elements{"NewElements": classical, "FromPerihelion": hyperbola} {
-		pos, vel, err := el.StateAt(time.FromJD(math.NaN(), time.TT))
-		if !errors.Is(err, ErrKeplerNoConverge) {
-			t.Errorf("%s: StateAt(NaN) = %v, %v, %v; want ErrKeplerNoConverge", name, pos, vel, err)
+	for _, c := range []struct {
+		name string
+		el   Elements
+		want error
+	}{
+		{"NewElements", classical, ErrPhaseUnresolved},
+		{"FromPerihelion", hyperbola, ErrKeplerNoConverge},
+	} {
+		pos, vel, err := c.el.StateAt(time.FromJD(math.NaN(), time.TT))
+		if !errors.Is(err, c.want) {
+			t.Errorf("%s: StateAt(NaN) = %v, %v, %v; want %v", c.name, pos, vel, err, c.want)
 		}
 	}
 }

@@ -471,73 +471,57 @@ func (el Elements) Validate() error {
 	return el.validateAngles()
 }
 
-// SolveKepler solves Kepler's equation E - e*sin(E) = M for the
-// eccentric anomaly E in [0, 2π), given the mean anomaly M and eccentricity
-// e (0 <= e < 1), via Newton-Raphson iteration starting from the
-// Eccentricity-dependent initial guess E0 = M + e*sin(M) (or ±π for
-// e>0.9, where that guess converges poorly). Converges to 1e-12 rad or
-// fails with ErrKeplerNoConverge after 50 iterations; the result is
-// checked finite before being reported as a success, so a degenerate
-// iteration can never silently return a NaN/Inf eccentric anomaly.
+// SolveKepler solves Kepler's equation E − e·sin E = M for the eccentric
+// anomaly E in [−π, π], given the mean anomaly M and an eccentricity
+// 0 <= e < 1.
 //
-// # Why M is taken in (−π, π]
+// It is Markley's method (1995): a starting value from a cubic, then one
+// fifth-order correction, with no iteration and so no stopping rule. Its
+// contract, measured against a 256-bit oracle over e up to the last float64
+// below 1 (TestSolveKeplerContract, docs/kepler.md):
 //
-// Near perihelion on an orbit with e close to 1, f'(E) = 1 − e·cos E is
-// small: about 1e-4 at e = 0.9999. The Newton step is f/f', so it cannot be
-// smaller than f's own rounding over f'. With M in [0, 2π), the side just
-// before perihelion puts E and M near 2π, f's rounding is an ulp of 2π,
-// 8.9e-16, and the step settles into a two-cycle near 9e-12 that never
-// meets the tolerance. Comet C/2026 C1, at e = 0.99991, sat in that region
-// for about two years before perihelion (#781). Taken in (−π, π], E is small
-// there and f's rounding is relative to it. The ±π start is on the root's
-// side of the curvature: f is convex on [0, π] and concave on [−π, 0], so
-// Newton's method from there approaches the root monotonically. A step taken
-// once f is at its rounding floor is accepted as well, since no further step
-// can improve on it.
+//   - M is reduced by 2π exactly, so a phase just past a whole revolution
+//     keeps its relative precision. |M| ≥ 2⁵², where a float64 no longer
+//     resolves the phase to a radian, is refused with ErrPhaseUnresolved, as
+//     is a non-finite M.
+//   - E is within 2 ulps of the exact root of the reduced M, relatively,
+//     everywhere: the equation's relative condition number is at most 1, and
+//     the residual is evaluated as (1−e)·E + e·(E − sin E) − M near
+//     perihelion, where E − e·sin E − M would lose what 1 − e has.
+//   - E(−M) = −E(M) bit for bit, and E(±0) = ±0.
+//
+// It used to be Newton's method on the direct residual, answering in
+// [0, 2π), and measured in docs/kepler.md §3.2 it lost three ways: for M just
+// below zero E was a float64 near 2π, wrong as an angle by more than its own
+// size; reducing by the float64 2π gave a phase a hair past a revolution the
+// wrong sign; and near perihelion as e → 1 the direct residual's rounding
+// limits E to about ε·E/(1 − e·cos E).
 func SolveKepler(meanAnomaly angle.Angle, ecc float64) (angle.Angle, error) {
-	const (
-		tolerance = 1e-12
-		maxIter   = 50
-		epsilon   = 0x1p-52 // the spacing of float64 values at 1
-	)
-
 	if !finite(ecc) || ecc < 0 || ecc >= 1 {
 		return angle.Zero(), fmt.Errorf("%w: eccentricity %v", ErrUnsupportedOrbit, ecc)
 	}
 
-	m := meanAnomaly.WrapPi().Radians()
-	if !finite(m) {
-		return angle.Zero(), fmt.Errorf("%w: mean anomaly is not finite", ErrKeplerNoConverge)
+	m := meanAnomaly.Radians()
+	if !finite(m) || math.Abs(m) >= 0x1p52 {
+		return angle.Zero(), fmt.Errorf("%w: %v rad", ErrPhaseUnresolved, m)
 	}
 
-	e := m + ecc*math.Sin(m)
-	if ecc > 0.9 {
-		e = math.Copysign(math.Pi, m)
+	m = reduceExact(m)
+	if m == 0 {
+		return angle.Rad(m), nil // keeps the sign of zero
 	}
 
-	converged := false
+	// Solved on |M| and the sign restored, so the answer is odd in M bit for
+	// bit.
+	am := math.Abs(m)
+	bigE := markleyStart(am, ecc)
 
-	for range maxIter {
-		sinE, cosE := math.Sincos(e)
-		f := e - ecc*sinE - m
-		fp := 1 - ecc*cosE
-		de := f / fp
-		e -= de
+	s, c := math.Sincos(bigE)
+	f1 := stableSlope(s, c, ecc)
 
-		// The rounding in f is a few ulps of its largest term.
-		floor := 4 * epsilon * (math.Abs(e) + math.Abs(m))
+	bigE += markleyDelta5(stableResidual(bigE, s, am, ecc), f1, ecc*s, 1-f1)
 
-		if math.Abs(de) < tolerance || math.Abs(f) <= floor {
-			converged = true
-			break
-		}
-	}
-
-	if !converged || !finite(e) {
-		return angle.Zero(), fmt.Errorf("%w: after %d iterations", ErrKeplerNoConverge, maxIter)
-	}
-
-	return angle.Rad(e).Wrap2Pi(), nil
+	return angle.Rad(math.Copysign(bigE, m)), nil
 }
 
 // rotatePerifocalToEcliptic transforms a perifocal-frame vector into the
@@ -666,24 +650,44 @@ func (el Elements) perifocalClassical(dtDays float64) (posPf, velPf vector.Vec3,
 		nRadPerDay = 2 * math.Pi / el.periodDays
 	}
 
-	m := el.meanAnomaly.Radians() + nRadPerDay*dtDays
+	// The phase in one rounding: what is left is the inputs' own.
+	m := math.FMA(nRadPerDay, dtDays, el.meanAnomaly.Radians())
 
 	ea, err := SolveKepler(angle.Rad(m), el.eccentricity)
 	if err != nil {
 		return vector.Zero(), vector.Zero(), err
 	}
 
+	// The state with every quantity that cancels near perihelion as e → 1
+	// written as a sum of same-signed terms (docs/kepler.md §4):
+	//
+	//	1 − cos E = sin²E / (1 + cos E)      while cos E > 0
+	//	x         = a·((1 − e) − (1 − cos E))
+	//	r         = a·((1 − e) + e·(1 − cos E))
+	//	b         = a·√((1 − e)(1 + e))
+	//	Ė         = n·a / r
+	//
+	// cos E − e, 1 − e·cos E and √(1 − e²) each lost the digits 1 − e has:
+	// 882 m of a near-parabolic comet's position at e = 0.999999, against
+	// 4 m now, from an exact solution of the same two-body problem.
 	e := el.eccentricity
-	cosE, sinE := ea.Cos(), ea.Sin()
-	sqrtOneMinusE2 := math.Sqrt(1 - e*e)
 	a := el.semiMajorAxis.AU()
+	s, c := math.Sincos(ea.Radians())
 
-	posPf = vector.V3(a*(cosE-e), a*sqrtOneMinusE2*sinE, 0)
+	omc := 1 - c
+	if c > 0 {
+		omc = s * s / (1 + c)
+	}
 
-	// Ėdot: rate of change of eccentric anomaly, rad/day — from
-	// differentiating Kepler's equation E - e*sin(E) = M w.r.t. time.
-	eDot := nRadPerDay / (1 - e*cosE)
-	velPf = vector.V3(-a*sinE*eDot, a*sqrtOneMinusE2*cosE*eDot, 0)
+	delta := 1 - e
+	b := a * math.Sqrt(delta*(1+e))
+
+	posPf = vector.V3(a*(delta-omc), b*s, 0)
+
+	// Ė, the rate of the eccentric anomaly in rad/day, from differentiating
+	// Kepler's equation: n / (1 − e·cos E), the denominator being r/a.
+	eDot := nRadPerDay / (delta + e*omc)
+	velPf = vector.V3(-a*s*eDot, b*c*eDot, 0)
 
 	return posPf, velPf, nil
 }

@@ -2,7 +2,6 @@ package keplerlab_test
 
 import (
 	"math"
-	"math/big"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -30,29 +29,6 @@ const (
 	contractAnomalyULPs = 2 // measured 1.52
 	contractStateULPs   = 2 // the construction's own share
 )
-
-// stateSensitivity is |∂(x, y)/∂E| and |∂(vx, vy)/∂E| at the exact root, by
-// a central difference at prec with a step of 2⁻¹⁰⁰ of E: exact to far below
-// the float64 quantities it bounds.
-func stateSensitivity(a, e, n float64, bigE *big.Float) (dPos, dVel float64) {
-	h := new(big.Float).SetPrec(prec).SetMantExp(newF(1), bigE.MantExp(nil)-100)
-
-	hi := new(big.Float).SetPrec(prec).Add(bigE, h)
-	lo := new(big.Float).SetPrec(prec).Sub(bigE, h)
-
-	x1, y1, vx1, vy1 := exactStateFromE(a, e, n, hi)
-	x0, y0, vx0, vy0 := exactStateFromE(a, e, n, lo)
-
-	twoH, _ := new(big.Float).SetPrec(prec).Mul(h, newI(2)).Float64()
-
-	diff := func(p, q *big.Float) float64 {
-		d, _ := new(big.Float).SetPrec(prec).Sub(p, q).Float64()
-
-		return d / twoH
-	}
-
-	return math.Hypot(diff(x1, x0), diff(y1, y0)), math.Hypot(diff(vx1, vx0), diff(vy1, vy0))
-}
 
 // TestProposedContract holds the proposal to the contract over the whole
 // sweep: E within contractAnomalyULPs of the exact root, E(±0) = ±0 and

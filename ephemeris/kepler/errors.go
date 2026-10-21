@@ -13,11 +13,14 @@ var (
 	// element (semi-major axis, angle) that isn't specifically an
 	// eccentricity problem.
 	ErrInvalidElements = errors.New("kepler: invalid orbital elements")
-	// ErrKeplerNoConverge indicates Kepler's equation failed to converge
-	// within the iteration budget: in the eccentric anomaly for a set built
-	// by NewElements, or in the universal anomaly for one built by
-	// FromPerihelion.
+	// ErrKeplerNoConverge indicates the universal anomaly of a set built by
+	// FromPerihelion failed to converge within the iteration budget. The
+	// eccentric anomaly does not iterate (see SolveKepler).
 	ErrKeplerNoConverge = errors.New("kepler: Kepler's equation did not converge")
+	// ErrPhaseUnresolved indicates a mean anomaly whose phase a float64 cannot
+	// resolve: not finite, or 2⁵² radians or more, where a float64 no longer
+	// resolves an angle to a whole radian.
+	ErrPhaseUnresolved = errors.New("kepler: mean anomaly too large to resolve its phase")
 	// ErrSofaFailure indicates the underlying SOFA (gofaext) computation
 	// backing the default base provider returned a failure status.
 	ErrSofaFailure = errors.New("kepler: underlying SOFA computation failed")

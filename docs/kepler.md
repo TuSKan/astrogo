@@ -325,7 +325,9 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    exact reduction, odd in M, answering in [−π, π] and refusing |M| ≥ 2⁵²;
    `perifocalClassical` takes the stable construction; gate 1 comes with it.
    The answer's range changes, so the fragment is `Changed — BREAKING`, though
-   every caller in the module uses E only as an angle.
+   every caller in the module uses E only as an angle. **Done in #827**, as
+   `TestSolveKeplerContract`; the "production" rows above are what it
+   replaced, and `internal/keplerlab` keeps that solver so §3.2 reproduces.
 3. **Prepared `Elements`.** The derived quantities at construction, the
    orientation as P and Q, the phase by one fused multiply-add.
 4. **The Earth from the base (#810),** then the per-orbit centre (#803).

@@ -119,14 +119,17 @@ func TestSolveKeplerConvergesNearPerihelionWhenNearlyParabolic(t *testing.T) {
 					t.Fatalf("e = %v, M = %.17g: %v", e, m, err)
 				}
 
-				if r := ea.Radians(); r < 0 || r >= 2*math.Pi {
-					t.Fatalf("e = %v, M = %.17g: E = %.17g, not in [0, 2π)", e, m, r)
+				if r := ea.Radians(); r < -math.Pi || r > math.Pi {
+					t.Fatalf("e = %v, M = %.17g: E = %.17g, not in [−π, π]", e, m, r)
 				}
 
-				// The input's own offset from 2π is exact by Sterbenz.
+				// The input's offset from 2π: exact from the float64 2π by
+				// Sterbenz, and from 2π itself less the 2.449×10⁻¹⁶ the float64
+				// falls short of it. That shortfall is 2.45×10⁻¹² of E here,
+				// where dE/dM is 10⁴, and SolveKepler reduces by 2π exactly.
 				signed := m
 				if m > math.Pi {
-					signed = m - 2*math.Pi
+					signed = (m - 2*math.Pi) - 0x1.1a62633145c07p-52
 				}
 
 				if got, want := ea.WrapPi().Radians(), bisectKepler(signed, e); math.Abs(got-want) > tol {
