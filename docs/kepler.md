@@ -348,7 +348,7 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    replaced, and `internal/keplerlab` keeps that solver so §3.2 reproduces.
 3. **Prepared `Elements`.** The derived quantities at construction, the
    orientation as P and Q, the phase by one fused multiply-add. The phase
-   came with #827; the rest is **done in #PR**, measured in §5.
+   came with #827; the rest is **done in #832**, measured in §5.
 4. **The Earth from the base (#810),** then the per-orbit centre (#803).
 5. **The universal path's own audit.** It is the stable form already and is
    not measured here: the oracle gains the universal anomaly and the Stumpff
