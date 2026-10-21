@@ -198,7 +198,7 @@ func TestAmericanEnglish(t *testing.T) {
 }
 
 // words splits a line into its words, and an identifier into the words it
-// is made of: TestTheCommonCentre gives Test, The, Common and Centre, and
+// is made of: worldAtTheCentre gives world, At, The and Centre, and
 // HTTPServer gives HTTP and Server.
 func words(line string) []string {
 	var out []string
