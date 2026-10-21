@@ -421,7 +421,7 @@ func BenchmarkFullSkyEstimate(b *testing.B) {
 	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(45))
 	q := skybrightness.Query{Scene: scene, Direction: dir, Grid: grid}
 
-	// Warm the per-scene caches, which a sky map amortises.
+	// Warm the per-scene caches, which a sky map amortizes.
 	if _, err := model.Estimate(context.Background(), q); err != nil {
 		b.Fatal(err)
 	}

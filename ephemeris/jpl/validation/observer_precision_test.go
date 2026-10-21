@@ -123,7 +123,7 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // even without a single identified root cause for the smaller azimuth
 // residual within it.
 //
-// # Since then, the residual has been localised
+// # Since then, the residual has been localized
 //
 // Three later comparisons narrowed it by removing one stage at a time,
 // which the single end-to-end number here cannot do (#256).
@@ -186,7 +186,7 @@ func (b observerPrecisionBody) command() string { return strconv.Itoa(b.naifID) 
 // Horizons over three real observatories, two planets and a year of epochs,
 // astrogo and Atco13 differ from it by the same amount to four decimal places.
 //
-// Which localises the residual precisely, because a rotation preserves
+// Which localizes the residual precisely, because a rotation preserves
 // great-circle separation. Both sides are given the same topocentric
 // astrometric place, and their apparent right ascension and declination agree
 // to 0.049" — but their horizon-frame separation is 0.380". The extra 0.33"

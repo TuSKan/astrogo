@@ -85,7 +85,7 @@ func TestSubPointIsOverhead(t *testing.T) {
 // satellite at 420 km, observed from the point returned, airless, through
 // the transform core.
 //
-// The normal at a point does not pass through Earth's centre, so the point
+// The normal at a point does not pass through Earth's center, so the point
 // whose normal is merely parallel to the body's direction, which SubPoint
 // returned until #579, sees a near body off the zenith by up to R⊕·11.5′ over
 // the distance: 11″ for the Moon at these declinations, and over 10′ for the

@@ -37,7 +37,7 @@ const (
 	fuzzLine2 = "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537"
 )
 
-// FuzzValidateTLE drives the checker itself, which is astrogo's only defence
+// FuzzValidateTLE drives the checker itself, which is astrogo's only defense
 // between an untrusted element set and the backend.
 func FuzzValidateTLE(f *testing.F) {
 	f.Add(fuzzLine1, fuzzLine2)
@@ -77,7 +77,7 @@ func FuzzValidateTLE(f *testing.F) {
 		// accepts, the constructor has to survive.
 		//
 		// It can still legitimately fail — SGP4 rejects an orbit it cannot
-		// initialise, which is an error and not a defect. What it must not do
+		// initialize, which is an error and not a defect. What it must not do
 		// is terminate the process, and reaching this line at all is the check.
 		sat, err := satellite.NewFromTLE("fuzz", line1, line2)
 		if err != nil {

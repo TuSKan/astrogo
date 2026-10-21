@@ -372,7 +372,7 @@ func TestTheGalacticBasisIsOrthonormal(t *testing.T) {
 }
 
 // TestToICRSDeclinesAVelocityItCannotSplit covers the two ways the inverse can
-// fail to turn a Cartesian velocity back into catalogue kinematics.
+// fail to turn a Cartesian velocity back into catalog kinematics.
 //
 // Both are positions a caller can construct and no star occupies, and in both
 // the position is still returned — losing the velocity is the right degradation,

@@ -5,7 +5,7 @@
 // # What this package is and is not
 //
 // It holds a *map* and the arithmetic to read it. It does not compute
-// integrated starlight from a star catalogue — that is a bulk aggregation
+// integrated starlight from a star catalog — that is a bulk aggregation
 // over Gaia DR3's 1.8 billion sources, an offline job producing a data
 // product, not something a library does at query time. GAMBONS (Masana et
 // al. 2021, MNRAS 501, 5443) is one such product; any map on the same grid

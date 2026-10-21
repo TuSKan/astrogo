@@ -7,7 +7,7 @@ algorithm that keeps the promise.
 **Status: design, no production change.** The measurements come from
 `internal/keplerlab`, a test-only package added with this document: a
 multiprecision oracle, seven candidate solvers, and the contract test the
-proposal passes. The orbit-centre question (heliocentric or barycentric fits)
+proposal passes. The orbit-center question (heliocentric or barycentric fits)
 is #803's second half and is not re-argued here.
 
 **Recommendation in one paragraph.** Replace the solver with Markley's (1995)
@@ -49,7 +49,7 @@ answer returned in [0, 2π). Its only caller outside tests is
    the root is M, and 1 − e·cos E with an absolute rounding of about ε while
    its value is (1 − e) + e·(1 − cos E). Both are the textbook form and both
    fail exactly where an orbit is closest to parabolic (§3).
-2. **The state is built from cancelling forms.** cos E − e, 1 − e·cos E and
+2. **The state is built from canceling forms.** cos E − e, 1 − e·cos E and
    √(1 − e²) each lose the digits that 1 − e has.
 3. **The answer in [0, 2π) puts E near 2π just before perihelion,** where its
    sine carries an absolute error of an ulp of 2π, 8.9×10⁻¹⁶, against a value
@@ -129,7 +129,7 @@ is given.
 Each implemented from its primary source in `internal/keplerlab`, and none
 copied: the methods are published mathematics, and no published code is used.
 
-| | source | licence of the source | idea |
+| | source | license of the source | idea |
 | --- | --- | --- | --- |
 | production | `kepler.SolveKepler` | — | Newton on the direct residual |
 | Markley, published | Markley 1995, *Kepler Equation Solver*, NASA GSFC (NTRS 19950021346), eqs. 2–29 | US Government work, public use permitted | a cubic built on a Padé approximation to sin E, solved with Stumpff's rationalization, then one fifth-order correction |
@@ -184,7 +184,7 @@ How to read the large numbers:
   is only trustworthy outside an interval of that width. That contradicts the
   3×10⁻¹⁵ rad its paper reports; this is a reimplementation from the paper's
   description, and the difference is measured, not explained.
-- **Mikkola's 435–1,140 ulps are his starter's s = z − α/z cancelling at tiny
+- **Mikkola's 435–1,140 ulps are his starter's s = z − α/z canceling at tiny
   M** for moderate e, which the stable residual cannot repair; Markley's
   starter avoids it with Stumpff's rationalization (his eq. 13).
 
@@ -255,7 +255,7 @@ The proposed 4.7 at e = 0.99 is the contract working as §2.3 says: E's 1.5
 ulps carried through a sensitivity of about 1.8, plus the construction's own.
 `TestProposedContract` asserts it per point against the exact ∂state/∂E.
 
-In kilometres, from an exact solution of the same two-body problem — the
+In kilometers, from an exact solution of the same two-body problem — the
 arithmetic's error, not the model's:
 
 | orbit (elements as `NewElements` takes them) | M | production | proposed |
@@ -267,7 +267,7 @@ arithmetic's error, not the model's:
 | near-parabolic, q 1 AU, e 0.999999 | 10⁻¹ | 882 m | 4.0 m |
 
 The main belt shows no difference because nothing there cancels. The
-near-parabolic comet loses most of a kilometre to arithmetic today. Such a
+near-parabolic comet loses most of a kilometer to arithmetic today. Such a
 comet should come through `FromPerihelion` and the universal path, which has
 no 1 − e to lose — but `NewElements` accepts it, and the contract is for
 everything the constructor accepts.
@@ -349,7 +349,7 @@ ephemeris layer's (docs/ephemeris.md §6.2).
 3. **Prepared `Elements`.** The derived quantities at construction, the
    orientation as P and Q, the phase by one fused multiply-add. The phase
    came with #827; the rest is **done in #832**, measured in §5.
-4. **The Earth from the base (#810),** then the per-orbit centre (#803).
+4. **The Earth from the base (#810),** then the per-orbit center (#803).
 5. **The universal path's own audit.** It is the stable form already and is
    not measured here: the oracle gains the universal anomaly and the Stumpff
    functions, and C(z) = (1 − cos √z)/z takes its cancellation-free form

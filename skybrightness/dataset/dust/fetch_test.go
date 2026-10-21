@@ -194,7 +194,7 @@ func TestFetchKeepsWhatItLearnedWhenCutOff(t *testing.T) {
 }
 
 // TestCachedDirectionsIsOrdered: the ordering is what lets the all-sky
-// validation report the same worst case twice running. Go randomises map
+// validation report the same worst case twice running. Go randomizes map
 // iteration, so without the sort the same cache reads back differently on
 // consecutive runs and no comparison against it is reproducible.
 //

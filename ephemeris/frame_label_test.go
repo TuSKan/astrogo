@@ -7,17 +7,17 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// TestProvidersNameTheirCentreAndAxes is the point of the Frame and Center
+// TestProvidersNameTheirCenterAndAxes is the point of the Frame and Center
 // fields.
 //
 // Before them, the contract on State was a comment reading "Geocentric
 // position in AU (ICRS-like)" — hedged, on a struct several providers fill in
-// differently. A provider now locates a body about the centre it computes it
+// differently. A provider now locates a body about the center it computes it
 // from and says which, and an Instant composes those, so a label that lied
 // would put a body an AU from where it is. The analytical provider computes
 // the planets about the Sun and the Moon about the Earth; a state composed
-// from them is about the centre it was asked for.
-func TestProvidersNameTheirCentreAndAxes(t *testing.T) {
+// from them is about the center it was asked for.
+func TestProvidersNameTheirCenterAndAxes(t *testing.T) {
 	t.Parallel()
 
 	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)

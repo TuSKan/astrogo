@@ -59,7 +59,7 @@ func TestLeakedProvesTheShapesItClaims(t *testing.T) {
 
 	after, report := waitForLeaks(t, before+2)
 	if after < before+2 {
-		t.Fatalf("two goroutines blocked on unreachable synchronisation were reported "+
+		t.Fatalf("two goroutines blocked on unreachable synchronization were reported "+
 			"as %d leaks, want at least %d; a leak check that cannot fail is a package "+
 			"that only looks clean\n%s", after, before+2, report)
 	}

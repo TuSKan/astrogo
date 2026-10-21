@@ -339,7 +339,7 @@ func TestScatteredInRejectsBadInput(t *testing.T) {
 // A sky map and a direction-by-direction evaluation agree exactly.
 //
 // SkyMap samples the incoming field once and shares it across every direction,
-// where Estimate samples one per call. That is a pure optimisation — L_0 is the
+// where Estimate samples one per call. That is a pure optimization — L_0 is the
 // radiance above the atmosphere and does not depend on where the observer looks
 // — so the two must produce the same numbers, not merely close ones.
 //

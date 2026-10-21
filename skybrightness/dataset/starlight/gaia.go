@@ -35,7 +35,7 @@ var (
 // A Gaia source_id encodes the HEALPix index of the source in its high bits:
 // source_id / 2^(59-2k) is the level-k nested pixel. That makes the whole
 // aggregation a server-side GROUP BY, so the map is built from about 800
-// queries rather than the 600 GB the bulk catalogue would cost, and each
+// queries rather than the 600 GB the bulk catalog would cost, and each
 // chunk is a source_id range that rides the primary-key index instead of
 // scanning the table.
 //
@@ -357,7 +357,7 @@ func columnName(name string) string {
 // have failed at the parser in milliseconds got the same silence, which is how
 // a defending service looks from outside and not how a broken one does.
 //
-// The queries are spaced and serialised (see [aggregationPace]) for that
+// The queries are spaced and serialized (see [aggregationPace]) for that
 // reason. If a full sky is what you want rather than the directions you intend
 // to observe, consider the bulk release instead: ESA publishes gaia_source as
 // files keyed by HEALPix level-8 range, which is this aggregation's own grid,
@@ -370,7 +370,7 @@ func columnName(name string) string {
 //
 // It sums the flux of every Gaia source into its HEALPix pixel, applying the
 // caller's color transformation per star. That is the core of the GAMBONS
-// method and the part that needs the catalogue.
+// method and the part that needs the catalog.
 //
 // It does not add the bright stars Gaia omits, which Masana et al. take from
 // Hipparcos and which carry disproportionate weight; it drops sources with no
@@ -505,7 +505,7 @@ func RunChunk(ctx context.Context, build GaiaBuild, first, last int64) (*Map, []
 
 // aggregationTimeout is the per-request budget for one chunk.
 //
-// The registered Gaia endpoint allows 30 seconds, which suits a catalogue
+// The registered Gaia endpoint allows 30 seconds, which suits a catalog
 // lookup. One chunk here is a GROUP BY over a few million sources and the
 // archive's own queueing, and 30 seconds is not reliably enough: a run of 787
 // chunks meets a slow one sooner or later.
@@ -540,7 +540,7 @@ const aggregationBudget = 6 * time.Minute
 // milliseconds. GETs to the same host kept working throughout, which is what
 // distinguishes a defending service from a broken one.
 //
-// So the queries are spaced and serialised. It makes a whole-sky build slower
+// So the queries are spaced and serialized. It makes a whole-sky build slower
 // and that is the correct trade: the cost of being wrong here is borne by
 // every other user of a shared research instrument, not by us.
 const aggregationPace = 2 * time.Second
@@ -848,7 +848,7 @@ func GaiaJohnsonV() GaiaBand {
 
 // GaiaGZeroPoint is the Gaia DR3 G VEGAMAG zero point.
 //
-// It turns a catalogue flux in electrons per second into a magnitude, so a
+// It turns a catalog flux in electrons per second into a magnitude, so a
 // band conversion has to undo it before applying the target band's own zero
 // point. Declared once because it appeared as a local constant in two
 // separate band constructors, and two copies of a zero point are two chances
@@ -877,7 +877,7 @@ const johnsonVZeroFlux = 3.63e-11
 // U is absent and cannot be added: Gaia's bluest band starts around 330 nm and
 // Table 5.9 publishes no G-to-U relation, because Gaia does not constrain the
 // Balmer jump well enough to support one. A four-band map is what this
-// catalogue can produce.
+// catalog can produce.
 func JohnsonCousinsColorTerm(band string) ([]float64, error) {
 	switch band {
 	case "B":
@@ -956,7 +956,7 @@ func GaiaJohnsonCousins(name string, band magnitude.Passband) (GaiaBand, error) 
 		return GaiaBand{}, err
 	}
 
-	// The Gaia DR3 G VEGAMAG zero point, which turns a catalogue flux in
+	// The Gaia DR3 G VEGAMAG zero point, which turns a catalog flux in
 	// electrons per second into a magnitude and so has to be undone before the
 	// target band's zero point is applied.
 	return GaiaBand{

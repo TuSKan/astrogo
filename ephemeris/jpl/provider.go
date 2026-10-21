@@ -82,7 +82,7 @@ const naifJ2000 = 1
 var ErrNoSegment = errors.New("jpl: no coverage for target at requested epoch")
 
 // ErrUnknownTarget is returned when no loaded kernel holds the target at all:
-// the Pluto centre (999) from a planetary kernel, which has only the Pluto
+// the Pluto center (999) from a planetary kernel, which has only the Pluto
 // barycenter (9). It used to be reported as ErrNoSegment, as if the kernel
 // covered the body at other epochs (#809).
 var ErrUnknownTarget = errors.New("jpl: no loaded kernel holds the target")
@@ -279,11 +279,11 @@ func (p *Provider) Close() error {
 	return lastErr
 }
 
-// Locate returns id's state at t about the centre of the segment that holds
+// Locate returns id's state at t about the center of the segment that holds
 // it there, as the kernel stores it: the Moon and the Earth about the
 // Earth-Moon barycenter, a planet's barycenter about the Solar System
 // barycenter, a moon of Neptune about Neptune's barycenter. ephemeris.At
-// composes those into a state about any centre.
+// composes those into a state about any center.
 //
 // It used to answer geocentric, summing the target's chain and the Earth's
 // each to the Solar System barycenter and differencing the two: a 9-body sky
@@ -293,7 +293,7 @@ func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	// Straight to ET seconds: going via a summed Julian Date quantises the
+	// Straight to ET seconds: going via a summed Julian Date quantizes the
 	// result to about 40 microseconds, which is 4 cm of lunar motion (#150).
 	et := lsk.UTCToET(t, p.LSK)
 

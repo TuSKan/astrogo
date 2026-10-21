@@ -677,7 +677,7 @@ func TestRemoteExceptionCarriesItsMessage(t *testing.T) {
 
 // TestAbsenceNeedsTheBulkTableToHaveAnswered is the other half of the rule, and
 // the one that keeps it honest: when SSOFT could not be loaded, nobody has
-// asked the complete catalogue, so "not found" is an assertion the provider is
+// asked the complete catalog, so "not found" is an assertion the provider is
 // not entitled to make.
 func TestAbsenceNeedsTheBulkTableToHaveAnswered(t *testing.T) {
 	t.Cleanup(remote.Reset)
@@ -705,7 +705,7 @@ func TestAbsenceNeedsTheBulkTableToHaveAnswered(t *testing.T) {
 
 	_, err := New().Resolve(context.Background(), "999999")
 	if err == nil {
-		t.Fatal("Resolve returned no error although the catalogue was never consulted")
+		t.Fatal("Resolve returned no error although the catalog was never consulted")
 	}
 
 	if errors.Is(err, resolve.ErrNotFound) {

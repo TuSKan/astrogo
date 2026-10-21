@@ -124,8 +124,8 @@ var sunCenter = CentralBody{ID: core.Sun, GM: constants.IAU.SunGravitationalPara
 //
 // It is not the ecliptic and not the planet's equator. It is the plane a
 // satellite's orbit precesses about — for a close satellite, forced by the
-// planet's oblateness towards the equator, and for a distant one by the Sun
-// towards the planet's orbital plane. JPL tabulates its pole per satellite,
+// planet's oblateness toward the equator, and for a distant one by the Sun
+// toward the planet's orbital plane. JPL tabulates its pole per satellite,
 // alongside the elements, precisely because it differs from both and from
 // one satellite to the next: at Jupiter it runs from (268.1°, 64.5°) for Io
 // to (268.7°, 64.8°) for Callisto.
@@ -246,7 +246,7 @@ func (p SecularPrecession) rate() float64 {
 // Reports false for a body with no satellite system in the table — the Sun,
 // the Moon, Mercury and Venus.
 //
-// A planet's centre and its system barycenter find the same GM — the
+// A planet's center and its system barycenter find the same GM — the
 // planet's — and the CentralBody keeps the id it was asked for, so an orbit
 // is placed about whichever of the two points the caller named (#809).
 func CentralBodyFor(id core.ID) (CentralBody, bool) {

@@ -35,8 +35,8 @@ func itrsContext(t *testing.T) *coord.Context {
 //
 // The Context keeps precession-nutation and polar motion separately so that
 // SetTime can rebuild the matrix from a fresh Earth rotation angle alone, which
-// is what makes a time step cheap. That is an optimisation of C2t06a, and an
-// optimisation of a reference routine is only safe while it still agrees with
+// is what makes a time step cheap. That is an optimization of C2t06a, and an
+// optimization of a reference routine is only safe while it still agrees with
 // it — so the comparison is exact equality rather than a tolerance. A
 // tolerance here would let the factored form drift and call it rounding.
 func TestICRSToITRSIsSOFAsC2t06a(t *testing.T) {

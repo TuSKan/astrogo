@@ -237,7 +237,7 @@ func TestIntegratedStarlightDimsTowardTheHorizon(t *testing.T) {
 
 // Extinction is steepest at the blue end, so what arrives is redder than what
 // left. Reddening is the signature of attenuating per wavelength rather than
-// scaling a band-integrated number by one grey factor.
+// scaling a band-integrated number by one gray factor.
 func TestIntegratedStarlightReddens(t *testing.T) {
 	t.Parallel()
 
@@ -304,7 +304,7 @@ func TestIntegratedStarlightFlagsMissingCoverage(t *testing.T) {
 // one as the other rotates the Milky Way across the sky and still returns
 // plausible numbers everywhere, so the only way to catch it is to make the map
 // report which coordinates it was asked for.
-func TestIntegratedStarlightHonoursTheMapFrame(t *testing.T) {
+func TestIntegratedStarlightHonorsTheMapFrame(t *testing.T) {
 	t.Parallel()
 
 	grid := skybrightness.DefaultOpticalGrid()

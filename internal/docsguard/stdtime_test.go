@@ -145,7 +145,7 @@ func TestNoStandardLibraryTimeOutsideTimePackage(t *testing.T) {
 
 			t.Errorf("%s:%d: imports astrogo/time under a local name.\n"+
 				"  With the standard library's time gone there is nothing to disambiguate,\n"+
-				"  and the alias only makes the package read differently from its neighbours.",
+				"  and the alias only makes the package read differently from its neighbors.",
 				filepath.ToSlash(rel), lineOf(body, loc[0]))
 		}
 

@@ -271,7 +271,7 @@ func (s *Atmosphere) Profile() VerticalProfile { return s.profile }
 // Ozone returns the total-column ozone amount.
 func (s *Atmosphere) Ozone() unit.OzoneColumnDU { return s.ozone }
 
-// PrecipitableWater returns the precipitable water vapour column.
+// PrecipitableWater returns the precipitable water vapor column.
 func (s *Atmosphere) PrecipitableWater() unit.PrecipitableWaterMM { return s.pwv }
 
 // Aerosol returns the broadband aerosol state.
@@ -461,7 +461,7 @@ func (b *Builder) SurfaceAtAltitude(height unit.Length) *Builder {
 	return b.Surface(isa.Pressure, isa.Temperature+273.15)
 }
 
-// PrecipitableWater sets precipitable water vapour, in millimeters.
+// PrecipitableWater sets precipitable water vapor, in millimeters.
 func (b *Builder) PrecipitableWater(mm float64) *Builder {
 	b.s.pwv = unit.PrecipitableWaterMM(mm)
 	return b

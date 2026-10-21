@@ -27,7 +27,7 @@ var ErrExposure = errors.New("optics: exposure and aperture must be positive and
 //
 // Because it is the one a sky model can change. The other three are
 // properties of the detector and the exposure, fixed once the equipment is
-// chosen, while B is the whole reason a dark site is worth travelling to:
+// chosen, while B is the whole reason a dark site is worth traveling to:
 // under a bright sky the numerator is unchanged and the denominator grows,
 // so the same source in the same instrument is detected or not depending on
 // where and when it was pointed at. That is what makes this the natural

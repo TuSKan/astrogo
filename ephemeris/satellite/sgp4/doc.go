@@ -46,6 +46,6 @@
 //
 // The propagator takes an [Elements] value, not two lines of text. A TLE is
 // one serialization of a mean element set and [ParseTLE] reads it, but an OMM
-// or a catalogue row describes the same thing, and none of them should have to
+// or a catalog row describes the same thing, and none of them should have to
 // become a TLE first.
 package sgp4

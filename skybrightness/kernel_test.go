@@ -45,7 +45,7 @@ func kernelScene(t *testing.T) *Scene {
 // The test did not exist. The rearranged form — the innermost loop of the
 // whole sky-brightness model, and the only place in it where a transcendental
 // was traded for a table lookup — had no test of any kind, while its comment
-// said otherwise. That is worse than an untested optimisation, because a
+// said otherwise. That is worse than an untested optimization, because a
 // reader checking whether the claim is guarded finds a name and stops.
 //
 // # What equivalence means here
@@ -141,7 +141,7 @@ func TestScatterKernelMatchesTheReferenceFunctions(t *testing.T) {
 				// The reference phase function, combined by the same weights
 				// the kernel splits apart.
 				phase, perr := atmosphere.CombinedPhaseFunction(
-					theta, rayleigh, aer, k.asymmetry, k.depolarisation)
+					theta, rayleigh, aer, k.asymmetry, k.depolarization)
 				if perr != nil {
 					t.Fatalf("CombinedPhaseFunction: %v", perr)
 				}

@@ -155,7 +155,7 @@ func newOppositionScan(target Observable, sun MovingBody, start time.Time) (*opp
 
 // oppositionSample is the scan's view of one instant.
 type oppositionSample struct {
-	// phi is the target's ecliptic longitude about its centre less the
+	// phi is the target's ecliptic longitude about its center less the
 	// Earth's about the Sun, in radians within (−π, π]: zero when the three
 	// are aligned.
 	phi float64
@@ -467,7 +467,7 @@ func longitudeRate(r, v vector.Vec3) float64 {
 
 // longitudeCurvatureBound bounds how fast the rate of ecliptic longitude can
 // change, in radians per day², on the two-body orbit through the state (r, v)
-// about a centre of gravitational parameter mu (AU, AU/day, AU³/day²).
+// about a center of gravitational parameter mu (AU, AU/day, AU³/day²).
 //
 // By Kepler's second law the longitude turns at L' = h_z/ρ², h_z the ecliptic
 // component of the angular momentum and ρ the distance projected on the

@@ -18,7 +18,7 @@
 // # Transformations
 //
 // The [Context] type precomputes expensive SOFA intermediate astrometry
-// parameters (ASTROM) once per observation epoch, then amortises the cost
+// parameters (ASTROM) once per observation epoch, then amortizes the cost
 // across many targets. It supports the full pipeline:
 //
 //	Geometric → Astrometric → CIRS → Observed (Alt/Az)
@@ -37,15 +37,15 @@
 // The [Reducer] provides a lightweight topocentric reduction pipeline that
 // also handles chromatic atmospheric dispersion.
 //
-// # Catalogue frames
+// # Catalog frames
 //
-// [FK4] (B1950.0) and [FK5] (J2000.0) are the fundamental catalogues the IAU
+// [FK4] (B1950.0) and [FK5] (J2000.0) are the fundamental catalogs the IAU
 // used before the ICRS, and are what most archival positions are actually in:
 // [FK4ToFK5] is the classic B1950 → J2000 conversion, and [FK4ToICRS] carries
 // it the rest of the way. Neither is a rotation — FK4's E-terms of aberration
-// and both catalogues' non-inertial drift mean a star at rest in one is moving
+// and both catalogs' non-inertial drift mean a star at rest in one is moving
 // in the next — so each has two constructors, one for a recorded proper motion
-// and one for a catalogue that recorded none. Confusing FK5 J2000 with ICRS
+// and one for a catalog that recorded none. Confusing FK5 J2000 with ICRS
 // costs about 20 mas; confusing FK4 B1950 with either costs about 0.7°.
 //
 // # The Earth-fixed frame
@@ -111,7 +111,7 @@
 // [Context.BarycentricRadialVelocity] removes the observer's own motion and
 // leaves a velocity measured against the solar system barycenter, which is the
 // wrong frame for anything Galactic: the Sun is itself moving at about 18 km/s
-// through its neighbourhood. [LSRCorrection] removes that too, and takes an
+// through its neighborhood. [LSRCorrection] removes that too, and takes an
 // [LSRKind] because the published conventions disagree by 2.1 km/s and a v_LSR
 // quoted without one carries that ambiguity.
 //

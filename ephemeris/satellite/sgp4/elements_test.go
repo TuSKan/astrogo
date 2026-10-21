@@ -80,7 +80,7 @@ func TestValidateRefusesTheImpossible(t *testing.T) {
 		{"infinite B*", func(e *sgp4.Elements) { e.BStar = math.Inf(1) }, true},
 		{
 			// B* is a fitted coefficient, not a physical drag area, and a
-			// negative one is ordinary in a catalogue.
+			// negative one is ordinary in a catalog.
 			name:    "negative B*",
 			mutate:  func(e *sgp4.Elements) { e.BStar = -0.5 },
 			wantErr: false,

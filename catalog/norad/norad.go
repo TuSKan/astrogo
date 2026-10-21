@@ -62,7 +62,7 @@ func (gp GP) EpochTime() (time.Time, error) {
 // # Catalog numbers past 99999
 //
 // Five columns hold the catalog number, and CelesTrak ran out of five-digit
-// numbers on 2026-07-11: every object catalogued since has six. Those up to
+// numbers on 2026-07-11: every object cataloged since has six. Those up to
 // 339999 are written in Alpha-5, the extension python-sgp4 reads and
 // [github.com/TuSKan/astrogo/ephemeris/satellite/sgp4.ParseTLE] reads too —
 // a letter for the tens of thousands, A for 10 through Z for 33 without I and
@@ -70,7 +70,7 @@ func (gp GP) EpochTime() (time.Time, error) {
 // lines come back empty rather than naming another one; CelesTrak serves those
 // as GP data only.
 //
-// Until #737 the number was clamped to 99999, so every object catalogued since
+// Until #737 the number was clamped to 99999, so every object cataloged since
 // July claimed to be the same one.
 func (gp GP) ToTLE() (line1, line2 string) {
 	catID, ok := catalogField(gp.NoradCatID)

@@ -92,7 +92,7 @@ func TestFK4DoesNotInventARadialVelocity(t *testing.T) {
 // TestFK4KeepsSOFAsAnswerForARealStar is the other half of the contract: the
 // dispatch must not have widened into "always take the distance-free route".
 //
-// A star at a parallax a catalogue really contains keeps SOFA's answer,
+// A star at a parallax a catalog really contains keeps SOFA's answer,
 // relativistic terms and light-time distortion included, because at that
 // distance SOFA's answer is the better one.
 func TestFK4KeepsSOFAsAnswerForARealStar(t *testing.T) {
@@ -132,7 +132,7 @@ func TestFK4KeepsSOFAsAnswerForARealStar(t *testing.T) {
 // TestFK4RoundTripClosesAtEveryParallax is the property #339 is named for.
 //
 // FK4 -> FK5 -> FK4 on a star at rest returns it at rest, at parallaxes
-// spanning from a real catalogue's down to ones that describe no distance at
+// spanning from a real catalog's down to ones that describe no distance at
 // all. Before this it went to 38.9 km/s at 1e-9 arcsec, growing without bound
 // as 1/px.
 //
@@ -146,7 +146,7 @@ func TestFK4KeepsSOFAsAnswerForARealStar(t *testing.T) {
 // residual of its own — the frame artifact really does imply a small space
 // velocity at a known distance, and at 1e-5 arcsec that is 3.9 mm/s. That is
 // not this package's to remove, and #339 states the same bound: at any
-// parallax a real catalogue contains, under 4e-3 km/s.
+// parallax a real catalog contains, under 4e-3 km/s.
 func TestFK4RoundTripClosesAtEveryParallax(t *testing.T) {
 	t.Parallel()
 

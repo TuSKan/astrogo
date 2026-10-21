@@ -6,7 +6,7 @@ import (
 )
 
 // FuzzParseOpenNGC holds the OpenNGC CSV reader to never panicking or hanging
-// on whatever the catalogue's repository serves (#746). Rows are
+// on whatever the catalog's repository serves (#746). Rows are
 // semicolon-separated, with sexagesimal positions split on colons.
 func FuzzParseOpenNGC(f *testing.F) {
 	f.Add(realNGCRows)

@@ -49,11 +49,11 @@ const (
 // it is absent, and so cannot host the download lock.
 var ErrNoExclusiveCreate = errors.New("remote/file: filesystem cannot create exclusively")
 
-// inProcess serialises lock acquisition within this process, one key at a
+// inProcess serializes lock acquisition within this process, one key at a
 // time.
 //
 // Kept even though the cross-process primitive is now exact, because it is
-// doing something the exclusive create is not: honouring a context while
+// doing something the exclusive create is not: honoring a context while
 // waiting. A goroutine blocked on a lock held by another goroutine in the same
 // process would otherwise have to discover the release by polling, and the
 // thing being waited for is a download that may legitimately run for minutes.
@@ -69,7 +69,7 @@ var ErrNoExclusiveCreate = errors.New("remote/file: filesystem cannot create exc
 // (#245).
 var inProcess = keyedSemaphore{held: make(map[string]chan struct{})}
 
-// keyedSemaphore hands out exclusive access per key, honouring a context
+// keyedSemaphore hands out exclusive access per key, honoring a context
 // while waiting.
 //
 // A plain sync.Mutex would do the exclusion but not the waiting: a caller
@@ -307,7 +307,7 @@ func RecordedETag(ctx context.Context, fsys fs.FS, key string) string {
 // disk — so the HTTP backend puts its response header in Sys, which is the
 // standard library's own escape hatch for exactly this.
 //
-// Otherwise a weak validator synthesised from size and modification time. That
+// Otherwise a weak validator synthesized from size and modification time. That
 // is not a fallback invented here: it is precisely what gocloud's fileblob did
 // for every local object, and it is what makes a file:// source resumable at
 // all. It is weaker than a real ETag and says so in its shape — a file replaced

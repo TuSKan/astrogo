@@ -72,7 +72,7 @@ import (
 //
 // So both ends are tested. If either describes something that could not be a
 // star, the distance behind it was not a distance, and the conversion is redone
-// without one. That costs an extra iauStarpv on a catalogue conversion and
+// without one. That costs an extra iauStarpv on a catalog conversion and
 // makes the two directions agree, which a round trip closing at all requires.
 
 // Fk425 converts B1950.0 FK4 star data to J2000.0 FK5, with the full

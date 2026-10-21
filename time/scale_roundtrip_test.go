@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// epochs spans the range a catalogue or an ephemeris is likely to be asked
+// epochs spans the range a catalog or an ephemeris is likely to be asked
 // about, including a leap-second boundary and both sides of J2000.
 func epochs() []time.GoTime {
 	return []time.GoTime{

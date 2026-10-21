@@ -11,7 +11,7 @@ import (
 )
 
 // Instant is one epoch of a [Provider]: the states it locates at that epoch,
-// composed into a state about any centre ([Instant.Geometric]) and into the
+// composed into a state about any center ([Instant.Geometric]) and into the
 // places an observer sees ([Instant.Astrometric], [Instant.Apparent]).
 //
 // It remembers what it has located, so a body asked for twice at one epoch,
@@ -27,7 +27,7 @@ type Instant struct {
 
 // instantMemo is how many bodies an Instant remembers: the Sun, the Earth and
 // the Moon, the Earth-Moon barycenter, every planetary system's barycenter and
-// centre, and room besides. Past it an Instant locates again rather than
+// center, and room besides. Past it an Instant locates again rather than
 // remembering, which costs time and changes no answer.
 const instantMemo = 24
 
@@ -37,9 +37,9 @@ type located struct {
 	st State
 }
 
-// chainDepth bounds a chain of centres. The deepest a kernel nests is a
+// chainDepth bounds a chain of centers. The deepest a kernel nests is a
 // satellite of a planet: the satellite, its planet's barycenter, the Solar
-// System barycenter. A chain this long is a provider whose centres loop.
+// System barycenter. A chain this long is a provider whose centers loop.
 const chainDepth = 8
 
 // At returns the Instant of p at t.
@@ -51,9 +51,9 @@ func (in *Instant) Time() time.Time { return in.t }
 // Geometric returns the state of target about center at the Instant's epoch:
 // r_target(t) − r_center(t), both at TDB t, with no light time.
 //
-// It walks the two chains of centres the provider names, alternately, to the
+// It walks the two chains of centers the provider names, alternately, to the
 // first body on both, and differences the two sums below it. A body is never
-// taken through a centre it does not need: the Moon about the Earth in a JPL
+// taken through a center it does not need: the Moon about the Earth in a JPL
 // kernel is the Moon about the Earth-Moon barycenter less the Earth about it,
 // and never passes through the Solar System barycenter an AU away, which is
 // where the rounding of a geocentric state composed through it would be.
@@ -152,7 +152,7 @@ type Observer struct {
 	pos, vel vector.Vec3
 }
 
-// Geocenter is the observer at the centre of the Earth.
+// Geocenter is the observer at the center of the Earth.
 func Geocenter() Observer { return Observer{} }
 
 // Astrometric returns the astrometric state of target seen by obs, as SOFA
@@ -167,7 +167,7 @@ func Geocenter() Observer { return Observer{} }
 //
 // The velocity omits the factor 1 − dτ/dt, which is 1 within |ṙ|/c ≤ 10⁻⁴.
 // The light time is solved in TDB without the Shapiro delay, a few hundred
-// microseconds at worst: metres of motion, microarcseconds of direction.
+// microseconds at worst: meters of motion, microarcseconds of direction.
 // Center is the Earth.
 func (in *Instant) Astrometric(target ID, obs Observer) (State, error) {
 	var a astrometric
@@ -234,7 +234,7 @@ func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
 	}
 
 	// iauAb's last term is the Sun's gravitational potential at the
-	// observer, over em; an observer at the Sun's centre, which only a
+	// observer, over em; an observer at the Sun's center, which only a
 	// synthetic provider can put there, has it dropped rather than infinite.
 	if em == 0 {
 		em = math.Inf(1)
@@ -327,7 +327,7 @@ func (in *Instant) astrometric(target ID, obs Observer, a *astrometric) error {
 
 		// The light time of the epoch as represented, not as asked for: an
 		// epoch near JD 2.46e6 resolves to about a tenth of a microsecond,
-		// which is millimetres of the Moon, and the position read is the one
+		// which is millimeters of the Moon, and the position read is the one
 		// at the epoch the provider was given.
 		tau = in.t.Sub(a.then.t).Days()
 

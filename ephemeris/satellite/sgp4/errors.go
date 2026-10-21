@@ -61,7 +61,7 @@ var (
 	// rather than fatal: the state is computed and returned.
 	//
 	// It is a statement about the model, not about the object. SGP4 has no
-	// atmosphere below its drag parameterisation and will happily continue
+	// atmosphere below its drag parameterization and will happily continue
 	// propagating an orbit that reentered years ago.
 	ErrDecayed = errors.New("sgp4: the model places the satellite below the Earth's surface")
 

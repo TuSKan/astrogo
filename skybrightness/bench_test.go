@@ -20,7 +20,7 @@ import (
 // their own cost against this, so a regression in the machinery is
 // distinguishable from the expected cost of real models.
 //
-// The spec's performance work is Phase 8. Nothing here is optimised yet;
+// The spec's performance work is Phase 8. Nothing here is optimized yet;
 // the point is to have numbers before opinions.
 
 func benchScene(b *testing.B) *skybrightness.Scene {

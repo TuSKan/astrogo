@@ -47,7 +47,7 @@ type GroundEmitter interface {
 }
 
 // UniformEmitter is a source with a fixed spectral power distribution and
-// a parameterised upward emission function.
+// a parameterized upward emission function.
 //
 // It is the simplest emitter that is still physically honest: the spectrum
 // and the emission shape are both explicit and both flagged as assumed

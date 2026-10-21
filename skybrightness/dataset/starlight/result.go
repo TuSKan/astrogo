@@ -126,11 +126,11 @@ func (c *csvRows) Err() error { return c.err }
 
 // parquetRows reads the columnar form.
 //
-// The whole table is materialised, which is what the format requires: the
+// The whole table is materialized, which is what the format requires: the
 // footer holding the schema and the row-group offsets is at the end of the
 // file, so it cannot be streamed from the front. A whole-sky four-band result
 // is around sixty megabytes this way against two hundred and forty-five as
-// CSV, so materialising it is cheaper than streaming the alternative.
+// CSV, so materializing it is cheaper than streaming the alternative.
 type parquetRows struct {
 	columns map[string]arrow.Array
 	rows    int64
@@ -291,7 +291,7 @@ func openResult(ctx context.Context, r io.Reader) (resultRows, error) {
 	return newCSVRows(joined)
 }
 
-// voTableRows reads the IVOA VOTable serialisation.
+// voTableRows reads the IVOA VOTable serialization.
 //
 // It exists because asking for CSV does not get CSV. Gaia@AIP's synchronous
 // endpoint — this package's own default, set by [GaiaBuild.withDefaults] —
@@ -390,11 +390,11 @@ func (v *voTableRows) Number(column string) (float64, bool) {
 // returning, so anything that could fail has already failed by construction.
 func (v *voTableRows) Err() error { return nil }
 
-// newSyncRows reads whichever serialisation the archive actually sent.
+// newSyncRows reads whichever serialization the archive actually sent.
 //
 // The format is decided by the payload rather than by the request, the same
 // way catalog/gaia decides it and the same way the star-map loader tells
-// Parquet from CSV by the file's own magic. It has to be: ESA honours
+// Parquet from CSV by the file's own magic. It has to be: ESA honors
 // FORMAT=csv and Gaia@AIP does not, so what was asked for does not determine
 // what arrives, and a service that changes its mind is then handled rather
 // than discovered.

@@ -301,7 +301,7 @@ func (t *Reader) ReadGrid() (*Grid, error) {
 
 // SampleBilinear interpolates the sample at a
 // longitude/latitude by reading only the strips/tiles covering the four
-// neighbouring pixels — the windowed path that never loads the whole atlas.
+// neighboring pixels — the windowed path that never loads the whole atlas.
 func (t *Reader) SampleBilinear(lon, lat angle.Angle) (float64, error) {
 	var ioErr error
 
@@ -912,7 +912,7 @@ func unlzw(raw []byte, limit int) ([]byte, error) {
 //
 // The accumulation stride is one BYTE, not one sample — the differencing runs
 // over the shuffled byte planes, where adjacent bytes are the same byte
-// position of neighbouring samples. (libtiff's fpAcc uses the sample-count
+// position of neighboring samples. (libtiff's fpAcc uses the sample-count
 // stride, which is 1 here because this reader only accepts single-band files;
 // see the SamplesPerPixel check in configure.)
 func (t *Reader) undoPredictor(raw []byte, rowSamples int) {

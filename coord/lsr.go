@@ -20,13 +20,13 @@ import (
 // site's rotation and Earth's orbit — and leaves a velocity measured against
 // the solar system barycenter. That is the right frame for a stellar orbit and
 // the wrong one for anything Galactic, because the Sun itself is moving at
-// about 18 km/s with respect to its neighbours. Two clouds with the same
+// about 18 km/s with respect to its neighbors. Two clouds with the same
 // Galactic velocity, observed six months apart in opposite parts of the sky,
 // have barycentric velocities that differ by up to 36 km/s for no physical
 // reason.
 //
 // Radio spectroscopy quotes v_LSR for exactly this reason, and so do Galactic
-// rotation curves, molecular cloud catalogues and H I surveys.
+// rotation curves, molecular cloud catalogs and H I surveys.
 //
 // # There is more than one of them
 //
@@ -178,7 +178,7 @@ func solarMotionICRS(kind LSRKind) vector.Vec3 {
 //
 // It depends on the direction alone — not on the epoch, and not on where the
 // observer is standing. Both of those were already removed by the barycentric
-// step; what is left is the Sun's own motion through its neighbourhood, which
+// step; what is left is the Sun's own motion through its neighborhood, which
 // is the same today as it was a century ago.
 //
 // # Sign

@@ -13,7 +13,7 @@ import (
 // extreme only just passes the threshold, so that it crosses and crosses back
 // within one 15-minute step and no sample lands on the far side. The helpers
 // returned nothing for all three. The instants are Skyfield 1.54's, for the
-// same definition — the geometric topocentric centre, no refraction (DE421).
+// same definition — the geometric topocentric center, no refraction (DE421).
 //
 // The tolerances are wide for an event time because these crossings are
 // shallow: the Sun at Mawson climbs 4.5e-5 °/s through its threshold, so 1″

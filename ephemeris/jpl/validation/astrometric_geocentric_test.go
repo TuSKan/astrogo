@@ -59,7 +59,7 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
 	// DE441, the ephemeris Horizons itself reports for these queries, rather
-	// than the de440 its neighbours in this package use. Part 2 is the half
+	// than the de440 its neighbors in this package use. Part 2 is the half
 	// covering the modern era; part 1 is the ancient one and is not needed
 	// for 2026.
 	provider, err := jpl.NewProvider(context.Background(), core.Planets, "de441_part-2")
@@ -291,7 +291,7 @@ type astrometricRow struct {
 // Earth rotation enter the comparison.
 //
 // ANG_FORMAT='DEG' with EXTRA_PREC='YES', and its own parser rather than
-// parseObserverRow, because the default sexagesimal table is quantised far
+// parseObserverRow, because the default sexagesimal table is quantized far
 // too coarsely to measure anything here. Horizons prints it to 0.01 seconds
 // of right ascension and 0.1 arcseconds of declination — 0.15 and 0.1
 // arcseconds respectively. A first run against that table returned a

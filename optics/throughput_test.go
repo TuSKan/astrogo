@@ -125,7 +125,7 @@ func TestSystemMultipliesAndZerosOutsideRange(t *testing.T) {
 // The throughput deliberately spans wider than the grid. A band with edges
 // *inside* the grid is sampled with ramps at those edges, so the discrete
 // integral legitimately differs from an ideal top-hat by about one sample
-// — a discretisation artifact of a sharp-edged filter, not an error. Using
+// — a discretization artifact of a sharp-edged filter, not an error. Using
 // a band with no interior edge keeps the reference exact.
 func TestPhotonRateAgainstClosedForm(t *testing.T) {
 	t.Parallel()

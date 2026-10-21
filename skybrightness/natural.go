@@ -807,7 +807,7 @@ type StarMap interface {
 	// RadianceAt returns the passband-averaged spectral radiance in the
 	// map's own frame, W m^-2 sr^-1 nm^-1 — the response-weighted mean the
 	// magnitude systems are defined against, which is what a zero point
-	// converts a summed catalogue flux into. The passband it averages over
+	// converts a summed catalog flux into. The passband it averages over
 	// is the one handed to [NewIntegratedStarlight]; a map built for one
 	// band and read against another is a silent error this interface
 	// cannot catch.

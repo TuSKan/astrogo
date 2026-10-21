@@ -75,7 +75,7 @@ func WithCachedChunks(n int) ReaderAtOption {
 // a pread — 48x cheaper than the gocloud path it replaces, and still 84x slower
 // than serving the same bytes from a resident chunk.
 //
-// So the cache is not an optimisation a caller opts into and forgets; it is the
+// So the cache is not an optimization a caller opts into and forgets; it is the
 // difference between the layer working and not. Making Open the only door means
 // no call site can get it wrong, which is the same reason remote is the only
 // door to this package.

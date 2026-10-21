@@ -93,7 +93,7 @@ together directly. The frames themselves have caught up — FK4/B1950, FK5/J2000
 HCRS, LSR and LSRK, Supergalactic and Galactocentric are all here — but the missing graph is
 exactly why the next one will cost another implementation rather than one edge.
 `Galactocentric` carries velocities as well as positions, and `coord.SpaceVelocity` turns a
-catalogue's proper motion, parallax and radial velocity into km/s on the ICRS axes. See
+catalog's proper motion, parallax and radial velocity into km/s on the ICRS axes. See
 [Known Limitations & Scope](#known-limitations--scope) and the
 [open issues](https://github.com/TuSKan/astrogo/issues).
 

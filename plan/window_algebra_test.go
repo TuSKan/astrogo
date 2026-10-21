@@ -215,13 +215,13 @@ func TestWindowEdgeCases(t *testing.T) {
 
 	// TotalDuration must not double count overlapping input.
 	if d := totalHours([]plan.Window{win(0, 10), win(0, 10), win(5, 15)}); absDiff(d, 15) > 1e-9 {
-		t.Errorf("overlapping windows totalled %g hours, want 15", d)
+		t.Errorf("overlapping windows totaled %g hours, want 15", d)
 	}
 }
 
 // A zero-duration window is a real result — a target that rises and sets at
 // the same instant — so the algebra has to absorb it rather than let it
-// fragment a neighbouring window or invent an overlap.
+// fragment a neighboring window or invent an overlap.
 func TestZeroDurationWindowsAreAbsorbed(t *testing.T) {
 	t.Parallel()
 

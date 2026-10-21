@@ -12,8 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// TestSOFABaseLocatesAboutItsSeriesCentres: the default base answers each
-// body about the centre its series computes it from — the Earth about the
+// TestSOFABaseLocatesAboutItsSeriesCenters: the default base answers each
+// body about the center its series computes it from — the Earth about the
 // Sun and the Sun about the barycenter from one Epv00, a planet about the
 // Sun from Plan94, the Moon about the Earth from Moon98 — each to the bit of
 // the series itself, so composing them is the arithmetic State used to do.
@@ -21,7 +21,7 @@ import (
 // The base keeps its last Epv00 for the Sun and the Earth at one epoch. Many
 // readers at once, each at its own epoch, must still get their own epoch's
 // series, which is what -race and the bit comparison hold it to.
-func TestSOFABaseLocatesAboutItsSeriesCentres(t *testing.T) {
+func TestSOFABaseLocatesAboutItsSeriesCenters(t *testing.T) {
 	t.Parallel()
 
 	p := kepler.New()

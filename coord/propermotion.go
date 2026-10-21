@@ -10,7 +10,7 @@ import (
 // Proper motion in right ascension comes in two flavours, and the difference
 // is a factor of cos(dec) that is 1 at the equator and 0.17 at +80°.
 //
-// # What every catalogue publishes
+// # What every catalog publishes
 //
 // μα* ≡ μα·cos δ — the **angular rate on the sky** in the direction of
 // increasing right ascension. Gaia's data model spells it out: "Proper motion
@@ -35,14 +35,14 @@ import (
 //
 // # Why the conversion lives here and not at the call sites
 //
-// It used to live nowhere. Catalogue readers stored μα*, every consumer handed
+// It used to live nowhere. Catalog readers stored μα*, every consumer handed
 // it to SOFA as though it were dα/dt, and the RA component of every
 // Gaia- or SIMBAD-resolved proper motion came out short by cos δ — 30% at
-// δ = 45°, and 83% at δ = 80°. Propagating a catalogue row twenty years moved
+// δ = 45°, and 83% at δ = 80°. Propagating a catalog row twenty years moved
 // it 3.47″ instead of 20″.
 //
 // Fixing that at each call site would have left the same trap for the next
-// one. So the boundary is here: the public types carry the catalogue's
+// one. So the boundary is here: the public types carry the catalog's
 // quantity, and the two functions below are the only places the other one
 // exists.
 
@@ -82,7 +82,7 @@ func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 // The parsec is defined as the distance at which one astronomical unit
 // subtends one arcsecond, so this is d = 1/p with p in arcseconds, exactly —
 // there is no constant here to get wrong, only a unit. It exists because the
-// unit is the thing that does get got wrong: catalogues publish parallax in
+// unit is the thing that does get got wrong: catalogs publish parallax in
 // milliarcseconds, and 1/p_mas is a distance in kiloparsecs, which is a
 // factor of a thousand that looks entirely reasonable in a table.
 //
@@ -101,7 +101,7 @@ func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 //
 // A measured parallax is a true parallax plus noise, so a distant star's can
 // come out small, zero, or negative — Gaia publishes hundreds of thousands of
-// negative parallaxes, and they are not errors in the catalogue. Inverting the
+// negative parallaxes, and they are not errors in the catalog. Inverting the
 // measurement transforms a symmetric error bar into a wildly asymmetric one
 // and turns the small-parallax tail into a tail of implausibly distant stars,
 // biasing any sample selected on distance. Bailer-Jones (2015), PASP 127, 994
@@ -109,7 +109,7 @@ func pmRACosDec(dRAdtRad float64, dec angle.Angle) angle.Angle {
 // infer the distance with a prior rather than to compute it.
 //
 // This function is the arithmetic, not the inference. Use it when the parallax
-// is precise, and a published distance catalogue when it is not.
+// is precise, and a published distance catalog when it is not.
 func ParallaxDistance(p angle.Angle) unit.Length {
 	return unit.Pc(1 / p.Arcseconds())
 }

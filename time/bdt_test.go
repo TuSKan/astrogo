@@ -22,7 +22,7 @@ func TestBDTOffsetFromTAIIsExactlyThirtyThreeSeconds(t *testing.T) {
 
 	for _, when := range []time.Time{
 		epoch(),
-		time.Date(2006, time.January, 1, 0, 0, 0, 0, time.LocationUTC), // the synchronisation
+		time.Date(2006, time.January, 1, 0, 0, 0, 0, time.LocationUTC), // the synchronization
 		time.Date(1999, time.June, 1, 0, 0, 0, 0, time.LocationUTC),    // before it
 		time.Date(2040, time.June, 1, 0, 0, 0, 0, time.LocationUTC),    // past the table
 	} {

@@ -506,7 +506,7 @@ func TestAccessorsDescribeTheOrbit(t *testing.T) {
 
 	// A 15.7 rev/day near-circular orbit sits around 400 km. Loose bounds:
 	// the point is that the two are the right way round and in the right
-	// neighbourhood, not to re-derive the orbit here.
+	// neighborhood, not to re-derive the orbit here.
 	perigee, apogee := p.PerigeeAltitude(), p.ApogeeAltitude()
 
 	if perigee > apogee {

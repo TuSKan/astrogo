@@ -63,7 +63,7 @@ func openKernel(t *testing.T) *lsk.Reader {
 // The old path summed the two-part Julian Date and only then subtracted the
 // epoch. At a modern epoch a Julian Date is about 2.46e6, where one ULP of a
 // float64 is 4.657e-10 days — **40 microseconds**. So the ET handed to the SPK
-// evaluator was quantised: measured, the smallest offset it could resolve was
+// evaluator was quantized: measured, the smallest offset it could resolve was
 // 32.8 µs, and a caller advancing the epoch by 1 µs or 10 µs got back exactly
 // the same number.
 //
@@ -94,7 +94,7 @@ func TestUTCToETResolvesSubMicrosecondSteps(t *testing.T) {
 	shifted := lsk.UTCToET(base.Add(wantResolvable), r)
 	if shifted == baseET {
 		t.Errorf("advancing the epoch by 1 microsecond did not change ET at all.\n" +
-			"  The conversion is quantised — check that the epoch is subtracted from " +
+			"  The conversion is quantized — check that the epoch is subtracted from " +
 			"the Julian day number before the fraction is added back, rather than after.")
 	}
 
@@ -137,7 +137,7 @@ func TestUTCToETDelegatesOutsideTheKernelsEra(t *testing.T) {
 //
 // The tests below used to compute this as (UTCToTDB(t) - t.JD()) * 86400 — a
 // difference of two numbers near 2.46e6, so catastrophic cancellation on top
-// of the 40 microsecond quantisation that motivated UTCToET in the first
+// of the 40 microsecond quantization that motivated UTCToET in the first
 // place. Subtracting in seconds past J2000 avoids both.
 func tdbMinusUTC(t time.Time, r *lsk.Reader) float64 {
 	d1, d2 := t.UTC().JDParts()

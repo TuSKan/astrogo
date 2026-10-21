@@ -12,7 +12,7 @@ import (
 )
 
 // The five Johnson-Cousins bands as Table 1 of Masana, Bará, Carrasco & Ribas
-// (2024), arXiv:2408.17371, characterises them: effective wavelength and
+// (2024), arXiv:2408.17371, characterizes them: effective wavelength and
 // effective width, in nanometers.
 //
 // This is what makes the comparison worth running. GAMBONS states which bands
@@ -36,7 +36,7 @@ var table1 = []struct {
 // Tolerances on the comparison against Table 1, separate because the two
 // statistics carry different weight.
 //
-// The center is what identifies a band: neighbouring Johnson-Cousins filters
+// The center is what identifies a band: neighboring Johnson-Cousins filters
 // are 90 nm apart at the blue end, so two per cent cannot confuse one for
 // another. The width is looser because "effective width" has several
 // definitions — SVO alone publishes WidthEff and FWHM, which differ by four
