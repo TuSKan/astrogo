@@ -83,7 +83,7 @@ type File interface {
 ```
 
 That is the whole read model. The exported `remote.ReaderAt` no longer exists;
-its chunked LRU — 64 KiB × 16, 1 MiB resident for any object — became a
+its chunk cache — 64 KiB × 16, 1 MiB resident for any object — became a
 decorator over `io.ReaderAt` inside `remote.Open`, and kept its benchmark.
 
 ### 2.2 What `io/fs` does not have, and the three interfaces that answer it

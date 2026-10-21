@@ -492,6 +492,41 @@ func BenchmarkSatellite(b *testing.B) {
 			return nil
 		})
 	})
+
+	// The same through a Context, as a look angle takes it (#812): StateCtx
+	// with the precession-nutation the Context holds. The pass moves one
+	// Context minute by minute, rebuilding it each hour, as plan's pass search
+	// does.
+	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	if err != nil {
+		b.Fatalf("site: %v", err)
+	}
+
+	b.Run("state-ctx", func(b *testing.B) {
+		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+		measure(b, nil, nil, func() error {
+			_, err := sat.StateCtx(0, ctx)
+
+			return err //nolint:wrapcheck // the provider's error is the one to report
+		})
+	})
+
+	b.Run("pass-6h-1min-ctx", func(b *testing.B) {
+		measure(b, nil, nil, func() error {
+			ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+			for i := range 360 {
+				ctx.SetTime(at.Add(unit.Minutes(float64(i))))
+
+				if _, err := sat.StateCtx(0, ctx); err != nil {
+					return err //nolint:wrapcheck // the provider's error is the one to report
+				}
+			}
+
+			return nil
+		})
+	})
 }
 
 // BenchmarkConcurrentReaders (B9): one provider shared by every goroutine,

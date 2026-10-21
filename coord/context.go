@@ -23,24 +23,31 @@ import (
 //
 // # One Context, moved through time
 //
-// A Context holds two kinds of state. Precession-nutation, aberration, the
-// Earth's position and velocity, and polar motion are built for one epoch,
-// at the cost of a full SOFA evaluation, and drift by a fraction of an
-// arcsecond an hour. Earth rotation, the matrix built from it and the
-// observer's position move 15″ a second. [Context.SetTime] moves a Context to
-// another instant by updating the second kind in place, and rebuilds the
-// first in place once the instant is an hour from the epoch it was built
-// for. It never allocates.
+// A Context holds two kinds of state. Precession-nutation, the Earth's
+// position and velocity, and polar motion come from series, at the cost of a
+// full SOFA evaluation, and move by a fraction of an arcsecond an hour. Earth
+// rotation, and everything that turns with it — the observer's position and
+// velocity, the celestial-to-terrestrial matrix — move 15″ a second.
+// [Context.SetTime] moves a Context to another instant by recomputing the
+// second kind at that instant and interpolating the first between two
+// evaluations a day apart, so the series are evaluated about once a day of
+// movement. It never allocates.
 //
 // A Context is a value: c := *ctx is an independent copy, for a caller that
 // needs two instants at once.
 type Context struct {
 	t time.Time
 
-	// epoch is the instant the slow state was built for: the astrometry
-	// apart from its Earth rotation angle, rc2i, rpom, diurab and eo.
-	// SetTime moves t away from it, and rebuilds at t an hour out.
-	epoch time.Time
+	// nodes are the instants the slow state has been evaluated at, in time
+	// order, and what was evaluated there: one after a build, and two, a
+	// bracket apart, once SetTime has moved further than holdFor from it.
+	// SetTime interpolates between the two; see [Context.SetTime].
+	nodes  [2]node
+	nnodes int
+
+	// refa and refb are the refraction constants SOFA's astrometry carries,
+	// which depend on the atmosphere alone.
+	refa, refb float64
 
 	site   *Geodetic
 	atm    atmosphere.Refraction
@@ -107,6 +114,15 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	ctx.sinLat, ctx.cosLat = math.Sincos(site.Lat().Radians())
 	ctx.sinLon, ctx.cosLon = math.Sincos(site.Lon().Radians())
 	ctx.tirs = tirsVec(ctx.sinLat, ctx.cosLat, ctx.sinLon, ctx.cosLon, site.Height().Meters())
+
+	// A custom model refracts outside SOFA, so SOFA is given no atmosphere;
+	// see [Context.refract].
+	p := atm.Pressure
+	if atm.Model != nil {
+		p = 0.0
+	}
+
+	ctx.refa, ctx.refb = gofaext.Refco(p, atm.Temperature, atm.Humidity, atm.Wavelength)
 	ctx.build(t)
 
 	return ctx
@@ -153,28 +169,42 @@ func icrsFromTIRS(mat [3][3]float64, tirs vector.Vec3) vector.Vec3 {
 	}
 }
 
-// rebuildAfter is how far [Context.SetTime] moves a Context from the epoch
-// it was built for before building it again. Holding the slow state fixed
-// costs ≲0.1″ per hour of separation, so an hour bounds it at ≲0.1″: under
-// 0.01 s of rise/set time at the horizon's steepest crossing rate. It was
-// plan's ctxRefresh, which plan applied and no caller outside it did.
-var rebuildAfter = unit.Hours(1)
+// bracket and holdFor are how SetTime spends series evaluations, and both
+// follow from how fast the slow state moves. Its fastest-curving term is
+// nutation's 13.66-day term, 0.23″ in longitude; after it comes the annual
+// aberration, 20.5″ over a year. Interpolated linearly across a bracket L, a
+// term of amplitude A and angular frequency ω errs by at most A·ω²·L²/8: for a
+// day, 0.006″ from that nutation term and 0.0008″ from aberration, ≲0.007″.
+// Held fixed instead, the state moves by at most the sum of A·ω, with
+// precession ≲0.026″ an hour, so a quarter of an hour holds it inside the
+// same 0.007″.
+var (
+	bracket = unit.Days(1)
+	holdFor = unit.Minutes(15)
+)
 
 // SetTime moves ctx to instant t. It never allocates.
 //
-// Within an hour of the epoch ctx was built for, it updates only what Earth
-// rotation changes: the Earth Rotation Angle in the astrometry, the
-// celestial-to-terrestrial matrix and the observer's position, a handful of
-// trig calls, matrix products and one EOP lookup. Precession-nutation, the
-// Earth's ephemeris and aberration, polar motion and the equation of the
-// origins stay the epoch's, which costs ≲0.1″ per hour of |t − epoch| —
-// dominated by nutation's ~13.66-day term (≈0.025″/h) and the
-// annual-aberration direction's drift (≈0.015″/h); precession (≈0.006″/h) and
-// polar motion (<0.001″/h) are smaller still.
+// Everything that turns with the Earth is recomputed at t: the Earth
+// rotation angle, the observer's position and velocity — and with that
+// velocity the diurnal aberration of the stellar path — the
+// celestial-to-terrestrial matrix and the observer vector. That is SOFA's
+// Apco, about a microsecond, with no series in it.
 //
-// More than an hour out, SetTime builds all of it again for t, in place and as
-// [NewContext] would, and t becomes the epoch. The error therefore stays
-// ≲0.1″ however far a caller moves, without the caller tracking it.
+// The rest comes from series: the Earth's position and velocity, the CIP and
+// the CIO locator, the equation of the origins, polar motion. SetTime
+// evaluates them at two instants a day apart, a bracket, and interpolates
+// across it, which is good to ≲0.007″ (see bracket). It moves the bracket a
+// day at a time as t leaves it, one evaluation a day, and starts a new one at
+// t when t is further than that. Within a quarter of an hour of where ctx was
+// built it holds the evaluation there rather than making a second; see
+// holdFor. At an instant where the series were evaluated, ctx is what
+// [NewContext] builds there.
+//
+// It used to hold the series' state fixed for an hour and evaluate it again
+// an hour out: 24 evaluations in a day of steps, at 0.1 ms each, and a drift
+// of up to 0.07″, three quarters of it the observer's velocity held at the
+// epoch's Earth rotation angle while the Earth turned (#790).
 //
 // It replaces AtTime, which returned a new Context for every instant, 704
 // bytes on the heap to change four values, and left the rebuild to each
@@ -183,32 +213,110 @@ var rebuildAfter = unit.Hours(1)
 // SetTime writes ctx, so it must not run while anything else reads or moves
 // the same Context; see the package's Concurrency section.
 //
-// # DUT1 is t's own, not reused
+// # DUT1 is t's own, not interpolated
 //
-// Reusing the epoch's DUT1 cost under a millisecond of UT1 per hour on an
-// ordinary day, which is why it used to be reused. Across a leap second it
-// costs a whole second: DUT1 = UT1 − UTC jumps by exactly one second there,
-// because UTC steps back and UT1 does not, so an epoch before the leap put
-// every instant after it a second early in Earth rotation — 13″ for a star at
-// −30°, against the 0.1″ above (#489). Looking DUT1 up at t, as NewContext
-// does, costs one interpolation.
+// Across a leap second DUT1 = UT1 − UTC jumps by exactly one second, because
+// UTC steps back and UT1 does not, so reusing an earlier instant's put every
+// instant after the leap a second early in Earth rotation — 13″ for a star at
+// −30° (#489). Looking DUT1 up at t, as NewContext does, costs one
+// interpolation.
 func (ctx *Context) SetTime(t time.Time) {
 	t = t.UTC()
-	if t.Sub(ctx.epoch).Abs() > rebuildAfter {
+	lo, hi := &ctx.nodes[0], &ctx.nodes[1]
+	fromLo, fromHi := utcDays(t, lo.at), utcDays(t, hi.at)
+
+	switch {
+	case ctx.nnodes == 2 && fromLo >= 0 && fromHi <= 0:
+		// Inside the bracket.
+	case ctx.nnodes == 1 && math.Abs(fromLo) <= holdFor.Days():
+		ctx.place(t, lo)
+
+		return
+	case ctx.nnodes == 1 && math.Abs(fromLo) <= bracket.Days():
+		if fromLo > 0 {
+			*hi = nodeAt(lo.at.Add(bracket))
+		} else {
+			*hi = *lo
+			*lo = nodeAt(hi.at.Add(-bracket))
+		}
+
+		ctx.nnodes = 2
+	case ctx.nnodes == 2 && fromHi > 0 && fromHi <= bracket.Days():
+		*lo = *hi
+		*hi = nodeAt(lo.at.Add(bracket))
+	case ctx.nnodes == 2 && fromLo < 0 && -fromLo <= bracket.Days():
+		*hi = *lo
+		*lo = nodeAt(hi.at.Add(-bracket))
+	default:
 		ctx.build(t)
 
 		return
 	}
 
-	// t's own DUT1, applied by time so that a leap-second day is handled; see
-	// the same step in NewContext.
-	ut1, ut2 := t.UT1Using(t.EOP().DUT1).JDParts()
-	era := gofaext.Era00(ut1, ut2)
+	n := between(lo, hi, utcDays(t, lo.at)/utcDays(hi.at, lo.at))
+	ctx.place(t, &n)
+}
 
-	ctx.t = t
-	gofaext.Aper(era, &ctx.astrom)
-	ctx.mat = gofaext.C2tcio(ctx.rc2i, era, ctx.rpom)
-	ctx.obsVec = icrsFromTIRS(ctx.mat, ctx.tirs)
+// utcDays is a − b in days of UTC labels, for two UTC instants: their
+// elapsed time, except across a leap second, which it leaves out. SetTime
+// uses it where a second does not matter — to choose nodes and weigh them,
+// and to carry TT for proper motion — because Time.Sub, which does count
+// the second, looks both instants up in the leap-second table, and that was
+// most of a move.
+func utcDays(a, b time.Time) float64 {
+	a1, a2 := a.JDParts()
+	b1, b2 := b.JDParts()
+
+	return (a1 - b1) + (a2 - b2)
+}
+
+// node is the series' state at one instant: what [gofaext.CelestialAt]
+// evaluates there, that instant's polar motion and its matrix, and its TT.
+type node struct {
+	at       time.Time
+	tt1, tt2 float64
+	cel      gofaext.Celestial
+	xp, yp   float64
+	rpom     [3][3]float64
+}
+
+func nodeAt(t time.Time) node {
+	tt1, tt2 := t.TT().JDParts()
+	eop := t.EOP()
+
+	n := node{at: t, tt1: tt1, tt2: tt2, cel: gofaext.CelestialAt(tt1, tt2), xp: eop.XP, yp: eop.YP}
+	n.rpom = gofaext.Pom00(n.xp, n.yp, n.cel.Sp)
+
+	return n
+}
+
+// between is the series' state a fraction f of the way from a to b, linearly.
+// It is a's at f = 0 and b's at f = 1, exactly. Its instant and TT stay a's,
+// which place moves on from.
+func between(a, b *node, f float64) node {
+	l := func(p, q float64) float64 { return p*(1-f) + q*f }
+
+	n := node{at: a.at, tt1: a.tt1, tt2: a.tt2, xp: l(a.xp, b.xp), yp: l(a.yp, b.yp)}
+	c, ca, cb := &n.cel, &a.cel, &b.cel
+
+	for i := range 2 {
+		for j := range 3 {
+			c.Ebpv[i][j] = l(ca.Ebpv[i][j], cb.Ebpv[i][j])
+		}
+	}
+
+	for j := range 3 {
+		c.Ehp[j] = l(ca.Ehp[j], cb.Ehp[j])
+
+		for k := range 3 {
+			n.rpom[j][k] = l(a.rpom[j][k], b.rpom[j][k])
+		}
+	}
+
+	c.X, c.Y, c.S = l(ca.X, cb.X), l(ca.Y, cb.Y), l(ca.S, cb.S)
+	c.EO, c.Sp = l(ca.EO, cb.EO), l(ca.Sp, cb.Sp)
+
+	return n
 }
 
 // Time returns the encapsulated observation time.
@@ -372,67 +480,68 @@ func (ctx *Context) BarycentricVelocity() vector.Vec3 {
 	return vector.V3(ctx.astrom.V[0], ctx.astrom.V[1], ctx.astrom.V[2]).MulScalar(kmPerSec)
 }
 
-// build computes, in place, everything in ctx that belongs to the epoch t:
-// what NewContext does once the site is set, and what SetTime does again
-// when t has moved an hour from the last epoch.
-func (ctx *Context) build(t time.Time) {
-	t = t.UTC()
-	eop := t.EOP()
-	site, atm := ctx.site, ctx.atm
-
-	// A custom model refracts outside SOFA, so SOFA is given no atmosphere;
-	// see [Context.refract].
-	p := atm.Pressure
-	if atm.Model != nil {
-		p = 0.0
-	}
-
+// place sets everything in ctx that turns with the Earth, at t, from the
+// series' state n: the astrometry, with the observer's position and velocity
+// at t's Earth rotation angle, and the celestial-to-terrestrial matrix and
+// observer vector.
+func (ctx *Context) place(t time.Time, n *node) {
 	// UT1 through time rather than by adding DUT1 to the UTC Julian Date: on
 	// a day that ends in a leap second that date's fraction is of 86401
 	// seconds, and the sum would misplace Earth's rotation by up to a second.
-	ut1, ut2 := t.UT1Using(eop.DUT1).JDParts()
-	tt1, tt2 := t.TT().JDParts()
+	ut1, ut2 := t.UT1Using(t.EOP().DUT1).JDParts()
+	era := gofaext.Era00(ut1, ut2)
+	site := ctx.site
 
-	// ApcoAt is SOFA's Apco13 given this Context's TT and UT1 rather than
-	// deriving its own. Its second return is the equation of the origins, the
-	// angle between the true equinox and the CIO. It is what separates the
-	// CIRS place this Context computes from the equinox-based apparent place
-	// an almanac quotes, and discarding it used to leave that conversion
-	// unreachable. See [Context.CIRSToTETE].
-	astrom, eo := gofaext.ApcoAt(
-		tt1, tt2, ut1, ut2,
+	// TT moves uniformly, so it is the node's and the time since: no
+	// leap-second lookup at every move, which was a quarter of one. Apco reads
+	// it for one thing, the interval stars' proper motion is applied over,
+	// which a second across a leap second does not move.
+	tt1, tt2 := n.tt1, n.tt2+utcDays(t, n.at)
+
+	// SOFA's Apco13 given this Context's TT and UT1 rather than deriving its
+	// own (#474), and the series' state rather than evaluating it here.
+	ctx.astrom = gofaext.ApcoFrom(&n.cel, tt1, tt2, era,
 		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
-		eop.XP, eop.YP,
-		p, atm.Temperature, atm.Humidity, atm.Wavelength,
-	)
+		n.xp, n.yp, ctx.refa, ctx.refb)
 
-	// The celestial-to-intermediate matrix, which ApcoAt has already built as
-	// astrom.Bpn from the precession-nutation series: evaluating it again with
-	// C2i06a cost a third of every NewContext (#473). Held apart from Earth
-	// rotation and polar motion, so SetTime can recompute mat from a fresh
-	// Earth Rotation Angle alone. C2tcio(rc2i, era, rpom) is bit-identical to
-	// a direct C2t06a call at the same TT and UT1.
-	rc2i := astrom.Bpn
-	sp := gofaext.Sp00(tt1, tt2)
-	rpom := gofaext.Pom00(eop.XP, eop.YP, sp)
-	era0 := gofaext.Era00(ut1, ut2)
-	mat := gofaext.C2tcio(rc2i, era0, rpom)
+	// The celestial-to-intermediate matrix, which Apco has already built as
+	// astrom.Bpn: evaluating it again with C2i06a cost a third of every
+	// NewContext (#473). C2tcio(rc2i, era, rpom) is bit-identical to a direct
+	// C2t06a call at the same TT and UT1.
+	ctx.t = t
+	ctx.eo = n.cel.EO
+	ctx.rc2i = ctx.astrom.Bpn
+	ctx.rpom = n.rpom
+	ctx.mat = gofaext.C2tcio(ctx.rc2i, era, ctx.rpom)
+	ctx.obsVec = icrsFromTIRS(ctx.mat, ctx.tirs)
+}
+
+// build computes, in place, everything in ctx for instant t, evaluating the
+// series there: what NewContext does once the site is set, and what SetTime
+// does again when t is beyond the bracket next to the one it has.
+func (ctx *Context) build(t time.Time) {
+	t = t.UTC()
+	site := ctx.site
+
+	// The series, evaluated at t, and the only node until SetTime needs a
+	// second. Its equation of the origins, the angle between the true equinox
+	// and the CIO, is what separates the CIRS place this Context computes from
+	// the equinox-based apparent place an almanac quotes; see
+	// [Context.CIRSToTETE].
+	ctx.nodes[0], ctx.nnodes = nodeAt(t), 1
+	ctx.eop = t.EOP()
+	ctx.place(t, &ctx.nodes[0])
 
 	// Diurnal aberration, derived exactly as iauApio does: the horizontal
 	// part of the observer's velocity in the celestial intermediate system,
-	// over c. sp and era0 are already in hand, so this costs one Pvtob.
+	// over c. Its size depends on the site alone, the Earth's rotation turning
+	// it without changing it, so it is taken once, at rotation angle zero.
+	n := &ctx.nodes[0]
 	pvob := gofaext.Pvtob(
 		site.Lon().Radians(), site.Lat().Radians(), site.Height().Meters(),
-		eop.XP, eop.YP, sp, era0,
+		n.xp, n.yp, n.cel.Sp, 0,
 	)
-	diurab := math.Hypot(pvob[1][0], pvob[1][1]) / constants.SI2019.SpeedOfLight.Value
-
-	ctx.t, ctx.epoch = t, t
-	ctx.astrom, ctx.eo, ctx.eop = astrom, eo, eop
-	ctx.rc2i, ctx.rpom = rc2i, rpom
-	ctx.mat = mat
-	ctx.obsVec = icrsFromTIRS(mat, ctx.tirs)
-	ctx.diurab = diurab
+	ctx.diurab = math.Hypot(pvob[1][0], pvob[1][1]) / constants.SI2019.SpeedOfLight.Value
 }
 
 // refract carries a true altitude to the observed one under this Context's

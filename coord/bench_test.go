@@ -37,10 +37,10 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 }
 
 // BenchmarkSetTime moves one Context in five-minute steps, the samplers'
-// pattern #675 measured AtTime on. Within the hour is the cheap path alone:
-// eleven steps and back to the start. A night is 96 steps, seven of them
-// more than an hour from the epoch and so rebuilt, and the step back to the
-// start an eighth.
+// pattern #675 measured AtTime on, and back to the start: eleven steps, and a
+// night of 96. Both stay inside the day-long bracket the first pass evaluates,
+// so this is the cost of a move alone; BenchmarkAltitudeCurve counts the
+// series evaluations a fresh Context makes over a day.
 func BenchmarkSetTime(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
 	start := time.FromJD(2461056.25, time.UTC)
@@ -64,6 +64,43 @@ func BenchmarkSetTime(b *testing.B) {
 
 				for _, t := range steps {
 					ctx.SetTime(t)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkAltitudeCurve is #790's measurement: one star's altitude over 24
+// hours, from a Context built at the first tick and moved to each of the
+// others, at three tick spacings. Per curve, so the series evaluations a day
+// of movement makes are counted in it rather than amortized away.
+func BenchmarkAltitudeCurve(b *testing.B) {
+	loc, _ := coord.NewGeodetic(angle.Deg(15), angle.Deg(50), 0)
+	start := time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
+	m31 := coord.NewICRS(angle.Hour(0.7122), angle.Deg(41.269))
+	atm := atmosphere.StandardRefraction()
+
+	for _, c := range []struct {
+		name string
+		step unit.Duration
+	}{{"1min", unit.Minutes(1)}, {"15min", unit.Minutes(15)}, {"2h", unit.Hours(2)}} {
+		b.Run(c.name, func(b *testing.B) {
+			ticks := make([]time.Time, int(unit.Days(1)/c.step))
+			for i := range ticks {
+				ticks[i] = start.Add(c.step * unit.Duration(i))
+			}
+
+			b.ReportAllocs()
+
+			for b.Loop() {
+				ctx := coord.NewContext(ticks[0], loc, atm)
+
+				for _, t := range ticks {
+					ctx.SetTime(t)
+
+					if _, err := ctx.ICRSToAltAz(m31); err != nil {
+						b.Fatal(err)
+					}
 				}
 			}
 		})

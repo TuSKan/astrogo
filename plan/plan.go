@@ -379,8 +379,8 @@ func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 //
 // The probes move a copy of ctx, the scoring instant's, with SetTime, and
 // leave ctx where the caller has it. They were five full Contexts per score
-// (#481); SetTime rebuilds past the hour, so no probe is more than ≲0.1″
-// out, against an interpolation whose own error is degrees.
+// (#481); SetTime holds every probe to ≲0.007″ of a full Context, against an
+// interpolation whose own error is degrees.
 func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, currentAlt float64) float64 {
 	// If already below horizon, urgency is maximum.
 	if currentAlt <= 0 {

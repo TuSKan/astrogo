@@ -57,8 +57,10 @@ func BenchmarkLookAngle(b *testing.B) {
 //
 // It used to be two Apco13 solves per sample, then one (#111/#165), and is now
 // six for the whole window — one for each hour SetTime rebuilds. Measured on an
-// i9-11980HK: 201 ms before the Context cache, 96 ms after. What is left is
-// SGP4 propagation, which is the work this function exists to do.
+// i9-11980HK: 201 ms before the Context cache, 96 ms after. That left a fresh
+// precession-nutation evaluation inside every sample's satellite State, 78 ms
+// of this window; with the Context's own taken instead (#812) it is 2.6 ms,
+// and what is left is SGP4, the six rebuilds and the root-finding.
 func BenchmarkSatellitePasses_6h(b *testing.B) {
 	sat, site := benchISS(b)
 

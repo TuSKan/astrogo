@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -339,6 +340,74 @@ func BenchmarkChunkedReadAt(b *testing.B) {
 			b.Cleanup(func() { _ = f.Close() })
 			b.ReportMetric(float64(chunk*16)/(1<<20), "MiB-resident")
 			benchReadAt(b, f, int64(len(data)))
+		})
+	}
+}
+
+// BenchmarkChunkedReadAtParallel is GOMAXPROCS readers sharing one file through
+// the default cache — what parallel ephemeris evaluation does to one kernel
+// (#811). One operation is one read.
+//
+// "resident" is the SPK pattern, each reader starting at its own place in it.
+// The pattern touches six chunks, so after the first pass every read is a hit
+// and the number is what concurrent hits cost each other. "random" is 104-byte
+// reads anywhere in the object, of which sixteen chunks in 1024 are resident,
+// so nearly every read is a miss and readers race on claiming and eviction.
+func BenchmarkChunkedReadAtParallel(b *testing.B) {
+	dir := b.TempDir()
+
+	const name = "kernel.bsp"
+
+	data := benchObject(benchSizeMB)
+	if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
+		b.Fatal(err)
+	}
+
+	slash := filepath.ToSlash(dir)
+	if !strings.HasPrefix(slash, "/") {
+		slash = "/" + slash
+	}
+
+	fsys, err := file.OpenFS((&url.URL{Scheme: "file", Path: slash}).String())
+	if err != nil {
+		b.Fatalf("OpenFS: %v", err)
+	}
+
+	size := int64(len(data))
+	offs := spkPattern(size, benchReads)
+
+	for _, c := range []struct {
+		name string
+		next func(r *rand.Rand, i int) int64
+	}{
+		{"resident", func(_ *rand.Rand, i int) int64 { return offs[i%len(offs)] }},
+		{"random", func(r *rand.Rand, _ int) int64 { return r.Int64N(size - 104) }},
+	} {
+		b.Run(c.name, func(b *testing.B) {
+			f, oerr := file.Open(b.Context(), fsys, name)
+			if oerr != nil {
+				b.Fatal(oerr)
+			}
+
+			b.Cleanup(func() { _ = f.Close() })
+
+			var seed atomic.Uint64
+
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				s := seed.Add(1)
+				r := rand.New(rand.NewPCG(s, 0))
+				buf := make([]byte, 104)
+
+				for i := int(s) * benchReads / 7; pb.Next(); i++ {
+					off := c.next(r, i)
+					if _, err := f.ReadAt(buf, off); err != nil {
+						b.Errorf("ReadAt(%d): %v", off, err)
+
+						return
+					}
+				}
+			})
 		})
 	}
 }

@@ -6,10 +6,63 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
+
+// stateOnly is a provider with State alone, which is all LookAngle sees of a
+// planet's provider. The probes below wrap the satellite in it to stay on that
+// route: the satellite's own takes its precession-nutation from the Context,
+// so through a moved Context it answers almost exactly as through a fresh one
+// and could not tell them apart (#812). TestLookAngleTakesASatelliteFromTheContext
+// holds that route.
+type stateOnly struct{ eph.Provider }
+
+// TestLookAngleTakesASatelliteFromTheContext: given a satellite, LookAngle
+// places it through the Context's own precession-nutation, StateCtx, rather
+// than State's fresh evaluation at the Context's instant. A moved Context is
+// the probe, since there the two differ; exact equality, since the value must
+// be StateCtx's through this Context and nothing else.
+func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
+	sat, err := satellite.NewFromTLE("ISS (ZARYA)", issLine1, issLine2)
+	if err != nil {
+		t.Fatalf("NewFromTLE: %v", err)
+	}
+
+	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	if err != nil {
+		t.Fatalf("NewGeodetic: %v", err)
+	}
+
+	base := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+
+	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
+		at := base.Add(dt)
+		derived := coord.NewContext(base, site, defaultAtm)
+		derived.SetTime(at)
+
+		st, err := sat.StateCtx(0, derived)
+		if err != nil {
+			t.Fatalf("StateCtx: %v", err)
+		}
+
+		want := derived.GeocentricToObserved(st.Pos)
+
+		got, err := LookAngle(sat, 0, derived)
+		if err != nil {
+			t.Fatalf("LookAngle: %v", err)
+		}
+
+		if got.Alt() != want.Alt() || got.Az() != want.Az() {
+			t.Errorf("dt=%v: LookAngle returned alt %v az %v, but StateCtx through the "+
+				"Context gives alt %v az %v (%.4f and %.4f arcsec apart)",
+				dt, got.Alt(), got.Az(), want.Alt(), want.Az(),
+				(got.Alt() - want.Alt()).Arcseconds(), (got.Az() - want.Az()).Arcseconds())
+		}
+	}
+}
 
 // TestLookAngleUsesTheContextItIsGiven pins that the Context parameter is the
 // one used, rather than three fields copied out of it and a fresh Context built
@@ -65,7 +118,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 			t.Fatalf("dt=%v: the moved Context answers exactly as a fresh one, so this probe cannot tell them apart", dt)
 		}
 
-		got, err := LookAngle(sat, 0, derived)
+		got, err := LookAngle(stateOnly{sat}, 0, derived)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}
@@ -128,7 +181,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		reduction := coord.NewReducer(site, at, defaultAtm).Reduce(st.Pos)
 		reduction.Observed.SetDist(unit.Km(reduction.Topocentric.Norm() * kmPerAU))
 
-		got, err := LookAngle(sat, 0, ctx)
+		got, err := LookAngle(stateOnly{sat}, 0, ctx)
 		if err != nil {
 			t.Fatalf("LookAngle: %v", err)
 		}
