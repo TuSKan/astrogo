@@ -529,7 +529,12 @@ func (p *Provider) FindSegment(target int32, et float64) (*SegmentRef, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return p.findSegmentLocked(target, et)
+	ref, err := p.findSegmentLocked(target, et)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ref, nil
 }
 
 // SupportedBodies returns a list of body IDs available in the loaded kernels.
@@ -770,7 +775,12 @@ func (p *Provider) evaluateRecursive(targetID int32, et float64, baseID int32) (
 // already hold p.mu (evaluateRecursive) without recursively re-locking it —
 // sync.RWMutex's RLock is not safe to call recursively from one goroutine
 // (a writer queued in between would deadlock it).
-func (p *Provider) findSegmentLocked(target int32, et float64) (*SegmentRef, error) {
+//
+// It returns the reference by value. It used to return a pointer to its loop
+// variable, which escaped: one allocation for every segment of every chain,
+// four for a geocentric Moon, and with records cached (#802) the only
+// allocations a State made.
+func (p *Provider) findSegmentLocked(target int32, et float64) (SegmentRef, error) {
 	// Fast failure path 1: target not loaded
 	refs, ok := p.ByTarget[target]
 	if !ok {
@@ -781,27 +791,25 @@ func (p *Provider) findSegmentLocked(target int32, et float64) (*SegmentRef, err
 		}
 
 		if !ok {
-			return nil, ErrNoSegment
+			return SegmentRef{}, ErrNoSegment
 		}
 	}
 
 	// Fast failure path 2: ET outside known target coverage
 	cov := p.ByTargetCoverage[target]
 	if et < cov.StartET || et > cov.EndET {
-		return nil, ErrNoSegment
+		return SegmentRef{}, ErrNoSegment
 	}
 
 	// Scan target-local segments in reverse (last match wins = precedence)
-	for _, v := range slices.Backward(refs) {
-		ref := &v
-
-		seg := p.segmentLocked(*ref)
+	for _, ref := range slices.Backward(refs) {
+		seg := p.segmentLocked(ref)
 		if et >= seg.StartET && et <= seg.EndET {
 			return ref, nil
 		}
 	}
 
-	return nil, ErrNoSegment
+	return SegmentRef{}, ErrNoSegment
 }
 
 // segmentLocked dereferences a SegmentRef to the actual spk.Segment. Callers

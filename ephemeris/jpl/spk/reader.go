@@ -13,6 +13,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -49,12 +51,20 @@ type ReadAtCloser interface {
 //
 // A *Reader is safe for concurrent use by multiple goroutines once
 // constructed: FileRec is populated once in NewReader and never mutated
-// afterward, and every read method goes through F.ReadAt, whose io.ReaderAt
+// afterward, every read method goes through F.ReadAt, whose io.ReaderAt
 // contract requires position-independent, concurrency-safe reads regardless
-// of the underlying implementation.
+// of the underlying implementation, and the record cache below is built for
+// concurrent readers.
+//
+// A Reader from NewReader caches, for each segment it evaluates, the
+// segment's directory and the last record it evaluated there (see
+// recordCache). A Reader built as a literal has no cache and reads both on
+// every evaluation; the results are the same to the last bit.
 type Reader struct {
 	F       ReadAtCloser
 	FileRec FileRecord
+
+	records *recordCache
 }
 
 // CacheDownload opens the SPK file named kernel, downloading it first when
@@ -283,11 +293,16 @@ func NewReader(f ReadAtCloser) (*Reader, error) {
 			FREE:   int32(order.Uint32(buf[84:88])),
 			Order:  order,
 		},
+		records: new(recordCache),
 	}, nil
 }
 
-// Close closes the file.
+// Close closes the file and drops the record cache, so a closed kernel
+// answers no evaluation it would not have answered before: every one needs a
+// read, and the read fails.
 func (r *Reader) Close() error {
+	r.records.clear()
+
 	err := r.F.Close()
 	if err != nil {
 		return fmt.Errorf("spk: close: %w", err)
@@ -507,35 +522,7 @@ const maxAllowedDim = 25
 // table up to that axis's own order KQ[axis] (not one order shared across
 // all three axes).
 func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	meta, err := r.ReadDoubles(s.EndAddr-1, s.EndAddr)
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	if !finite(meta[0]) || !finite(meta[1]) {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite MAXDIM/nRecs metadata", ErrCorruptSPK)
-	}
-
-	maxDim := int32(meta[0])
-	nRecs := int32(meta[1])
-
-	// maxType21Records is a generous upper bound guarding nRecs*dlSize
-	// (below) against int32 overflow — no real Horizons-generated small-body
-	// kernel this library targets has anywhere near this many records.
-	const maxType21Records = 10_000_000
-	if nRecs <= 0 || nRecs > maxType21Records {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d", ErrInvalidRecordCount, nRecs)
-	}
-
-	if maxDim <= 0 || maxDim > maxAllowedDim {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: MAXDIM=%d, allowed [1,%d]", ErrInvalidOrder, maxDim, maxAllowedDim)
-	}
-
-	dlSize := 4*maxDim + 11
-
-	epochBase := s.StartAddr + nRecs*dlSize
-
-	epochs, err := r.ReadDoubles(epochBase, epochBase+nRecs-1)
+	dir, entry, err := r.type21Directory(s)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
@@ -545,56 +532,27 @@ func evaluateType21(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, er
 	// adjustment (confirmed against the reference implementation: it
 	// keeps the found 1-based loop index as-is for the record number,
 	// which is this same 0-based search index here).
-	idx := int32(sort.Search(int(nRecs), func(i int) bool {
-		return epochs[i] > et
+	idx := int32(sort.Search(int(dir.nRecs), func(i int) bool {
+		return dir.epochs[i] > et
 	}))
-	if idx >= nRecs {
-		idx = nRecs - 1
+	if idx >= dir.nRecs {
+		idx = dir.nRecs - 1
 	}
 
-	recStart := s.StartAddr + idx*dlSize
-
-	rec, err := r.ReadDoubles(recStart, recStart+dlSize-1)
+	rec, err := r.type21Record(s, dir, entry, idx)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
 	}
 
-	if int32(len(rec)) < dlSize {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), dlSize)
-	}
-
+	maxDim := dir.maxDim
 	t0 := rec[0]
 	g := rec[1 : maxDim+1]
 	refPos := [3]float64{rec[maxDim+1], rec[maxDim+3], rec[maxDim+5]}
 	refVel := [3]float64{rec[maxDim+2], rec[maxDim+4], rec[maxDim+6]}
 	dt := rec[maxDim+7 : maxDim+7+3*maxDim] // column-major: axis i occupies dt[i*maxDim : (i+1)*maxDim]
 
-	if !finite(rec[4*maxDim+7]) || !finite(rec[4*maxDim+8]) || !finite(rec[4*maxDim+9]) || !finite(rec[4*maxDim+10]) {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: non-finite KQMAX1/KQ metadata", ErrCorruptSPK)
-	}
-
 	kqmax1 := int32(rec[4*maxDim+7])
 	kq := [3]int32{int32(rec[4*maxDim+8]), int32(rec[4*maxDim+9]), int32(rec[4*maxDim+10])}
-
-	if kqmax1 < 2 || kqmax1 > maxAllowedDim+1 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQMAX1=%d, allowed [2,%d]", ErrInvalidOrder, kqmax1, maxAllowedDim+1)
-	}
-
-	// KQMAX1/KQ are read straight from the record with no guarantee they
-	// stay within this segment's own MAXDIM — unlike the maxAllowedDim+1
-	// check above (a fixed library-wide ceiling), this is the check that a
-	// small, valid-looking MAXDIM (e.g. 1) can't be paired with a
-	// KQMAX1/KQ large enough to index g/dt/w out of their MAXDIM-sized
-	// bounds below.
-	if kqmax1 > maxDim+1 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQMAX1=%d exceeds this segment's own MAXDIM=%d", ErrInvalidOrder, kqmax1, maxDim)
-	}
-
-	for axis, k := range kq {
-		if k < 0 || k > maxDim {
-			return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: KQ[%d]=%d exceeds MAXDIM=%d", ErrInvalidOrder, axis, k, maxDim)
-		}
-	}
 
 	delta := et - t0
 
@@ -699,40 +657,12 @@ func validateChebyshevMeta(tInit, tLen float64, rSize int32) error {
 }
 
 func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	meta, err := r.ReadDoubles(s.EndAddr-3, s.EndAddr)
+	rec, nCoeffs, err := r.chebyshevWords(s, et, 3)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
-	if err := validateChebyshevMeta(tInit, tLen, rSize); err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	nCoeffs := (rSize - 2) / 3
-	if nCoeffs <= 0 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
-	}
-
-	recStart, err := chebyshevRecord(s, et, tInit, tLen, rSize, meta[3])
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	if int32(len(rec)) < 2+3*nCoeffs {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+3*nCoeffs)
 	}
 
 	mid, radius := rec[0], rec[1]
-	if !finite(mid) || !finite(radius) || radius == 0 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
-	}
-
 	tau := (et - mid) / radius
 	pos.X, vel.X = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, true)
 	pos.Y, vel.Y = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, true)
@@ -746,40 +676,12 @@ func evaluateType2(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 }
 
 func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err error) {
-	meta, err := r.ReadDoubles(s.EndAddr-3, s.EndAddr)
+	rec, nCoeffs, err := r.chebyshevWords(s, et, 6)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
-	if err := validateChebyshevMeta(tInit, tLen, rSize); err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	nCoeffs := (rSize - 2) / 6
-	if nCoeffs <= 0 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
-	}
-
-	recStart, err := chebyshevRecord(s, et, tInit, tLen, rSize, meta[3])
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	rec, err := r.ReadDoubles(recStart, recStart+rSize-1)
-	if err != nil {
-		return vector.Vec3{}, vector.Vec3{}, err
-	}
-
-	if int32(len(rec)) < 2+6*nCoeffs {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+6*nCoeffs)
 	}
 
 	mid, radius := rec[0], rec[1]
-	if !finite(mid) || !finite(radius) || radius == 0 {
-		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
-	}
-
 	tau := (et - mid) / radius
 	pos.X, _ = EvalChebyshev(rec[2:2+nCoeffs], tau, radius, false)
 	pos.Y, _ = EvalChebyshev(rec[2+nCoeffs:2+2*nCoeffs], tau, radius, false)
@@ -796,10 +698,51 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 	return pos, vel, nil
 }
 
-// chebyshevRecord returns the first word of the type 2 or 3 record that holds
-// et. The records are tLen seconds each from tInit, n of them, each rSize
-// words, and the segment's four-word directory (INIT, INTLEN, RSIZE, N)
-// follows the last.
+// chebyshevDir is a type 2 or 3 segment's directory, validated: records of
+// tLen seconds each from tInit, nRecs of them, each rSize words holding
+// nCoeffs coefficients for each of the record's components.
+type chebyshevDir struct {
+	tInit, tLen           float64
+	rSize, nCoeffs, nRecs int32
+}
+
+// chebyshevDirectory is s's four-word directory (INIT, INTLEN, RSIZE, N),
+// read and validated on first use and kept by the record cache after.
+// components is 3 for type 2, position only, and 6 for type 3.
+//
+// A directory that fails validation is never kept, so it fails the same way
+// on every call, as it always has.
+func (r *Reader) chebyshevDirectory(s *Segment, components int32) (*chebyshevDir, *segmentEntry, error) {
+	if e := r.records.load(s); e != nil {
+		return e.cheb, e, nil
+	}
+
+	meta, err := r.ReadDoubles(s.EndAddr-3, s.EndAddr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tInit, tLen, rSize := meta[0], meta[1], int32(meta[2])
+	if err := validateChebyshevMeta(tInit, tLen, rSize); err != nil {
+		return nil, nil, err
+	}
+
+	nCoeffs := (rSize - 2) / components
+	if nCoeffs <= 0 {
+		return nil, nil, fmt.Errorf("%w: %d coefficients derived from record size %d", ErrRecordTooShort, nCoeffs, rSize)
+	}
+
+	n := meta[3]
+	if !finite(n) || n < 1 || n != math.Trunc(n) || n > math.MaxInt32 {
+		return nil, nil, fmt.Errorf("%w: %v records", ErrInvalidRecordCount, n)
+	}
+
+	dir := &chebyshevDir{tInit: tInit, tLen: tLen, rSize: rSize, nCoeffs: nCoeffs, nRecs: int32(n)}
+
+	return dir, r.records.store(s, &segmentEntry{cheb: dir}), nil
+}
+
+// record is the first word and the index of the record that holds et.
 //
 // An et at the end of the last record is the segment's final instant, which
 // segment selection admits, and it belongs to the last record: the index
@@ -811,32 +754,279 @@ func evaluateType3(s *Segment, r *Reader, et float64) (pos, vel vector.Vec3, err
 // records means the directory does not describe et, and is reported rather
 // than clamped: a clamp would hand back the nearest record's polynomial far
 // outside the interval it fits.
-func chebyshevRecord(s *Segment, et, tInit, tLen float64, rSize int32, n float64) (int32, error) {
-	if !finite(n) || n < 1 || n != math.Trunc(n) || n > math.MaxInt32 {
-		return 0, fmt.Errorf("%w: %v records", ErrInvalidRecordCount, n)
+func (d *chebyshevDir) record(s *Segment, et float64) (start, idx int32, err error) {
+	pos := math.Floor((et - d.tInit) / d.tLen)
+	if !(pos >= 0 && pos <= float64(d.nRecs)) {
+		return 0, 0, fmt.Errorf("%w: ET %v falls in record %v of a segment with %d", ErrCorruptSPK, et, pos, d.nRecs)
 	}
 
-	nRecs := int32(n)
-
-	pos := math.Floor((et - tInit) / tLen)
-	if !(pos >= 0 && pos <= float64(nRecs)) {
-		return 0, fmt.Errorf("%w: ET %v falls in record %v of a segment with %d", ErrCorruptSPK, et, pos, nRecs)
-	}
-
-	idx := int32(pos)
-	if idx == nRecs {
+	idx = int32(pos)
+	if idx == d.nRecs {
 		idx--
 	}
 
 	// The records end where the directory's four words begin. Checking that
 	// here, rather than trusting N, keeps a directory that overstates its
 	// record count from steering the read into whatever follows.
-	start := int64(s.StartAddr) + int64(idx)*int64(rSize)
-	if start+int64(rSize)-1 > int64(s.EndAddr)-4 {
-		return 0, fmt.Errorf("%w: record %d of %d words runs past the segment's records", ErrCorruptSPK, idx, rSize)
+	start64 := int64(s.StartAddr) + int64(idx)*int64(d.rSize)
+	if start64+int64(d.rSize)-1 > int64(s.EndAddr)-4 {
+		return 0, 0, fmt.Errorf("%w: record %d of %d words runs past the segment's records", ErrCorruptSPK, idx, d.rSize)
 	}
 
-	return int32(start), nil
+	return int32(start64), idx, nil
+}
+
+// chebyshevWords is the record of s that holds et, validated, and its
+// coefficients per component: from the record cache when the last record
+// evaluated in s is that one, read and decoded otherwise.
+func (r *Reader) chebyshevWords(s *Segment, et float64, components int32) (rec []float64, nCoeffs int32, err error) {
+	dir, entry, err := r.chebyshevDirectory(s, components)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	start, idx, err := dir.record(s, et)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if rec := entry.cached(idx); rec != nil {
+		return rec, dir.nCoeffs, nil
+	}
+
+	rec, err = r.ReadDoubles(start, start+dir.rSize-1)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if int32(len(rec)) < 2+components*dir.nCoeffs {
+		return nil, 0, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), 2+components*dir.nCoeffs)
+	}
+
+	mid, radius := rec[0], rec[1]
+	if !finite(mid) || !finite(radius) || radius == 0 {
+		return nil, 0, fmt.Errorf("%w: invalid mid=%g/radius=%g", ErrCorruptSPK, mid, radius)
+	}
+
+	entry.keep(idx, rec)
+
+	return rec, dir.nCoeffs, nil
+}
+
+// type21Dir is a type 21 segment's directory, validated: MAXDIM, the record
+// count, the record size MAXDIM gives, and the epoch table.
+type type21Dir struct {
+	maxDim, nRecs, dlSize int32
+	epochs                []float64
+}
+
+// type21Directory is s's directory and epoch table, read and validated on
+// first use and kept by the record cache after.
+//
+// The epoch table is nRecs doubles. Every evaluation used to read all of it,
+// allocating it twice, to binary-search one epoch; held once it costs the same
+// memory a single evaluation used to allocate.
+func (r *Reader) type21Directory(s *Segment) (*type21Dir, *segmentEntry, error) {
+	if e := r.records.load(s); e != nil {
+		return e.t21, e, nil
+	}
+
+	meta, err := r.ReadDoubles(s.EndAddr-1, s.EndAddr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !finite(meta[0]) || !finite(meta[1]) {
+		return nil, nil, fmt.Errorf("%w: non-finite MAXDIM/nRecs metadata", ErrCorruptSPK)
+	}
+
+	maxDim := int32(meta[0])
+	nRecs := int32(meta[1])
+
+	// maxType21Records is a generous upper bound guarding nRecs*dlSize
+	// (below) against int32 overflow — no real Horizons-generated small-body
+	// kernel this library targets has anywhere near this many records.
+	const maxType21Records = 10_000_000
+	if nRecs <= 0 || nRecs > maxType21Records {
+		return nil, nil, fmt.Errorf("%w: %d", ErrInvalidRecordCount, nRecs)
+	}
+
+	if maxDim <= 0 || maxDim > maxAllowedDim {
+		return nil, nil, fmt.Errorf("%w: MAXDIM=%d, allowed [1,%d]", ErrInvalidOrder, maxDim, maxAllowedDim)
+	}
+
+	dlSize := 4*maxDim + 11
+
+	epochBase := s.StartAddr + nRecs*dlSize
+
+	epochs, err := r.ReadDoubles(epochBase, epochBase+nRecs-1)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dir := &type21Dir{maxDim: maxDim, nRecs: nRecs, dlSize: dlSize, epochs: epochs}
+
+	return dir, r.records.store(s, &segmentEntry{t21: dir}), nil
+}
+
+// type21Record is record idx of s, validated: from the record cache when it
+// is the last one evaluated in s, read and checked otherwise.
+func (r *Reader) type21Record(s *Segment, dir *type21Dir, entry *segmentEntry, idx int32) ([]float64, error) {
+	if rec := entry.cached(idx); rec != nil {
+		return rec, nil
+	}
+
+	maxDim := dir.maxDim
+	recStart := s.StartAddr + idx*dir.dlSize
+
+	rec, err := r.ReadDoubles(recStart, recStart+dir.dlSize-1)
+	if err != nil {
+		return nil, err
+	}
+
+	if int32(len(rec)) < dir.dlSize {
+		return nil, fmt.Errorf("%w: %d doubles (need >= %d)", ErrRecordTooShort, len(rec), dir.dlSize)
+	}
+
+	if !finite(rec[4*maxDim+7]) || !finite(rec[4*maxDim+8]) || !finite(rec[4*maxDim+9]) || !finite(rec[4*maxDim+10]) {
+		return nil, fmt.Errorf("%w: non-finite KQMAX1/KQ metadata", ErrCorruptSPK)
+	}
+
+	kqmax1 := int32(rec[4*maxDim+7])
+	kq := [3]int32{int32(rec[4*maxDim+8]), int32(rec[4*maxDim+9]), int32(rec[4*maxDim+10])}
+
+	if kqmax1 < 2 || kqmax1 > maxAllowedDim+1 {
+		return nil, fmt.Errorf("%w: KQMAX1=%d, allowed [2,%d]", ErrInvalidOrder, kqmax1, maxAllowedDim+1)
+	}
+
+	// KQMAX1/KQ are read straight from the record with no guarantee they
+	// stay within this segment's own MAXDIM — unlike the maxAllowedDim+1
+	// check above (a fixed library-wide ceiling), this is the check that a
+	// small, valid-looking MAXDIM (e.g. 1) can't be paired with a
+	// KQMAX1/KQ large enough to index g/dt/w out of their MAXDIM-sized
+	// bounds in evaluateType21.
+	if kqmax1 > maxDim+1 {
+		return nil, fmt.Errorf("%w: KQMAX1=%d exceeds this segment's own MAXDIM=%d", ErrInvalidOrder, kqmax1, maxDim)
+	}
+
+	for axis, k := range kq {
+		if k < 0 || k > maxDim {
+			return nil, fmt.Errorf("%w: KQ[%d]=%d exceeds MAXDIM=%d", ErrInvalidOrder, axis, k, maxDim)
+		}
+	}
+
+	entry.keep(idx, rec)
+
+	return rec, nil
+}
+
+// recordCache is what a Reader keeps of the segments it has evaluated: each
+// one's directory, read and validated once, and the last record evaluated in
+// it, decoded (#802).
+//
+// # Why records, not bytes
+//
+// remote.Open's chunk cache holds 16 chunks of 64 KiB. One body's evaluation
+// touches two places in the file — its segment's directory, at the segment's
+// end, and the record in force — so it stays warm; a sky does not. Nine
+// bodies at one instant touch the directory and the record of each of 13
+// segments, 26 places, and 18 of each sky's 60 reads missed and reloaded a
+// chunk: the geometric sky from the kernel on disk took 360 µs, 23 times the
+// same evaluations from memory (docs/ephemeris.md §4). A bigger chunk cache
+// only moves the point where it thrashes. What a caller evaluates again is a
+// record: a planetary record spans days, so a light-time iteration, a scan's
+// next step and the next body asking for the Earth all land in the one just
+// used. CSPICE buffers segment records for the same reason.
+//
+// # Why it is safe
+//
+// The arithmetic is untouched: a cached record is the same []float64 the
+// read would return, so every evaluation is bit-identical to an uncached one,
+// which a Reader built as a literal still performs. Nothing is cached until it
+// has passed the validation a read would apply, so a corrupt directory or
+// record fails on every call as before. Entries are keyed by the segment's
+// addresses and type rather than its pointer, since SelectSegment and callers
+// hand back copies; a record is immutable once published through an
+// atomic.Pointer, so concurrent readers share it without a lock, and two that
+// miss together each read it and publish an identical one.
+type recordCache struct {
+	segments sync.Map // segmentKey → *segmentEntry
+}
+
+type segmentKey struct {
+	start, end, typ int32
+}
+
+// segmentEntry is one segment's cached directory — cheb for types 2 and 3,
+// t21 for type 21 — and its last evaluated record.
+type segmentEntry struct {
+	cheb *chebyshevDir
+	t21  *type21Dir
+	last atomic.Pointer[cachedRecord]
+}
+
+type cachedRecord struct {
+	idx   int32
+	words []float64
+}
+
+func keyOf(s *Segment) segmentKey {
+	return segmentKey{start: s.StartAddr, end: s.EndAddr, typ: s.Type}
+}
+
+// load is s's entry, or nil when there is none or no cache.
+func (c *recordCache) load(s *Segment) *segmentEntry {
+	if c == nil {
+		return nil
+	}
+
+	v, ok := c.segments.Load(keyOf(s))
+	if !ok {
+		return nil
+	}
+
+	e, _ := v.(*segmentEntry)
+
+	return e
+}
+
+// store keeps e for s unless another reader kept one first, and returns the
+// entry in force; with no cache it keeps nothing and returns nil.
+func (c *recordCache) store(s *Segment, e *segmentEntry) *segmentEntry {
+	if c == nil {
+		return nil
+	}
+
+	v, _ := c.segments.LoadOrStore(keyOf(s), e)
+	got, _ := v.(*segmentEntry)
+
+	return got
+}
+
+func (c *recordCache) clear() {
+	if c != nil {
+		c.segments.Clear()
+	}
+}
+
+// cached is record idx when it is the last one evaluated in e's segment.
+func (e *segmentEntry) cached(idx int32) []float64 {
+	if e == nil {
+		return nil
+	}
+
+	if rec := e.last.Load(); rec != nil && rec.idx == idx {
+		return rec.words
+	}
+
+	return nil
+}
+
+// keep makes record idx the last one evaluated in e's segment.
+func (e *segmentEntry) keep(idx int32, words []float64) {
+	if e != nil {
+		e.last.Store(&cachedRecord{idx: idx, words: words})
+	}
 }
 
 // EvalChebyshev evaluates a Chebyshev polynomial and optionally its derivative.
