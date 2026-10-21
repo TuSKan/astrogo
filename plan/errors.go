@@ -29,6 +29,13 @@ var (
 	ErrReversedInterval = errors.New("plan: interval ends before it starts")
 	// ErrFamilyNotImpl indicates an event solver for the given family is not implemented.
 	ErrFamilyNotImpl = errors.New("event solver for family is not implemented")
+	// ErrOppositionNeedsSun indicates an Oppositions call where neither body
+	// is the Sun, or both are. An opposition is of a body to the Sun.
+	ErrOppositionNeedsSun = errors.New("plan: an opposition is of a body other than the Sun, to the Sun")
+	// ErrOppositionScan indicates an opposition search that could not bound
+	// its next step: a target whose ecliptic longitude has no bounded rate,
+	// on an orbit through the ecliptic's pole.
+	ErrOppositionScan = errors.New("plan: opposition search cannot bound its step")
 	// ErrUnsupportedGeom indicates an unsupported geometry kind.
 	ErrUnsupportedGeom = errors.New("unsupported geometry kind")
 	// ErrMoonRequired indicates the illumination solver requires a Moon target.

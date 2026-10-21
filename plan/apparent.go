@@ -118,7 +118,13 @@ func firstOrderApparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3,
 		return vector.Vec3{}, fmt.Errorf("plan: state: %w", err)
 	}
 
+	return firstOrderPosition(st), nil
+}
+
+// firstOrderPosition is firstOrderApparentVec of a geocentric state already
+// read: its position less its velocity times the light time.
+func firstOrderPosition(st eph.State) vector.Vec3 {
 	tau := st.Pos.Norm() / lightAUPerDay
 
-	return st.Pos.Sub(st.Vel.MulScalar(tau)), nil
+	return st.Pos.Sub(st.Vel.MulScalar(tau))
 }
