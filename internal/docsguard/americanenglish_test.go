@@ -110,6 +110,9 @@ var britishAllowed = []*regexp.Regexp{
 	regexp.MustCompile(`BP - RP colour`),
 }
 
+// inlineCode matches a Markdown inline code span.
+var inlineCode = regexp.MustCompile("`[^`\n]+`")
+
 // TestAmericanEnglish keeps the repository's own prose and identifiers in
 // American English: meters, not metres; center, not centre.
 //
@@ -176,6 +179,13 @@ func TestAmericanEnglish(t *testing.T) {
 		text := string(data)
 		for _, allowed := range britishAllowed {
 			text = allowed.ReplaceAllStringFunc(text, func(s string) string { return strings.Repeat("_", len(s)) })
+		}
+
+		// In Markdown an inline code span quotes code as it is or was, a
+		// renamed identifier among them; the prose around it is what is
+		// checked here, and live identifiers are checked in the .go files.
+		if strings.HasSuffix(rel, ".md") {
+			text = inlineCode.ReplaceAllStringFunc(text, func(s string) string { return strings.Repeat("_", len(s)) })
 		}
 
 		for i, line := range strings.Split(text, "\n") {
