@@ -38,12 +38,13 @@ func TestGofaExtWrappers(t *testing.T) {
 	sep := gofaext.Seps(0, 0, 1, 0)
 	testutil.AssertNear(t, "Seps", sep, 1.0, 1e-9)
 
-	// Atco13 / Atio13, and the quick inverse Atoiq / Aticq on an ApcoAt
+	// Atco13 / Atio13, and the quick inverse Atoiq / Aticq on an ApcoFrom
 	aob, zob, _, _, _, _, st := gofaext.Atco13(0, 0, 0, 0, 0, 0, d1, d2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 	testutil.AssertEqual(t, "Status", st, 0)
 	gofaext.Atio13(0, 0, d1, d2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-	astrom, _ := gofaext.ApcoAt(d1, d2, d1, d2, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+	cel := gofaext.CelestialAt(d1, d2)
+	astrom := gofaext.ApcoFrom(&cel, d1, d2, gofaext.Era00(d1, d2), 0, 0, 0, 0, 0, 0, 0)
 	ri, di := gofaext.Atoiq("A", aob, zob, &astrom)
 	gofaext.Aticq(ri, di, &astrom)
 
@@ -122,16 +123,14 @@ func TestC2tcioDecompositionMatchesC2t06a(t *testing.T) {
 }
 
 // TestAperUpdatesOnlyEral proves Aper touches only ASTROM.Eral, leaving
-// every other field (populated by a real ApcoAt call) untouched — the
-// property that makes it a safe O(1) substitute for a full ApcoAt rebuild
+// every other field (populated by a real ApcoFrom call) untouched — the
+// property that makes it a safe O(1) substitute for a full ApcoFrom
 // when only the Earth Rotation Angle has changed.
 func TestAperUpdatesOnlyEral(t *testing.T) {
-	astrom, _ := gofaext.ApcoAt(
-		2451545.0, 0.5, 2451545.0, 0.5,
-		0.3, 0.7, 500.0,
-		1.5e-7, 2.3e-7,
-		1013.25, 15.0, 0.5, 0.55,
-	)
+	cel := gofaext.CelestialAt(2451545.0, 0.5)
+	refa, refb := gofaext.Refco(1013.25, 15.0, 0.5, 0.55)
+	astrom := gofaext.ApcoFrom(&cel, 2451545.0, 0.5, gofaext.Era00(2451545.0, 0.5),
+		0.3, 0.7, 500.0, 1.5e-7, 2.3e-7, refa, refb)
 
 	before := astrom
 	gofaext.Aper(1.2345, &astrom)

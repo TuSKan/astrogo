@@ -152,44 +152,51 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	}
 }
 
-// TestMovingContextRebuildsPastTheHour: the whole safety argument rests on
-// the Context being rebuilt once the drift would exceed an hour's. A minute
-// past the hour, the moving Context must be exactly what a fresh NewContext
-// gives at that instant, where a stale epoch would be about the drift SetTime
-// documents away.
+// TestMovingContextKeepsAFixedStarInSetTimesBound: the whole safety argument
+// rests on the moving Context's series being evaluated afresh as it moves. A
+// fixed star's CIRS place through it must stay within coord.Context.SetTime's
+// documented 0.007″ of a fresh NewContext's, across three days; a Context
+// that kept its first evaluation would be about a second of arc off by then,
+// and one rebuilt only hourly 0.07″ (#790).
 //
-// Without this, a Context that never rebuilt would pass every other test here:
-// six hours of ISS look angles stay inside 0.1" anyway, because the
-// geocentric-to-observed path rebuilds its rotation matrix exactly and only
-// the ASTROM precession-nutation goes stale. A fixed star is what exposes it.
-func TestMovingContextRebuildsPastTheHour(t *testing.T) {
+// Without this, a Context that never refreshed would pass every other test
+// here: six hours of ISS look angles stay inside 0.1" anyway. A fixed star is
+// what exposes it.
+func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 	_, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	past := start.Add(unit.Hours(1) + unit.Minutes(1))
-
 	ctxAt := movingContext(site, defaultAtm)
-	ctxAt(start)
 
 	// The Crab, as an ordinary catalogue position; any fixed direction does.
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 
-	got := ctxAt(past).AstrometricToCIRS(fixed)
-	want := coord.NewContext(past, site, defaultAtm).AstrometricToCIRS(fixed)
+	// coord.Context.SetTime's documented bound against a fresh Context.
+	const boundArcsec = 0.007
 
-	if got.RA() != want.RA() || got.Dec() != want.Dec() {
-		sep := coord.Separation(
+	var worst float64
+
+	for m := 0; m <= 3*24*60; m += 47 {
+		at := start.Add(unit.Minutes(float64(m)))
+
+		got := ctxAt(at).AstrometricToCIRS(fixed)
+		want := coord.NewContext(at, site, defaultAtm).AstrometricToCIRS(fixed)
+
+		worst = max(worst, coord.Separation(
 			coord.NewICRS(got.RA(), got.Dec()),
 			coord.NewICRS(want.RA(), want.Dec()),
-		).Arcsec()
+		).Arcsec())
+	}
 
-		t.Errorf("a minute past the hour, the moving Context is %.6f arcsec from a fresh one; "+
-			"it was moved rather than rebuilt", sep)
+	if worst > boundArcsec {
+		t.Errorf("across three days the moving Context puts a fixed star %.4f arcsec from a fresh one, "+
+			"over SetTime's %g", worst, boundArcsec)
 	}
 }
 
-// TestMovingContextHandlesBackwardsSteps: SetTime's drift test is
-// |t − epoch|, not t − epoch, and this is the caller that needs it.
+// TestMovingContextHandlesBackwardsSteps: SetTime finds its bracket either
+// way from where it is, not only forward, and this is the caller that needs
+// it.
 //
 // SatellitePasses samples the whole window forward and only then refines its
 // crossings, so the first refinement asks for an instant hours *behind* the
@@ -224,10 +231,11 @@ func TestMovingContextHandlesBackwardsSteps(t *testing.T) {
 
 	t.Logf("backwards step of ~5h from the base: %.4f arcsec", sep)
 
-	const boundArcsec = 0.1
+	// coord.Context.SetTime's documented bound against a fresh Context.
+	const boundArcsec = 0.007
 
 	if sep > boundArcsec {
-		t.Errorf("a backwards step was served from a stale base: %.4f arcsec, over the %.2f arcsec bound",
+		t.Errorf("a backwards step was served from a stale base: %.4f arcsec, over the %g arcsec bound",
 			sep, boundArcsec)
 	}
 }

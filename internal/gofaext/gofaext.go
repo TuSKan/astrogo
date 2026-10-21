@@ -288,38 +288,57 @@ func Refco(phpa, tc, rh, wl float64) (refa, refb float64) {
 // astrometry parameters.
 type ASTROM = gofa.ASTROM
 
-// ApcoAt prepares the ASTROM parameters for ICRS <-> observed transformations,
-// and returns the equation of the origins, at the TT (tt1, tt2) and UT1
-// (ut11, ut12) the caller gives.
-//
-// It is SOFA's Apco13 step for step (Epv00, Pnm06a, Bpn2xy, S06, Era00, Sp00,
-// Refco, Apco, Eors) without the two conversions Apco13 makes first, UTC to TT
-// and UTC to UT1 through SOFA's TAI−UTC table. Those disagree with astrogo's
-// own time scales before 1972, by up to 34 s of TT and, on the days SOFA
-// stretches for a step in TAI−UTC, up to 0.82 s of UT1; a caller holding
-// astrogo's TT and UT1 passes them here so one Context runs on one time scale
-// (#474). Given the TT and UT1 Apco13 would derive, the result is Apco13's,
-// bit for bit.
-func ApcoAt(tt1, tt2, ut11, ut12, elong, phi, hm, xp, yp, phpa, tc, rh, wl float64) (ASTROM, float64) {
+// Celestial is the part of SOFA's Apco13 that comes from series in TT: the
+// Earth's barycentric position and velocity and heliocentric position
+// (Epv00), the CIP and the CIO locator (Pnm06a, Bpn2xy, S06), and the
+// equation of the origins (Eors). It is nearly all of Apco13's cost.
+type Celestial struct {
+	Ebpv [2][3]float64 // Earth, barycentric, au and au/day
+	Ehp  [3]float64    // Earth, heliocentric, au
+	X, Y float64       // the CIP
+	S    float64       // the CIO locator
+	EO   float64       // the equation of the origins, ERA − GST
+	Sp   float64       // the TIO locator
+}
+
+// CelestialAt evaluates Apco13's series at TT (tt1, tt2), in Apco13's order:
+// Epv00, Pnm06a, Bpn2xy, S06, Sp00, and Eors.
+func CelestialAt(tt1, tt2 float64) Celestial {
 	var (
-		ehpv, ebpv [2][3]float64
-		r          [3][3]float64
-		x, y       float64
-		refa, refb float64
-		astrom     ASTROM
+		c    Celestial
+		ehpv [2][3]float64
+		r    [3][3]float64
 	)
 
-	gofa.Epv00(tt1, tt2, &ehpv, &ebpv)
+	gofa.Epv00(tt1, tt2, &ehpv, &c.Ebpv)
+	c.Ehp = ehpv[0]
+
 	gofa.Pnm06a(tt1, tt2, &r)
-	gofa.Bpn2xy(r, &x, &y)
-	s := gofa.S06(tt1, tt2, x, y)
-	theta := gofa.Era00(ut11, ut12)
-	sp := gofa.Sp00(tt1, tt2)
+	gofa.Bpn2xy(r, &c.X, &c.Y)
+	c.S = gofa.S06(tt1, tt2, c.X, c.Y)
+	c.Sp = gofa.Sp00(tt1, tt2)
+	c.EO = gofa.Eors(r, c.S)
 
-	gofa.Refco(phpa, tc, rh, wl, &refa, &refb)
-	gofa.Apco(tt1, tt2, ebpv, ehpv[0], x, y, s, theta, elong, phi, hm, xp, yp, sp, refa, refb, &astrom)
+	return c
+}
 
-	return astrom, gofa.Eors(r, s)
+// ApcoFrom is the rest of Apco13: the astrometry parameters at TT (tt1, tt2)
+// and Earth rotation angle theta, from the series c holds, for a site at east
+// longitude elong, latitude phi and height hm, polar motion xp, yp, and the
+// refraction constants refa, refb.
+//
+// With c from CelestialAt at the same TT, the result is Apco13's, bit for bit,
+// given the TT and UT1 Apco13 derives from a UTC date. A caller holding
+// astrogo's own TT and UT1 passes them instead, so one Context runs on one
+// time scale: SOFA's TAI−UTC table disagrees with astrogo's before 1972, by
+// up to 34 s of TT and, on the days SOFA stretches for a step in TAI−UTC, up
+// to 0.82 s of UT1 (#474).
+func ApcoFrom(c *Celestial, tt1, tt2, theta, elong, phi, hm, xp, yp, refa, refb float64) ASTROM {
+	var astrom ASTROM
+
+	gofa.Apco(tt1, tt2, c.Ebpv, c.Ehp, c.X, c.Y, c.S, theta, elong, phi, hm, xp, yp, c.Sp, refa, refb, &astrom)
+
+	return astrom
 }
 
 // Atciq provides quick ICRS to CIRS transformation given precomputed ASTROM parameters.

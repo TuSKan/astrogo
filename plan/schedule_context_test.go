@@ -67,11 +67,11 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 //
 // Which block goes where is a sequence of discrete decisions at whole steps,
 // so the order must agree exactly: a decision changes only if a constraint
-// sits within the cache's ≲0.1″ of its threshold at some step, and none does
-// here. The instants agree to a bound rather than exactly, because since #485
-// the slew between blocks goes through the cache too, and 0.1″ at the 2°/s
-// used here is ~14 µs of slew, carried forward block to block; the bound is
-// 0.01 s. Scores differ by that 0.1″ of altitude, about 1e-5 at these
+// sits within the cache's ≲0.007″ of its threshold at some step, and none
+// does here. The instants agree to a bound rather than exactly, because since
+// #485 the slew between blocks goes through the cache too, and 0.007″ at the
+// 2°/s used here is ~1 µs of slew, carried forward block to block; the bound
+// is 0.01 s. Scores differ by that much altitude, well under 1e-5 at these
 // priorities; the bound is 1e-3.
 func TestScheduleThroughTheContextCache(t *testing.T) {
 	t.Parallel()
@@ -167,7 +167,7 @@ func TestBlockIsScoredAtItsMidpoint(t *testing.T) {
 
 // TestHoursUntilSetProbesMoveACopy holds estimateHoursUntilSet, whose probes
 // move a copy of the scoring Context with SetTime (#481, #675), to the same
-// probes on full Contexts. SetTime holds each probe to ≲0.1″; the estimate is
+// probes on full Contexts. SetTime holds each probe to ≲0.007″; the estimate is
 // a linear interpolation between probes, so that moves it by milliseconds. The
 // bound is 1e-3 h, 3.6 s. The scoring Context itself must be where the caller
 // left it: the probes move a copy, never the caller's.

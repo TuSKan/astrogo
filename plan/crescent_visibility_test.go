@@ -133,8 +133,8 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 }
 
 // The best time's Context is sunset's, moved with SetTime, which the coord
-// contract holds to ≲0.1″ an hour. This evening's best time is 25 minutes
-// after sunset; the criteria read tenths of a degree.
+// contract holds to ≲0.007″. This evening's best time is 25 minutes after
+// sunset; the criteria read tenths of a degree.
 func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 	t.Parallel()
 
