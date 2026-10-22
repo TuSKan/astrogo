@@ -68,7 +68,7 @@ var diurnalEpoch = time.Date(2026, time.June, 21, 18, 42, 9, 0, time.LocationUTC
 //
 // The second is oracle-free. It reconstructs the pre-fix arithmetic — the pure
 // rotation the function used to be — and asserts that the displacement from it
-// obeys the aberration law, |v|/c · sin(theta) towards the velocity, with |v|/c
+// obeys the aberration law, |v|/c · sin(theta) toward the velocity, with |v|/c
 // computed from first principles as omega times the site's distance from the
 // rotation axis over c. Two implementations of one model can be wrong
 // together; a physical law they both have to satisfy is what catches that.
@@ -110,7 +110,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 
 	// The observer's rotation velocity points due east: it is perpendicular to
 	// the meridian plane, so geodetic and geocentric east coincide and this is
-	// the exact direction aberration displaces towards.
+	// the exact direction aberration displaces toward.
 	east := coord.NewAltAz(angle.Zero(), angle.Deg(90))
 
 	for _, s := range diurnalSites {

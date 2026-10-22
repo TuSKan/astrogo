@@ -154,12 +154,12 @@ func TestAcquireLockReleasesTheInProcessSlotOnFailure(t *testing.T) {
 	}
 }
 
-// TestAcquireLockDoesNotSerialiseDifferentKeys keeps the exclusion scoped.
+// TestAcquireLockDoesNotSerializeDifferentKeys keeps the exclusion scoped.
 //
 // The in-process semaphore is keyed, and a single global one would pass
 // every other test here while making a multi-gigabyte kernel download block
 // an unrelated bulletin fetch behind it for minutes.
-func TestAcquireLockDoesNotSerialiseDifferentKeys(t *testing.T) {
+func TestAcquireLockDoesNotSerializeDifferentKeys(t *testing.T) {
 	fsys, _ := openLocalFS(t)
 
 	first, err := AcquireLock(context.Background(), fsys, "kernel-a.bin", 0)

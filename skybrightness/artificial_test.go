@@ -159,7 +159,7 @@ func TestKocifaj2022Eq4Monotonic(t *testing.T) {
 // The published fit is not bounded to the physical range. At high aerosol
 // loading with a strongly forward-scattering aerosol it exceeds 1, where a
 // Henyey-Greenstein phase function is undefined. That is a limit of the
-// parameterisation, and it must be reported rather than silently clamped.
+// parameterization, and it must be reported rather than silently clamped.
 func TestKocifaj2022Eq4LeavesPhysicalRange(t *testing.T) {
 	t.Parallel()
 
@@ -501,10 +501,10 @@ func BenchmarkAllSkyRadiance(b *testing.B) {
 // target: the effective asymmetry parameter g against the aerosol asymmetry
 // parameter g_a, for three aerosol optical depths.
 //
-// The figure itself is not digitised here, so this checks the properties the
+// The figure itself is not digitized here, so this checks the properties the
 // paper states about it rather than pixel values: all three curves start at
 // 0.33 + 0.15*tau_a when the aerosol is isotropic, rise monotonically with
-// g_a, and separate in tau_a order across the whole range. A digitised
+// g_a, and separate in tau_a order across the whole range. A digitized
 // comparison would be strictly better and is what §13's Level 2 ultimately
 // wants; this is what can be asserted from the text.
 func TestKocifaj2022Fig1Curves(t *testing.T) {

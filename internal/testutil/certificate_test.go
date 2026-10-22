@@ -270,7 +270,7 @@ func TestACertificateForAnotherNameStaysFatal(t *testing.T) {
 }
 
 // TestCertificateFailureIgnoresEverythingElse guards the negative: this
-// predicate must not widen into the errors its neighbours already classify, or
+// predicate must not widen into the errors its neighbors already classify, or
 // into errors nobody classifies at all.
 func TestCertificateFailureIgnoresEverythingElse(t *testing.T) {
 	t.Parallel()

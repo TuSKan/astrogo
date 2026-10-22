@@ -33,7 +33,7 @@ type Attempt struct {
 // # What it does not decide
 //
 // How long to wait. That is already handled better than a policy would: resty
-// honours a 429 or 503 response's own Retry-After header — in both the seconds
+// honors a 429 or 503 response's own Retry-After header — in both the seconds
 // and the HTTP-date forms — and otherwise backs off exponentially with jitter,
 // bounded by the client's retry count. A server that says when to come back is
 // obeyed, and one that does not gets a well-behaved client anyway, so there is

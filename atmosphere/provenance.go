@@ -55,7 +55,7 @@ type TimeRange struct {
 
 // SourceRef records the provenance of one dataset that contributed to a
 // result: what it is, which version, over what period it was acquired,
-// when this process retrieved it, its checksum, its licence, and its
+// when this process retrieved it, its checksum, its license, and its
 // Fidelity. Every dataset that enters a pipeline attaches one of these at
 // the point it is opened. Originally introduced for Sky Brightness V2
 // (docs/skybrightness.md §6), lives here because it is a general

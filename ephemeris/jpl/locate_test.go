@@ -12,13 +12,13 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// TestLocateAnswersAboutTheSegmentCentre: a kernel locates a body about the
-// centre of the segment that holds it, as de440s stores it — the Moon and the
+// TestLocateAnswersAboutTheSegmentCenter: a kernel locates a body about the
+// center of the segment that holds it, as de440s stores it — the Moon and the
 // Earth about the Earth-Moon barycenter, the barycenters and the Sun about the
 // Solar System barycenter — and an Instant composed from those reproduces the
 // barycentric route to rounding: the Moon about the Earth through their
 // barycenter, and through the Solar System barycenter an AU away.
-func TestLocateAnswersAboutTheSegmentCentre(t *testing.T) {
+func TestLocateAnswersAboutTheSegmentCenter(t *testing.T) {
 	t.Parallel()
 
 	p, err := jpl.NewProvider(context.Background(), core.Planets, "de440s")
@@ -66,7 +66,7 @@ func TestLocateAnswersAboutTheSegmentCentre(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The barycentric route rounds at an AU, 2e-16 AU, three centimetres;
+	// The barycentric route rounds at an AU, 2e-16 AU, three centimeters;
 	// the native one at the Moon's distance.
 	if d := moon.Pos.Sub(earth.Pos).Sub(native.Pos).Norm(); d > 1e-15 {
 		t.Errorf("the Moon about the Earth natively and through the barycenter differ by %g AU", d)

@@ -465,7 +465,7 @@ func BenchmarkArtificialSkyglow(b *testing.B) {
 	dst := skybrightness.NewSpectralRadiance(grid)
 	dir := coord.NewAltAz(angle.Deg(30), angle.Deg(10))
 
-	// Warm the per-scene cache, which is what a sky map amortises.
+	// Warm the per-scene cache, which is what a sky map amortizes.
 	if _, err := component.AddRadiance(context.Background(), dst, grid, dir, scene); err != nil {
 		b.Fatal(err)
 	}
@@ -529,8 +529,8 @@ func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 		thetaA := math.Acos(source.ToUnitVector().Dot(a.ToUnitVector()))
 		thetaB := math.Acos(source.ToUnitVector().Dot(b.ToUnitVector()))
 
-		want = atmosphere.RayleighPhaseFunction(thetaA, atmosphere.RayleighDepolarisation) /
-			atmosphere.RayleighPhaseFunction(thetaB, atmosphere.RayleighDepolarisation)
+		want = atmosphere.RayleighPhaseFunction(thetaA, atmosphere.RayleighDepolarization) /
+			atmosphere.RayleighPhaseFunction(thetaB, atmosphere.RayleighDepolarization)
 
 		got = radianceAt(t, component, scene, alt, azA) / radianceAt(t, component, scene, alt, azB)
 

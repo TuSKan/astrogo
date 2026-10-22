@@ -93,7 +93,7 @@ type ICRS struct {
 	//
 	// "No proper motion recorded" and "proper motion measured as zero" are
 	// different claims about a star, and they convert differently: the first
-	// is a catalogue position with no motion information, the second asserts
+	// is a catalog position with no motion information, the second asserts
 	// the star is genuinely at rest in ICRS. [ICRSToFK4] and [ICRSToFK5] used
 	// to tell them apart by testing every kinematic field for zero, which
 	// cannot distinguish them and silently answered the first question when
@@ -137,11 +137,11 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 //
 // pmRA is mu_alpha* = dRA/dt · cos(dec) — the rate the star moves across the
 // sky, which is the pmra column Gaia, SIMBAD and Hipparcos all publish and
-// what astropy calls pm_ra_cosdec. Pass a catalogue's value straight in.
+// what astropy calls pm_ra_cosdec. Pass a catalog's value straight in.
 //
 // SOFA's own routines want the other one, dRA/dt, which near a pole is huge
 // for a star that is barely moving; converting to it is this package's job
-// and happens at the one boundary where SOFA is called. Handing a catalogue
+// and happens at the one boundary where SOFA is called. Handing a catalog
 // value to SOFA directly is what #281 was: it lost a factor of cos(dec),
 // which is 30% at δ = 45° and 83% at δ = 80°.
 func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) ICRS {
@@ -209,7 +209,7 @@ func (c ICRS) Dec() angle.Angle { return c.dec }
 func (c ICRS) Dist() unit.Length { return c.dist }
 
 // PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
-// the on-sky rate every catalogue publishes. See [NewICRSWithKinematics].
+// the on-sky rate every catalog publishes. See [NewICRSWithKinematics].
 func (c ICRS) PmRA() angle.Angle { return c.pmRA }
 
 // PmDec returns the proper motion in declination of the ICRS coordinate.
@@ -340,7 +340,7 @@ func (c Astrometric) RA() angle.Angle { return c.ra }
 func (c Astrometric) Dec() angle.Angle { return c.dec }
 
 // PmRA returns the proper motion in right ascension — μα* = dRA/dt · cos(dec),
-// the on-sky rate every catalogue publishes. See [NewICRSWithKinematics].
+// the on-sky rate every catalog publishes. See [NewICRSWithKinematics].
 func (c Astrometric) PmRA() angle.Angle { return c.pmRA }
 
 // PmDec returns the proper motion in declination of the Astrometric coordinate.

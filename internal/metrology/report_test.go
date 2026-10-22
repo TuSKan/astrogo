@@ -189,7 +189,7 @@ func TestReportWritesAReadableDocument(t *testing.T) {
 	}
 
 	if res.Contract.Rationale == "" || res.Contract.Source == "" {
-		t.Error("the justification of the contract did not survive serialisation")
+		t.Error("the justification of the contract did not survive serialization")
 	}
 
 	if res.Generated == "" || res.GoVersion == "" || res.Platform == "" {

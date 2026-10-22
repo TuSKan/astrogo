@@ -163,7 +163,7 @@ func TestConstellationAreasMatchThePublishedValues(t *testing.T) {
 	}
 }
 
-// The north polar cap is the region the boundary catalogue leaves implicit,
+// The north polar cap is the region the boundary catalog leaves implicit,
 // and the one that was broken. Ursa Minor's boundary tops out at +88 degrees
 // and encircles the pole above that.
 func TestNorthPolarCapBelongsToUrsaMinor(t *testing.T) {
@@ -195,7 +195,7 @@ func TestNorthPolarCapBelongsToUrsaMinor(t *testing.T) {
 		t.Errorf("Polaris resolved to %q (err %v), want UMi", abbr, err)
 	}
 
-	// The south polar cap is Octans, which the catalogue does close explicitly
+	// The south polar cap is Octans, which the catalog does close explicitly
 	// and which therefore never had the same problem — checked so that a
 	// change to the polar handling cannot break it unnoticed.
 	for _, dec := range []float64{-88.5, -89.5, -89.99, -90} {

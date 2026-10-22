@@ -43,7 +43,7 @@ var ErrUnexpectedID = errors.New("satellite: state queried for an id other than 
 // describing different satellites, or a field that is not the number the
 // format says it is.
 //
-// SGP4 will initialise happily from a corrupted element set and propagate it
+// SGP4 will initialize happily from a corrupted element set and propagate it
 // for ever, as long as every field it reads is still a number. A single digit
 // altered in transmission or truncated in a copy moves an inclination or a
 // mean motion to another plausible value and puts the satellite somewhere it
@@ -66,7 +66,7 @@ type Satellite struct {
 	// propagator, and kept.
 	MeanMotion unit.AngularRate
 
-	// prop holds the initialised model. It is immutable, so a *Satellite is
+	// prop holds the initialized model. It is immutable, so a *Satellite is
 	// as safe to share across goroutines as the propagator inside it.
 	prop *sgp4.Propagator
 
@@ -139,7 +139,7 @@ func (s *Satellite) ID() core.ID { return s.id }
 // Those callers should not have to reach for a second parse of the same text.
 func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 
-// Locate returns the satellite's state about the Earth, its centre, in GCRS
+// Locate returns the satellite's state about the Earth, its center, in GCRS
 // (AU, AU/day), implementing the [core.Provider] interface contract.
 //
 // id must be [Satellite.ID] — this provider tracks exactly one body — and

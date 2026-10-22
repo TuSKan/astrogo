@@ -16,7 +16,7 @@ import (
 // The obvious reading is that an API request is the sensitive one, because the
 // query says what is being observed. But a KindFile fetch over cleartext is at
 // least as bad and arguably worse: the bytes coming back are a physical
-// constant, a catalogue, or an ephemeris kernel, and anything on the path can
+// constant, a catalog, or an ephemeris kernel, and anything on the path can
 // rewrite them. A tampered luminous-efficiency table does not look like an
 // attack, it looks like a slightly different answer. So the rule covers the
 // whole registry.

@@ -9,12 +9,12 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 )
 
-// The real catalogue, the two files remote.OpenNGC pins, resolved the way a
+// The real catalog, the two files remote.OpenNGC pins, resolved the way a
 // caller would. Every other test in this package parses a fixture; this one
 // is what found that 72 of OpenNGC's rows were dropped for a type code the
 // parser did not know (#599). M24 and Brocchi's Cluster are two of them, and
 // both are naked-eye objects.
-func TestOpenNGCResolvesTheRealCatalogue(t *testing.T) {
+func TestOpenNGCResolvesTheRealCatalog(t *testing.T) {
 	testutil.RequireReachable(t, "raw.githubusercontent.com:443")
 
 	remote.EnableDownloads(16<<20, remote.OpenNGC)

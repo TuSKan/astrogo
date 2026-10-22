@@ -125,7 +125,7 @@ func TestLimitingMagnitudeBooleanRejects(t *testing.T) {
 // The score is monotonic in the margin and bounded in [0,1].
 //
 // Monotonicity is the property a scheduler depends on: a deeper sky must
-// never lower a target's merit, or the optimiser is free to prefer a worse
+// never lower a target's merit, or the optimizer is free to prefer a worse
 // night.
 func TestLimitingMagnitudeScoreIsMonotonic(t *testing.T) {
 	t.Parallel()
@@ -158,7 +158,7 @@ func TestLimitingMagnitudeScoreIsMonotonic(t *testing.T) {
 // A target with no photometry imposes no requirement.
 //
 // The alternative would be a constraint that silently empties a target list:
-// most deep-sky catalogues carry magnitudes, most do not carry them for every
+// most deep-sky catalogs carry magnitudes, most do not carry them for every
 // row, and rejecting the gaps would look like a very selective sky.
 func TestLimitingMagnitudeIgnoresTargetsWithNoMagnitude(t *testing.T) {
 	t.Parallel()

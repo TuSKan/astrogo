@@ -355,7 +355,7 @@ const (
 // added on top of an offset it already carried. 69.184 s late — about 40
 // arcsec of lunar motion and 1.8 arcsec for Mars. The type is scale-aware
 // precisely so this cannot be left to the caller, and the SOFA provider always
-// honoured it.
+// honored it.
 //
 // The formula it used, TDB = UTC + (LS + 32.184)/86400, is the formula for
 // **TT**, not TDB. It omitted the TDB−TT periodic term entirely — an amplitude
@@ -393,7 +393,7 @@ const (
 //
 //	math.Ulp(2460545.0) = 4.657e-10 days = 40.2 microseconds
 //
-// so the ET handed to the evaluator was quantised to 40 µs. That is 4 cm of
+// so the ET handed to the evaluator was quantized to 40 µs. That is 4 cm of
 // lunar motion and 31 cm for the ISS — and the Moon figure sits at the level of
 // the 33 mm this library claims against Horizons.
 //

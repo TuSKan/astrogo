@@ -8,12 +8,12 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// FK4 is a position in the FK4 system, the pre-1984 fundamental catalogue
+// FK4 is a position in the FK4 system, the pre-1984 fundamental catalog
 // whose equinox is B1950.0.
 //
-// # Why a library that reads catalogues needs this
+// # Why a library that reads catalogs needs this
 //
-// Real catalogues still carry B1950 positions — the Palomar and ESO/SERC sky
+// Real catalogs still carry B1950 positions — the Palomar and ESO/SERC sky
 // surveys, most pre-1990 variable-star and double-star work, and every plate
 // archive built on them. Reading one and treating its coordinates as J2000
 // puts a target about 0.7° away, which is far outside any telescope's field
@@ -22,14 +22,14 @@ import (
 // # It is not a rotation
 //
 // FK4 to FK5 is not a change of axes. Three things happen, and two of them
-// have no analogue in the Galactic or ecliptic conversions this package also
+// have no analog in the Galactic or ecliptic conversions this package also
 // offers:
 //
 //   - The equinox and equator move, which is the part that looks like a
 //     rotation.
 //   - The **E-terms of aberration** are removed. FK4 positions have the
 //     elliptic part of annual aberration baked into them, up to 0.34″,
-//     because that is how the catalogue was constructed.
+//     because that is how the catalog was constructed.
 //   - FK4's equinox **drifts**, so the system is not inertial. A star at rest
 //     in FK4 has a real proper motion in FK5, and one with a measured FK4
 //     proper motion needs that fictitious component subtracted.
@@ -45,7 +45,7 @@ type FK4 struct {
 	hasProperMotion bool
 
 	// fictitiousMotion records that the proper motion above came from the
-	// frame rather than from a catalogue.
+	// frame rather than from a catalog.
 	//
 	// A star with no measured motion still moves in FK4, because FK4's equinox
 	// drifts, and [FK5ToFK4] and [ICRSToFK4] hand that motion back rather than
@@ -68,12 +68,12 @@ type FK4 struct {
 }
 
 // B1950 is the Besselian epoch of the FK4 equinox, and the default epoch of
-// observation for a catalogue that does not record one.
+// observation for a catalog that does not record one.
 const B1950 = 1950.0
 
-// NewFK4 builds an FK4 position from a catalogue that records no proper
+// NewFK4 builds an FK4 position from a catalog that records no proper
 // motion, at the Besselian epoch its positions were determined for — B1950.0
-// unless the catalogue says otherwise, which several plate surveys do.
+// unless the catalog says otherwise, which several plate surveys do.
 //
 // "No proper motion recorded" is not "proper motion is zero", and the
 // distinction changes the answer. A star at rest in FK4 is moving in FK5 at
@@ -81,12 +81,12 @@ const B1950 = 1950.0
 // drifts; SOFA supplies that fictitious motion for a position-only star
 // through a different routine than the one for a star with a measured one.
 // Passing zeroes to [NewFK4WithProperMotion] asserts the star really is at
-// rest in the inertial sense, which is a claim almost no catalogue makes.
+// rest in the inertial sense, which is a claim almost no catalog makes.
 func NewFK4(ra, dec angle.Angle, bepoch float64) FK4 {
 	return FK4{ra: ra, dec: dec, bepoch: bepoch}
 }
 
-// NewFK4WithProperMotion builds an FK4 position from a catalogue that records
+// NewFK4WithProperMotion builds an FK4 position from a catalog that records
 // the full six elements: proper motions per Julian year, parallax as an angle,
 // and radial velocity in km/s.
 //
@@ -114,7 +114,7 @@ func (c FK4) Dec() angle.Angle { return c.dec }
 // [NewFK4] for why those are different positions after conversion.
 //
 // It does not say where the motion came from. A value built by
-// [NewFK4WithProperMotion] carries a catalogue's measurement; one returned by
+// [NewFK4WithProperMotion] carries a catalog's measurement; one returned by
 // [FK5ToFK4] or [ICRSToFK4] for a position-only input carries the fictitious
 // motion FK4's drifting equinox gives it, which is a real rate and not a
 // measurement. The type keeps that distinction internally because the two
@@ -139,7 +139,7 @@ func (c FK4) String() string {
 	return fmt.Sprintf("FK4 B%.1f RA %s Dec %s", c.bepoch, c.ra, c.dec)
 }
 
-// hasRecordedMotion reports whether a catalogue measured this star's proper
+// hasRecordedMotion reports whether a catalog measured this star's proper
 // motion, as opposed to there being none or it having been supplied by a frame
 // conversion. It is what the six-element routes must dispatch on.
 func (c FK4) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiousMotion }
@@ -165,7 +165,7 @@ func FK4ToFK5(c FK4) FK5 {
 	}
 
 	// SOFA's routines speak dRA/dt in and out; these types carry the
-	// catalogue's on-sky rate, so each crossing converts. See [dRAdt].
+	// catalog's on-sky rate, so each crossing converts. See [dRAdt].
 	r5, d5, dr5, dd5, px5, rv5 := gofaext.Fk425(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),
@@ -180,7 +180,7 @@ func FK4ToFK5(c FK4) FK5 {
 }
 
 // FK5ToFK4 converts an FK5 (J2000.0) position to FK4 at the given Besselian
-// epoch of observation — [B1950] for the catalogue equinox itself.
+// epoch of observation — [B1950] for the catalog equinox itself.
 //
 // The inverse of [FK4ToFK5]: the E-terms of aberration are put back and the
 // fictitious proper motion is restored. A position with no recorded motion
@@ -219,7 +219,7 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 		parallax: angle.Arcsec(px1950),
 		rv:       unit.KmPerSec(rv1950),
 		// B1950, not bepoch — see [ICRSToFK4]'s doc comment, which records why
-		// the six-element route cannot honour an epoch and what to use instead.
+		// the six-element route cannot honor an epoch and what to use instead.
 		bepoch:          B1950,
 		hasProperMotion: true,
 	}
@@ -232,7 +232,7 @@ func FK5ToFK4(c FK5, bepoch float64) FK4 {
 // [FK4ToFK5] and [FK5ToICRS], so the intermediate J2000 position a caller may
 // actually want is reachable rather than buried here.
 //
-// Kinematics survive the conversion when the catalogue recorded them: the
+// Kinematics survive the conversion when the catalog recorded them: the
 // returned ICRS carries proper motion, parallax and radial velocity, and
 // [Context.ICRSToAltAz] will use them for rigorous space-motion propagation.
 func FK4ToICRS(c FK4) ICRS {
@@ -240,7 +240,7 @@ func FK4ToICRS(c FK4) ICRS {
 }
 
 // ICRSToFK4 converts an ICRS position to FK4 at the given Besselian epoch of
-// observation — [B1950] for the catalogue equinox itself.
+// observation — [B1950] for the catalog equinox itself.
 //
 // The inverse of [FK4ToICRS] and, like it, not a rotation: the E-terms of
 // aberration are put back and the fictitious proper motion is restored. A
@@ -278,7 +278,7 @@ func FK4ToICRS(c FK4) ICRS {
 // uses, carries a position to bepoch by evaluating the E-terms of aberration
 // *at* bepoch and then propagating along the fictitious proper motion the frame
 // gives it. Its six-element counterpart Fk524 takes no epoch at all, by design:
-// with a real proper motion in hand the star's state is stated at the catalogue
+// with a real proper motion in hand the star's state is stated at the catalog
 // equinox and moving it is the caller's business.
 //
 // Propagating it here anyway would mean inventing an epoch convention SOFA does
@@ -331,7 +331,7 @@ func ICRSToFK4(c ICRS, bepoch float64) FK4 {
 		rv:       unit.KmPerSec(rv1950),
 		// B1950 rather than bepoch, and deliberately: see the note on the
 		// six-element route in this function's doc comment. Fk524 answers at
-		// the catalogue equinox and takes no epoch, so labeling its output
+		// the catalog equinox and takes no epoch, so labeling its output
 		// with the caller's would be a false claim about the numbers beside it.
 		bepoch:          B1950,
 		hasProperMotion: true,

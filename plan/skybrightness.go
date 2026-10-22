@@ -16,7 +16,7 @@ import (
 // Half a magnitude: wide enough that a target sitting exactly at the limit
 // scores near the middle rather than snapping between 0 and 1 on a hundredth
 // of a magnitude of sky, and narrow enough that a target two magnitudes clear
-// of the limit is not still being penalised for it.
+// of the limit is not still being penalized for it.
 const defaultLimMagRamp = 0.5
 
 // SkyDepth reports how faint a source can be at a pointing and an instant and

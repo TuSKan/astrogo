@@ -18,7 +18,7 @@ correct rather than merely plausible.
 ## Provenance
 
 Obtained 2026-09-05 from the `sgp4` Python package, which redistributes
-Vallado's files unmodified under the MIT licence:
+Vallado's files unmodified under the MIT license:
 
 ```
 https://raw.githubusercontent.com/brandon-rhodes/python-sgp4/master/sgp4/SGP4-VER.TLE

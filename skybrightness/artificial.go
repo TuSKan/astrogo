@@ -41,7 +41,7 @@ var (
 // Artificial skyglow propagation, after Kocifaj, Bará & Falchi (2022).
 //
 //   - Model: semi-analytic two-parameter all-sky radiance from a ground
-//     source, generalising Kocifaj & Bará (2019) to include scattering
+//     source, generalizing Kocifaj & Bará (2019) to include scattering
 //     orders up to the fifth.
 //   - Primary reference: Kocifaj, M., Bará, S. & Falchi, F. (2022),
 //     "Towards a global map of the artificial all-sky brightness",
@@ -51,7 +51,7 @@ var (
 //     in atmosphere as CombinedPhaseFunction, shared with the lunar model.
 //   - Units: radiance in the same units as the supplied source radiance;
 //     t dimensionless.
-//   - Validity: the g parameterisation was solved at 550 nm and 450 nm and
+//   - Validity: the g parameterization was solved at 550 nm and 450 nm and
 //     is stated to represent a band roughly 20-30 nm wide. The model is
 //     therefore NOT spectrally resolved to the same degree as the rest of
 //     this module, which its provenance records.
@@ -223,7 +223,7 @@ func positiveFinite(v float64) bool {
 // own: at high aerosol loading combined with a strongly forward-scattering
 // aerosol — around tau_a = 0.5 with g_a = 0.9 — it evaluates above 1,
 // where a Henyey-Greenstein phase function is undefined. That is a real
-// limit of the published parameterisation, not of this implementation, so
+// limit of the published parameterization, not of this implementation, so
 // the value is returned alongside ErrAsymmetryOutOfRange rather than being
 // silently clamped: a caller in that regime needs to know their inputs
 // left the fit's domain.

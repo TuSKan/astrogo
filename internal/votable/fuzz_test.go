@@ -14,7 +14,7 @@ import (
 //
 // # What is actually under test
 //
-// encoding/xml does the tokenising and is not what needs fuzzing. What does is
+// encoding/xml does the tokenizing and is not what needs fuzzing. What does is
 // what this package builds on top: the walk that decides which RESOURCE holds
 // the results, the FIELD/TD alignment, and the type conversion driven by each
 // field's declared datatype. A row with more cells than the table has columns,

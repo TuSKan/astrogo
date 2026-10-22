@@ -165,7 +165,7 @@ func TestAODWrapsAtTheMeridian(t *testing.T) {
 
 	t.Logf("0.5W 51.5N: %.4f   0.5E 51.5N: %.4f", west, east)
 
-	// One degree apart on a 0.4-degree grid: neighbouring cells, so the same
+	// One degree apart on a 0.4-degree grid: neighboring cells, so the same
 	// air mass. A wrap failure sends one of them to the antimeridian.
 	if diff := west - east; diff > 0.2 || diff < -0.2 {
 		t.Errorf("cells 1 degree apart read %.4f and %.4f; that is not one air mass, so "+

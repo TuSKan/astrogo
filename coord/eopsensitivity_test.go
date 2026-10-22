@@ -92,7 +92,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
-	// A fixed catalogue direction rather than a body: no ephemeris, no light
+	// A fixed catalog direction rather than a body: no ephemeris, no light
 	// time, nothing that could move for a reason other than the one under
 	// test.
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))

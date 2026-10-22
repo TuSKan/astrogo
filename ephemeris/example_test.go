@@ -15,8 +15,8 @@ import (
 // runs on every `go test`. For arcsecond work over long spans, swap in a JPL
 // SPK-backed provider from ephemeris/jpl; the interface is the same.
 //
-// A provider locates each body about the centre it computes it from; [At]
-// composes those into a state about any centre at one instant, here the
+// A provider locates each body about the center it computes it from; [At]
+// composes those into a state about any center at one instant, here the
 // Earth's.
 func Example() {
 	when := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
@@ -54,7 +54,7 @@ func ExampleInstant_Apparent() {
 	// The light left Mars about 19 minutes earlier, 2.31 AU away, and in that
 	// time Mars moved; the aberration of the Earth's 30 km/s turns the
 	// direction by up to 20.5″ more. Tens of thousands of kilometers, at that
-	// distance, is the size to expect rather than a rounding artefact.
+	// distance, is the size to expect rather than a rounding artifact.
 	moved := apparent.Pos.Sub(geometric.Pos).Norm()
 	fmt.Printf("geometric to apparent is %.0f km\n", moved*1.495978707e8)
 

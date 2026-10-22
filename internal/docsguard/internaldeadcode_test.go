@@ -30,7 +30,7 @@ import (
 //
 // An internal package has no external audience. Nothing outside this module
 // can import it, so a name nothing here uses is used by nobody, and that is
-// a fact rather than a judgement.
+// a fact rather than a judgment.
 //
 // # Why a test caller counts
 //

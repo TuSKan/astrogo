@@ -23,7 +23,7 @@ var updateAccuracy = flag.Bool("update-accuracy", false,
 // before TestMain takes it away.
 //
 // Declared here, in the only file that reads it, rather than beside the
-// TestMain that clears it. Package-level variables are initialised before
+// TestMain that clears it. Package-level variables are initialized before
 // TestMain is called, so this still sees the real value — and putting it in
 // the untagged file would leave a symbol with no consumer in a build that
 // compiles neither tag, which is what "golangci-lint run" does and what it

@@ -148,7 +148,7 @@ Never reintroduce a `go:generate`/download-tooling step, and never add `go:embed
 
 That boundary is the point of the arrangement rather than tidiness. The subpackages move bytes; `remote` decides whether bytes may move — which endpoint, whether the process is offline, whether a download was consented to, where the result is cached. Going around it produces working code that silently ignores `SetOffline` at one call site.
 
-**Policy is a value, not a process global.** `remote.Client` holds offline mode, download consent, endpoint URL overrides and the cache location; `remote.NewClient()` builds one and every package-level function is a method on `remote.Default()` (the `http.DefaultClient` analogue). Add a new policy control as a `*Client` method plus a one-line package-level delegation — never as a new package-level variable.
+**Policy is a value, not a process global.** `remote.Client` holds offline mode, download consent, endpoint URL overrides and the cache location; `remote.NewClient()` builds one and every package-level function is a method on `remote.Default()` (the `http.DefaultClient` analog). Add a new policy control as a `*Client` method plus a one-line package-level delegation — never as a new package-level variable.
 
 Every endpoint is registered in [remote/endpoint.go](remote/endpoint.go) as an `Endpoint`: `URL`, `Kind` (`KindAPI`|`KindFile`), `Subsystem`, `Timeout`/`DownloadTimeout`, `Mutable`, `Downloadable`. That struct is the single source of truth for how a package talks to a service, and `remote.URL(id)` is the single gate every call site passes through (offline mode, `Disable`, `SetURL`).
 

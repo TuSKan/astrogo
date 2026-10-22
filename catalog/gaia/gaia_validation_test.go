@@ -25,7 +25,7 @@ import (
 // [DefaultEndpoint] is Gaia@AIP, on measured speed and availability. That
 // choice is only defensible if the two archives actually agree, because a
 // faster service returning different sources is not a mirror, it is a second
-// catalogue wearing the same name. DR3 is a fixed data release — neither
+// catalog wearing the same name. DR3 is a fixed data release — neither
 // archive can be more current than the other — so any disagreement here is a
 // service defect rather than an update, and worth failing over.
 //

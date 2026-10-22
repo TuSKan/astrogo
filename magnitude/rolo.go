@@ -98,7 +98,7 @@ type roloBand struct {
 // roloBands is Kieffer & Stone (2005) Table 4 in full, model version 311g.
 //
 // The 2126.3 nm row is not a transcription error: its a1 and a2 depart
-// sharply from every neighbouring band (-2.55069 and 2.10026 against roughly
+// sharply from every neighboring band (-2.55069 and 2.10026 against roughly
 // -1.3 and 0.2), and its d3 is an order of magnitude larger. That band sits
 // in a strong telluric absorption region, and the fit absorbs the resulting
 // poor sampling into the phase terms. The values are as published, verified
@@ -144,7 +144,7 @@ var roloBands = [32]roloBand{
 // The model is defined only at these wavelengths. It is a fit to broadband
 // photometry in 32 filters, not a continuous spectrum, so a value between two
 // bands is the caller's interpolation and carries the caller's assumption —
-// which matters most across 943 nm and 1400 nm, where the neighbouring bands
+// which matters most across 943 nm and 1400 nm, where the neighboring bands
 // straddle telluric water absorption and the true lunar spectrum is not
 // smooth between them.
 func ROLOBands() []unit.WavelengthNM {

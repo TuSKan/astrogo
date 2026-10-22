@@ -86,7 +86,7 @@ type Region struct {
 	InnerM, OuterM float64
 
 	// Sectors is the number of azimuthal sources produced, and so the
-	// number of emitters. It is the model's own discretisation.
+	// number of emitters. It is the model's own discretization.
 	Sectors int
 
 	// RadialSamples is how finely each azimuth is walked outward. It

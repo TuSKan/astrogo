@@ -129,10 +129,10 @@ func TestReadsCONTINUEFromOGIPStyleBytes(t *testing.T) {
 	}
 }
 
-// TestAStrayCONTINUEIsNotGluedOntoItsNeighbour keeps the join from inventing a
+// TestAStrayCONTINUEIsNotGluedOntoItsNeighbor keeps the join from inventing a
 // value. A CONTINUE card after something that was not waiting for one is
 // malformed, and swallowing it would silently corrupt the previous keyword.
-func TestAStrayCONTINUEIsNotGluedOntoItsNeighbour(t *testing.T) {
+func TestAStrayCONTINUEIsNotGluedOntoItsNeighbor(t *testing.T) {
 	t.Parallel()
 
 	raw := headerBlock(t,

@@ -66,7 +66,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	}
 
 	if stars == 0 {
-		t.Error("four pixels of the Gaia catalogue held no sources at all")
+		t.Error("four pixels of the Gaia catalog held no sources at all")
 	}
 
 	t.Logf("four pixels held %d sources", stars)
@@ -205,7 +205,7 @@ func archiveCongested(err error) bool {
 // must agree exactly. A divisor wrong by any power of two breaks this; so does
 // an off-by-one in the range arithmetic.
 //
-// Checked once at full scale against the whole catalogue: summing the published
+// Checked once at full scale against the whole catalog: summing the published
 // order-8 map returns 1,811,709,771 sources and 1,540,770,489 with BP-RP, both
 // exactly the values the archive reports for gaiadr3.gaia_source with no GROUP
 // BY at all. This is the cheap version of that, four pixels instead of 786,432.
@@ -448,7 +448,7 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	}
 
 	if stars == 0 {
-		t.Fatal("four pixels of the Gaia catalogue held no sources at all")
+		t.Fatal("four pixels of the Gaia catalog held no sources at all")
 	}
 
 	if m == nil {

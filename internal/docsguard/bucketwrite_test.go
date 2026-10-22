@@ -39,7 +39,7 @@ var bucketWriteAllowed = map[string]bool{
 // basename and a nanosecond clock, and on Windows that clock does not move —
 // 2000 consecutive reads returned one distinct value. Two writers of one file
 // name therefore agree on the staging path, and one renames it out from under
-// the other. The write lock [file.Save] holds serialises them.
+// the other. The write lock [file.Save] holds serializes them.
 //
 // A new caller reaching for bucket.WriteAll instead gets code that works
 // everywhere its author runs it and fails one time in seven on Windows,
@@ -114,6 +114,6 @@ func TestBucketWritesGoThroughTheStagingLock(t *testing.T) {
 			"from the key's basename and a clock that does not move on Windows, so two "+
 			"writers of one name rename it out from under each other (#241). If this file "+
 			"genuinely needs WriterOptions, add it to bucketWriteAllowed and say there "+
-			"what serialises it.", o)
+			"what serializes it.", o)
 	}
 }

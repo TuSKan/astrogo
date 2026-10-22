@@ -146,7 +146,7 @@ func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, e
 		return p.recordToTarget(rec), nil
 	}
 
-	// Fall back to the bulk table, which is the complete catalogue.
+	// Fall back to the bulk table, which is the complete catalog.
 	if lerr := p.ensureLoaded(ctx); lerr != nil {
 		attempts = append(attempts, fmt.Errorf("bulk table: %w", lerr))
 	} else {

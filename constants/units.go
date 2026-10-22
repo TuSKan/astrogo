@@ -13,7 +13,7 @@ import (
 //
 // Kept unexported: these exist to give Constant.Unit a correct dimension
 // and a readable symbol, not to extend unit's public vocabulary. Spelling
-// follows unit/units.go ("meter", not "metre").
+// follows unit/units.go ("meter", not "meter").
 var (
 	// meterPerSecond is m·s⁻¹ (velocity) — SpeedOfLight.
 	meterPerSecond = unit.Unit{

@@ -54,7 +54,7 @@ const (
 // That matters because [Provider] is itself an alias for [resolve.Provider],
 // and that interface's documentation is written entirely in terms of
 // resolve.ErrNotFound: a caller who reads the contract and follows it lands in
-// their "the catalogues could not be reached" branch for an object that simply
+// their "the catalogs could not be reached" branch for an object that simply
 // does not exist. Inverting #102 exactly — an ordinary negative read as an
 // outage instead of the other way round.
 //
@@ -245,7 +245,7 @@ type candidate struct {
 // # Every provider is asked, all at once
 //
 // Merging is the point of this type, so there is no short-circuit: a hit from
-// a local catalogue does not mean SIMBAD has nothing to add to it, and
+// a local catalog does not mean SIMBAD has nothing to add to it, and
 // stopping early would quietly turn Resolve into "ask whichever provider was
 // registered first". The providers are queried concurrently instead, so the
 // cost is the slowest one rather than the sum — see askAll.

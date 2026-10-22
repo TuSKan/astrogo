@@ -70,13 +70,13 @@ func WithGravity(g Gravity) Option { return func(c *config) { c.gravity = g } }
 // WithMode selects the operational convention. The default is [ModeImproved].
 func WithMode(m Mode) Option { return func(c *config) { c.mode = m } }
 
-// Propagator holds one element set's initialised SGP4 coefficients.
+// Propagator holds one element set's initialized SGP4 coefficients.
 //
 // # Immutable, and therefore safe to share
 //
 // Every field is written once by [New] and only read afterwards, so any number
 // of goroutines may call [Propagator.At] on one value at the same time without
-// synchronisation. That is not how the model is usually implemented: the
+// synchronization. That is not how the model is usually implemented: the
 // reference threads its state through a mutable record, and its deep-space
 // resonance integrator deliberately carries `atime`/`xli`/`xni` between calls
 // as a speed memo, which makes concurrent use of one satellite unsound.
@@ -121,7 +121,7 @@ type Propagator struct {
 	rz resonanceTerms
 }
 
-// New initialises a propagator for el.
+// New initializes a propagator for el.
 //
 // The elements are validated ([Elements.Validate]) before anything is derived
 // from them, so a returned *Propagator has already refused what it cannot

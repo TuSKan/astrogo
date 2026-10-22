@@ -111,7 +111,7 @@ func TestMPCObservatoriesParsesTheWholeRegister(t *testing.T) {
 		//
 		// 95% of the register lands inside a kilometer of sea level and six of
 		// the summit of Everest; the outliers are all in the two coarse
-		// buckets, and every one of them is inside its own quantisation. That
+		// buckets, and every one of them is inside its own quantization. That
 		// is the check: not "is this height plausible" — which cannot be true
 		// for a 3-decimal row — but "is it plausible given what this row
 		// claims to know". A column read one field over produces hundreds of

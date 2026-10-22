@@ -18,7 +18,7 @@ func fetchSpec() GaiaBuild {
 // A scattered set of directions must become one query with one BETWEEN each,
 // not a span covering everything between them. Asking for two pixels at
 // opposite ends of the sky as a single range would aggregate the entire
-// catalogue.
+// catalog.
 func TestADQLForPixelsIsADisjunction(t *testing.T) {
 	t.Parallel()
 
@@ -359,7 +359,7 @@ func TestColorRecoveryDegradesSafely(t *testing.T) {
 // Flux-weighting the mean color is what makes this reachable: one dominant
 // star can carry a pixel's mean past any color a real star has, and over the
 // order-9 sky it reaches BP-RP = 7.41. A cubic fitted to 5.0 evaluated at 7.41
-// is not a transformation, it is an artefact, so the color is clamped and the
+// is not a transformation, it is an artifact, so the color is clamped and the
 // factor stops changing beyond the interval.
 func TestColorFactorRefusesToExtrapolate(t *testing.T) {
 	t.Parallel()

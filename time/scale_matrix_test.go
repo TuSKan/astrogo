@@ -160,7 +160,7 @@ func TestScaleRoundTripMatrix(t *testing.T) {
 				"rather than rounding",
 			"IEEE 754 double spacing at the magnitude of jd2; see Time.normalize"))
 
-	modeled := metrology.NewSuite("time.scale.roundtrip.modelled", ref,
+	modeled := metrology.NewSuite("time.scale.roundtrip.modeled", ref,
 		metrology.MustContract(5.0, "s",
 			"a round trip through a scale defined by tabulated data can lose up to the magnitude "+
 				"of the offset itself: |DUT1| is kept below 0.9 s by leap-second insertion, and "+

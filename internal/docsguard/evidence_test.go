@@ -16,7 +16,7 @@ const validationDoc = "../../docs/VALIDATION.md"
 
 // backtickName matches one citation inside an Evidence cell. A cell may hold
 // several: a suite is often measured in companion parts — position and
-// velocity, separation and cross-track — that one status-table row summarises
+// velocity, separation and cross-track — that one status-table row summarizes
 // together.
 var backtickName = regexp.MustCompile("`([^`]+)`")
 

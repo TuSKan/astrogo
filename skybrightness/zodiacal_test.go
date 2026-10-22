@@ -155,7 +155,7 @@ func TestZodiacalInterpolates(t *testing.T) {
 	mid := zodiacalAt(t, 97.5, 0)
 
 	if want := (lo + hi) / 2; math.Abs(mid-want)/want > 1e-12 {
-		t.Errorf("midpoint = %.6g, want the mean %.6g of its neighbours", mid, want)
+		t.Errorf("midpoint = %.6g, want the mean %.6g of its neighbors", mid, want)
 	}
 
 	// And in latitude, between the 75-degree column and the quoted pole.

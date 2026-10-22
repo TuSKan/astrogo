@@ -53,7 +53,7 @@ func TestSexagesimalParsesBothHemispheres(t *testing.T) {
 func TestParseHipparcosRecoversPositionsAndDropsUnusableRows(t *testing.T) {
 	t.Parallel()
 
-	// HIP 3 has ICRS; 55203 has only sexagesimal, as in the real catalogue;
+	// HIP 3 has ICRS; 55203 has only sexagesimal, as in the real catalog;
 	// the last row has no magnitude at all.
 	csv := "HIP,RAICRS,DEICRS,Vmag,pmRA,pmDE,RAhms,DEdms\n" +
 		"3,0.00500795,38.85928608,6.61,5.24,-2.91,00 00 01.20,+38 51 33.4\n" +
