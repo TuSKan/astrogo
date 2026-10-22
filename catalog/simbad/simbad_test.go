@@ -127,8 +127,10 @@ func TestRetryTimeout(t *testing.T) {
 		return false
 	})
 
-	if attempts == 0 {
-		t.Errorf("expected multiple attempts")
+	// More than one: this asked for "multiple attempts" but checked for any,
+	// and so passed while a POST was never retried (#845).
+	if attempts < 2 {
+		t.Errorf("the 429 was sent %d time(s), want it retried", attempts)
 	}
 }
 
