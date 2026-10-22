@@ -152,7 +152,7 @@ func TestRayleighOpticalDepthRejectsBadInput(t *testing.T) {
 // A normalized phase function integrates to exactly 1 over the sphere.
 // This is the single most valuable check on any scattering kernel: it
 // catches a wrong prefactor, a missing 4*pi, and a mis-transcribed
-// depolarisation term at once.
+// depolarization term at once.
 func integrateOverSphere(t *testing.T, p func(theta float64) float64) float64 {
 	t.Helper()
 
@@ -173,7 +173,7 @@ func integrateOverSphere(t *testing.T, p func(theta float64) float64) float64 {
 func TestRayleighPhaseFunctionNormalization(t *testing.T) {
 	t.Parallel()
 
-	for _, rho := range []float64{0, atmosphere.RayleighDepolarisation, 0.03} {
+	for _, rho := range []float64{0, atmosphere.RayleighDepolarization, 0.03} {
 		got := integrateOverSphere(t, func(theta float64) float64 {
 			return atmosphere.RayleighPhaseFunction(theta, rho)
 		})
@@ -185,13 +185,13 @@ func TestRayleighPhaseFunctionNormalization(t *testing.T) {
 }
 
 // Winkler (2022) states that (1+3rho)/(1-rho) = 1.06 for the adopted
-// depolarisation, matching the coefficient Krisciunas & Schaefer (1991)
+// depolarization, matching the coefficient Krisciunas & Schaefer (1991)
 // fitted empirically. That identity is what ties the adopted rho to the
 // literature, so it is asserted directly.
-func TestRayleighDepolarisationMatchesKS91Coefficient(t *testing.T) {
+func TestRayleighDepolarizationMatchesKS91Coefficient(t *testing.T) {
 	t.Parallel()
 
-	rho := atmosphere.RayleighDepolarisation
+	rho := atmosphere.RayleighDepolarization
 
 	got := (1 + 3*rho) / (1 - rho)
 	if math.Abs(got-1.06) > 5e-4 {
@@ -210,7 +210,7 @@ func TestRayleighDepolarisationMatchesKS91Coefficient(t *testing.T) {
 // forward-peaked aerosol term.
 //
 // The peak-to-side ratio is exactly 2 only for an ideal dipole. Real air
-// is slightly depolarising, which lifts the 90-degree minimum and lowers
+// is slightly depolarizing, which lifts the 90-degree minimum and lowers
 // the ratio to (1+3rho)/(1-rho) + 1 over (1+3rho)/(1-rho) = 2.06/1.06 =
 // 1.9434 for the adopted rho. That is precisely the ratio implied by
 // Krisciunas & Schaefer's (1991) f_R = C_R(1.06 + cos^2 theta), so the
@@ -218,7 +218,7 @@ func TestRayleighDepolarisationMatchesKS91Coefficient(t *testing.T) {
 func TestRayleighPhaseFunctionSymmetry(t *testing.T) {
 	t.Parallel()
 
-	rho := atmosphere.RayleighDepolarisation
+	rho := atmosphere.RayleighDepolarization
 
 	fwd := atmosphere.RayleighPhaseFunction(0, rho)
 	back := atmosphere.RayleighPhaseFunction(math.Pi, rho)
@@ -311,7 +311,7 @@ func TestCombinedPhaseFunction(t *testing.T) {
 
 	const (
 		g   = 0.5
-		rho = atmosphere.RayleighDepolarisation
+		rho = atmosphere.RayleighDepolarization
 	)
 
 	got := integrateOverSphere(t, func(theta float64) float64 {

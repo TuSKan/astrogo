@@ -68,7 +68,7 @@ var motionGrid = []struct {
 	rv          float64
 }{
 	{
-		// At rest but at a known distance, which is an ordinary catalogue
+		// At rest but at a known distance, which is an ordinary catalog
 		// entry. A parallax of zero is excluded from this grid for the reason
 		// given below it.
 		name:     "at rest, with parallax",
@@ -217,7 +217,7 @@ const (
 
 // assertClosed compares two six-element states and reports every element that
 // moved, rather than the first — a conversion that breaks one element usually
-// breaks more, and seeing which ones is what localises the term.
+// breaks more, and seeing which ones is what localizes the term.
 func assertClosed(t *testing.T, what string, got, want elements, tol elementTolerance) {
 	t.Helper()
 
@@ -318,7 +318,7 @@ func TestICRSFK4RoundTripsAllSixElements(t *testing.T) {
 }
 
 // TestFK4ICRSRoundTripsAllSixElements starts from FK4, which is the direction
-// a catalogue reader actually takes.
+// a catalog reader actually takes.
 func TestFK4ICRSRoundTripsAllSixElements(t *testing.T) {
 	t.Parallel()
 
@@ -392,7 +392,7 @@ func TestFK4FK5RoundTripsAllSixElements(t *testing.T) {
 // row at parallax 0 is the one this test exists for; before the fix it read
 // (0.0, 0.0).
 //
-// This matters because catalogues of exactly this shape exist — proper motion
+// This matters because catalogs of exactly this shape exist — proper motion
 // measured, parallax not — and they describe most of the pre-Hipparcos ones.
 func TestProperMotionSurvivesWithoutAParallax(t *testing.T) {
 	t.Parallel()

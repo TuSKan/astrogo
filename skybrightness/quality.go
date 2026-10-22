@@ -13,7 +13,7 @@ import "strings"
 type Flag uint32
 
 // Quality flags. Each names what a specific input was, not how good the
-// result is — "good" is a judgement the caller makes from these.
+// result is — "good" is a judgment the caller makes from these.
 const (
 	// MeasuredAtmosphere marks surface conditions from real measurements.
 	MeasuredAtmosphere Flag = 1 << iota

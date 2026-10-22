@@ -33,7 +33,7 @@ func fitsBlock(b []byte) []byte {
 	return b
 }
 
-// TestIntegerIDsSurviveLoading: a catalogue whose ID column is 16-bit
+// TestIntegerIDsSurviveLoading: a catalog whose ID column is 16-bit
 // integers (TFORM I) keeps its IDs (#769). GetStringColumn had no case for an
 // Int16 column, so every ID loaded as "" and resolving one by ID failed.
 func TestIntegerIDsSurviveLoading(t *testing.T) {

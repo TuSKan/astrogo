@@ -85,17 +85,17 @@ func TestFetchHipparcosReportsAServiceFailure(t *testing.T) {
 	}
 }
 
-// TestAddCousinsRQueriesTheBrightStarCatalogue covers the second VizieR query
+// TestAddCousinsRQueriesTheBrightStarCatalog covers the second VizieR query
 // this package sends, for the same reason as the first: the ADQL is the part no
 // parser test can check.
-func TestAddCousinsRQueriesTheBrightStarCatalogue(t *testing.T) {
+func TestAddCousinsRQueriesTheBrightStarCatalog(t *testing.T) {
 	var gotQuery string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		gotQuery = r.PostForm.Get("QUERY")
 
-		// One catalogue row at the same position as the star below, so the
+		// One catalog row at the same position as the star below, so the
 		// positional match succeeds and R is filled in.
 		_, _ = w.Write([]byte("RAJ2000,DEJ2000,Vmag,R-I\n" +
 			"0.00500795,38.85928608,6.61,0.35\n"))
@@ -116,7 +116,7 @@ func TestAddCousinsRQueriesTheBrightStarCatalogue(t *testing.T) {
 		Mag:  map[string]float64{"V": 6.61},
 
 		// Only a star already carrying V-I is a candidate for R: the
-		// catalogue supplies R-I, and R needs both.
+		// catalog supplies R-I, and R needs both.
 		hasVminusI: true,
 	}}
 
@@ -135,6 +135,6 @@ func TestAddCousinsRQueriesTheBrightStarCatalogue(t *testing.T) {
 	}
 
 	if matched != 1 {
-		t.Errorf("matched = %d, want 1 — the catalogue row is at the star's own position", matched)
+		t.Errorf("matched = %d, want 1 — the catalog row is at the star's own position", matched)
 	}
 }

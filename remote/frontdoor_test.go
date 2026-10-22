@@ -14,12 +14,12 @@ import (
 // they moved for a reason worth stating once: that package no longer knows
 // what an endpoint is. It takes a base URL per call and does what it is told.
 // Resolving an id into that URL — refusing it while offline, refusing it while
-// disabled, honouring an override — is this package's job and is only
+// disabled, honoring an override — is this package's job and is only
 // observable here.
 
 // TestAPIClientGatesEveryRequest is the property the wrapper exists for.
 //
-// A client is not a licence to reach a service. It resolves per call, so
+// A client is not a license to reach a service. It resolves per call, so
 // SetOffline and Disable stop an API request exactly as they stop a file
 // fetch, on a client that was built while the endpoint was perfectly
 // reachable. Building the client first and only then closing the gate is the

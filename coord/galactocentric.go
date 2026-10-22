@@ -126,7 +126,7 @@ const (
 // That choice is worth stating precisely, because it is where astrogo's frame
 // and astropy's are defined differently even though they agree:
 //
-//   - astropy parameterises the Galactic-center direction (galcen_coord) and a
+//   - astropy parameterizes the Galactic-center direction (galcen_coord) and a
 //     roll angle, and its defaults are ICRS α = 266.4051°, δ = −28.936175° with
 //     a roll of 58.5986320306°.
 //   - astrogo takes the direction from [GalacticToICRS] of l = 0, b = 0, which
@@ -161,7 +161,7 @@ type GalactocentricFrame struct {
 // Nothing is validated. A sunDistance of zero leaves the frame untilted and
 // centered on the Sun, and a sunHeight larger than sunDistance is clamped to a
 // quarter turn; both are nonsense that a caller can construct, and neither
-// produces a NaN that would propagate silently into a catalogue.
+// produces a NaN that would propagate silently into a catalog.
 func NewGalactocentricFrame(sunDistance, sunHeight unit.Length, sunVelocity vector.Vec3) GalactocentricFrame {
 	return GalactocentricFrame{
 		sunDistance: sunDistance,
@@ -269,7 +269,7 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance unit.Len
 	out := GalacticToICRS(NewGalactic(angle.Rad(lon).Wrap360(), angle.Rad(lat)))
 	distance = unit.Meters(v.Norm())
 
-	// A velocity, if there is one, comes back as catalogue kinematics: the
+	// A velocity, if there is one, comes back as catalog kinematics: the
 	// reverse of what [GalactocentricFrame.FromICRS] did, then SOFA's Pvstar
 	// to split a Cartesian velocity back into a proper motion, a parallax and
 	// a radial velocity.
@@ -284,13 +284,13 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance unit.Len
 	return out, distance
 }
 
-// icrsFromBarycentricVelocity rebuilds catalogue kinematics from a direction, a
+// icrsFromBarycentricVelocity rebuilds catalog kinematics from a direction, a
 // distance and a barycentric velocity in km/s on the ICRS axes.
 //
 // It is the inverse of [SpaceVelocity], and exists so that
 // [GalactocentricFrame.ToICRS] is a real inverse of FromICRS rather than one
 // that quietly drops the velocity — which is the asymmetry that turns into a
-// bug the first time somebody round-trips a catalogue through the frame.
+// bug the first time somebody round-trips a catalog through the frame.
 //
 // The bool is false when SOFA declines the pv-vector: a speed at or past c, or
 // a zero-length position — which is a target at the Sun, where there is no

@@ -97,7 +97,7 @@ func sofaEpochs() []sofaEpoch {
 // a real regression. 1e-7 AU is 15.0 km — **less than half** Moon98's
 // published worst case of 31.7 km, so the Moon bound demanded the two agree
 // twice as closely as SOFA documents its own routine to be accurate. It
-// passed only because the sampled epochs happened to land in a favourable
+// passed only because the sampled epochs happened to land in a favorable
 // part of the lunar residual, and one of those epochs was time.NowUTC(), so
 // that luck was re-rolled on every single run.
 //

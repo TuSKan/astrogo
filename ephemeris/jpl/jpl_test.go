@@ -27,7 +27,7 @@ func TestTimeConv(t *testing.T) {
 	// 2023-JAN-1
 	tm := time.FromJD(2459945.5, time.UTC)
 	// ET seconds past J2000, the argument SPK segments are indexed by. The
-	// Julian-date pair this used to go through is gone: summing it quantised
+	// Julian-date pair this used to go through is gone: summing it quantized
 	// the result to about 40 microseconds (#150).
 	et := lsk.UTCToET(tm, l)
 	if et < 0 {

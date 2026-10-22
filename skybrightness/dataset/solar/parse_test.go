@@ -178,7 +178,7 @@ func TestParseDropsRowsItCannotUse(t *testing.T) {
 }
 
 // TestParseClampsNegativeFlux pins the documented decision that a negative
-// flux is a calibration artefact rather than a measurement.
+// flux is a calibration artifact rather than a measurement.
 //
 // Clamping to zero and dropping the row are different answers: dropping would
 // leave a gap in the wavelength grid that At would then interpolate across.

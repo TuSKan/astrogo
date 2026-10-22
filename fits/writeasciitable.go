@@ -99,7 +99,7 @@ func asciiTableKeywords(schema *arrow.Schema, forms []asciiForm, starts []int, n
 // asciiFormFor chooses a column's text format and width.
 //
 // The width has to hold every value the column contains, since the fields are
-// positional: one value too wide would run into its neighbour and shift every
+// positional: one value too wide would run into its neighbor and shift every
 // column after it. So the column is measured rather than guessed at.
 func asciiFormFor(field arrow.Field, col arrow.Array) (asciiForm, error) {
 	switch field.Type.ID() { //nolint:exhaustive // the default rejects the rest

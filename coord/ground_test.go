@@ -196,7 +196,7 @@ func TestOffsetRoundTrip(t *testing.T) {
 		}
 
 		if rel := math.Abs(d.Meters()-tc.distance) / tc.distance; rel > 1e-9 {
-			t.Errorf("bearing %v: travelled %.4f m, want %.4f", tc.bearing, d.Meters(), tc.distance)
+			t.Errorf("bearing %v: traveled %.4f m, want %.4f", tc.bearing, d.Meters(), tc.distance)
 		}
 
 		b, err := coord.InitialBearing(start, end)

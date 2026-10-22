@@ -26,7 +26,7 @@ import (
 // declaring its own copy of the on-disk shape — CorpusEntry on one side,
 // RegressionEntry plus BaselinePoint on the other, with a comment noting the
 // duplication was there "to bypass network blocks". Two independent
-// declarations of one serialisation format drift silently: a field renamed on
+// declarations of one serialization format drift silently: a field renamed on
 // the writing side decodes as a zero on the reading side, and a corpus of
 // zeroes still parses.
 
@@ -163,7 +163,7 @@ func (e corpusEntry) key() string {
 // the consumer feeds Horizons' geocentric state through a linear mock
 // provider precisely so the comparison isolates the apparent-place and
 // topocentric stages. Recording a kernel SHA-256 that played no part would be
-// provenance theatre, and a reader would reasonably infer the corpus had been
+// provenance theater, and a reader would reasonably infer the corpus had been
 // validated against that kernel.
 //
 // Also not pinned: Earth-orientation data. The consumer builds a coord.Context

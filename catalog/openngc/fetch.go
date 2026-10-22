@@ -129,7 +129,7 @@ func toTargets(records []targetRecord) []resolve.Target {
 //
 // The codes are OpenNGC's own, the 21 its NGC_guide.txt defines at the commit
 // remote.OpenNGC pins, and every one of them has a case here. The switch used
-// to list codes from other catalogues ("Gx", "*Assoc", "Nb") that OpenNGC never
+// to list codes from other catalogs ("Gx", "*Assoc", "Nb") that OpenNGC never
 // uses, and miss two it does: "*Ass", an association of stars, and "EmN", an
 // emission nebula. Their 72 rows, M24 and Brocchi's Cluster among them, fell
 // through to KindOther and were dropped (#599).
@@ -153,7 +153,7 @@ func mapKind(t string) resolve.Kind {
 	case "PN", "HII", "DrkN", "EmN", "Neb", "RfN", "SNR":
 		return resolve.KindNebula
 	case "Nova", "NonEx", "Dup", "Other":
-		// A nova's catalogued position is a star that has faded; a
+		// A nova's cataloged position is a star that has faded; a
 		// nonexistent object and a duplicate have nothing of their own to
 		// observe; "Other" is defined only by its notes.
 		return resolve.KindOther
@@ -228,7 +228,7 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 
 		if commonNames != "" {
 			// Cut rather than Split(...)[0]: this runs on every one of the
-			// ~14,000 catalogue rows, and Split allocates the whole list to
+			// ~14,000 catalog rows, and Split allocates the whole list to
 			// reach its first element.
 			head, _, _ := strings.Cut(commonNames, ",")
 
@@ -340,7 +340,7 @@ func gatherAliases(id, mID, commonNames, identifiers string) []string {
 // never ran and a malformed row became a target with a confident wrong
 // position instead of being dropped.
 //
-// The ranges are checked for the same reason. A catalogue row is not repaired
+// The ranges are checked for the same reason. A catalog row is not repaired
 // by reading 99 minutes as an hour and change; there is no way to know what it
 // was meant to say, and the honest result is that the row has no position.
 func sexagesimal(s string, sentinel error, maxFirst float64) (first, minutes, seconds float64, err error) {

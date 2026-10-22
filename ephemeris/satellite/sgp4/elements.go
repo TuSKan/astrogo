@@ -43,7 +43,7 @@ type Elements struct {
 	// Empty when the source carried none; SGP4 never reads it.
 	Name string
 
-	// NORAD is the catalogue number.
+	// NORAD is the catalog number.
 	NORAD int
 
 	// Designator is the international launch designator in the TLE's own

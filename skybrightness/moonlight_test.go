@@ -549,7 +549,7 @@ func BenchmarkScatteredMoonlight(b *testing.B) {
 
 	dir := coord.NewAltAz(angle.Deg(60), angle.Deg(45))
 
-	// Warm the per-scene geometry cache, which is what a sky map amortises.
+	// Warm the per-scene geometry cache, which is what a sky map amortizes.
 	if _, err := component.AddRadiance(context.Background(), dst, grid, dir, scene); err != nil {
 		b.Fatal(err)
 	}

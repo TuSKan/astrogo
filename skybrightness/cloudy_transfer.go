@@ -13,7 +13,7 @@ import (
 //
 // Built once per direction rather than per integration step, because none of
 // it depends on height: the profiles are analytic in h and the column values
-// are what parameterise them. The height loop then does arithmetic only.
+// are what parameterize them. The height loop then does arithmetic only.
 type skyglowOptics struct {
 	// Column optical depths at each wavelength, molecular and aerosol.
 	molecular, aerosol []unit.OpticalDepth
@@ -88,7 +88,7 @@ func newSkyglowOptics(grid unit.SpectralGrid, scene *Scene) (*skyglowOptics, err
 // Recomputing those per wavelength meant two square roots, a 1.5 power and
 // four exponentials repeated 671 times per height step for values that never
 // changed. Hoisting them leaves the inner loop with one exponential and a
-// handful of multiplies. This is the same optimisation the Eq. 11 scattering
+// handful of multiplies. This is the same optimization the Eq. 11 scattering
 // kernel already carries, and it is worth repeating for the same reason: the
 // cost of this component is that inner loop and nothing else.
 type stepKernel struct {
@@ -146,7 +146,7 @@ func (o *skyglowOptics) newStepKernel(
 		depthFractionA:   1 - decayA,
 		extinctionShapeM: decayM / o.molecularScaleM,
 		extinctionShapeA: decayA / o.aerosolScaleM,
-		rayleighPhase:    atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarisation),
+		rayleighPhase:    atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarization),
 		aerosolPhase:     aerosolPhase,
 	}, true, nil
 }

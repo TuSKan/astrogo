@@ -48,7 +48,7 @@ var (
 // no loader registered the result is [ErrNoLoader], and the caller
 // degrades to zero EOP exactly as it does when consent is absent.
 //
-// Safe for concurrent use: a mutex serialises attempts, and the coverage
+// Safe for concurrent use: a mutex serializes attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
 // respected immediately.
 func EnsureLoaded(mjd float64) error {

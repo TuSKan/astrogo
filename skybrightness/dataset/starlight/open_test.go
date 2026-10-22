@@ -136,7 +136,7 @@ func TestOpenFetchesAndParses(t *testing.T) {
 }
 
 // The header has to say every input that changes the numbers. A hosted file
-// that cannot state its own catalogue, grid, cut and zero points is an
+// that cannot state its own catalog, grid, cut and zero points is an
 // unattributable number, and the person holding it cannot tell whether it
 // answers their question.
 func TestPublishedHeaderCarriesProvenance(t *testing.T) {
@@ -145,7 +145,7 @@ func TestPublishedHeaderCarriesProvenance(t *testing.T) {
 	header := publishedSpec().Header()
 
 	for _, want := range []string{
-		"gaiadr3.gaia_source",        // which catalogue release
+		"gaiadr3.gaia_source",        // which catalog release
 		"HEALPix order 8",            // which grid
 		"ICRS",                       // which frame
 		"Gaia sees nothing brighter", // the limit the instrument itself imposes

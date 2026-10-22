@@ -30,7 +30,7 @@ It exists to answer one operational question:
 > see, and how uncertain is that prediction?
 
 Applications: observation scheduling, exposure-time estimation, instrument background
-prediction, site characterisation, and light-pollution impact studies.
+prediction, site characterization, and light-pollution impact studies.
 
 ### What this is not
 
@@ -187,14 +187,14 @@ even when the choice is a climatology.
 
 Confusing these is a category error the specification calls out explicitly.
 
-| Grid | What it discretises |
+| Grid | What it discretizes |
 | :--- | :--- |
 | **Source grid** | Geographic distribution of artificial emitters. |
 | **Atmospheric grid** | Vertical and horizontal structure the atmosphere and cloud models need. |
 | **Sky grid** | Directions at the observer. |
 
-A geographic grid is a numerical discretisation of emitters. It is **not** the
-light-propagation algorithm. Averaging neighbouring cells is not atmospheric scattering.
+A geographic grid is a numerical discretization of emitters. It is **not** the
+light-propagation algorithm. Averaging neighboring cells is not atmospheric scattering.
 The propagation kernel determines how light emitted by each source element reaches each
 observer direction.
 
@@ -286,7 +286,7 @@ sources.
 
 **Scientific model.** A semi-analytic two-parameter model whose parameters `t` and `g`
 encode the atmospheric state, the source–observer distance, and the source's angular and
-spectral emission pattern. It generalises Kocifaj & Bará (2019) to include scattering
+spectral emission pattern. It generalizes Kocifaj & Bará (2019) to include scattering
 orders up to the fifth, provided *ab initio* rather than fitted a posteriori to site
 imagery.
 
@@ -513,7 +513,7 @@ that reaches a distant cloud, so a better-shielded town screens sooner. The test
 asserts the signs and the ordering and *records* the crossover rather than requiring one;
 tightening it needs their source inventory, not more code.
 
-**The 2007 figures are not digitised, and cannot be from what is in hand.** Figs. 2-6 are
+**The 2007 figures are not digitized, and cannot be from what is in hand.** Figs. 2-6 are
 contour plots in relative units on a logarithmic scale, and the copy available here is a
 text extraction with no image tooling to recover the panels. Reading numbers off them would
 be inventing precision. What the paper states in prose — cloudless radiance falling about
@@ -547,9 +547,9 @@ the Sun.
 
 **A numerical trap worth recording.** `angle.Angle` holds radians, so a direction given in
 degrees round-trips imprecisely — `angle.Deg(15).Degrees()` is 14.999999999999998. Without
-snapping, a direction sitting exactly on a grid line gives the neighbouring cell a weight of
+snapping, a direction sitting exactly on a grid line gives the neighboring cell a weight of
 4×10⁻¹⁶. Harmless in an ordinary interpolation; fatal at the edge of the blank region, where
-that neighbour is missing and a vanishing weight still vetoes the lookup. It cost the
+that neighbor is missing and a vanishing weight still vetoes the lookup. It cost the
 brightest cell in the table. `bracketAxis` now snaps within `gridSnapTolerance`, and the
 corner weights are computed *before* the missing-data check so a zero-weight blank never
 vetoes anything. This is the third time this session that a degree-to-radian round trip has
@@ -691,7 +691,7 @@ Winkler's own paper motivates. It is never the production path and never a silen
 
 **Implemented (Phase 1), in `atmosphere`.**
 
-**Rayleigh choice.** The phase function and depolarisation are Winkler's (2022) Bucholtz
+**Rayleigh choice.** The phase function and depolarization are Winkler's (2022) Bucholtz
 lineage, shared with the artificial model (Kocifaj et al. 2022), so the two components
 propagate through one atmosphere. The optical depth is Bodhaine et al. (1999) Eq. 30, for
 both at once (#592). Winkler's Eq. 13, a single λ^−4.05 power law after Dutton et al.
@@ -704,12 +704,12 @@ an independent formulation, within 0.4% at 320 nm (Buton et al. 2013, Table 6).
 | :--- | :--- | :--- | :--- |
 | Bodhaine Eq. 30 | `τ_R = (P/1013.25)·0.0021520·(1.0455996 − 341.29061λ⁻² − 0.90230850λ²)/(1 + 0.0027059889λ⁻² − 85.968563λ²)`, λ in µm | `atmosphere.RayleighOpticalDepth` | `TestRayleighOpticalDepthIsBodhainesTable3` (Table 3 within 0.05%), `…PressureScalingAtMaunaLoa`, `…BeyondTheFit`, `…SeaLevel550`, `…ScalesWithPressure` |
 | Winkler Eq. 9 | `p_R(Θ) = 3(1−ρ)/(16π(1+2ρ))·[(1+3ρ)/(1−ρ) + cos²Θ]` (after Bucholtz 1995) | `atmosphere.RayleighPhaseFunction` | `TestRayleighPhaseFunctionNormalization` (integrates to 1 over the sphere), `…Symmetry` |
-| — | `ρ = 0.0148`, giving `(1+3ρ)/(1−ρ) = 1.06` | `atmosphere.RayleighDepolarisation` | `TestRayleighDepolarisationMatchesKS91Coefficient` |
+| — | `ρ = 0.0148`, giving `(1+3ρ)/(1−ρ) = 1.06` | `atmosphere.RayleighDepolarization` | `TestRayleighDepolarizationMatchesKS91Coefficient` |
 | Winkler Eq. 10 | `p_M(Θ) = (1−g²)/(4π(1+g²−2g·cosΘ)^{3/2})` (Henyey & Greenstein 1941) | `atmosphere.HenyeyGreensteinPhaseFunction` | `TestHenyeyGreensteinNormalization`, `…Limits` |
 | Winkler Eq. 12 | `p(Θ) = (τ_R/τ_s)·p_R + (τ_M/τ_s)·p_M` | `atmosphere.CombinedPhaseFunction` | `TestCombinedPhaseFunction` (normalization plus both pure limits) |
 | Ångström | `τ_a(λ) = τ_a(λ₀)·(λ/λ₀)^−α` | `atmosphere.Aerosol.TauAt` | `TestAerosolTauAtFollowsTheAngstromLaw` |
 
-The `ρ = 0.0148` value is worth noting: it is the depolarisation for which Bucholtz's
+The `ρ = 0.0148` value is worth noting: it is the depolarization for which Bucholtz's
 theoretical phase function reproduces the `1.06 + cos²Θ` coefficient Krisciunas & Schaefer
 (1991) had fitted empirically, and it lies inside Bucholtz's tabulated 0.01384–0.01557. The
 resulting peak-to-side ratio is 1.9434, not the ideal-dipole 2 — a detail the test asserts
@@ -791,7 +791,7 @@ inputs the module refuses to guess; the other is the airglow zenith spectrum.
 **Why the frame travels with the map.** A galactic map read as equatorial rotates the
 Milky Way across the sky and still returns plausible numbers everywhere. `StarMap.Galactic`
 carries the answer so the component converts rather than assumes, and
-`TestIntegratedStarlightHonoursTheMapFrame` asserts the two frames are sampled at
+`TestIntegratedStarlightHonorsTheMapFrame` asserts the two frames are sampled at
 different coordinates.
 
 **The map: server-side Gaia aggregation.** A Gaia `source_id` carries its HEALPix index in
@@ -811,7 +811,7 @@ while ordinary GETs to the same host kept returning 200 throughout. TCP and TLS 
 normally. That is a service defending itself, not a service that is broken, and three
 whole-sky builds plus some probing in one afternoon is a plausible cause.
 
-Queries are therefore spaced and serialised (`api.WithMinInterval`, two seconds here),
+Queries are therefore spaced and serialized (`api.WithMinInterval`, two seconds here),
 which roughly doubles a whole-sky build. The cost of getting this wrong is paid by every
 other user of a shared research instrument rather than by us.
 
@@ -820,7 +820,7 @@ publishes `gaia_source` as at least 2,911 files totalling at least 649 GB compre
 measured from the CDN listing, which was still truncated where the count stopped. The
 files are named for the HEALPix level-8 range they hold
 (`GaiaSource_000000-003111.csv.gz`), which is exactly this aggregation's grid, so a bulk
-route parallelises and resumes cleanly. Against it: `gaia_source` carries about 150
+route parallelizes and resumes cleanly. Against it: `gaia_source` carries about 150
 columns where this needs three, and CSV.gz cannot be pruned server-side, so it moves
 roughly 700 GB to use two per cent of it. That trade is about *our* bandwidth. The bulk
 files exist precisely so that heavy users do not ask the query service 787 times, and for
@@ -983,23 +983,23 @@ Order 8 is therefore what ships: it is GAMBONS' own grid, so the comparison is d
 a quarter the size, and nothing measurable is lost.
 
 **What is actually validated, and what is not.** The absolute scale of this map has no free
-parameter — it is a sum of catalogue fluxes through two zero points and one polynomial — so
+parameter — it is a sum of catalog fluxes through two zero points and one polynomial — so
 validating it means validating those three things:
 
 | link | check | result |
 | :--- | :--- | ---: |
 | Gaia G VEGAMAG zero point | `G + 2.5·log₁₀(flux)` over 177,426 DR3 sources | **25.687367**, scatter 3×10⁻⁷ |
 | G → V transformation | 4,000 stars with Gaia and Tycho-2 photometry | **−0.002 mag**, ±0.03 per color bin |
-| HEALPix tiling by `source_id` | map summed back up against the catalogue | **exact** on counts |
+| HEALPix tiling by `source_id` | map summed back up against the catalog | **exact** on counts |
 | flux conservation | same | 2.4×10⁻¹¹ relative |
 | Johnson V Vega zero point | not independently checked here | 3.63×10⁻¹¹ W m⁻² nm⁻¹, adopted |
 
 **The tiling is exact, and that is worth checking rather than assuming.** The aggregation
 assigns a source to a pixel by integer division of its `source_id`, which is only correct if
 the high bits really are the nested HEALPix index at every order. Summing the published map
-back up and comparing against the catalogue queried without a `GROUP BY`:
+back up and comparing against the catalog queried without a `GROUP BY`:
 
-| | map summed | catalogue direct |
+| | map summed | catalog direct |
 | :--- | ---: | ---: |
 | sources | 1,811,709,771 | 1,811,709,771 |
 | with BP−RP | 1,540,770,489 | 1,540,770,489 |
@@ -1007,12 +1007,12 @@ back up and comparing against the catalogue queried without a `GROUP BY`:
 | colored G flux | 9.94290378118816e12 | 9.94290378119190e12 |
 
 The counts agree exactly, and the source total is Gaia DR3's own published size, so every
-source in the catalogue landed in exactly one pixel — none dropped at a boundary, none
+source in the catalog landed in exactly one pixel — none dropped at a boundary, none
 counted twice. No pixel is empty and no pixel lacks a colored source. The flux differs at
 2.4×10⁻¹¹, which is what summing 1.8 billion doubles in two different orders costs: √N·ε is
 about 10⁻¹¹. That is arithmetic noise, not a missing source.
 
-The zero point this package uses, 25.6874, rounds the catalogue's own 25.687367 — an error
+The zero point this package uses, 25.6874, rounds the catalog's own 25.687367 — an error
 of 3×10⁻⁵ mag, or three parts in a hundred thousand.
 
 That is a validation of the chain, not of the sky. An end-to-end comparison against an
@@ -1027,7 +1027,7 @@ with no BP−RP makes the polynomial null and SQL drops it, and the archive reje
 `CASE` and `COALESCE`, so no default can be substituted in the query.
 
 An earlier revision of this section called that *"about one per cent of a pixel's sources
-and less of its flux"*. **That was measured on sparse high-latitude sky and generalised
+and less of its flux"*. **That was measured on sparse high-latitude sky and generalized
 without checking.** Counted across the whole order-8 build:
 
 | region | sources dropped |
@@ -1116,13 +1116,13 @@ G = 7 star carries 18 per cent of it in the first block. Neither block samples t
 plane — both come out near 1.3 per cent colorless against 14.95 per cent all-sky — so these
 fractions describe the quiet sky, where the deficit is a few bright stars rather than many
 faint ones. That is what bounds the mean-color assumption: no weighting scheme recovers the
-color of one specific saturated star from its neighbours.
+color of one specific saturated star from its neighbors.
 
 **Those stars can be resolved exactly rather than assumed.** `gaiadr3.tycho2tdsc_merge`
 carries `bt_mag`/`vt_mag` and is reachable from `gaia_source` through
 `tycho2tdsc_merge_best_neighbour`; both are present on Gaia@AIP. Tycho-2 photometry converts
 to Johnson V by the published ESA (1997, Vol. 1, §1.3, Eq. 1.3.20) transformation
-V = V_T − 0.090 (B_T − V_T) — a catalogue measurement, not an inferred color. Of the 161
+V = V_T − 0.090 (B_T − V_T) — a catalog measurement, not an inferred color. Of the 161
 bright colorless sources in the first block, 22 have such a counterpart and those 22 hold
 58.8 per cent of the bright colorless flux, so about 32 per cent of all the dropped flux in
 that block can be replaced by a measured magnitude.
@@ -1147,7 +1147,7 @@ starlight. Against DR3, counted through `gaiadr3.hipparcos2_best_neighbour` on G
 
 So DR3 halves the gap DR2 left, and the residual is 5.6 per cent of the sky rather than
 20 — a real correction, still worth making, and much smaller than the reference implies
-because the catalogue improved between their work and ours.
+because the catalog improved between their work and ours.
 
 Two earlier figures in this work were wrong and are superseded. A positional match against
 Gaia sources brighter than G = 7 found 73 missing stars carrying 2.6 per cent; it counted
@@ -1295,7 +1295,7 @@ radiance and magnitude:
 
 Medians rather than means: single bright stars spike individual pixels, and the brightest in
 this export is 17.75 against a horizon of 22.15. The same effect puts Sirius at 13.1 in our
-own map, so it is a property of star-catalogue sky maps rather than of either model.
+own map, so it is a property of star-catalog sky maps rather than of either model.
 
 The profile is not monotonic in altitude — brightest around 15–30°, faintest around 45–60° —
 because airglow's van Rhijn enhancement toward the horizon and atmospheric extinction pull
@@ -1525,11 +1525,11 @@ allocations.
 | 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. Ozone's cross section ships only as `atmosphere`'s 10 nm average of the 223 K file that `dataset/crosssection` fetches (§11.5, §16), and every component that crosses the ozone layer applies it (#632) |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
 | 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.6 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
-| 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitised comparison remains |
-| 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitised because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
+| 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitized comparison remains |
+| 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitized because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
 | 7 | Operational observatory calibration | Planned |
-| 8 | Performance: LUTs, surrogates, caching, loop optimisation | **Partly done, and now with the number it was waiting for.** Caching was built in rather than deferred: `coord.Context` is reused per epoch, every natural component holds a `frameCache`, and `ScatteredMoonlight` caches its per-scene geometry — correctness-shaped decisions that were never Phase 8 work. The row previously said no optimisation should start before a measurement justified it. `CloudySkyglow` produced one: **9.35 ms per direction** against the analytic solution's 9.9 µs, a factor of 942, because its cost is a height integral per wavelength. Loop optimisation alone took it to **0.72 ms, 13× faster**, by hoisting out of the spectral loop everything that does not vary across it — the airmass of each leg, both phase functions, and the exponential profile shapes, which factor into a wavelength-independent decay times a per-wavelength column. Verified exact: 32 sampled radiances moved by at most 1.9 ulps, which is reassociation rather than a change in the model. What remains is LUTs and surrogates, and the measurement to justify *those* has not been taken |
+| 8 | Performance: LUTs, surrogates, caching, loop optimization | **Partly done, and now with the number it was waiting for.** Caching was built in rather than deferred: `coord.Context` is reused per epoch, every natural component holds a `frameCache`, and `ScatteredMoonlight` caches its per-scene geometry — correctness-shaped decisions that were never Phase 8 work. The row previously said no optimization should start before a measurement justified it. `CloudySkyglow` produced one: **9.35 ms per direction** against the analytic solution's 9.9 µs, a factor of 942, because its cost is a height integral per wavelength. Loop optimization alone took it to **0.72 ms, 13× faster**, by hoisting out of the spectral loop everything that does not vary across it — the airmass of each leg, both phase functions, and the exponential profile shapes, which factor into a wavelength-independent decay times a per-wavelength column. Verified exact: 32 sampled radiances moved by at most 1.9 ulps, which is reassociation rather than a change in the model. What remains is LUTs and surrogates, and the measurement to justify *those* has not been taken |
 
 Delivery order departs from the numbering: Phase 1, then 4, then 3, because their literature
 was in hand. Phase 2 is last because it is not one model but five — integrated starlight,
@@ -1540,7 +1540,7 @@ own literature and its own dataset:
 | :--- | :--- |
 | Integrated starlight | GAMBONS' equations, plus precomputed all-sky Gaia DR3 tiles. `catalog/gaia` does cone searches; an all-sky integral needs a different, prepared product. |
 | Diffuse galactic light | Its own scattering model over a dust map. |
-| ~~Extragalactic background~~ | **Resolved.** `skybrightness.ExtragalacticBackground` implements it, isotropic with direct attenuation. The nine values were confirmed against the paper’s own LaTeX source and every one matched the summary that had been recorded here; `TestKoushanTableIsTranscribedCorrectly` now guards them row by row, because a wrong digit in a component worth one per cent of the sky changes no total while making the component wrong. Table 3 is nu*I_nu in nW/m2/sr, so it is divided by the pivot wavelength to become a spectral radiance — checked against a hand-worked 27.70 mag arcsec⁻² at r. The original note is kept below because the reasoning it records is why the check happened. | **Was: decided, values not yet verified.** Koushan et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS): integrated galaxy light over 0.3-2.2 um, which spans the optical grid, superseding Driver et al. (2016b) in that range by a stated 5-15 per cent. Table 3 gives per-band EBL in nW m^-2 sr^-1 for u, g, r, i, Z, Y, J, H, Ks with pivot wavelengths from 0.3577 to 2.1549 um — six of the nine fall inside 330-1000 nm, so the component interpolates between roughly six published points rather than a dense spectrum, and that coarseness belongs in its error budget. **The numbers themselves reached this document through a fetched summary of the publisher's page, not through the paper's own text, and must be confirmed against the preprint before any of them enters the code.** A summariser's table is not a primary source, and the rule about never fabricating a coefficient does not weaken just because a plausible table was easy to obtain. |
+| ~~Extragalactic background~~ | **Resolved.** `skybrightness.ExtragalacticBackground` implements it, isotropic with direct attenuation. The nine values were confirmed against the paper’s own LaTeX source and every one matched the summary that had been recorded here; `TestKoushanTableIsTranscribedCorrectly` now guards them row by row, because a wrong digit in a component worth one per cent of the sky changes no total while making the component wrong. Table 3 is nu*I_nu in nW/m2/sr, so it is divided by the pivot wavelength to become a spectral radiance — checked against a hand-worked 27.70 mag arcsec⁻² at r. The original note is kept below because the reasoning it records is why the check happened. | **Was: decided, values not yet verified.** Koushan et al. (2021), MNRAS 503, 2033 (GAMA/DEVILS): integrated galaxy light over 0.3-2.2 um, which spans the optical grid, superseding Driver et al. (2016b) in that range by a stated 5-15 per cent. Table 3 gives per-band EBL in nW m^-2 sr^-1 for u, g, r, i, Z, Y, J, H, Ks with pivot wavelengths from 0.3577 to 2.1549 um — six of the nine fall inside 330-1000 nm, so the component interpolates between roughly six published points rather than a dense spectrum, and that coarseness belongs in its error budget. **The numbers themselves reached this document through a fetched summary of the publisher's page, not through the paper's own text, and must be confirmed against the preprint before any of them enters the code.** A summarizer's table is not a primary source, and the rule about never fabricating a coefficient does not weaken just because a plausible table was easy to obtain. |
 | Extragalactic background, uncertainty model | **Decided.** Integrated galaxy counts are a floor by construction — galaxies that were not detected were not counted — so the value is reported as a lower limit rather than a central estimate, with the very-high-energy gamma-ray absorption constraint carried as one-sided headroom for anything undetected. Koushan et al. state the VHE data are consistent with their IGL across u to Ks "without the need to include any significant additional source of diffuse light", which is the bound this uses. This differs deliberately from the other components' symmetric uncertainties, because the measurement is asymmetric and pretending otherwise would misreport it. |
 | Zodiacal light | A solar-elongation-dependent model, e.g. Leinert et al. (1998). |
 | Airglow | **Decided, not yet wired.** ESO SkyCalc, Noll et al. (2012), A&A 543, A92 — the Cerro Paranal sky model, already cited here — which carries the pseudo-continuum, the emission lines and the solar-activity scaling in one place rather than requiring a line atlas and a continuum to be reconciled onto one grid. Its interface and terms of use need checking before anything is wired. |
@@ -1548,7 +1548,7 @@ own literature and its own dataset:
 | Airglow, why its lines are representable | Worth recording because it looks like the case this module rejected for O₂ and H₂O and is not. Those were refused because absorption band-averaged onto a nanometer grid is systematically wrong: `exp(−τ)` is convex, so averaging the cross section overestimates absorption. Airglow is **emission**, and emission adds linearly, so band-averaging the OH Meinel bands and the O I lines onto the optical grid is exact. The narrow-line objection does not transfer between the two. |
 | Airglow, where the fetch lives | SkyCalc is a *service*, and evaluation performs no I/O. The spectrum is therefore resolved under `skybrightness/dataset/` and handed in through the `Scene`, the same way `dataset/solar` supplies the CALSPEC spectrum the Moon needs. A per-scene SkyCalc call during `Estimate` would break the property `TestEstimateWorksOffline` exists to hold. |
 | Airglow, the SkyCalc interface | **Checked against ESO's CLI documentation.** Parameters: `msolflux` is the monthly averaged 10.7 cm solar radio flux in sfu, default 130.0 — which is the F10.7 the scene will carry, under the service's own name. `incl_airglow` toggles the upper-atmosphere term. `wmin`/`wmax` accept 300 to 30000 nm and `wdelta` defaults to 0.1 nm, so the 330-1000 nm grid sits inside the range at finer sampling than it needs. The response is a **binary FITS table returning `FLUX_AEL` (upper-atmosphere emission lines) and `FLUX_ARC` (airglow residual continuum) as separate columns** — the continuum-and-line separation this design called for arrives from the service rather than having to be constructed. Worth noting that a binary FITS response is only readable here because `fits.Read` was taught to decode BINTABLE extensions earlier in this work; before that it returned headers and skipped every payload, so a SkyCalc response would have parsed to nothing at all. |
-| Airglow, what is still unknown | Two things the CLI documentation does not state and which must be settled before wiring: **the HTTP endpoint the CLI posts to**, which is not on that page and has to come from the client's source rather than be guessed, and **the terms of use** — no rate limit, acknowledgement or citation requirement is stated there. Given that this project has already been throttled once today by a shared research service for asking too often without identifying itself, the second is not a formality. |
+| Airglow, what is still unknown | Two things the CLI documentation does not state and which must be settled before wiring: **the HTTP endpoint the CLI posts to**, which is not on that page and has to come from the client's source rather than be guessed, and **the terms of use** — no rate limit, acknowledgment or citation requirement is stated there. Given that this project has already been throttled once today by a shared research service for asking too often without identifying itself, the second is not a formality. |
 | Hipparcos bright stars, why not Gaia Sky | The ZAH/ARI Gaia Sky repository mirrors van Leeuwen (2007) — the right reduction, 8 MB, versioned and checksummed — and needs no TAP service, so this will be asked again. Its binary format **is** fully specified (LOD-catalogs documentation): a `-1` token, version, star count, then per star three doubles of cartesian position, velocity and proper motion, four floats named `appmag, absmag, color, size`, HIP number, Gaia source id and a UTF-16 name, big-endian. Reading that specification is what rules it out. **`color` is not a color index** — it is *"8 bits per channel in RGBA … encoded into a single float using the libgdx Color class"*, so B−V is gone and no band transformation is possible. **`size` is *"a derived quantity, for rendering"*.** The photometric **band of the magnitudes is never stated**, and a zero point is band-specific, so the conversion to radiance cannot be performed at all. Worst of all, `gaiasky-catgen` applies astrophysical corrections when generating: extinction `Ag = min(3.2, 150/|sin b| × 5.9e-4)` and reddening `E_BP−RP`, negative parallaxes replaced by a default 0.04 mas, and filtering by parallax relative error. Integrated starlight needs the light that actually arrives above the atmosphere — **observed** magnitudes, extinction included — so a de-reddened magnitude overestimates it, worst along the Galactic plane where extinction is largest and the map is brightest. The generator is open (`codeberg.org/gaiasky/gaiasky-catgen`), so the band could be established from its source, but the corrections disqualify the product regardless. VizieR I/311/hip2 is used instead: van Leeuwen (2007), documented columns, stated units, no corrections applied. |
 | Airglow, the SkyCalc protocol | **Read from the client's source, version 1.4.** Host `https://etimecalret-002.eso.org`; `POST /observing/etc/api/skycalc` with the parameters as a JSON body, which returns `{status, tmpdir}` rather than data. The spectrum is then fetched from `/observing/etc/tmp/{tmpdir}/skytable.fits`, and finally `GET /observing/etc/api/rmtmp?d={tmpdir}` releases it. The almanac is a second endpoint, `/observing/etc/api/skycalc_almanac`. |
 | Airglow, the obligation nobody documents | **The third call is not optional.** Each request makes ESO allocate a temporary directory on their server, and it is the client that deletes it. A client which fetches its FITS and stops leaves that directory behind on every call. Nothing on the help page says so — it is visible only in the client's source — and it matters more here than for a person running the tool by hand, because a library calls it once per user rather than once per afternoon. Whatever wraps this must delete the directory even when the fetch fails. |
@@ -1576,7 +1576,7 @@ cost of real models.
 | Surface-brightness projection | 3,870 | 2 |
 | Electron-rate projection | 5,030 | 3 |
 
-Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
+Nothing is optimized yet; that is Phase 8. The point is numbers before opinions.
 
 ---
 
@@ -1587,13 +1587,13 @@ Nothing is optimised yet; that is Phase 8. The point is numbers before opinions.
 | ROLO `c₁–c₄` at full precision | Nothing outright; caps Phase 3 accuracy | The display equation following "the eight constant 311g coefficients are", or the ASCII export of Table 5. |
 | Lunar orientation (IAU rotation elements or a JPL binary PCK) | The selenographic longitude of the Sun `Φ` and the libration angles `θ`, `φ`, which `magnitude.ROLOReflectance` therefore takes as inputs. Archinal et al. (2018) WGCCRE report, or PCK support in `ephemeris/jpl`, would close it. |
 | ~~Solar spectral irradiance at the 32 ROLO bands~~ | **Resolved.** `skybrightness/dataset/solar` fetches the CALSPEC reference (`sun_reference_stis_002.fits`) and `solar.NewScatteredMoonlight` samples it onto the ROLO bands. `magnitude.ROLOIrradiance` still takes the spectrum as a parameter, since ROLO's absolute scale depends on the choice and the engine performs no I/O. |
-| ~~O₃ absorption cross section~~ | **Resolved.** `skybrightness/dataset/crosssection.Ozone` fetches it and `crosssection.OzoneTemperatureK` pins the choice at 223 K. The reasoning below is kept because the temperature is a judgement, not a lookup. | Serdyuchenko et al. (2014), AMT 7, 609 and 625: 213–1100 nm at 0.02–0.06 nm in the UV–visible, eleven temperatures from 193 to 293 K in 10 K steps, better than 3 per cent absolute over most of the range. It spans the 330–1000 nm grid with no extrapolation at either end, and it is on MPI-Mainz, whose format `dataset/crosssection` already parses. **223 K** is the temperature to ship: ozone peaks near 22 km where the stratosphere is roughly 220–230 K, and 223 K is the nearest *measured* point to the ~226 K effective temperature used in total-column retrieval — interpolating a table to 226 K would be inventing data to gain nothing. The choice rests on the Chappuis band being far less temperature-sensitive than the UV Huggins band, which should be confirmed against Part 2 once the data is in hand; if it does not hold, the cross section has to be weighted per scene against `atmosphere`'s vertical profile instead. |
-| O₂ and H₂O absorption | Nothing in the visible continuum; narrow bands only | **Not a data gap — a capability gap.** These are line absorbers: O₂ at 688 and 762 nm, water vapour at 720, 820 and 940 nm. Beer–Lambert with a cross section band-averaged onto a 1 nm grid is systematically wrong and always in the same direction, because `exp(−τ)` is convex — averaging the cross section first overestimates absorption. Representing them needs a band model or a correlated-k treatment, which is a different capability from `atmosphere.CrossSection` rather than a dataset for it. HITRAN supplies the line lists whenever that capability exists. |
+| ~~O₃ absorption cross section~~ | **Resolved.** `skybrightness/dataset/crosssection.Ozone` fetches it and `crosssection.OzoneTemperatureK` pins the choice at 223 K. The reasoning below is kept because the temperature is a judgment, not a lookup. | Serdyuchenko et al. (2014), AMT 7, 609 and 625: 213–1100 nm at 0.02–0.06 nm in the UV–visible, eleven temperatures from 193 to 293 K in 10 K steps, better than 3 per cent absolute over most of the range. It spans the 330–1000 nm grid with no extrapolation at either end, and it is on MPI-Mainz, whose format `dataset/crosssection` already parses. **223 K** is the temperature to ship: ozone peaks near 22 km where the stratosphere is roughly 220–230 K, and 223 K is the nearest *measured* point to the ~226 K effective temperature used in total-column retrieval — interpolating a table to 226 K would be inventing data to gain nothing. The choice rests on the Chappuis band being far less temperature-sensitive than the UV Huggins band, which should be confirmed against Part 2 once the data is in hand; if it does not hold, the cross section has to be weighted per scene against `atmosphere`'s vertical profile instead. |
+| O₂ and H₂O absorption | Nothing in the visible continuum; narrow bands only | **Not a data gap — a capability gap.** These are line absorbers: O₂ at 688 and 762 nm, water vapor at 720, 820 and 940 nm. Beer–Lambert with a cross section band-averaged onto a 1 nm grid is systematically wrong and always in the same direction, because `exp(−τ)` is convex — averaging the cross section first overestimates absorption. Representing them needs a band model or a correlated-k treatment, which is a different capability from `atmosphere.CrossSection` rather than a dataset for it. HITRAN supplies the line lists whenever that capability exists. |
 | ~~A HEAD-less fetch in `httpblob`~~ | **Resolved.** Harvard Dataverse answers 403 to HEAD while serving ranged GET normally, and `httpblob.headObject` reached its ranged fallback only on 405. Fixed upstream in `blob/httpblob` v0.1.1. The local SFD map now matches IRSA over the 1,979 directions already cached: median ratio **1.00001**, 5th to 95th percentile 0.956 to 1.056 — the spread is interpolation across a 2.37 arcminute pixel, since IRSA returns the containing pixel's value and this interpolates between them. The worst case, 1.25, is at b = 6.2 degrees in the Galactic plane where the gradient is steepest. |
 | **Cell-averaged incoming field** | The accuracy of the Eq. 11 integral, not its speed | A `StarMap`/`DustMap` that can return the mean over a solid-angle cell rather than the value at a point. Measured, the hemispheric quadrature converges better than quadratically against a smooth field — 0.55 per cent at the default twelve rings, 0.026 at forty-eight — and **does not converge at all** against a field with an edge in it, wandering around a per cent however fine the grid gets. The real field is nothing but edges: a HEALPix star map and a dust map are both piecewise constant. Refining the quadrature cannot fix that, because the error is where the samples land relative to an edge rather than the step size; averaging the field over each cell can. In practice the pixel edges are far smaller than a quadrature cell and average out — twelve rings and twenty-four differ by 0.04 per cent against the published star map — so this is a known ceiling rather than a live defect. |
-| ~~VizieR V/50 position columns~~ | **Resolved.** `RAJ2000`/`DEJ2000` exist and the multi-band bright-star path runs end to end: B, V and I for all 74 stars Gaia cannot see, R for 66. Every R gap is accounted for — four have a null `R-I` in the catalogue, one is fainter than its completeness limit, and three are multiples where Hipparcos reports combined light while the catalogue reports components. Two bugs were found doing it, both in the match: positions were not propagated from the Hipparcos epoch, which lost α Cen A at 32″ of proper motion; and matching on position alone then picked α Cen **B**, 0.02″ nearer than A. The match now propagates and discriminates on V. |
-| ~~SkyGlow Simulator governing equations~~ | **Resolved.** Kocifaj (2007), *Appl. Opt.* **46**, 3013–3022 is in hand — the author's own preprint, which carries the full Section 2 derivation the PNAS 2025 paper points back to. It is the only one of the four that was needed, and the other three are now positively ruled out rather than merely deprioritised: this paper already handles "real finite-dimensional surface sources … in contrary to frequently used point-source approximation", which is what Kocifaj (2008) was wanted for; it works in the first scattering order, which the 2018 JQSRT abstract calls sufficient below 30 km; and it treats the cloud reflectance `ρ` as an input rather than deriving it, adopting scalar values directly, which is exactly the shape of `atmosphere.CloudLayer.Albedo`. See §11.2 for the equation map. |
-| A published AOD climatology asset | Nothing — deferred, not blocked | **Decided against for now (2026-08-26).** `atmosphere.CleanMountainAOD550` and its siblings are judged sufficient as the offline path, and `cams.AOD550` already serves anyone who wants the real hour. The design, if it is ever wanted: a **monthly median** of CAMS `aod550` on its own 0.4-degree grid, published as a release asset the way `starmap-v2` is, so the zero-setup path stops being a stated guess. Monthly because the seasonal cycle is the dominant signal — the Indo-Gangetic 1.07 measured here is a *January* number and the Saharan maximum moves thousands of kilometers by July, which is what broke this module's first grid-orientation test. Median rather than mean because AOD is skewed and a few dust events drag a mean above any typical night; 10th and 90th percentiles alongside it would let a caller carry a spread instead of a number pretending to certainty. Roughly 58 MB raw for twelve months and three percentiles, and smooth enough to compress toward `starmap-v2`'s order. Two things to settle first: the exact wording of the Copernicus licence on redistributing a derived product, which is the whole basis for publishing one instead of sharing credentials, and whether a three-day sampling across the four available years (~700 MB fetched) is enough for the median or whether it wants every day (~2.1 GB). |
+| ~~VizieR V/50 position columns~~ | **Resolved.** `RAJ2000`/`DEJ2000` exist and the multi-band bright-star path runs end to end: B, V and I for all 74 stars Gaia cannot see, R for 66. Every R gap is accounted for — four have a null `R-I` in the catalog, one is fainter than its completeness limit, and three are multiples where Hipparcos reports combined light while the catalog reports components. Two bugs were found doing it, both in the match: positions were not propagated from the Hipparcos epoch, which lost α Cen A at 32″ of proper motion; and matching on position alone then picked α Cen **B**, 0.02″ nearer than A. The match now propagates and discriminates on V. |
+| ~~SkyGlow Simulator governing equations~~ | **Resolved.** Kocifaj (2007), *Appl. Opt.* **46**, 3013–3022 is in hand — the author's own preprint, which carries the full Section 2 derivation the PNAS 2025 paper points back to. It is the only one of the four that was needed, and the other three are now positively ruled out rather than merely deprioritized: this paper already handles "real finite-dimensional surface sources … in contrary to frequently used point-source approximation", which is what Kocifaj (2008) was wanted for; it works in the first scattering order, which the 2018 JQSRT abstract calls sufficient below 30 km; and it treats the cloud reflectance `ρ` as an input rather than deriving it, adopting scalar values directly, which is exactly the shape of `atmosphere.CloudLayer.Albedo`. See §11.2 for the equation map. |
+| A published AOD climatology asset | Nothing — deferred, not blocked | **Decided against for now (2026-08-26).** `atmosphere.CleanMountainAOD550` and its siblings are judged sufficient as the offline path, and `cams.AOD550` already serves anyone who wants the real hour. The design, if it is ever wanted: a **monthly median** of CAMS `aod550` on its own 0.4-degree grid, published as a release asset the way `starmap-v2` is, so the zero-setup path stops being a stated guess. Monthly because the seasonal cycle is the dominant signal — the Indo-Gangetic 1.07 measured here is a *January* number and the Saharan maximum moves thousands of kilometers by July, which is what broke this module's first grid-orientation test. Median rather than mean because AOD is skewed and a few dust events drag a mean above any typical night; 10th and 90th percentiles alongside it would let a caller carry a spread instead of a number pretending to certainty. Roughly 58 MB raw for twelve months and three percentiles, and smooth enough to compress toward `starmap-v2`'s order. Two things to settle first: the exact wording of the Copernicus license on redistributing a derived product, which is the whole basis for publishing one instead of sharing credentials, and whether a three-day sampling across the four available years (~700 MB fetched) is enough for the median or whether it wants every day (~2.1 GB). |
 | **Cloud reaches only the artificial term** | A physically consistent cloudy sky, and any preset for one | **Not a data gap — a capability gap.** `scene.Atmosphere.Clouds()` is read in exactly one place in this module, `CloudySkyglow.deck`, so a deck in the atmosphere changes artificial skyglow and nothing else: moonlight, integrated starlight, diffuse galactic light, zodiacal light and airglow are all evaluated as though the sky were clear. Three different problems sit behind that one sentence. **Extraterrestrial light under cloud** — starlight, zodiacal, extragalactic, and the Moon's direct beam — needs the deck as an attenuator, and the line-of-sight opacity already exists as `cloudDeck.opacity`; what makes it more than plumbing is that a broken deck is binary per realization while that function is the ensemble mean, so a fractional cover would return a sky nobody standing under it ever sees. **Moonlight under cloud** is a different model rather than a factor: the Moon sits *above* the deck and lights it from above, making the cloud base a bright extended source, which is the mirror image of the ground-source geometry Kocifaj (2007) solves and is not reachable from it by changing the limits of integration. **Airglow** is a third case again, since its emitting layer at 87 km is above any deck, so what a cloud does to it is block it rather than scatter it. Until those exist, note what is and is not constructible today: no preset registers `CloudySkyglow`, and it shares the `Artificial` `ComponentID` with `ArtificialSkyglow` so `NewModel` refuses to hold both — a cloudy model must be assembled by hand, swapping the artificial term rather than adding to a preset. Such a model runs, and its artificial term is right, but a total from it is internally inconsistent and should not be quoted. |
 | ~~A detection model for limiting magnitude~~ | **Resolved for imaging.** `optics.Instrument.SNR` and `LimitingSignal` are the CCD equation of Merline & Howell (1995) and its closed-form inverse; `plan.SkyDepth` is the one-method interface `plan` declares for itself, `plan.LimitingMagnitudeConstraint` scores against it, and `skybrightness/plan.Imaging` bridges the two. `plan` imports no sky-brightness package at all. The conversion needs no zero point of its own: one estimate yields both a surface brightness and a detector background through the same instrument and the same spectrum, which is a calibration. |
 | **Visual limiting magnitude** | A naked-eye or eyepiece depth, and with it `examples/21_meteor_shower_forecast` | **The reference is in hand and this is still not a small job.** Crumey (2014), *MNRAS* **442**, 2600 (doi:10.1093/mnras/stu992, arXiv:1405.4209) is open access, and it is the right model: it replaces Hecht (1947) — the formula Schaefer (1990) uses — extends beyond point sources to targets of any size, and computes the scotopic correction for a source whose color differs from the background. An earlier revision of this row said the paper had not been obtained; that was wrong, and the distinction matters because it moves this from blocked to merely unstarted. Two things actually stand in the way. **A scotopic luminosity function**, which this module does not have: `unit.LuminanceCdM2` is a type with no producer, `magnitude` carries no V(λ) or V′(λ), and the CIE tables would have to arrive as a fetched dataset under `remote` like every other, with an endpoint, consent and a cache. Without it there is no way to turn a spectral radiance into the adaptation luminance the model takes. **And coefficient verification**: the model is piecewise with a scotopic/photopic split and several fitted constants, and this project has already had three transcription errors of exactly that kind — Kawara's decade, the Gaia table number, and a quadratic read as a cubic — each caught only by an independent physical cross-check rather than by re-reading. Transcribing it needs the same treatment, which is its own piece of work rather than a rider on someone else's. The candidate to avoid remains the one V1 used: Schaefer's SQM→NELM conversion consumes a single V-band scalar, so routing a spectrum through it discards the spectrum in the first step. |
@@ -1654,7 +1654,7 @@ against GAMBONS' own numbers in V:
 | **astronomical sky, airglow removed** | **21.74** | **21.71** | **−0.03** |
 
 **The astronomical sky agrees to 0.03 magnitudes** — three per cent in flux, between two
-implementations sharing no code, no catalogue aggregation and no transport. Integrated
+implementations sharing no code, no catalog aggregation and no transport. Integrated
 starlight, diffuse galactic light, zodiacal light and the extragalactic background, summed
 and propagated, land on the same number.
 
@@ -1678,7 +1678,7 @@ placeholder written into the real cache directory by `TestOpenFetchesAndParses`:
 filename, exactly 786,432 rows so the order check passed, a header claiming order 1, and
 `1.000000e-09` in every single pixel. Integrated starlight was a constant, plausible,
 entirely fictional 22.97 mag arcsec⁻² in every direction. It was caught by printing the
-neighbourhood of one pixel and finding 81 consecutive pixels identical to three decimals.
+neighborhood of one pixel and finding 81 consecutive pixels identical to three decimals.
 
 The mechanism is worth stating because it will recur. `remote.SetURL` redirects where bytes
 come from, not where they land, so a test that redirects an endpoint still writes into the
@@ -1959,7 +1959,7 @@ move it. `TestPresetsDifferOnlyInTransfer` holds the other half of that statemen
 of the gap.** Table 2 comes from the paper's full model, Eq. 11, which adds light scattered
 *into* the beam from the rest of the sky. That term scales with a component's radiance over
 the whole hemisphere rather than in the direction observed, so it is not a common factor: it
-favours components with light where the scattering kernel is strongest.
+favors components with light where the scattering kernel is strongest.
 
 `ScatteredIn` implements Eq. 11 directly — the Kocifaj & Kránicz (2011) first-order kernel
 under the aerosol-and-molecular phase function the paper specifies, both already in
@@ -2053,7 +2053,7 @@ was wrong.**
 
 An earlier revision of this document claimed Eq. 2 carried no source-area term and that a
 raster-derived prediction's absolute scale was therefore meaningless. That was a
-misreading. Kocifaj & Bará (2019) Eq. 9 — the model Eq. 2 generalises — defines the
+misreading. Kocifaj & Bará (2019) Eq. 9 — the model Eq. 2 generalizes — defines the
 quantity exactly:
 
 > `L_i(π/2, A_0i)` is the line-of-sight radiance, measured at the detector, of the i-th
@@ -2087,7 +2087,7 @@ sit on `τ_a`, not on the coefficients:
 Implemented as `AsymmetryParameter`. One property of the published fit is worth recording:
 it is not bounded to the physical range, and around `τ_a = 0.5` with `g_a = 0.9` it
 evaluates above 1, where a Henyey–Greenstein phase function is undefined. That is a limit
-of the parameterisation, so the value is returned together with `ErrAsymmetryOutOfRange`
+of the parameterization, so the value is returned together with `ErrAsymmetryOutOfRange`
 rather than clamped.
 
 The superseded analysis follows, kept because it explains why the ambiguity was real.

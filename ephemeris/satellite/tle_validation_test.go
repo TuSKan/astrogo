@@ -33,7 +33,7 @@ func TestValidateTLEAcceptsAPublishedElementSet(t *testing.T) {
 
 // One altered digit must be refused.
 //
-// This is the whole point of the checksum. SGP4 initialises happily from a
+// This is the whole point of the checksum. SGP4 initializes happily from a
 // corrupted element set and propagates it for ever, because every field it
 // reads is still a number: an inclination of 51.6416 degrees becomes 61.6416
 // and the orbit is simply a different one, with nothing anywhere reporting a
@@ -128,7 +128,7 @@ func TestValidateTLERejectsMalformedInput(t *testing.T) {
 	t.Parallel()
 
 	// Line 2 of a different satellite. Both lines are individually intact and
-	// both checksums pass; only the catalogue number reveals it. This is the
+	// both checksums pass; only the catalog number reveals it. This is the
 	// one a copy-paste from two rows of a listing actually produces.
 	const otherLine2 = "2 20580 028.4699 288.8102 0002739 279.8160 080.2317 15.09299865538277"
 

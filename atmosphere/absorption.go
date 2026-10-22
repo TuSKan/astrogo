@@ -53,7 +53,7 @@ var (
 // point to the effective temperature of stratospheric ozone.
 //
 // O2 and H2O are a different problem and are not merely unsupplied. They
-// absorb in narrow lines — O2 at 688 and 762 nm, water vapour at 720, 820
+// absorb in narrow lines — O2 at 688 and 762 nm, water vapor at 720, 820
 // and 940 nm — and Beer-Lambert with a cross section band-averaged onto a
 // nanometer grid is systematically wrong for them, always overestimating
 // absorption, because exp(-tau) is convex and averaging the cross section

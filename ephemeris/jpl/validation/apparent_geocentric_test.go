@@ -52,7 +52,7 @@ import (
 // Afterwards every body sits flat at 0.049 to 0.061 arcseconds with almost no
 // scatter — p95 and max within three milliarcseconds of the median — which is
 // the constant offset this package already measures in right ascension and
-// characterises elsewhere (#260). Before, the tail was the deflection: largest
+// characterizes elsewhere (#260). Before, the tail was the deflection: largest
 // where the geometry put a planet nearest the Sun, and Jupiter's worst case
 // thirteen times what it is now.
 //
@@ -142,7 +142,7 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 				"already been seen",
 			"measured: 7 bodies x 24 epochs across 2026, p50 0.047-0.051 arcsec with the "+
 				"worst within 0.002 of it; the offset itself is the right-ascension constant "+
-				"characterised in #260"))
+				"characterized in #260"))
 
 	var (
 		separations []float64
@@ -234,7 +234,7 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 	// Declination is the clean axis and has to stay clean.
 	//
 	// The residual this comparison measures lives almost entirely in right
-	// ascension — a constant +0.049 arcsec, characterised in #260 — while
+	// ascension — a constant +0.049 arcsec, characterized in #260 — while
 	// declination sits at -0.0002. Deflection is not axis-aligned, so it
 	// showed in both; pinning the quiet axis is what makes a term reappearing
 	// in declination visible instead of averaging into a separation.

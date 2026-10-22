@@ -253,7 +253,7 @@ const (
 	//
 	// # Why it is a scale rather than an offset a caller applies
 	//
-	// GNSS system times were synchronised to UTC once and then told to ignore
+	// GNSS system times were synchronized to UTC once and then told to ignore
 	// leap seconds, so each has drifted from UTC by a whole number of seconds
 	// that grows at every leap event. GPS was set to UTC on 1980-01-06, when
 	// TAI−UTC was 19 s, and has run at the TAI rate since:
@@ -281,7 +281,7 @@ const (
 	// BDT is BeiDou Navigation Satellite System time.
 	//
 	// The same construction as [GPST] with a different constant, because the
-	// constellation was synchronised later: BDT was set to UTC on 2006-01-01,
+	// constellation was synchronized later: BDT was set to UTC on 2006-01-01,
 	// when TAI−UTC was 33 s, and has run at the TAI rate since.
 	//
 	//	TAI − BDT = 33 s, exactly and for ever
@@ -344,13 +344,13 @@ const (
 // gpstMinusTAI is the fixed offset that defines GPS time.
 //
 // Negative because GPST runs behind TAI: TAI = GPST + 19 s. It is the value of
-// TAI−UTC at the 1980-01-06 synchronisation, frozen, and it is a constant of
+// TAI−UTC at the 1980-01-06 synchronization, frozen, and it is a constant of
 // the system rather than a table lookup — which is what makes this scale cheap
 // to support correctly.
 const gpstMinusTAI = -19.0
 
 // bdtMinusTAI is the fixed offset that defines BeiDou time — the value of
-// TAI−UTC at BeiDou's 2006-01-01 synchronisation, frozen. See [BDT].
+// TAI−UTC at BeiDou's 2006-01-01 synchronization, frozen. See [BDT].
 const bdtMinusTAI = -33.0
 
 func (s Scale) String() string {
@@ -1326,12 +1326,12 @@ func (t Time) TAI() Time {
 		return t.TDB().TAI()
 	case GPST:
 		// TAI = GPST + 19 s, exactly. No table, no epoch dependence: the
-		// offset was frozen at the 1980-01-06 synchronisation and GPS time
+		// offset was frozen at the 1980-01-06 synchronization and GPS time
 		// has ignored leap seconds ever since.
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-gpstMinusTAI/86400.0, TAI)
 	case BDT:
 		// TAI = BDT + 33 s, exactly, frozen at BeiDou's 2006-01-01
-		// synchronisation for the same reason.
+		// synchronization for the same reason.
 		return fromPartsPreserveLoc(t, t.jd1, t.jd2-bdtMinusTAI/86400.0, TAI)
 	default:
 		// UT1 → UTC → TAI. UT1 genuinely has to go this way: DUT1 is defined
@@ -1435,7 +1435,7 @@ func (t Time) TT() Time {
 // GPST returns a new Time converted to GPS system time.
 //
 // GPS time is TAI − 19 s exactly, so this conversion is arithmetic and cannot
-// fail: the offset was fixed at the 1980-01-06 synchronisation and GPS has
+// fail: the offset was fixed at the 1980-01-06 synchronization and GPS has
 // ignored leap seconds since. Against UTC the gap therefore grows at every leap
 // event, and is 18 s today.
 //

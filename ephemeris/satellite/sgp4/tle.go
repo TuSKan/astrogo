@@ -22,11 +22,11 @@ const LineLength = 69
 // Written as explicit start/end pairs rather than chaining each field's end to
 // the next field's start, because the fields are NOT adjacent — single blank
 // columns separate several of them, and treating a separator as part of its
-// neighbour silently widens the field. That is not a theoretical hazard: the
+// neighbor silently widens the field. That is not a theoretical hazard: the
 // first draft of this file did exactly that and handed an extra column to both
 // assumed-exponent fields.
 //
-// An off-by-one here mostly does not fail. It reads the neighbouring field,
+// An off-by-one here mostly does not fail. It reads the neighboring field,
 // which is also a number.
 type span struct{ start, end int }
 
@@ -88,7 +88,7 @@ func ParseTLE(line1, line2 string) (Elements, error) {
 // ParseTLEName is [ParseTLE] for a source that also carries a title line.
 //
 // name is trimmed and stored in [Elements.Name]; it is not validated, because
-// a title line is free text that catalogues pad, truncate and occasionally
+// a title line is free text that catalogs pad, truncate and occasionally
 // leave blank, and nothing in the model reads it.
 func ParseTLEName(name, line1, line2 string) (Elements, error) {
 	l1, l2, err := trimToLines(line1, line2)
@@ -195,7 +195,7 @@ func trimToLines(line1, line2 string) (l1, l2 string, err error) {
 	return l1, l2, nil
 }
 
-// parseSatelliteNumbers reads the catalogue number from both lines and refuses
+// parseSatelliteNumbers reads the catalog number from both lines and refuses
 // two lines that describe different objects.
 //
 // Worth checking rather than reading one and trusting it: a feed that
@@ -297,7 +297,7 @@ func parseEpoch(l1 string) (time.Time, error) {
 
 	jan1 := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	// unit.Days, not the standard library's Duration: that type quantises to
+	// unit.Days, not the standard library's Duration: that type quantizes to
 	// nanoseconds via a float64 product that exceeds 2^53 ns for a late-year
 	// epoch. Add advances the calendar label — which is what a day-of-year is.
 	return jan1.Add(unit.Days(doy - 1.0)), nil

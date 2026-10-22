@@ -87,7 +87,7 @@ const (
 
 // dscomResult carries the quantities dscom computes for dsinit's use only.
 //
-// They are not stored on the propagator because nothing after initialisation
+// They are not stored on the propagator because nothing after initialization
 // reads them. Vallado threads roughly eighty values between the two procedures
 // through one mutable record; grouping the forty that are actually consumed is
 // the only structural liberty taken here, and the arithmetic is unchanged.
@@ -140,7 +140,7 @@ type resonanceTerms struct {
 // the Sun and of the Moon.
 //
 // epoch1950 is days from 0 January 1950; tc is an offset in minutes, zero at
-// initialisation.
+// initialization.
 func (p *Propagator) dscom(epoch1950, tc float64) dscomResult {
 	ep := p.el.Eccentricity
 	argpp := p.el.ArgPerigee.Radians()
@@ -324,7 +324,7 @@ func (p *Propagator) dscom(epoch1950, tc float64) dscomResult {
 // dsinit computes the secular lunisolar rates and, for a resonant orbit, the
 // geopotential resonance coefficients.
 //
-// Called once, at initialisation, where the reference's t and tc are both zero.
+// Called once, at initialization, where the reference's t and tc are both zero.
 // That matters: the element updates the reference performs here (em += dedt*t
 // and its four siblings) are therefore no-ops, and their results are discarded
 // by the caller. Only the coefficients survive, and only those are computed.

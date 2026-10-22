@@ -384,7 +384,7 @@ func TestLimitingMagnitudeAtReportsWhichStepFailed(t *testing.T) {
 }
 
 // TestBandIsTheSkysOwnBand: the magnitudes are on the sky model's band, and
-// comparing them against a catalogue magnitude in a different filter is a
+// comparing them against a catalog magnitude in a different filter is a
 // mistake that produces entirely plausible numbers. Band is how a caller avoids
 // it, so it must report the band in use rather than a constant.
 func TestBandIsTheSkysOwnBand(t *testing.T) {

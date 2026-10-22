@@ -364,8 +364,8 @@ func TestHTTPIsReadOnly(t *testing.T) {
 	}
 }
 
-// TestHTTPHonoursItsContext is the property ContextFS exists for.
-func TestHTTPHonoursItsContext(t *testing.T) {
+// TestHTTPHonorsItsContext is the property ContextFS exists for.
+func TestHTTPHonorsItsContext(t *testing.T) {
 	t.Parallel()
 
 	fsys := serve(t, &objectServer{allowHEAD: true, sendLength: true, sendRangeSize: true})
@@ -526,7 +526,7 @@ func TestHTTPObjectMetadata(t *testing.T) {
 
 // TestHTTPObjectWithoutALastModifiedReportsTheZeroTime covers the other branch,
 // which matters because a zero ModTime is what makes [file.ETag] report "cannot
-// tell" rather than synthesising a validator that would match itself for ever.
+// tell" rather than synthesizing a validator that would match itself for ever.
 func TestHTTPObjectWithoutALastModifiedReportsTheZeroTime(t *testing.T) {
 	t.Parallel()
 

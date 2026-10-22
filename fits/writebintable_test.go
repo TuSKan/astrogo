@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/fits"
 )
 
-// A binary table is the half of #127 that catalogue pipelines need: a table
+// A binary table is the half of #127 that catalog pipelines need: a table
 // astrogo produced has to be readable by the tools the rest of the field uses,
 // which means the row-major transpose, the big-endian cells and the fixed-width
 // string columns all have to be right at once.
@@ -29,7 +29,7 @@ func builderAs[T array.Builder](t *testing.T, rb *array.RecordBuilder, i int) T 
 	return b
 }
 
-// catalogBatch builds a small catalogue-shaped batch: a name, a position, a
+// catalogBatch builds a small catalog-shaped batch: a name, a position, a
 // magnitude and a flag, which between them cover a string column, both float
 // widths, an integer and a logical.
 func catalogBatch(t *testing.T) arrow.RecordBatch {
@@ -101,8 +101,8 @@ func TestWriteBintableRoundTrips(t *testing.T) {
 // assertColumnsMatch compares two batches value by value, by column name.
 //
 // By name rather than by index, because a column order that silently rotated
-// would otherwise pass while putting every star's RA under its neighbour's
-// name — which is the failure mode a catalogue writer must not have.
+// would otherwise pass while putting every star's RA under its neighbor's
+// name — which is the failure mode a catalog writer must not have.
 func assertColumnsMatch(t *testing.T, want, got arrow.RecordBatch) {
 	t.Helper()
 
@@ -190,7 +190,7 @@ func TestWriteBintableSizesStringColumnsToTheLongestValue(t *testing.T) {
 	}
 }
 
-// TestWriteBintableRefusesAnEmptyBatch keeps an uninitialised table from being
+// TestWriteBintableRefusesAnEmptyBatch keeps an uninitialized table from being
 // written as a well-formed extension describing no columns.
 func TestWriteBintableRefusesAnEmptyBatch(t *testing.T) {
 	t.Parallel()

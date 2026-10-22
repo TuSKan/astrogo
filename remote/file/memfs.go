@@ -70,7 +70,7 @@ func openMem(u *url.URL) (fs.FS, error) {
 	return &memFS{store: store}, nil
 }
 
-// WithContext implements [ContextFS]. Nothing here blocks, so what is honoured
+// WithContext implements [ContextFS]. Nothing here blocks, so what is honored
 // is the context's state when each operation begins — see [localFS.WithContext]
 // for why a backend with nothing to cancel implements this rather than leaving
 // RequireContext with an exception.

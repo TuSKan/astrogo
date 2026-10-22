@@ -48,7 +48,7 @@ func ExampleSpaceVelocity() {
 
 // A space velocity in km/s needs a distance, and says so when it has none.
 func ExampleSpaceVelocity_withoutAParallax() {
-	// A proper-motion catalogue with no parallax column, which describes most
+	// A proper-motion catalog with no parallax column, which describes most
 	// of the pre-Hipparcos ones.
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(123.4), angle.Deg(-35.6),

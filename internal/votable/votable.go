@@ -13,7 +13,7 @@
 // # What it deliberately does not do
 //
 // This reads TABLEDATA — values as text, in document order — and nothing else.
-// VOTable also permits BINARY, BINARY2 and FITS serialisations, arrays, and
+// VOTable also permits BINARY, BINARY2 and FITS serializations, arrays, and
 // null-value conventions per field; none of that is handled, and a payload
 // carrying it produces a table with no rows rather than a wrong one. TAP
 // services return TABLEDATA for synchronous queries, and a format that needs

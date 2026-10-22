@@ -28,7 +28,7 @@ func barnardsStar() coord.ICRS {
 // compared against something outside this repository.
 //
 // Barnard's Star moves at about 142 km/s with respect to the Sun, a figure
-// that follows from its own catalogue entry and appears in every account of
+// that follows from its own catalog entry and appears in every account of
 // it. Reproducing it is what shows the unit conversion — au/day out of SOFA,
 // km/s out of here — is right, which no internal consistency check can.
 func TestSpaceSpeedOfBarnardsStar(t *testing.T) {
@@ -40,7 +40,7 @@ func TestSpaceSpeedOfBarnardsStar(t *testing.T) {
 	}
 
 	// The published figure is about 142.5 km/s. A per-cent tolerance is wide
-	// enough for the small differences between catalogue versions and far too
+	// enough for the small differences between catalog versions and far too
 	// tight for a factor-of-86400 or factor-of-au unit error, which is the
 	// class of mistake this is guarding.
 	testutil.AssertRelNear(t, "Barnard's Star space speed", speed.KmPerSec(), 142.5, 0.01)
@@ -82,7 +82,7 @@ func TestTheRadialComponentIsTheRadialVelocity(t *testing.T) {
 			continue
 		}
 
-		// Not an identity to the last bit, and it should not be. A catalogue's
+		// Not an identity to the last bit, and it should not be. A catalog's
 		// radial velocity is a measured Doppler quantity; SOFA's pv-vector is
 		// a geometric velocity computed relativistically and with the changing
 		// light-time its own notes describe. The two differ by that treatment.
@@ -218,9 +218,9 @@ func TestSpaceVelocityRefusesWhatItCannotAnswer(t *testing.T) {
 	}
 }
 
-// TestSpaceSpeedAgreesWithTheVectorItSummarises guards the one thing that
+// TestSpaceSpeedAgreesWithTheVectorItSummarizes guards the one thing that
 // could drift between the two entry points.
-func TestSpaceSpeedAgreesWithTheVectorItSummarises(t *testing.T) {
+func TestSpaceSpeedAgreesWithTheVectorItSummarizes(t *testing.T) {
 	t.Parallel()
 
 	star := barnardsStar()

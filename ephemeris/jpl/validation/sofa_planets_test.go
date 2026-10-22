@@ -227,7 +227,7 @@ func planetEpochs() []time.Time {
 //
 // The two models are genuinely independent — a JPL kernel read by this
 // repository's Chebyshev decoder on one side, gofa's truncated series on the
-// other — so a disagreement here is real rather than a rounding artefact. But
+// other — so a disagreement here is real rather than a rounding artifact. But
 // gofa is astrogo's own dependency rather than a third party's implementation,
 // so a fault in how astrogo drives gofa is invisible; only a fault in how it
 // drives the kernel would show. The shared ancestry is recorded on the

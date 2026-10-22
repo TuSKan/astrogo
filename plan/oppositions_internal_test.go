@@ -13,7 +13,7 @@ import (
 
 // conicState is the two-body state at true anomaly nu on the conic of
 // perihelion distance q, eccentricity e, inclination i, ascending node at
-// node and argument of perihelion w about a centre of parameter mu: the closed form, a
+// node and argument of perihelion w about a center of parameter mu: the closed form, a
 // producer independent of the code under test.
 func conicState(q, e, i, node, w, mu, nu float64) (r, v vector.Vec3) {
 	p := q * (1 + e)

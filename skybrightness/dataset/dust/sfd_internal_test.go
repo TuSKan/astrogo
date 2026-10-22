@@ -130,7 +130,7 @@ func TestSFDProjectionWindingFollowsHemisphere(t *testing.T) {
 // A lookup interpolates between pixels rather than snapping to one.
 //
 // The map is consulted at arbitrary directions and its pixels are 2.37
-// arcminutes. Nearest-neighbour would make the intensity a step function of
+// arcminutes. Nearest-neighbor would make the intensity a step function of
 // direction, and a component integrating over the sky would then see edges
 // belonging to the sampling rather than to the dust.
 func TestSFDLookupInterpolates(t *testing.T) {

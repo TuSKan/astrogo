@@ -157,12 +157,12 @@ func TestFK4RoundTripCloses(t *testing.T) {
 // TestFK4PositionOnlyIsNotZeroProperMotion is the error-vs-absence case, and
 // the reason this package has two constructors instead of one with defaults.
 //
-// "The catalogue recorded no proper motion" and "the proper motion is zero"
+// "The catalog recorded no proper motion" and "the proper motion is zero"
 // are different statements, and they convert to different places. FK4's
 // equinox drifts, so a star at rest *in FK4* has a real proper motion in FK5;
 // SOFA supplies that fictitious component through Fk45z. Passing zeroes to the
 // six-element routine instead asserts the star is at rest in the inertial
-// sense, which is a claim almost no old catalogue makes.
+// sense, which is a claim almost no old catalog makes.
 //
 // The two answers differ by enough to matter, which is what makes the API
 // distinction worth having rather than pedantry.
@@ -223,7 +223,7 @@ func TestFK4ProperMotionReportsWhetherItWasRecorded(t *testing.T) {
 }
 
 // TestFK4EpochIsCarried covers the Besselian epoch, which is not always 1950
-// even in a B1950 catalogue: several plate surveys record positions for the
+// even in a B1950 catalog: several plate surveys record positions for the
 // epoch of the plate and the equinox of B1950, and Fk45z takes both.
 func TestFK4EpochIsCarried(t *testing.T) {
 	t.Parallel()
@@ -297,9 +297,9 @@ func TestFK4StringNamesTheFrameAndEpoch(t *testing.T) {
 // surprises people: converting a star at rest in the ICRS into FK4 gives it a
 // proper motion.
 //
-// That is not an artefact. FK4's equinox drifts, so a genuinely inertial
+// That is not an artifact. FK4's equinox drifts, so a genuinely inertial
 // object appears to move in it, and the returned proper motion is what a
-// B1950 catalogue would have had to record to describe the same star.
+// B1950 catalog would have had to record to describe the same star.
 func TestICRSToFK4RestoresTheFictitiousProperMotion(t *testing.T) {
 	t.Parallel()
 
@@ -396,7 +396,7 @@ func TestFK4RoundTripWithKinematicsCloses(t *testing.T) {
 
 // TestFK4CarriesTheKinematicsItWasGiven covers the accessors that carry the
 // two elements the position-only path leaves at zero, so a caller reading an
-// FK4 back gets what the catalogue recorded rather than what survived a
+// FK4 back gets what the catalog recorded rather than what survived a
 // conversion.
 func TestFK4CarriesTheKinematicsItWasGiven(t *testing.T) {
 	t.Parallel()
@@ -517,7 +517,7 @@ func TestFK5ToFK4MatchesSOFAExactly(t *testing.T) {
 // The two proper-motion components are the whole point: they are the motion
 // FK4's drifting equinox gives a star that is not moving in FK5, and they are
 // of order 1e-8 rad/yr — about 2 milliarcseconds a year, or a fifth of an
-// arcsecond over the century between the two catalogues.
+// arcsecond over the century between the two catalogs.
 func TestFK5ToFK4PositionOnlyMatchesSOFA(t *testing.T) {
 	t.Parallel()
 
@@ -625,9 +625,9 @@ func TestICRSKinematicsRecordedVersusAbsent(t *testing.T) {
 				t.Errorf("position round trip is off by %.6f\", want under 0.001\"", sep)
 			}
 
-			// Not recorded: the catalogue said nothing about motion, so the
+			// Not recorded: the catalog said nothing about motion, so the
 			// conversion takes SOFA's matched z-routines and the position — the
-			// only thing such a catalogue actually asserts — survives intact.
+			// only thing such a catalog actually asserts — survives intact.
 			absent := coord.NewICRS(tc.ra, tc.dec)
 			backAbsent := coord.FK4ToICRS(coord.ICRSToFK4(absent, coord.B1950))
 

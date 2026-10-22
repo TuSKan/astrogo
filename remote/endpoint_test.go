@@ -120,7 +120,7 @@ func TestDefaultEndpointsCacheDirsMatchOnDiskLayout(t *testing.T) {
 //
 // That reasoning is only sound while astrogo never sends a credential the
 // service demands. TokenEnv's own contract says so — "a token is an
-// optimisation, never a requirement: every endpoint that declares one must
+// optimization, never a requirement: every endpoint that declares one must
 // still work without it" — and this is where the contract stops being prose.
 //
 // # Why the list rather than a flag

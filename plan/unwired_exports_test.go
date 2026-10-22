@@ -99,7 +99,7 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 // Provider(), and whether it earns its place in the public API is a question
 // for #106 rather than for a test. What a test can settle is that it targets
 // the body it names, which is the way a constructor written by copying its
-// neighbour goes wrong.
+// neighbor goes wrong.
 func TestNewEarthTargetsEarth(t *testing.T) {
 	t.Parallel()
 
@@ -153,7 +153,7 @@ func TestWithStepSetsTheSamplingCadence(t *testing.T) {
 	}
 
 	// It must not disturb the other fields, which is the failure mode of an
-	// option written by copying its neighbour.
+	// option written by copying its neighbor.
 	if cfg.minAltitude.Degrees() != 0 || cfg.includeMoons || cfg.forceSmallBodyKernels {
 		t.Errorf("WithStep changed something other than step: %+v", cfg)
 	}

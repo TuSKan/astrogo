@@ -62,7 +62,7 @@ const valladoMaxKMPerSec = 1e-7
 // passing the contract.
 const valladoP99KM = 1e-5
 
-// artefactRows are reference rows that are not states.
+// artifactRows are reference rows that are not states.
 //
 // Satellite 33334 is one of the three element sets Vallado hand-built to drive
 // SGP4 into an error return. Its block in tcppver.out has exactly one row, at
@@ -83,7 +83,7 @@ const valladoP99KM = 1e-5
 // This implementation refuses 33334 at tsince 0 with ErrPerturbedEccentricity,
 // which is the correct behavior and is asserted by
 // TestValladosErrorCasesReachTheModel.
-var artefactRows = map[string]bool{"33334": true}
+var artifactRows = map[string]bool{"33334": true}
 
 // TestAgreesWithVallado is the measurement this package exists to make.
 //
@@ -143,7 +143,7 @@ func TestAgreesWithVallado(t *testing.T) {
 			deep = append(deep, blk.satnum)
 		}
 
-		if artefactRows[blk.satnum] {
+		if artifactRows[blk.satnum] {
 			continue
 		}
 
@@ -477,7 +477,7 @@ func TestLowPerigeeCasesAreTheOnesThatMatter(t *testing.T) {
 // It is not a formality. The reference implementation threads its state through
 // a mutable record and mutates it on every evaluation, so the obvious
 // transcription of this model is not safe to call twice at once — and a caller
-// propagating a catalogue across a time grid will do exactly that.
+// propagating a catalog across a time grid will do exactly that.
 func TestPropagatorIsSafeToShare(t *testing.T) {
 	t.Parallel()
 
@@ -636,7 +636,7 @@ func TestAtIsAllocationFree(t *testing.T) {
 	})
 
 	if allocs != 0 {
-		t.Errorf("At allocates %v times per call; propagating a catalogue across a time grid "+
+		t.Errorf("At allocates %v times per call; propagating a catalog across a time grid "+
 			"is the whole workload and it should touch the heap never", allocs)
 	}
 }

@@ -163,14 +163,14 @@ func (c *Client) SetAPIOptions(opts ...APIOption) {
 
 // defaultClient backs every package-level function in this package.
 //
-// Not lazily initialised: defaultEndpoints() is a statically built map with no
+// Not lazily initialized: defaultEndpoints() is a statically built map with no
 // computation in it, so there is nothing to defer and no init() ordering to
 // reason about.
 var defaultClient = NewClient()
 
 // Default returns the client the package-level functions operate on.
 //
-// It is the analogue of http.DefaultClient, and it is exported for the same
+// It is the analog of http.DefaultClient, and it is exported for the same
 // reason: a caller holding a *Client generically — a helper that configures
 // either the process default or a component's own — should not need two code
 // paths.
