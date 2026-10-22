@@ -32,7 +32,7 @@ type (
 	// L_lambda(lambda, altitude, azimuth, site, epoch).
 	SpectralRadiance float64
 
-	// PhotonSpectralRadiance is the photon-counting analogue of
+	// PhotonSpectralRadiance is the photon-counting analog of
 	// SpectralRadiance, photon*s^-1*m^-2*sr^-1*nm^-1.
 	PhotonSpectralRadiance float64
 
@@ -100,7 +100,7 @@ type (
 	// OzoneColumnDU is a total-column ozone amount, in Dobson units.
 	OzoneColumnDU float64
 
-	// PrecipitableWaterMM is precipitable water vapour, in millimeters.
+	// PrecipitableWaterMM is precipitable water vapor, in millimeters.
 	PrecipitableWaterMM float64
 
 	// PressureHPa is atmospheric pressure, in hectopascals.

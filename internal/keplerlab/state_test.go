@@ -147,10 +147,10 @@ func TestStateAccuracy(t *testing.T) {
 	t.Log(sb.String())
 }
 
-// TestPhysicalOrbits puts the state errors in kilometres for orbits that
+// TestPhysicalOrbits puts the state errors in kilometers for orbits that
 // exist: a main-belt asteroid, a Halley-type comet, and two long-period
 // comets near perihelion, each from elements in the form NewElements takes.
-// Kilometres from an exact solution of the same two-body problem: this is
+// Kilometers from an exact solution of the same two-body problem: this is
 // arithmetic error, not model error.
 func TestPhysicalOrbits(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)

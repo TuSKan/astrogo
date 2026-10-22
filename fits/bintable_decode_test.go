@@ -182,7 +182,7 @@ func TestBintableTrimsColumnNames(t *testing.T) {
 
 // A row whose column widths do not add up to NAXIS1 means the layout is being
 // read wrong, and every value after the first bad column would be garbage
-// drawn from the neighbouring field. That has to fail rather than decode.
+// drawn from the neighboring field. That has to fail rather than decode.
 func TestBintableRejectsInconsistentRowWidth(t *testing.T) {
 	t.Parallel()
 

@@ -163,7 +163,7 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 // the distance it was given.
 //
 // It covers the poles and the RA wrap, and distances from inside the solar
-// neighbourhood to well past the far edge of the disc — including targets on
+// neighborhood to well past the far edge of the disc — including targets on
 // the far side of the center, where X changes sign and the direction back to
 // the Sun is nearly antiparallel to the one out.
 //
@@ -187,7 +187,7 @@ func TestRoundTripThroughTheFrame(t *testing.T) {
 
 	distances := []float64{
 		1,      // a nearby star
-		100,    // the solar neighbourhood
+		100,    // the solar neighborhood
 		1000,   // a kiloparsec
 		8178,   // the center's distance, so the far-side cases straddle it
 		20000,  // past the far edge of the disc
@@ -340,7 +340,7 @@ func TestDegenerateFramesDoNotProduceNaN(t *testing.T) {
 }
 
 // TestParallaxDistanceIsTheReciprocal checks the definition and the unit, the
-// latter being the one that goes wrong: a catalogue's milliarcseconds invert to
+// latter being the one that goes wrong: a catalog's milliarcseconds invert to
 // kiloparsecs, and the mistake is a factor of a thousand that looks plausible.
 func TestParallaxDistanceIsTheReciprocal(t *testing.T) {
 	t.Parallel()
@@ -387,7 +387,7 @@ func TestParallaxDistanceFeedsTheFrame(t *testing.T) {
 // [coord.NewGalactocentric], which is what makes [coord.GalactocentricFrame.ToICRS]
 // reachable at all for a position astrogo did not compute itself.
 //
-// That is the constructor's whole reason to exist: catalogues of Galactic
+// That is the constructor's whole reason to exist: catalogs of Galactic
 // structure publish Cartesian X, Y, Z directly — globular cluster compilations
 // and stream tracks among them — and without a way to enter one, the inverse
 // transform could only ever be handed output from the forward one.

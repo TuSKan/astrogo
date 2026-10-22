@@ -36,7 +36,7 @@ import (
 // constants.WGS84.AngularVelocity is 7.292115e-5, a different rounding of a
 // different realization, and differs by 2.0e-8 relative — 470 times further.
 // That is the check with teeth: it fails if this table is ever "corrected"
-// towards WGS-84, which is the mistake astrogo already made once with the
+// toward WGS-84, which is the mistake astrogo already made once with the
 // gravity model.
 func TestEarthRotationRateAgreesWithWGS72(t *testing.T) {
 	t.Parallel()
@@ -74,7 +74,7 @@ func TestEarthRotationRateAgreesWithWGS72(t *testing.T) {
 	if rel84 < 10*rel72 {
 		t.Errorf("SGP4's rotation rate is now as close to constants.WGS84 (%.3g) as to "+
 			"constants.WGS72 (%.3g). It should be much closer to WGS-72: that is the "+
-			"realization TLEs are fitted with, and this table must not drift towards the "+
+			"realization TLEs are fitted with, and this table must not drift toward the "+
 			"later one.", rel84, rel72)
 	}
 }

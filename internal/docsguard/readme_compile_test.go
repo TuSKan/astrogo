@@ -32,7 +32,7 @@ var stdlibForREADME = map[string]string{
 	"errors":  "errors",
 }
 
-// wrappingArtefact matches the errors that come from turning a README
+// wrappingArtifact matches the errors that come from turning a README
 // fragment into a function body rather than from the sample being wrong.
 //
 // A free variable is expected: a fragment shows a few lines in context and
@@ -40,7 +40,7 @@ var stdlibForREADME = map[string]string{
 // same thing seen from the other side — prose continues where the code block
 // stops, so the last value a sample introduces is often never consumed. Go
 // rejects both inside a function and neither says anything about the sample.
-var wrappingArtefact = regexp.MustCompile(`(undefined: \w+|declared and not used)`)
+var wrappingArtifact = regexp.MustCompile(`(undefined: \w+|declared and not used)`)
 
 // TestREADMECodeBlocksCompile type-checks every Go block in the README.
 //
@@ -286,8 +286,8 @@ func reportBuild(t *testing.T, root, dir string) int {
 		line = strings.TrimSpace(line)
 		switch {
 		case line == "" || strings.HasPrefix(line, "#"):
-		case wrappingArtefact.MatchString(line):
-			// An artefact of the wrapping. Expected, and counted so the
+		case wrappingArtifact.MatchString(line):
+			// An artifact of the wrapping. Expected, and counted so the
 			// unchecked surface stays visible.
 			unrooted++
 		default:

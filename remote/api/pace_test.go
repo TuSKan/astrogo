@@ -18,7 +18,7 @@ import (
 // why it needs a test: nothing downstream fails when it stops working. The
 // service being protected just starts refusing to answer, hours later, in a
 // way that looks like an outage.
-func TestMinIntervalPacesAndSerialises(t *testing.T) {
+func TestMinIntervalPacesAndSerializes(t *testing.T) {
 	var (
 		mu     sync.Mutex
 		starts []time.GoTime

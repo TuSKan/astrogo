@@ -122,7 +122,7 @@ func TestExtragalacticUnitConversion(t *testing.T) {
 }
 
 // Interpolation must reproduce the table at its own points, and stay between
-// neighbours in between.
+// neighbors in between.
 func TestExtragalacticInterpolation(t *testing.T) {
 	t.Parallel()
 

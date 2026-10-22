@@ -94,7 +94,7 @@ func openLocal(u *url.URL) (fs.FS, error) {
 // So the cancellation here is real rather than a no-op that would make
 // RequireContext lie. A local operation cannot be interrupted once the syscall
 // is in flight, and none of them blocks for long enough to matter; what is
-// honoured is the context's state at the moment each operation begins. That
+// honored is the context's state at the moment each operation begins. That
 // means a caller who cancels sees the next operation fail rather than a
 // transfer that runs to completion, which is the property the rule exists for.
 func (l *localFS) WithContext(ctx context.Context) fs.FS {

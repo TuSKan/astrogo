@@ -46,7 +46,7 @@ func TestUncertaintyBudgetWeightsByShare(t *testing.T) {
 	}
 
 	// The larger contribution wins even though its relative uncertainty is
-	// the smaller of the two — which is exactly the judgement the budget
+	// the smaller of the two — which is exactly the judgment the budget
 	// exists to make.
 	dom, share := b.Dominant(weights)
 

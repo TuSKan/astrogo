@@ -41,7 +41,7 @@ func TestFK5ToICRSMatchesSOFAWithKinematics(t *testing.T) {
 	assertRadians(t, got.Dec().Radians(), -0.2917516070530391757, "Dec")
 
 	// The kinematics come through too, or a caller loses the space motion the
-	// catalogue recorded.
+	// catalog recorded.
 	assertClose(t, got.PmRA().Radians(),
 		sofaPM(-0.1961874125605721270e-6, -0.2917516070530391757), 1e-18, "pmRA")
 	assertClose(t, got.PmDec().Radians(), -0.58459905176693911e-5, 1e-18, "pmDec")
@@ -217,7 +217,7 @@ func TestFK5StringNamesTheFrameAndEpoch(t *testing.T) {
 // this package stores.
 //
 // SOFA's routines speak dRA/dt; coord's accessors carry mu_alpha* — the on-sky
-// rate, dRA/dt times cos(dec), which is what every catalogue publishes and what
+// rate, dRA/dt times cos(dec), which is what every catalog publishes and what
 // #281 was about. The factor is stated here rather than folded into the
 // expected numbers so the published constants stay literal in the tests that
 // cite them, and so a reader can see which declination each conversion uses:

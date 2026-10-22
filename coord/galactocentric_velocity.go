@@ -138,7 +138,7 @@ func SolarVelocityFromSgrA(sunDistance unit.Length) vector.Vec3 {
 //
 // The axes come from [GalacticToICRS] rather than from a written-down matrix,
 // so there is still one definition of which way the Galaxy points — the same
-// reasoning [GalactocentricFrame] gives for not parameterising its orientation.
+// reasoning [GalactocentricFrame] gives for not parameterizing its orientation.
 var galacticBasis = computeGalacticBasis()
 
 // galacticAxes is the Galactic frame expressed on the ICRS axes.

@@ -132,7 +132,7 @@ var mpcCache struct {
 // The MPC's own reductions use 6378.140 km (IAU 1976) where this uses WGS 84's
 // 6378.137 km. The 3 m difference in the scale factor moves a recovered height
 // by about 3 m and a latitude not at all, which is two orders of magnitude
-// below the quantisation of the published constants — see [MPCObservatory] for
+// below the quantization of the published constants — see [MPCObservatory] for
 // what the accuracy actually is.
 func MPCObservatories(ctx context.Context) ([]MPCObservatory, error) {
 	mpcCache.mu.Lock()

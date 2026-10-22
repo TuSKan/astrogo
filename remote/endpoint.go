@@ -369,7 +369,7 @@ type Endpoint struct {
 	// environment, is never written to disk by this module, and is sent in a
 	// header rather than a query string.
 	//
-	// A token is an optimisation, never a requirement: every endpoint that
+	// A token is an optimization, never a requirement: every endpoint that
 	// declares one must still work without it.
 	TokenEnv string
 
@@ -378,7 +378,7 @@ type Endpoint struct {
 	//
 	// Cleartext is a real exposure for a library like this one, in both
 	// directions: what is requested reveals what is being observed, and what
-	// comes back is a physical constant or a catalogue position that anything
+	// comes back is a physical constant or a catalog position that anything
 	// on the path can rewrite. So it is never a default and never an
 	// oversight — TestNoUndeclaredCleartextEndpoints refuses any http:// URL
 	// that does not record a reason here.
@@ -653,7 +653,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "IAU Minor Planet Center orbital elements in MPCORB export format " +
 				"(MPCORB.DAT 317 MB, 94 MB gzipped; NEA.txt, Distant.txt, PHA.txt, " +
 				"Unusual.txt 0.5-8.6 MB each), and comets in CometEls.txt (0.16 MB)",
-			// Two orders of magnitude between the whole catalogue and the
+			// Two orders of magnitude between the whole catalog and the
 			// subsets, and the caller picks. A single figure here would either
 			// refuse a 0.5 MB fetch under a small grant or wave a 317 MB one
 			// through under it; SizeVaries makes the caller state a budget.
@@ -837,7 +837,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 // Token returns the API token registered for an endpoint, or an empty string
 // when the endpoint declares none or the environment does not supply one.
 //
-// A token is always an optimisation and never a requirement: Gaia@AIP serves
+// A token is always an optimization and never a requirement: Gaia@AIP serves
 // anonymously but caps a query at a five-second statement timeout, and an
 // identified caller gets a far larger budget. Code that uses this must work
 // when it returns nothing.

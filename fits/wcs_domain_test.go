@@ -16,7 +16,7 @@ import (
 // pixel more than pi radians from the reference point is off the sphere.
 //
 // A NaN here does not stop anything. It propagates into a coordinate, into a
-// catalogue match, into a plot, and looks like a missing value rather than a
+// catalog match, into a plot, and looks like a missing value rather than a
 // bug in the transform.
 func TestDeprojectNeverReturnsNaN(t *testing.T) {
 	t.Parallel()

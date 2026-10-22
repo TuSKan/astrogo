@@ -119,7 +119,7 @@ const DefaultStarTemperatureK = 5800
 //
 // A site field would have obscured exactly that. It would look like the
 // answer to the one question this cannot answer, while every computation
-// ignored it in favour of the observer arriving somewhere else entirely.
+// ignored it in favor of the observer arriving somewhere else entirely.
 type Spec struct {
 	// Preset is the configuration the inputs are gathered for. Required: it
 	// decides whether a solar spectrum is fetched at all.

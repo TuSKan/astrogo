@@ -123,7 +123,7 @@ type SeqIterator[T any] iter.Seq2[T, error]
 // an empty slice and reported "not found". One shape, four copies, one defect.
 //
 // The streaming iterators themselves were always correct; it was this drain
-// step that lost the error. Centralising it means the next provider inherits
+// step that lost the error. Centralizing it means the next provider inherits
 // the fix rather than the bug.
 //
 // # Partial results are discarded with the error

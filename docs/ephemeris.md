@@ -14,7 +14,7 @@ confirm it and change one detail of it (§7.4).
 is in `spk.Reader`, the prototype it replaces is deleted, and the measured
 production numbers are in §6.1 beside the prototype's. **And #803's first
 half** (§9, phases 3 and 4): a provider `Locate`s a body about its natural
-centre, `State.Center` is an `ID`, and `ephemeris.At` composes an `Instant`
+center, `State.Center` is an `ID`, and `ephemeris.At` composes an `Instant`
 whose places follow SOFA's order, seen from the geocentre. The site as an
 observer is the next change.
 
@@ -24,7 +24,7 @@ published atomically (#802). Prototyped, that takes a geometric sky from the
 kernel on disk from **360 µs to 3.8 µs with zero allocations**, bit-identical,
 with no API change, and every option below needs it. Then the breaking change
 #803 describes, now with its identity question answered (§3.1): IDs that are
-NAIF codes, states that name their centre, one `Instant` per epoch composing
+NAIF codes, states that name their center, one `Instant` per epoch composing
 them — **1.58 µs** for the same sky — and SOFA's order for apparent places.
 
 ---
@@ -84,7 +84,7 @@ const (
 	MarsBarycenter        ID = 4 // 1–9 are the system barycenters
 	JupiterBarycenter     ID = 5
 	Sun                   ID = 10
-	Mercury               ID = 199 // body centres are x99
+	Mercury               ID = 199 // body centers are x99
 	Venus                 ID = 299
 	Earth                 ID = 399
 	Moon                  ID = 301
@@ -93,10 +93,10 @@ const (
 )
 ```
 
-A body centre and a system barycenter are different points and get
+A body center and a system barycenter are different points and get
 different names; which one a planner observes is the planner's choice, made
 visibly (`plan.NewJupiter` keeps the barycenter it uses today, whose distance
-from the body centre is measured in `core.ID`'s doc, 0.05″ at worst). A
+from the body center is measured in `core.ID`'s doc, 0.05″ at worst). A
 provider never substitutes one for the other. Small bodies keep astrogo's
 `SmallBodyBase + n`, the Horizons convention, and an Earth satellite is
 −100000 − its NORAD number, NAIF's code for a satellite with no DSN number.
@@ -104,7 +104,7 @@ provider never substitutes one for the other. Small bodies keep astrogo's
 ### 3.2 Origin
 
 Every state names the point it is measured from, as an `ID` (`State.Center`).
-A geometric state is "target relative to centre"; there is no implicit
+A geometric state is "target relative to center"; there is no implicit
 geocentre.
 
 ### 3.3 Axes
@@ -138,7 +138,7 @@ The four places, defined as SOFA defines them (`iauApco13`, `iauAtciq`,
 
 | place | position | velocity |
 | --- | --- | --- |
-| **geometric** | r_target(t) − r_centre(t), both at TDB t | the derivative |
+| **geometric** | r_target(t) − r_center(t), both at TDB t | the derivative |
 | **astrometric** | r_target(t − τ) − r_observer(t), τ solving \|·\| = cτ | v_target(t − τ) − v_observer(t) |
 | **apparent** | the astrometric direction, deflected by the Sun (`iauLd`, true geometry) and then aberrated by the observer's barycentric velocity (`iauAb`); the astrometric range | the astrometric velocity: deflection and aberration bend a ray, not a motion |
 | **observed** | the apparent topocentric direction through CIRS, Earth rotation, polar motion, the horizon and refraction | — |
@@ -147,7 +147,7 @@ The observer is the geocentre or a site, and a site's barycentric position is
 the Earth's plus the site's GCRS position, so for a site τ is the light time
 *from the site*. The astrometric velocity omits the (1 − dτ/dt) factor, whose
 relative size is |ṙ|/c ≤ 10⁻⁴. The Shapiro delay is omitted: a few hundred
-microseconds at worst, metres of motion, microarcseconds of direction.
+microseconds at worst, meters of motion, microarcseconds of direction.
 
 One place astrogo produces departs from these definitions:
 
@@ -406,9 +406,9 @@ UTC → TDB, and the Earth's chain once per body, which is the instant's job.
 
 ### 6.2 Verdicts
 
-1. **Native target–centre segments.** 3.6–3.8× on a moon about its planet,
+1. **Native target–center segments.** 3.6–3.8× on a moon about its planet,
    rounding at the moon's distance rather than the barycenter's (§5.2). It falls out of states
-   that name their centre and an instant that finds the common ancestor; it
+   that name their center and an instant that finds the common ancestor; it
    is not a separate feature.
 2. **Same-epoch reuse.** 30 evaluations become 13 on the sky; 3.81 → 1.58 µs
    with the record cache in place. Only an instant can own it: a memo hidden
@@ -453,7 +453,7 @@ from the base (#810).
   same-epoch reuse has nowhere to live but a hidden, locked memo; the
   observer stays the geocentre, so §5.3 stays.
 
-### 7.2 B — natural-centre providers and one instant per epoch (#803)
+### 7.2 B — natural-center providers and one instant per epoch (#803)
 
 ```go
 // ephemeris/core
@@ -465,9 +465,9 @@ type State struct {
 	Frame    Frame
 }
 
-// Provider answers a body about the centre it computes it from: a JPL
-// kernel about the segment's centre, SOFA planets about the Sun, the Moon
-// and satellites about the Earth, a Kepler orbit about its fitted centre.
+// Provider answers a body about the center it computes it from: a JPL
+// kernel about the segment's center, SOFA planets about the Sun, the Moon
+// and satellites about the Earth, a Kepler orbit about its fitted center.
 type Provider interface {
 	Locate(id ID, t time.Time) (State, error)
 	Close() error
@@ -537,9 +537,9 @@ because every option needs them and they change no API. B is the contract —
 it is the only option in which §3 can be written down as a type. C waits for
 a workload that shows a need; nothing measured here does.
 
-One detail of #803 changes. It proposed taking the centres at the retarded
+One detail of #803 changes. It proposed taking the centers at the retarded
 epoch from the instant by Taylor extrapolation, with a stated error per
-centre. With records cached an evaluation is about 200 ns (§5.1), so the
+center. With records cached an evaluation is about 200 ns (§5.1), so the
 instant evaluates the target's whole chain at t − τ instead: exact, with no
 error budget to state, for a few hundred nanoseconds per iteration. Only the
 observer is held at t, which is what the definition says.
@@ -587,7 +587,7 @@ Performance is reported and never gates (CLAUDE.md); these gate.
    - **Gates.** 1, 3 and 4.
    - **Measured** (§6.1): the sky from disk 355 → 7.6 µs, a minute track 2.5 → 0.92 µs per state, all three backends equal.
    - **No API change.**
-3. **Identity, centre and frame (#809, #813, the first half of #803) — done.**
+3. **Identity, center and frame (#809, #813, the first half of #803) — done.**
    `ID` as a NAIF code, `State.Center` as an `ID`, `Locate`, segments checked
    for their frame. Breaking.
 4. **`Instant` and SOFA-order places (the rest of #803's first PR).** Done

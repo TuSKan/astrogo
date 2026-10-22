@@ -68,7 +68,7 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	rc2i := gofaext.C2i06a(tt1, tt2)
 
 	// The observer's rotation velocity is due east, so this is the direction
-	// the aberration displaces towards.
+	// the aberration displaces toward.
 	east := coord.NewAltAz(angle.Zero(), angle.Deg(90))
 
 	for _, s := range diurnalSites {

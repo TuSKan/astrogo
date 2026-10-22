@@ -10,7 +10,7 @@ name: Validation
 # schema change, a Horizons response-format change or a VizieR column rename —
 # failures that arrive without warning, and that `go vet -tags` cannot see
 # because the code still compiles. A week is a long time to be wrong about
-# whether the catalogue layer works, and #102 is why: a schema change surfaces
+# whether the catalog layer works, and #102 is why: a schema change surfaces
 # as "target not found" rather than as an error.
 #
 # The validation and integration tiers stay weekly. JPL and USNO are stable,
@@ -38,7 +38,7 @@ env:
 
 jobs:
   network:
-    name: Network Tests (live catalogue services)
+    name: Network Tests (live catalog services)
     # Every night, and on demand. The condition names the nightly cron rather
     # than excluding the weekly one, so adding a third schedule cannot silently
     # enrol this job in it.

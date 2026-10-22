@@ -384,7 +384,7 @@ type DetailOverrides struct {
 	// list. Nothing computes this.
 	Description string
 
-	// Source records where the target's data came from: a catalogue name, a
+	// Source records where the target's data came from: a catalog name, a
 	// kernel, an element set.
 	Source string
 

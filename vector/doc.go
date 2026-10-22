@@ -10,7 +10,7 @@
 //   - [Vec3.RotateX], [Vec3.RotateY], [Vec3.RotateZ]: in-place rotation about the principal axes.
 //
 // It is NOT a general linear algebra library. There is no matrix type, no
-// eigendecomposition, no LU factorisation. If a caller needs to compose
+// eigendecomposition, no LU factorization. If a caller needs to compose
 // multiple rotations, they can chain the Rotate methods or accumulate the
 // product in their own code.
 //

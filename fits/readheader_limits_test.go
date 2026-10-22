@@ -136,7 +136,7 @@ func TestReadHeaderAllocationDoesNotScaleWithInput(t *testing.T) {
 
 // blankStream is an endless source of blank cards — the corrupt file the block
 // failsafe exists for, where nothing is ever retained and nothing ever says
-// END. A generator rather than 28.8 MB of materialised spaces, since the point
+// END. A generator rather than 28.8 MB of materialized spaces, since the point
 // is that the stream has no end for ReadHeader to reach.
 type blankStream struct{}
 

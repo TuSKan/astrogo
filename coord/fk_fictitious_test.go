@@ -15,7 +15,7 @@ import (
 // frames drift against the inertial one, and the conversions hand that motion
 // back rather than pretending the star is at rest. Marking it as a *recorded*
 // proper motion sent the inverse down the six-element branch — Fk425 for FK4,
-// Fk52h for FK5 — and both of those take no epoch and assume the catalogue
+// Fk52h for FK5 — and both of those take no epoch and assume the catalog
 // equinox, while the position they were handed is at the caller's epoch.
 //
 // The cost was linear in the distance from the equinox, and zero at it, which
@@ -55,8 +55,8 @@ func TestTheRoundTripClosesAtEveryEpoch(t *testing.T) {
 		}
 	}
 
-	// And the leg between the two catalogues, which is where the defect was
-	// first localised.
+	// And the leg between the two catalogs, which is where the defect was
+	// first localized.
 	fk5 := coord.NewFK5(angle.Deg(123.4), angle.Deg(-35.6), coord.J2000Epoch)
 
 	for _, epoch := range []float64{1900, coord.B1950, 2000, 2050} {
@@ -73,7 +73,7 @@ func TestTheRoundTripClosesAtEveryEpoch(t *testing.T) {
 }
 
 // TestAstrogoMatchesRawSOFAAtEveryEpoch is the strongest form of the claim, and
-// the measurement that localised #341 in the first place.
+// the measurement that localized #341 in the first place.
 //
 // SOFA's Fk54z and Fk45z are matched inverses and close to 0.000023 arcsec at
 // any epoch — which was true before this fix too. The defect was never in SOFA;
@@ -112,7 +112,7 @@ func TestAstrogoMatchesRawSOFAAtEveryEpoch(t *testing.T) {
 // TestARecordedMotionStillTakesTheSixElementRoute is the other side of the
 // dispatch, and the reason it cannot simply always use the position-only pair.
 //
-// A catalogue's measured proper motion, parallax and radial velocity must
+// A catalog's measured proper motion, parallax and radial velocity must
 // survive the conversion. Routing those through Fk45z would silently drop all
 // three, which is a worse bug than the one being fixed.
 func TestARecordedMotionStillTakesTheSixElementRoute(t *testing.T) {
@@ -178,7 +178,7 @@ func TestAFictitiousMotionIsNotTreatedAsRecorded(t *testing.T) {
 		t.Fatal("the fictitious motion is zero, so this test cannot distinguish anything")
 	}
 
-	// The same numbers, but asserted as a catalogue measurement.
+	// The same numbers, but asserted as a catalog measurement.
 	asRecorded := coord.NewFK4WithProperMotion(
 		converted.RA(), converted.Dec(), pmRA, pmDec,
 		converted.Parallax(), converted.RV(),

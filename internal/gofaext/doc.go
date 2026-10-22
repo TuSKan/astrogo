@@ -4,7 +4,7 @@
 //   - isolate astrogo packages from gofa's calling conventions and type naming,
 //   - provide thin helpers that translate astrogo value types (Julian dates,
 //     ra/dec in radians, …) into the argument shapes gofa routines expect, and
-//   - centralise any workaround needed for gofa edge cases so the rest of the
+//   - centralize any workaround needed for gofa edge cases so the rest of the
 //     codebase stays clean.
 //
 // Nothing in this package is part of the public API. Callers outside astrogo

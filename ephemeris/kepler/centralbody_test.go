@@ -342,7 +342,7 @@ func TestSatelliteMovesWithItsParent(t *testing.T) {
 	}
 
 	// A circular orbit stays at one radius no matter where the parent has
-	// travelled; a composition that lost the parent term would show the
+	// traveled; a composition that lost the parent term would show the
 	// separation wandering by an astronomical unit.
 	if spread := (maxSep - minSep) / minSep; spread > 1e-9 {
 		t.Errorf("separation varied by a relative %.3g over 40 days on a circular orbit", spread)

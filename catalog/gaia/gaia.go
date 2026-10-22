@@ -206,11 +206,11 @@ func responseFormat(endpoint remote.EndpointID) string {
 	return "csv"
 }
 
-// parseResult decodes whichever serialisation the archive actually sent.
+// parseResult decodes whichever serialization the archive actually sent.
 //
 // The format is read off the payload rather than off the request, the same way
 // the star-map loader tells Parquet from CSV by the file's own magic. It has
-// to be: ESA honours FORMAT=csv and Gaia@AIP's synchronous endpoint does not —
+// to be: ESA honors FORMAT=csv and Gaia@AIP's synchronous endpoint does not —
 // it answers VOTable for FORMAT=csv, RESPONSEFORMAT=csv and text/csv alike,
 // checked against the live service — so what was asked for does not determine
 // what arrives. Sniffing also means a service that changes its mind is handled
@@ -326,7 +326,7 @@ func parseCSV(body io.Reader) ([]resolve.Target, error) {
 // targetFromRow turns one result row into a target, reporting false for a row
 // that cannot be used.
 //
-// Shared by both serialisations deliberately. They differ only in how bytes
+// Shared by both serializations deliberately. They differ only in how bytes
 // become cells; what a cell means — which column is the identifier, how a
 // proper motion is scaled, how V follows from G and BP−RP — is the same
 // question with the same answer, and two copies of it would be two things to

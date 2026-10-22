@@ -52,7 +52,7 @@ above, extends the link-reference chain, and deletes the consumed files. The
 release pull request is where the result is reviewed.
 
 The `-update` gate follows this repository's existing convention for generated
-artefacts — the Horizons corpus and the accuracy table work the same way — so
+artifacts — the Horizons corpus and the accuracy table work the same way — so
 nothing rewrites a checked-in file as a side effect of running the tests.
 
 Without `-update`, `go test ./internal/changelog/` checks that every file here

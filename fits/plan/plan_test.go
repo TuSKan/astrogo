@@ -130,7 +130,7 @@ func TestSiteFromFITSRefusesAnIncompleteSet(t *testing.T) {
 	}
 }
 
-// TestTargetFromFITSReadsTheWCS: the frame centre through the header's WCS, in
+// TestTargetFromFITSReadsTheWCS: the frame center through the header's WCS, in
 // the frame CTYPE and RADESYS name (#582). Each case was read as CRVAL1 and
 // CRVAL2 in right ascension and declination.
 func TestTargetFromFITSReadsTheWCS(t *testing.T) {
@@ -143,13 +143,13 @@ func TestTargetFromFITSReadsTheWCS(t *testing.T) {
 		tol     float64 // degrees; zero means 2e-6
 	}{
 		// The reference pixel at the corner of a 4096-pixel frame at 1"; the
-		// centre by astropy 8.0.1's wcs_pix2world.
+		// center by astropy 8.0.1's wcs_pix2world.
 		{"reference pixel at the corner", header([2]string{"NAXIS", "2"}, [2]string{"NAXIS1", "4096"}, [2]string{"NAXIS2", "4096"},
 			[2]string{"CTYPE1", "'RA---TAN'"}, [2]string{"CTYPE2", "'DEC--TAN'"},
 			[2]string{"CRPIX1", "1"}, [2]string{"CRPIX2", "1"}, [2]string{"CRVAL1", "83.82208"}, [2]string{"CRVAL2", "-5.39111"},
 			[2]string{"CDELT1", "-0.000277778"}, [2]string{"CDELT2", "0.000277778"}),
 			83.2513561, -4.8221401, 0},
-		// The Galactic Centre; ICRS by astropy's SkyCoord. astropy defines the
+		// The Galactic Center; ICRS by astropy's SkyCoord. astropy defines the
 		// galactic frame through FK5, SOFA's iauG2icrs on ICRS through the
 		// Hipparcos frame, and the two differ by about 25 mas: 0.024" here.
 		{"galactic axes", header([2]string{"CTYPE1", "'GLON-CAR'"}, [2]string{"CTYPE2", "'GLAT-CAR'"},

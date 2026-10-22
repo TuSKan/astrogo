@@ -518,7 +518,7 @@ func redirect(t *testing.T, url string) {
 // TestIdentifierVariantsCoversSIMBADPadding pins the spellings the exact
 // match depends on, without a network call.
 //
-// SIMBAD right-justifies a catalogue number in a fixed-width field — "M  31",
+// SIMBAD right-justifies a catalog number in a fixed-width field — "M  31",
 // "HD   3969" — and its ADQL cannot normalize (REPLACE, LOWER, ILIKE and
 // ivo_nocasematch are all rejected by the live parser). So these variants are
 // the whole mechanism: if the padded forms stop being generated, resolution

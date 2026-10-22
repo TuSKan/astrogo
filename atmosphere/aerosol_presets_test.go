@@ -226,7 +226,7 @@ func TestAerosolPresetsCarryTheirOPACScaleHeight(t *testing.T) {
 // The bounds are deliberately loose. They are not a claim about any site: an
 // AOD below 0.01 is cleaner than the cleanest observed background and one
 // above 1 is a dust storm, so anything landing outside says the constant was
-// mistyped rather than that a judgement was revised.
+// mistyped rather than that a judgment was revised.
 func TestIndicativeAODsAreOrderedAndPlausible(t *testing.T) {
 	t.Parallel()
 
@@ -323,7 +323,7 @@ func TestAerosolPresets_AddedTypesMatchOPAC(t *testing.T) {
 	}
 
 	// Particle size again: the continental types are fine-particle and steep,
-	// the maritime ones coarse and nearly grey. Maritime tropical at 0.04 is
+	// the maritime ones coarse and nearly gray. Maritime tropical at 0.04 is
 	// the flattest in the table.
 	if continentalCleanAngstrom <= 1 || continentalPollutedAngstrom <= 1 {
 		t.Errorf("continental Angstrom exponents %v and %v should be above 1 (fine particles)",

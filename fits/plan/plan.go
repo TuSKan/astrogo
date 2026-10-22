@@ -163,7 +163,7 @@ func has(h *fits.Header, key string) bool {
 }
 
 // TargetFromFITS returns what a FITS image is pointed at: the world
-// coordinate of the frame's centre, pixel ((NAXIS1+1)/2, (NAXIS2+1)/2), or of
+// coordinate of the frame's center, pixel ((NAXIS1+1)/2, (NAXIS2+1)/2), or of
 // the reference pixel when the header gives no image size, through the
 // header's own WCS ([fits.ExtractWCS]).
 //
@@ -182,9 +182,9 @@ func has(h *fits.Header, key string) bool {
 // DEC_DEG keywords, in degrees.
 //
 // Until #582 it returned CRVAL1 and CRVAL2 as right ascension and declination
-// whatever CTYPE said, documented as the frame's centre: a reference pixel at
+// whatever CTYPE said, documented as the frame's center: a reference pixel at
 // the corner of a 4096-pixel frame at 1″ put the target 0.57° off in each
-// coordinate, and the Galactic Centre came back as RA 0, Dec 0.
+// coordinate, and the Galactic Center came back as RA 0, Dec 0.
 //
 // The target is named by OBJECT, else OBJNAME, else "FITS Target".
 func TargetFromFITS(h *fits.Header) (plan.Observable, error) {
@@ -197,7 +197,7 @@ func TargetFromFITS(h *fits.Header) (plan.Observable, error) {
 		name = "FITS Target"
 	}
 
-	pos, err := frameCentre(h)
+	pos, err := frameCenter(h)
 	if err == nil {
 		return plan.NewDeepSkyObject(name, pos.RA(), pos.Dec()), nil
 	}
@@ -230,15 +230,15 @@ const (
 	galactic
 )
 
-// frameCentre is the ICRS position of the frame's centre, or of the
+// frameCenter is the ICRS position of the frame's center, or of the
 // reference pixel when NAXISn is absent.
-func frameCentre(h *fits.Header) (coord.ICRS, error) {
+func frameCenter(h *fits.Header) (coord.ICRS, error) {
 	lonAxis, latAxis, kind, err := celestialAxes(h)
 	if err != nil {
 		return coord.ICRS{}, err
 	}
 
-	lon, lat, err := worldAtCentre(h, lonAxis, latAxis)
+	lon, lat, err := worldAtCenter(h, lonAxis, latAxis)
 	if err != nil {
 		return coord.ICRS{}, err
 	}
@@ -288,10 +288,10 @@ func celestialAxes(h *fits.Header) (lonAxis, latAxis int, kind celestialKind, er
 	return lonAxis, latAxis, kind, nil
 }
 
-// worldAtCentre evaluates the WCS at the frame's centre. With no NAXIS, there
-// is no frame to take the centre of, and the reference pixel's world
+// worldAtCenter evaluates the WCS at the frame's center. With no NAXIS, there
+// is no frame to take the center of, and the reference pixel's world
 // coordinate is CRVAL by definition.
-func worldAtCentre(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err error) {
+func worldAtCenter(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err error) {
 	if !has(h, "NAXIS") {
 		lon, errLon := h.GetFloat(fmt.Sprintf("CRVAL%d", lonAxis+1))
 		lat, errLat := h.GetFloat(fmt.Sprintf("CRVAL%d", latAxis+1))
@@ -322,7 +322,7 @@ func worldAtCentre(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err 
 
 	world, err := w.PixelToWorld(pixel)
 	if err != nil {
-		return 0, 0, fmt.Errorf("fits/plan: WCS at the frame centre: %w", err)
+		return 0, 0, fmt.Errorf("fits/plan: WCS at the frame center: %w", err)
 	}
 
 	return world[lonAxis], world[latAxis], nil

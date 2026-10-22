@@ -286,8 +286,8 @@ func (h *hemisphere) pixelOf(l, b angle.Angle) (x, y float64) {
 
 // bilinear samples the grid at a fractional pixel position.
 //
-// Interpolated rather than nearest-neighbour because the map is consulted at
-// arbitrary directions and its pixels are 2.37 arcminutes: nearest-neighbour
+// Interpolated rather than nearest-neighbor because the map is consulted at
+// arbitrary directions and its pixels are 2.37 arcminutes: nearest-neighbor
 // would make the intensity a step function of direction, and a component that
 // integrates over the sky would then see edges that are the sampling's rather
 // than the dust's.

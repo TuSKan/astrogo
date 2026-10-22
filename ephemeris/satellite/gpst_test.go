@@ -101,8 +101,8 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 	// float64 seconds — and the two epochs reach the comparison through
 	// different scale conversions, so the difference is the residue of two
 	// Julian-date sums rather than a true offset. It used to read exactly
-	// zero because Sub returned int64 nanoseconds and quantised the residue
-	// away; that quantisation was an artifact of the type, not a measurement.
+	// zero because Sub returned int64 nanoseconds and quantized the residue
+	// away; that quantization was an artifact of the type, not a measurement.
 	if d := math.Abs(gps.Sub(utc).Seconds()); d > 1e-12 {
 		t.Errorf("gps.Sub(utc) = %v s, want 0 to within a picosecond", d)
 	}

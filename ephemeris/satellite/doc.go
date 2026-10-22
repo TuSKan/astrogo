@@ -15,7 +15,7 @@
 //
 // [Satellite.Locate] takes an astrogo time.Time, which carries its own scale, and
 // a GNSS receiver does not hand out UTC. GPS and Galileo system time run 18
-// seconds ahead of it today, because they were synchronised once in 1980 and
+// seconds ahead of it today, because they were synchronized once in 1980 and
 // told to ignore leap seconds since.
 //
 // Passing that timestamp as UTC puts the satellite that far along its track,

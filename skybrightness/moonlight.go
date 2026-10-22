@@ -172,7 +172,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 	}
 
 	// The scattering angle is the angle between the direction the light was
-	// travelling and the direction it travels after scattering, which for a
+	// traveling and the direction it travels after scattering, which for a
 	// source at geom.direction seen along dir is the separation between the
 	// two lines of sight.
 	scatter := angle.Acos(clamp(geom.direction.ToUnitVector().Dot(dir.ToUnitVector()), -1, 1))
@@ -206,7 +206,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
 
 		phase, err := atmosphere.CombinedPhaseFunction(scatter.Radians(),
-			rayleigh, aer, float64(aerosol.Asymmetry), atmosphere.RayleighDepolarisation)
+			rayleigh, aer, float64(aerosol.Asymmetry), atmosphere.RayleighDepolarization)
 		if err != nil {
 			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}

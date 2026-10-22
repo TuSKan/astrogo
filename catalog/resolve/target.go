@@ -108,7 +108,7 @@ type Target struct {
 	// PmRA is the proper motion in right ascension of the target, as the
 	// provider published it: mu_alpha* = dRA/dt * cos(dec), the on-sky rate.
 	// That is the pmra column in Gaia, SIMBAD and Hipparcos alike, and it is
-	// what coord.NewICRSWithKinematics takes, so it travels from a catalogue
+	// what coord.NewICRSWithKinematics takes, so it travels from a catalog
 	// row to a position without conversion at any layer between.
 	PmRA angle.Angle
 	// Oblateness is the oblateness of the target.
@@ -343,7 +343,7 @@ func Score(query, candidate string) float64 {
 	// Tested after normalizing, not before. A query of nothing but spaces is
 	// not empty as a string but is empty as a name, and every string begins
 	// with the empty string — so reaching the prefix rung with one would score
-	// 0.8 against every candidate in the catalogue.
+	// 0.8 against every candidate in the catalog.
 	if q == "" || c == "" {
 		return 0
 	}

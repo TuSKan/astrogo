@@ -11,15 +11,15 @@ import (
 )
 
 // The task this package exists for: turn a name someone typed into a target
-// with coordinates, by asking the catalogues that might know.
+// with coordinates, by asking the catalogs that might know.
 //
 // The three-way switch below is the part worth copying. Resolve returning a
 // typed sentinel rather than a bare error is what lets a caller tell "the
-// catalogues answered, and the answer is no" from "the catalogues could not be
+// catalogs answered, and the answer is no" from "the catalogs could not be
 // reached" — and treating the second as the first turns an outage into a
 // silently empty sky.
 //
-// The query here is one no catalogue can resolve, which keeps the example
+// The query here is one no catalog can resolve, which keeps the example
 // offline and therefore executable. A real one — "M31" — takes exactly the same
 // path.
 func Example() {

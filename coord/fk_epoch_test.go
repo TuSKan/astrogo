@@ -11,7 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// kinematicStarForEpoch is an ordinary catalogue entry with everything
+// kinematicStarForEpoch is an ordinary catalog entry with everything
 // recorded, so the six-element route is the one that runs.
 func kinematicStarForEpoch() coord.ICRS {
 	return coord.NewICRSWithKinematics(
@@ -27,7 +27,7 @@ func positionOnlyStarForEpoch() coord.ICRS {
 	return coord.NewICRS(angle.Deg(123.4), angle.Deg(-35.6))
 }
 
-// TestTheSixElementRouteLabelsItsOutputWithTheCatalogueEquinox is #330.
+// TestTheSixElementRouteLabelsItsOutputWithTheCatalogEquinox is #330.
 //
 // SOFA's Fk524 and H2fk5 answer at B1950.0 and J2000.0 and take no epoch
 // argument. The conversions that call them used to store the caller's epoch in
@@ -36,18 +36,18 @@ func positionOnlyStarForEpoch() coord.ICRS {
 //
 // The numbers were right and only the label was wrong, which is the worse of
 // the two failures: numbers get compared, labels get believed.
-func TestTheSixElementRouteLabelsItsOutputWithTheCatalogueEquinox(t *testing.T) {
+func TestTheSixElementRouteLabelsItsOutputWithTheCatalogEquinox(t *testing.T) {
 	t.Parallel()
 
 	star := kinematicStarForEpoch()
 	fk5Star := coord.ICRSToFK5(star, coord.J2000Epoch)
 
-	// Epochs far from the catalogue equinoxes, so a stored argument cannot be
+	// Epochs far from the catalog equinoxes, so a stored argument cannot be
 	// mistaken for the right answer.
 	for _, epoch := range []float64{1900, 1950, 1975, 2000, 2050} {
 		if got := coord.ICRSToFK4(star, epoch).Epoch(); got != coord.B1950 {
 			t.Errorf("ICRSToFK4(star, %g).Epoch() = %g, want B1950 — the six-element route "+
-				"answers at the catalogue equinox and must say so", epoch, got)
+				"answers at the catalog equinox and must say so", epoch, got)
 		}
 
 		if got := coord.FK5ToFK4(fk5Star, epoch).Epoch(); got != coord.B1950 {
@@ -61,14 +61,14 @@ func TestTheSixElementRouteLabelsItsOutputWithTheCatalogueEquinox(t *testing.T) 
 	}
 }
 
-// TestThePositionOnlyRouteStillHonoursItsEpoch is the other half, and the
+// TestThePositionOnlyRouteStillHonorsItsEpoch is the other half, and the
 // reason the argument cannot simply be removed.
 //
 // SOFA's Fk54z and Hfk5z do take a date, because a star with no recorded motion
 // acquires one from the frames' relative spin, and where it has drifted to
 // depends on when it is asked about. So on that route the epoch is used, the
 // label is true, and the answer genuinely changes with it.
-func TestThePositionOnlyRouteStillHonoursItsEpoch(t *testing.T) {
+func TestThePositionOnlyRouteStillHonorsItsEpoch(t *testing.T) {
 	t.Parallel()
 
 	star := positionOnlyStarForEpoch()

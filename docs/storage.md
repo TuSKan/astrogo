@@ -111,7 +111,7 @@ type RemoveFS interface {
 }
 
 // ContextFS binds a filesystem to a context, returning one whose operations
-// honour it.
+// honor it.
 type ContextFS interface {
     fs.FS
     WithContext(ctx context.Context) fs.FS

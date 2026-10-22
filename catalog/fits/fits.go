@@ -89,7 +89,7 @@ func New(filePath string) (*Provider, error) {
 }
 
 // usableCoord reports whether a row's right ascension and declination are a
-// position rather than an artefact of reading one that was not there.
+// position rather than an artifact of reading one that was not there.
 //
 // GetFloatColumn reads a null entry as NaN, refused below. A table that writes
 // zeros where it means "no position" is the case NaN cannot catch: the row

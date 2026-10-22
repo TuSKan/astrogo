@@ -81,7 +81,7 @@ func TestPvstarReportsTheInputsItCannotUse(t *testing.T) {
 
 // TestStarpvAndPvstarAreInverses is the property astrogo actually depends on:
 // coord.SpaceVelocity uses one and coord.GalactocentricFrame.ToICRS the other,
-// so a catalogue entry taken apart and put back together must survive.
+// so a catalog entry taken apart and put back together must survive.
 func TestStarpvAndPvstarAreInverses(t *testing.T) {
 	t.Parallel()
 

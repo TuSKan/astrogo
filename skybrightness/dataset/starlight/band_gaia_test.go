@@ -78,7 +78,7 @@ func TestVegaZeroFluxNeedsAZeroPoint(t *testing.T) {
 // The four published relations resolve and U does not.
 //
 // Gaia's bluest band starts around 330 nm and Table 5.9 publishes no G-to-U
-// relation, so a four-band map is what this catalogue can produce. Returning
+// relation, so a four-band map is what this catalog can produce. Returning
 // an error rather than an approximation is the whole point: a fabricated U
 // would be indistinguishable from a real one in the output.
 func TestJohnsonCousinsColorTermHasNoU(t *testing.T) {

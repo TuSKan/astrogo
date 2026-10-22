@@ -105,7 +105,7 @@ func TestBatchTransformDoesNotAllocate(t *testing.T) {
 
 // TestNewContextAllocationIsBounded states a bound rather than zero, because
 // zero would be a false claim: Context holds the SOFA astrometry parameters
-// and one allocation is what materialises them.
+// and one allocation is what materializes them.
 //
 // The bound is what matters. NewContext is the expensive call — measured
 // ~137 us against ~293 ns for a cached transform — and the risk is not that it

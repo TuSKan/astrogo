@@ -173,13 +173,13 @@ func TestParseDropsUnusableSamples(t *testing.T) {
 	}
 
 	// The two arrays must stay in step, or every wavelength is reported with
-	// its neighbour's radiance.
+	// its neighbor's radiance.
 	if len(got.LambdaNM) != len(got.Radiance) {
 		t.Errorf("%d wavelengths against %d radiances", len(got.LambdaNM), len(got.Radiance))
 	}
 }
 
-// A negative flux is a subtraction artefact in the model that produced it, not
+// A negative flux is a subtraction artifact in the model that produced it, not
 // emission removed from the sky, so it clamps rather than darkening the total.
 func TestParseClampsNegativeFlux(t *testing.T) {
 	t.Parallel()

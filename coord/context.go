@@ -650,7 +650,7 @@ func (ctx *Context) refract(alt angle.Angle) angle.Angle {
 func (ctx *Context) atciq(c Astrometric) (ri, di float64) {
 	return gofaext.Atciq(
 		c.RA().Radians(), c.Dec().Radians(),
-		// SOFA wants dRA/dt; this package stores the catalogue's on-sky
+		// SOFA wants dRA/dt; this package stores the catalog's on-sky
 		// rate. See [dRAdt].
 		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
 		&ctx.astrom,

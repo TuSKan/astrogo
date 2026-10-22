@@ -100,7 +100,7 @@ type State struct {
 	Frame Frame
 
 	// Center is the body the vectors are measured from, as a NAIF code (see
-	// [ID]): what [Provider.Locate] names as the centre it computes a body
+	// [ID]): what [Provider.Locate] names as the center it computes a body
 	// from. Unlike Frame it has no "unspecified": its zero value is the Solar
 	// System barycenter.
 	Center ID
@@ -123,16 +123,16 @@ func (s State) Speed() float64 { return s.Vel.Norm() }
 
 // Provider is the interface for celestial ephemeris sources.
 type Provider interface {
-	// Locate returns the state of id at t about the centre the provider
-	// computes it from, and names that centre in State.Center: the centre of
+	// Locate returns the state of id at t about the center the provider
+	// computes it from, and names that center in State.Center: the center of
 	// the segment a JPL kernel holds the body in, the Sun for the SOFA
 	// planets, the Earth for the SOFA Moon and an SGP4 satellite, the Sun or
-	// a planet for a Kepler orbit. Any centre a provider names, it also
+	// a planet for a Kepler orbit. Any center a provider names, it also
 	// locates, down to the Solar System barycenter, which is located about
 	// itself.
 	//
 	// It is not geocentric. ephemeris.At composes Locate answers into a state
-	// about any centre, the Earth among them. The method replaced a geocentric
+	// about any center, the Earth among them. The method replaced a geocentric
 	// State rather than redefining it, so that a caller still expecting a
 	// geocentric answer fails to compile instead of being an AU wrong (#803).
 	Locate(id ID, t time.Time) (State, error)

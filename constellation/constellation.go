@@ -60,7 +60,7 @@ func groupIntoLoops(raw []struct {
 }
 
 // windsAroundNorthPole reports whether poly's boundary encircles the north
-// celestial pole, by summing the signed right ascension travelled around the
+// celestial pole, by summing the signed right ascension traveled around the
 // closed loop. A boundary enclosing no pole returns to where it started and
 // sums to zero; one that encircles a pole sums to a full turn.
 //

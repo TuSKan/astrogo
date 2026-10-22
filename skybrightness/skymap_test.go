@@ -111,7 +111,7 @@ func TestIntegratedHemisphereUniformSky(t *testing.T) {
 
 	want := math.Pi * radiance
 
-	// The ring quadrature is a discretisation of the cos-weighted integral,
+	// The ring quadrature is a discretization of the cos-weighted integral,
 	// so it converges to pi*L rather than hitting it exactly; 1% at 60
 	// rings is the expected accuracy of this sampling.
 	if rel := math.Abs(float64(spectrum[0])-want) / want; rel > 0.01 {

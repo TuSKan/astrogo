@@ -233,7 +233,7 @@ func TestAgainstGAMBONSTable2AcrossBands(t *testing.T) {
 	}
 
 	// Bounds, not a transcription. These are wide because this is the first
-	// five-band measurement and its purpose is to characterise the
+	// five-band measurement and its purpose is to characterize the
 	// disagreement rather than to pin a number that has not been explained.
 	// They fail if the model stops resembling GAMBONS at all in any band,
 	// which is what would happen if a spectrum were replaced or a band

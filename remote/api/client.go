@@ -85,10 +85,10 @@ func WithAuthToken(scheme, token string) Option {
 // It exists for the case where a caller issues hundreds of queries in a row
 // against a shared research service that is free, anonymous and not obliged to
 // serve anyone in particular. Such a service will defend itself, and the
-// defence is rarely a clear error: submissions simply stop being answered,
+// defense is rarely a clear error: submissions simply stop being answered,
 // including ones that should fail instantly at the parser.
 //
-// The pacing is per client and serialises its requests, so it is a rate limit
+// The pacing is per client and serializes its requests, so it is a rate limit
 // and a concurrency limit at once. That is the intent — a burst of parallel
 // queries is what a limiter notices first.
 func WithMinInterval(d time.Duration) Option {
