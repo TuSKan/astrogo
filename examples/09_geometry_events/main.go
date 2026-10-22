@@ -10,6 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -28,6 +29,9 @@ func main() {
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
 	remote.EnableDownloads(200<<20, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	// 1. Setup high-precision JPL Ephemeris (DE442) as requested
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")

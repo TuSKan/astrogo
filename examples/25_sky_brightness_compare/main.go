@@ -22,6 +22,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/time"
@@ -51,6 +52,9 @@ func main() {
 	// spectrum besides, so granting for it covers the whole run.
 	ids, size := dataset.Endpoints(skybrightness.Observatory)
 	remote.EnableDownloads(size, ids...)
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
 
