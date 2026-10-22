@@ -10,6 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
+	"github.com/TuSKan/astrogo/vector"
 )
 
 // TargetDetails holds descriptive and ephemeris properties of an Observable.
@@ -216,21 +217,17 @@ func computeDetails(obs Observable, ctx *coord.Context, over DetailOverrides) (*
 // ── Moving-body helpers ─────────────────────────────────────────────────────
 
 // fillMovingBody computes topocentric AltAz, RA/Dec, distance, and elongation
-// for a target with an ephemeris provider. The observer's ICRS position is
-// subtracted to correct for diurnal parallax (~1° for the Moon, ~23″ for Mars).
+// for a target with an ephemeris provider, all from ctx's site.
 func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Context) {
-	vec, err := mb.GeocentricVec(t)
+	in := eph.At(mb.Provider(), t)
+
+	topoVec, err := astrometricFromSite(in, mb, ctx)
 	if err != nil {
 		return
 	}
 
-	// Topocentric vector: geocentric body position minus observer ICRS position.
-	topoVec := vec.Sub(ctx.ObsVec())
 	topoDist := topoVec.Norm()
 
-	// Topocentric ICRS RA/Dec (astrometric, corrected for diurnal parallax
-	// but not for precession-nutation or aberration — matches J2000 star
-	// charts, Stellarium default, and GoTo mount coordinate systems).
 	ra, dec := topoVec.ToSpherical()
 	d.RA, d.Dec = angle.Rad(ra), angle.Rad(dec)
 
@@ -263,14 +260,64 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 		d.AngularSize = formatAngularSize(diam)
 	}
 
-	// Elongation from the Sun (topocentric).
-	sunVec, err := geocentric(mb.Provider(), eph.Sun, t)
+	// Elongation from the Sun, placed the same way as the body.
+	sunVec, err := sunFromSite(in, mb, ctx)
 	if err == nil {
-		sunRA, sunDec := sunVec.Sub(ctx.ObsVec()).ToSpherical()
+		sunRA, sunDec := sunVec.ToSpherical()
 		sunPos := coord.NewICRS(angle.Rad(sunRA), angle.Rad(sunDec))
 		bodyPos := coord.NewICRS(d.RA, d.Dec)
 		d.Elongation = coord.Separation(bodyPos, sunPos)
 	}
+}
+
+// astrometricFromSite is mb's astrometric place from ctx's site, the vector
+// TargetDetails' RA, Dec and distance describe: light time to the site, but
+// no deflection and no aberration. in is at ctx's time.
+//
+// A body seenFromTheSite takes it from in with the site as the observer. It
+// used to be the geocentric apparent place less the site's position, which
+// carried the annual aberration the RA and Dec are documented without: up to
+// 21.0″ from the astrometric place for the Moon, the Sun and the planets
+// across 2026 (#843). Any other MovingBody still offers only its
+// GeocentricVec, and has the site's position taken off that.
+func astrometricFromSite(in *eph.Instant, mb MovingBody, ctx *coord.Context) (vector.Vec3, error) {
+	if !seenFromTheSite(mb) {
+		vec, err := mb.GeocentricVec(in.Time())
+		if err != nil {
+			return vector.Vec3{}, fmt.Errorf("plan: geocentric vector: %w", err)
+		}
+
+		return vec.Sub(ctx.ObsVec()), nil
+	}
+
+	st, err := in.Astrometric(mb.EphID(), eph.Site(ctx))
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("plan: %s: astrometric state from the site: %w", mb.Name(), err)
+	}
+
+	return st.Pos, nil
+}
+
+// sunFromSite is the Sun placed from ctx's site the way astrometricFromSite
+// places mb, so an elongation compares two places of one kind. A body
+// seenFromTheSite has the Sun's astrometric place from the same Instant; any
+// other has its geometric one, less the site's position.
+func sunFromSite(in *eph.Instant, mb MovingBody, ctx *coord.Context) (vector.Vec3, error) {
+	if !seenFromTheSite(mb) {
+		vec, err := geocentric(mb.Provider(), eph.Sun, in.Time())
+		if err != nil {
+			return vector.Vec3{}, err
+		}
+
+		return vec.Sub(ctx.ObsVec()), nil
+	}
+
+	st, err := in.Astrometric(eph.Sun, eph.Site(ctx))
+	if err != nil {
+		return vector.Vec3{}, fmt.Errorf("plan: the Sun's astrometric state from the site: %w", err)
+	}
+
+	return st.Pos, nil
 }
 
 // ── Static magnitude ────────────────────────────────────────────────────────
