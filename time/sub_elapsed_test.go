@@ -165,7 +165,7 @@ func TestSubHasNoCeiling(t *testing.T) {
 // residue it is allowed to leave.
 //
 // This used to assert *exact* equality, and got it, because Sub returned an
-// integer nanosecond count that quantised the residue away. A scale round trip
+// integer nanosecond count that quantized the residue away. A scale round trip
 // adds and removes an offset of about 69 s, which lands the result a part in
 // 1e13 below a whole second; rounding to the nearest nanosecond hid that, and
 // truncating instead — which an earlier version did — reported a ten-minute
@@ -198,7 +198,7 @@ func TestAddThenSubReturnsTheInterval(t *testing.T) {
 // Add is label arithmetic and Sub is physical, so across a leap second
 // t.Add(24h).Sub(t) is 86401 s rather than 86400 s. Both cannot be true at
 // once while UTC has no label for 23:59:60: physical addition into a leap
-// second has nowhere to land, aliases to its neighbour, and the trip back
+// second has nowhere to land, aliases to its neighbor, and the trip back
 // arrives a second away — which is why Add stays reversible instead.
 //
 // Doing the arithmetic in a uniform scale gives the physical answer.

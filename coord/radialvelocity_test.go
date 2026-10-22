@@ -361,7 +361,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 	site := equatorSite(t)
 
 	// Early January, when Earth is near perihelion and moving fastest, and a
-	// target on the ecliptic at RA 0 — the geometry that maximises the
+	// target on the ecliptic at RA 0 — the geometry that maximizes the
 	// correction and so the term that scales with it.
 	ctx := coord.NewContext(
 		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)

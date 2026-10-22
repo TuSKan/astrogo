@@ -82,7 +82,7 @@ func TestGridNoData(t *testing.T) {
 	}
 
 	// One valid corner: sampling at its center returns it exactly, with the
-	// missing neighbours dropped rather than treated as zero.
+	// missing neighbors dropped rather than treated as zero.
 	partial := northUpGrid(2, 2, []float64{10, nan, nan, nan}, 0, 0)
 
 	got, err := partial.SampleBilinear(angle.Deg(0.5), angle.Deg(-0.5))

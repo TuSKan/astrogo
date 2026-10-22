@@ -220,7 +220,7 @@ func (e *ExtragalacticBackground) Provenance() Provenance {
 // [ExtrapolatedModel].
 //
 // Interpolation is linear in wavelength. The IGL rises smoothly from u to Y and
-// turns over by Ks, so a straight line between neighbouring pivots is within a
+// turns over by Ks, so a straight line between neighboring pivots is within a
 // few per cent of any smoother curve through the same points — comfortably
 // inside the 4 to 7 per cent the measurements themselves carry.
 func (e *ExtragalacticBackground) at(lambdaNM float64) (value float64, extrapolated bool) {

@@ -1155,7 +1155,7 @@ func EvalChebyshev(coeffs []float64, tau, radius float64, calcDeriv bool) (p, v 
 // content failure is destructive.
 //
 // The handle is closed either way. extra runs only when the file is deleted —
-// it is for artefacts that describe the kernel and must not outlive it.
+// it is for artifacts that describe the kernel and must not outlive it.
 func discardIfCorrupt(ctx context.Context, fsys remote.FS, key string,
 	closeFile func() error, cause error, extra ...func() error,
 ) error {

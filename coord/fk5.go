@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// FK5 is a position in the FK5 system, the fundamental catalogue the IAU used
+// FK5 is a position in the FK5 system, the fundamental catalog the IAU used
 // from 1984 until the ICRS replaced it in 1998.
 //
 // # Why it is not simply ICRS with a different name
@@ -25,12 +25,12 @@ import (
 //     frame, so the bias between them depends on the epoch of the position.
 //     That is why [FK5ToICRS] takes an epoch and not only a direction.
 //
-// A catalogue that says "J2000" is usually FK5, not ICRS. The difference does
+// A catalog that says "J2000" is usually FK5, not ICRS. The difference does
 // not matter at arcsecond precision and does matter at the precision this
 // library otherwise claims, which is why the two are separate types here
 // rather than one type with a note in its doc comment.
 //
-// # What a catalogue records
+// # What a catalog records
 //
 // The same distinction [FK4] draws: a star with no recorded proper motion is
 // not a star measured to have none. FK5's spin means a star at rest in FK5 has
@@ -46,7 +46,7 @@ type FK5 struct {
 	hasProperMotion bool
 
 	// fictitiousMotion records that the proper motion above came from the
-	// frame rather than from a catalogue — here, from the slow spin of FK5
+	// frame rather than from a catalog — here, from the slow spin of FK5
 	// with respect to the ICRS, which [ICRSToFK5] hands back for a star with
 	// no recorded motion of its own. See [FK4.fictitiousMotion], which carries
 	// the same meaning and the fuller explanation.
@@ -59,29 +59,29 @@ type FK5 struct {
 }
 
 // J2000Epoch is the Julian epoch of the FK5 equinox, and the epoch of
-// observation for a catalogue that records none.
+// observation for a catalog that records none.
 const J2000Epoch = 2000.0
 
-// NewFK5 builds an FK5 position from a catalogue that records no proper
+// NewFK5 builds an FK5 position from a catalog that records no proper
 // motion, at the Julian epoch its positions were determined for — J2000.0
-// unless the catalogue says otherwise.
+// unless the catalog says otherwise.
 //
 // "No proper motion recorded" is not "proper motion is zero". FK5's frame
 // spins slowly against the extragalactic one, so a star genuinely at rest in
 // FK5 acquires a small motion in ICRS; SOFA supplies that through a different
 // routine than the one for a star with a measured motion. Passing zeroes to
 // [NewFK5WithProperMotion] asserts the star really is at rest in the inertial
-// sense, which is a claim almost no catalogue makes.
+// sense, which is a claim almost no catalog makes.
 func NewFK5(ra, dec angle.Angle, jepoch float64) FK5 {
 	return FK5{ra: ra, dec: dec, jepoch: jepoch}
 }
 
-// NewFK5WithProperMotion builds an FK5 position from a catalogue that records
+// NewFK5WithProperMotion builds an FK5 position from a catalog that records
 // the full six elements: proper motions per Julian year, parallax as an angle,
 // and radial velocity in km/s.
 //
 // There is no epoch parameter, and that is not an omission: SOFA's six-element
-// routines are defined for FK5 data at the catalogue equinox J2000.0, and a
+// routines are defined for FK5 data at the catalog equinox J2000.0, and a
 // position carrying its own motion already says where it will be at any other
 // date. The epoch matters only for the position-only form, which has nothing
 // else to go on — see [NewFK5].
@@ -130,7 +130,7 @@ func (c FK5) String() string {
 	return fmt.Sprintf("FK5 J%.1f RA %s Dec %s", c.jepoch, c.ra, c.dec)
 }
 
-// hasRecordedMotion reports whether a catalogue measured this star's proper
+// hasRecordedMotion reports whether a catalog measured this star's proper
 // motion, as opposed to there being none or it having been supplied by a frame
 // conversion. It is what the six-element routes must dispatch on.
 func (c FK5) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiousMotion }
@@ -145,7 +145,7 @@ func (c FK5) hasRecordedMotion() bool { return c.hasProperMotion && !c.fictitiou
 // epoch-dependent — the same position quoted at 1990 and at 2020 is not the
 // same ICRS direction.
 //
-// Kinematics survive the conversion when the catalogue recorded them: the
+// Kinematics survive the conversion when the catalog recorded them: the
 // returned ICRS carries proper motion, parallax and radial velocity, and
 // [Context.ICRSToAltAz] will use them for rigorous space-motion propagation.
 func FK5ToICRS(c FK5) ICRS {
@@ -156,7 +156,7 @@ func FK5ToICRS(c FK5) ICRS {
 		return NewICRS(angle.Rad(rh).Wrap360(), angle.Rad(dh))
 	}
 
-	// SOFA speaks dRA/dt in and out; these types carry the catalogue's
+	// SOFA speaks dRA/dt in and out; these types carry the catalog's
 	// on-sky rate, so each crossing converts. See [dRAdt].
 	rh, dh, drh, ddh, pxh, rvh := gofaext.Fk52h(
 		c.ra.Radians(), c.dec.Radians(),
@@ -172,7 +172,7 @@ func FK5ToICRS(c FK5) ICRS {
 }
 
 // ICRSToFK5 converts an ICRS position to FK5 at the given Julian epoch of
-// observation — [J2000Epoch] for the catalogue equinox itself.
+// observation — [J2000Epoch] for the catalog equinox itself.
 //
 // The inverse of [FK5ToICRS]. A position with no kinematics attached comes
 // back carrying the proper motion FK5's spin gives it, which is the honest
@@ -224,7 +224,7 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 		ra: angle.Rad(r5).Wrap360(), dec: angle.Rad(d5),
 		pmRA: pmRACosDec(dr5, angle.Rad(d5)), pmDec: angle.Rad(dd5),
 		parallax: angle.Arcsec(px5), rv: unit.KmPerSec(rv5),
-		// J2000Epoch rather than jepoch: H2fk5 answers at the catalogue equinox
+		// J2000Epoch rather than jepoch: H2fk5 answers at the catalog equinox
 		// and takes no date, so echoing the caller's would label these numbers
 		// with an epoch they are not at. See this function's doc comment.
 		jepoch:          J2000Epoch,

@@ -27,7 +27,7 @@ import (
 // proper motion in it was invented.
 //
 // The damage is not subtle. A star with 150 mas/yr and no recorded parallax —
-// which is most of any pre-Hipparcos proper-motion catalogue — sits at 10 Mpc
+// which is most of any pre-Hipparcos proper-motion catalog — sits at 10 Mpc
 // once the distance is overridden, where 150 mas/yr is about 24c. The velocity
 // is therefore zeroed, and ICRS → FK5 → ICRS returns (0, 0). Worse in the
 // other direction: a star *declared at rest* in FK4 comes back from FK4 → ICRS
@@ -73,7 +73,7 @@ import (
 // status its own wrappers throw away — that it cannot.
 
 // Fk52h converts J2000.0 FK5 star data to the Hipparcos frame, which is the
-// ICRS as realized by the Hipparcos catalogue.
+// ICRS as realized by the Hipparcos catalog.
 //
 // Unlike iauFk52h it does not require a usable parallax: see the commentary at
 // the top of this file for what happens when SOFA's pv route cannot be taken,
@@ -167,7 +167,7 @@ func h2fk5Angular(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv
 	return r5, d5, dr5, dd5, pxh, rvh
 }
 
-// maxStellarSpeed bounds what a catalogue star can plausibly be doing, as a
+// maxStellarSpeed bounds what a catalog star can plausibly be doing, as a
 // fraction of the speed of light.
 //
 // # Why SOFA's own limit is not enough
@@ -181,13 +181,13 @@ func h2fk5Angular(rh, dh, drh, ddh, pxh, rvh float64) (r5, d5, dr5, dd5, px5, rv
 // velocity of -9046 km/s and a status of zero. The implied speed there is
 // 0.43c.
 //
-// # Why this one is a judgement, and the only one in this package
+// # Why this one is a judgment, and the only one in this package
 //
 // Nothing SOFA publishes separates "mathematically valid" from "not a star";
 // its limits are about where its own arithmetic fails. So this is astrogo's
 // number, and it is chosen from astronomy rather than from arithmetic: the
 // Galaxy's escape velocity at the Sun is about 550 km/s, and the fastest
-// objects a star catalogue contains are hypervelocity ejections from the
+// objects a star catalog contains are hypervelocity ejections from the
 // Galactic center at order 10^3 km/s. 0.01c is 3000 km/s — comfortably above
 // anything real and fifty times below the point where SOFA gives up.
 //
@@ -204,7 +204,7 @@ const maxStellarSpeed = 0.01
 // It runs iauStarpv purely for the status its callers throw away, and the pv
 // it produces is discarded — the successful path below calls iauFk52h or
 // iauH2fk5, which computes it again. That is a few dozen floating-point
-// operations on a catalogue conversion, and it buys the property that the
+// operations on a catalog conversion, and it buys the property that the
 // number returned in the ordinary case is SOFA's own, produced by SOFA's own
 // code path, rather than something reassembled here from parts.
 //
@@ -223,7 +223,7 @@ func starpvIsExact(ra, dec, dr, dd, px, rv float64) bool {
 	return gofa.Pm(pv[1])/gofa.DC <= maxStellarSpeed
 }
 
-// starToAngular decomposes a catalogue position and proper motion into a unit
+// starToAngular decomposes a catalog position and proper motion into a unit
 // vector and the tangential angular-rate vector dp̂/dt, in radians per year.
 //
 // dr is dRA/dt — coordinate angle, SOFA's convention throughout this package —

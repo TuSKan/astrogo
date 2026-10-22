@@ -165,7 +165,7 @@ const (
 
 // RuralAerosol seeds a Builder with OPAC's "Continental average" aerosol
 // type (Hess, Koepke & Schult 1998) — background continental aerosol
-// away from major urban or desert sources, the OPAC analogue of the
+// away from major urban or desert sources, the OPAC analog of the
 // classical Shettle & Fenn (1979) "Rural" model. aod550 is the caller-
 // supplied aerosol optical depth at 550nm; single-scattering albedo,
 // asymmetry parameter, and Angstrom exponent come from the published
@@ -253,7 +253,7 @@ func MaritimePollutedAerosol(height unit.Length, aod550 float64) *Builder {
 // MaritimeTropicalAerosol seeds a Builder with OPAC's "Maritime tropical"
 // aerosol type (Hess, Koepke & Schult 1998) — the cleanest air OPAC
 // tabulates outside the polar types, with a single-scattering albedo of
-// 0.998 and an Angstrom exponent of 0.04, which is very nearly grey: sea
+// 0.998 and an Angstrom exponent of 0.04, which is very nearly gray: sea
 // salt is large enough that extinction barely varies across the visible.
 // See RuralAerosol's doc comment for parameter/caveat details shared by
 // all eight constructors.

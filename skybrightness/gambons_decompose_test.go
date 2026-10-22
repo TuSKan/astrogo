@@ -117,7 +117,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	t.Logf("  raw pixel %d holds %.6e; interface and pixel agree: %t",
 		pixel, raw, raw == islExtra)
 
-	// What the neighbourhood looks like, so a single odd pixel is visible as
+	// What the neighborhood looks like, so a single odd pixel is visible as
 	// one rather than mistaken for the region.
 	var lo, hi, sum float64
 
@@ -143,7 +143,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 		count++
 	}
 
-	t.Logf("  %d neighbouring pixels run %.3f to %.3f mag arcsec^-2, mean %.3f",
+	t.Logf("  %d neighboring pixels run %.3f to %.3f mag arcsec^-2, mean %.3f",
 		count, toMag(hi), toMag(lo), toMag(sum/float64(count)))
 
 	// ── the dust the DGL rests on ───────────────────────────────────────────

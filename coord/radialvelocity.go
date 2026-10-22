@@ -241,7 +241,7 @@ func (ctx *Context) TopocentricRadialVelocity(posAU, velAUPerDay vector.Vec3) un
 //
 // # Why it matters less than its size suggests
 //
-// These are very nearly constant. A programme measuring how a star's velocity
+// These are very nearly constant. A program measuring how a star's velocity
 // *changes* — which is what precision radial velocity is — sees them cancel,
 // which is why a classical projection served for so long. They matter for an
 // absolute velocity, and for agreeing with anyone else's absolute velocity.

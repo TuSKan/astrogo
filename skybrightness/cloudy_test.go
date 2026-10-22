@@ -34,7 +34,7 @@ func cloudyCity(tb testing.TB, bearingDeg, distanceKM float64) *skybrightness.Un
 //
 // The aerosol scale height is 1538 m, which is 1/beta for the paper's
 // beta = 0.65 km^-1 — the same profile written the way this package
-// parameterises it.
+// parameterizes it.
 func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
 	tb.Helper()
 
@@ -177,7 +177,7 @@ func TestCloudTermScalesWithReflectanceAndHeight(t *testing.T) {
 //
 // Kocifaj (2007) §3.1 states it for the cloudless case: "reduction of the
 // intensity may reach two orders of magnitude" across the sky. This checks
-// the direction and the rough scale, not a digitised curve — the figures are
+// the direction and the rough scale, not a digitized curve — the figures are
 // in relative units on a logarithmic scale and reading numbers off them would
 // be inventing precision.
 func TestCloudlessRadianceFallsAwayFromTheSource(t *testing.T) {

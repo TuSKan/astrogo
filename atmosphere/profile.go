@@ -126,11 +126,11 @@ func checkProfile(altitude unit.Length, column unit.OpticalDepth, scaleHeight un
 // smooth, positive and out by a constant, which is the kind that survives
 // every plausibility check.
 //
-// The molecular phase function is Rayleigh at the given depolarisation and
+// The molecular phase function is Rayleigh at the given depolarization and
 // the aerosol one is Henyey-Greenstein at asymmetry g, matching every other
 // scattering path in this package.
 func VolumeScatteringFunction(
-	theta float64, molecularScatter, aerosolScatter float64, g, depolarisation float64,
+	theta float64, molecularScatter, aerosolScatter float64, g, depolarization float64,
 ) (float64, error) {
 	switch {
 	case molecularScatter < 0 || math.IsNaN(molecularScatter) || math.IsInf(molecularScatter, 0):
@@ -144,7 +144,7 @@ func VolumeScatteringFunction(
 	// averaged one: Rayleigh is symmetric about 90 degrees and aerosol is
 	// forward-peaked, so averaging first and weighting after would move light
 	// from one angular regime into the other.
-	rayleigh := RayleighPhaseFunction(theta, depolarisation)
+	rayleigh := RayleighPhaseFunction(theta, depolarization)
 
 	aerosol, err := HenyeyGreensteinPhaseFunction(theta, g)
 	if err != nil {

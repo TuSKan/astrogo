@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 )
 
-// The R identity is exact arithmetic on two catalogued color indices.
+// The R identity is exact arithmetic on two cataloged color indices.
 //
 // V-R = (V-I) - (R-I), so R = V - (V-I) + (R-I). Alpha Centauri A, from
 // Hipparcos V and V-I and the Bright Star Catalogue's R-I for HR 5459.
@@ -37,7 +37,7 @@ func TestCousinsRFromTwoIndices(t *testing.T) {
 // Brightness, not distance, picks between the components of a close binary.
 //
 // Alpha Centauri is the case: its two components sit 1.4 arcseconds apart in
-// the catalogue while a position propagated through eight and three quarter
+// the catalog while a position propagated through eight and three quarter
 // years lands about six arcseconds out, so both are candidates and the nearer
 // was B by two hundredths of an arcsecond. Position cannot separate them and V
 // can, -0.01 against 1.33.
@@ -98,7 +98,7 @@ func TestMagnitudeToleranceSitsBetweenThePopulations(t *testing.T) {
 	t.Parallel()
 
 	// Gamma Leonis, Xi Ursae Majoris, Xi Scorpii: Hipparcos against the
-	// catalogue candidate that carries R-I.
+	// catalog candidate that carries R-I.
 	for _, delta := range []float64{0.60, 0.62, 0.61} {
 		if delta <= BrightStarMagnitudeTolerance {
 			t.Errorf("a combined-light multiple at delta V %.2f is admitted by a tolerance "+
@@ -115,9 +115,9 @@ func TestMagnitudeToleranceSitsBetweenThePopulations(t *testing.T) {
 	}
 }
 
-// The catalogue radius is wide enough for the residual a propagated position
+// The catalog radius is wide enough for the residual a propagated position
 // leaves, and no wider than it has to be.
-func TestCatalogueRadiusFitsThePropagationResidual(t *testing.T) {
+func TestCatalogRadiusFitsThePropagationResidual(t *testing.T) {
 	t.Parallel()
 
 	arcsec := BrightStarCatalogRadius.Degrees() * 3600

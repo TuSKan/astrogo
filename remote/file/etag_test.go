@@ -58,7 +58,7 @@ func TestETagPrefersTheServersOwn(t *testing.T) {
 		}
 	})
 
-	t.Run("no server ETag synthesises a weak one", func(t *testing.T) {
+	t.Run("no server ETag synthesizes a weak one", func(t *testing.T) {
 		t.Parallel()
 
 		got := file.ETag(stubInfo{size: 10, modTime: epoch, sys: noTag})
@@ -298,10 +298,10 @@ func TestMemFSWritePath(t *testing.T) {
 	}
 }
 
-// TestMemFSHonoursItsContext covers ContextFS on the in-memory backend, which
+// TestMemFSHonorsItsContext covers ContextFS on the in-memory backend, which
 // implements it for the same reason the local one does: a check with an
 // exception is one nobody can rely on.
-func TestMemFSHonoursItsContext(t *testing.T) {
+func TestMemFSHonorsItsContext(t *testing.T) {
 	t.Parallel()
 
 	fsys, err := file.OpenFS("mem://ctx")
@@ -336,7 +336,7 @@ func TestMemFSHonoursItsContext(t *testing.T) {
 }
 
 // TestMemDirCannotBeReadAsAFile pins the one thing an open directory must
-// refuse. fs.File gives a directory a Read method it cannot honour, and
+// refuse. fs.File gives a directory a Read method it cannot honor, and
 // returning zero bytes and io.EOF instead of an error would make a caller that
 // mistook a prefix for an object see an empty file rather than a mistake.
 func TestMemDirCannotBeReadAsAFile(t *testing.T) {

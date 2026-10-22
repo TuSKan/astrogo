@@ -12,7 +12,7 @@ import (
 // identifierVariants returns the spellings SIMBAD might store for a
 // user-typed identifier.
 //
-// SIMBAD right-justifies a catalogue number in a fixed-width field, so the
+// SIMBAD right-justifies a catalog number in a fixed-width field, so the
 // Andromeda Galaxy is stored as "M  31" and its Henry Draper number as
 // "HD   3969" — two and three spaces, chosen by the width of the field and
 // the number, not by any rule a caller can be expected to follow. Nobody
@@ -23,7 +23,7 @@ import (
 // normalization has to happen here, by generating the handful of spellings
 // the padding can produce and matching all of them exactly.
 //
-// Four spaces is past every field width SIMBAD uses for the catalogues in
+// Four spaces is past every field width SIMBAD uses for the catalogs in
 // common use, and an over-generated variant simply matches nothing.
 //
 // The "NAME " prefix is how SIMBAD stores common names — "NAME Andromeda
@@ -37,7 +37,7 @@ func identifierVariants(query string) []string {
 
 	seen := map[string]bool{q: true, "NAME " + q: true}
 
-	// Split a leading catalogue acronym from the number that follows it, so
+	// Split a leading catalog acronym from the number that follows it, so
 	// the padding can be varied between them.
 	if i := strings.IndexFunc(q, func(r rune) bool { return r >= '0' && r <= '9' }); i > 0 {
 		prefix := strings.TrimRight(q[:i], " ")
@@ -59,7 +59,7 @@ func identifierVariants(query string) []string {
 }
 
 // maxIdentifierPadding is the widest gap [identifierVariants] will try
-// between a catalogue acronym and its number.
+// between a catalog acronym and its number.
 const maxIdentifierPadding = 4
 
 // quoteADQL renders values as a comma-separated ADQL string list.

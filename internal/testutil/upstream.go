@@ -51,7 +51,7 @@ import (
 //
 // That reasoning holds only while astrogo sends no credential the service
 // requires, which remote.TokenEnv's contract states ("a token is an
-// optimisation, never a requirement") and remote's
+// optimization, never a requirement") and remote's
 // TestNoAPIEndpointRequiresACredential enforces. Break that invariant and this
 // arm starts hiding a real authorization failure — which is why the test that
 // keeps it true names this function.

@@ -44,7 +44,7 @@ const asyncPhaseCap = 45 * time.Minute
 // endpoint.
 //
 // It exists because the synchronous endpoint gives up: a GROUP BY over the
-// whole Gaia catalogue is a minutes-long query and the service aborts it after
+// whole Gaia catalog is a minutes-long query and the service aborts it after
 // about one, which is what forced a whole-sky build into 787 range-restricted
 // chunks. Asynchronously it is one query.
 //
@@ -56,7 +56,7 @@ func runAsync(ctx context.Context, client *remote.Client, id remote.EndpointID, 
 	// Parquet, not CSV.
 	//
 	// The synchronous endpoints ignore FORMAT and answer VOTable whatever is
-	// asked for; the asynchronous one honours it, which is the only place the
+	// asked for; the asynchronous one honors it, which is the only place the
 	// choice is available. Columnar, typed and compressed: a whole-sky
 	// four-band result is about sixty megabytes against two hundred and
 	// forty-five as CSV, and no number crosses the wire as a decimal string to
@@ -71,7 +71,7 @@ func runAsync(ctx context.Context, client *remote.Client, id remote.EndpointID, 
 	// The service runs jobs in queues that differ by the statement timeout
 	// they set: the default one gives a query well under a minute, and the "2h"
 	// queue issues SET SESSION statement_timeout TO 7200000 before running it.
-	// A GROUP BY over the whole Gaia catalogue takes about fourteen minutes,
+	// A GROUP BY over the whole Gaia catalog takes about fourteen minutes,
 	// so on the default queue it is canceled mid-flight with "canceling
 	// statement due to statement timeout" — which reads like a service problem
 	// and is a missing parameter.

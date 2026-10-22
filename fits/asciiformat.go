@@ -228,7 +228,7 @@ func impliedDecimal(mantissa string, d int) string {
 // formatCell renders a value into its fixed-width field.
 //
 // A value too wide for its field is an error rather than a truncation: the
-// columns are positional, so an overflowing field runs into its neighbour and
+// columns are positional, so an overflowing field runs into its neighbor and
 // every column after it is misread.
 func (f asciiForm) formatCell(value float64, str string, null bool) (string, error) {
 	if null {

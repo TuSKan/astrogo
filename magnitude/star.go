@@ -29,7 +29,7 @@ func StarApparent(catMag, airmass, k float64) float64 {
 //
 // so V = G − (G−V). The table is tabulated as G minus the target band, and
 // reading it the other way round costs 2(G−V) — about 0.3 mag at solar color,
-// 0.5 mag at the color most catalogue stars have and over 3 mag for an M
+// 0.5 mag at the color most catalog stars have and over 3 mag for an M
 // dwarf — always in the direction that makes the star too bright.
 //
 // Three independent checks fix the direction. The Sun has G = −26.90 against

@@ -83,14 +83,14 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 	return nil
 }
 
-// Locate returns id's state at t about the centre its orbit is fitted
+// Locate returns id's state at t about the center its orbit is fitted
 // about: the Sun for heliocentric elements, the parent planet for a
 // satellite's ([Elements.CentralBody]). A body with no elements registered is
 // the base provider's to locate.
 //
 // It used to answer geocentric, placing a heliocentric orbit against the
 // base's Sun, and before #810 against SOFA's Epv00 whatever the base was.
-// Located about its own centre, the orbit meets the Earth, the Sun and any
+// Located about its own center, the orbit meets the Earth, the Sun and any
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
 func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
@@ -146,7 +146,7 @@ var plutoElements = func() Elements {
 // sofaBase is the default WithBase delegate: a small, offline,
 // SOFA-only core.Provider covering the Sun, the Earth, the Moon, the
 // Earth-Moon barycenter, the planets' system barycenters, Pluto's from its
-// elements, and the Solar System Barycenter. It answers each about the centre
+// elements, and the Solar System Barycenter. It answers each about the center
 // its series computes it from:
 //
 //	Sun                           about the Solar System barycenter (Epv00)

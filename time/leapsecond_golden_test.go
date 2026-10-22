@@ -25,7 +25,7 @@ type leapStep struct {
 // at its end.
 //
 // The first entry is *not* a leap second: 1972-01-01 is where the current
-// system was initialised with ΔAT already at 10 s. Levine, Tavella & Milton
+// system was initialized with ΔAT already at 10 s. Levine, Tavella & Milton
 // (2023) count "27 leap events", and 27 + that baseline is the 28 rows below.
 //
 // The record is also nearly final. CGPM Resolution 4 (2022) commits to ending

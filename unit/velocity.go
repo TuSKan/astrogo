@@ -46,7 +46,7 @@ var (
 //
 // The same gap [Length] documents, and it bites harder here, because the unit
 // a caller writes a radial velocity in is never the stored one: `rv: -7.6`
-// compiles and means −7.6 m/s, not the −7.6 km/s every catalogue publishes.
+// compiles and means −7.6 m/s, not the −7.6 km/s every catalog publishes.
 // Write [KmPerSec] around a literal.
 type Velocity float64
 

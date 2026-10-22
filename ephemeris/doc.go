@@ -3,7 +3,7 @@
 // # Architecture
 //
 // The top-level [NewProvider] factory creates a [Provider] for a given
-// [Source] and kernel identifier, routing internally to specialised
+// [Source] and kernel identifier, routing internally to specialized
 // implementations:
 //
 //   - [Planets], [SmallBody], [Asteroids], [Comets] — JPL SPK/LSK kernels

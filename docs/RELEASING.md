@@ -52,7 +52,7 @@ The commit being tagged must have:
 - **CI green** on all three platforms, including the race run.
 - **The latest nightly network run green** (`pre-release.yml`), or each failure
   triaged as an upstream outage with an issue of its own. The network tier is
-  the only thing that notices a catalogue service changing its schema.
+  the only thing that notices a catalog service changing its schema.
 - **That week's validation and integration run green.**
 - **`govulncheck` clean.**
 

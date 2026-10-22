@@ -69,7 +69,7 @@ func TestOnlyTestutilProbesReachability(t *testing.T) {
 
 		src, readErr := os.ReadFile(path)
 		if readErr != nil {
-			return nil //nolint:nilerr // unreadable is not an offence
+			return nil //nolint:nilerr // unreadable is not an offense
 		}
 
 		for i, line := range strings.Split(string(src), "\n") {

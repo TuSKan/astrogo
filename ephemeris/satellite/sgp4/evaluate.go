@@ -130,7 +130,7 @@ func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) 
 	cosip := math.Cos(inclm)
 
 	// con41, x1mth2, x7thm1, aycof and xlcof are read below. In the near-Earth
-	// case they are the initialised values; in deep space the model recomputes
+	// case they are the initialized values; in deep space the model recomputes
 	// them from the perturbed inclination on every call. The reference does
 	// that by writing back into its satrec, which is what makes it unsafe to
 	// share; these are locals for the same reason.

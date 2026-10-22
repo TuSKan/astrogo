@@ -101,7 +101,7 @@ const ClearSkyTopM = 100_000
 // to compute it.
 //
 // It derives the line-of-sight opacity from a stochastic 3D cloud field —
-// randomised cuboids filled with cloud elements — and reads it off a ray cast
+// randomized cuboids filled with cloud elements — and reads it off a ray cast
 // through one realization. The text does not specify that generator closely
 // enough to reproduce, so [cloudDeck.opacity] takes the other route to the
 // same quantity, Beer-Lambert through a deck of stated optical depth. The
@@ -288,7 +288,7 @@ type cloudDeck struct {
 // # Where this comes from
 //
 // The paper does not print a formula for it. It derives the quantity from a
-// stochastic 3D cloud field — randomised cuboids filled with cloud elements —
+// stochastic 3D cloud field — randomized cuboids filled with cloud elements —
 // and reads the opacity off a ray cast through that realization. That
 // generator is not specified closely enough in the text to reproduce, so this
 // takes the other route to the same quantity: Beer-Lambert through the deck

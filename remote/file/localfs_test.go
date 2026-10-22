@@ -239,7 +239,7 @@ func TestFailedWriteLeavesTheObjectAlone(t *testing.T) {
 // that clock does not advance — one distinct value across 2000 consecutive
 // reads, measured. Every concurrent writer picked the same path and its O_EXCL
 // retry re-read the same frozen clock, so one writer's file was renamed out
-// from under another. astrogo serialised writers in-process to work around it.
+// from under another. astrogo serialized writers in-process to work around it.
 //
 // The staging name here carries a per-process atomic counter, so this needs no
 // lock. Eight goroutines, forty rounds, is the shape that reproduced the

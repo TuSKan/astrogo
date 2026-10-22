@@ -27,7 +27,7 @@ type BrightStar struct {
 	// RA and Dec are ICRS coordinates.
 	RA, Dec angle.Angle
 
-	// Vmag is the Johnson V magnitude, which the Hipparcos catalogue supplies
+	// Vmag is the Johnson V magnitude, which the Hipparcos catalog supplies
 	// directly.
 	Vmag float64
 
@@ -44,7 +44,7 @@ type BrightStar struct {
 	//	R = V - (V-I) + (R-I)  the last from the Bright Star Catalogue V/50
 	//
 	// The R identity is the one worth stating: V-R = (V-I) - (R-I), so R
-	// follows exactly from two catalogued indices with nothing interpolated.
+	// follows exactly from two cataloged indices with nothing interpolated.
 	// Hipparcos publishes no R and no V-R, and the alternative — a
 	// color-color relation predicting V-R from B-V — would be a fit, which
 	// is what this package refuses everywhere else. A star that the Bright
@@ -97,7 +97,7 @@ func (s BrightStar) magnitudeIn(band string) (float64, bool) {
 // equivalent correction at around 20 per cent, but that is a **DR2** figure:
 // DR2 lacked a counterpart for some 35,000 Hipparcos stars, DR3 recovered
 // nearly all of them, and what remains is only the handful Gaia saturates on.
-// The correction shrank because the catalogue improved, not because the
+// The correction shrank because the catalog improved, not because the
 // physics changed.
 //
 // A star outside the map's grid, or with a magnitude that cannot produce a
@@ -129,7 +129,7 @@ func AddBrightStars(m *Map, name string, band magnitude.Passband, stars []Bright
 	for _, s := range stars {
 		mag, ok := s.magnitudeIn(name)
 		if !ok {
-			// Not every catalogue covers every band, and a star with no
+			// Not every catalog covers every band, and a star with no
 			// magnitude in this one contributes nothing to it. Silently, and
 			// deliberately: the alternative is to invent a color, and the
 			// count is reported below so the gap is visible rather than
@@ -170,7 +170,7 @@ func AddBrightStars(m *Map, name string, band magnitude.Passband, stars []Bright
 // BrightStarsMissingFromGaia reports which of the given Hipparcos stars have no
 // Gaia counterpart, propagating Hipparcos positions to Gaia's epoch first.
 //
-// Hipparcos is catalogued at J1991.25 and Gaia DR3 at J2016.0, so a star has
+// Hipparcos is cataloged at J1991.25 and Gaia DR3 at J2016.0, so a star has
 // moved by nearly twenty-five years of proper motion between them. Matching
 // without that shift misses genuine counterparts for exactly the nearby, fast
 // stars that are also the brightest, which would then be added twice.
@@ -213,7 +213,7 @@ func BrightStarsMissingFromGaia(
 // over the given number of years.
 func propagate(ra, dec angle.Angle, pmRA, pmDec, years float64) (angle.Angle, angle.Angle) {
 	// Proper motion in right ascension is already the great-circle rate for
-	// these catalogues, so it is divided by cos(dec) to become a coordinate
+	// these catalogs, so it is divided by cos(dec) to become a coordinate
 	// increment rather than multiplied by it.
 	cosDec := math.Cos(dec.Radians())
 	if cosDec == 0 {

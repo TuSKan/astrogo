@@ -628,7 +628,7 @@ func TCBToTDB(tcb1, tcb2 float64) (tdb1, tdb2 float64, status int) {
 	return tdb1, tdb2, status
 }
 
-// Starpv converts star catalogue data into the barycentric position/velocity
+// Starpv converts star catalog data into the barycentric position/velocity
 // pv-vector SOFA's astrometry routines work in: pv[0] is the position in au
 // and pv[1] the velocity in au per day.
 //
@@ -664,7 +664,7 @@ func Gc2gde(a, f float64, xyz [3]float64) (elong, phi, height float64, status in
 }
 
 // Pvstar is the inverse of [Starpv]: a barycentric position/velocity pv-vector,
-// in au and au per day, back to star catalogue data.
+// in au and au per day, back to star catalog data.
 //
 // The status is SOFA's own:
 //

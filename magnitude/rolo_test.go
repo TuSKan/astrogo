@@ -186,7 +186,7 @@ func TestROLOReflectanceOppositionSurge(t *testing.T) {
 //
 // The rise is *not* monotonic band to band, and asserting that it is would be
 // testing an assumption rather than the model. Each ROLO band is an
-// independent fit to its own filter, so neighbouring pairs invert where the
+// independent fit to its own filter, so neighboring pairs invert where the
 // filters are close together and the fits differ by more than the underlying
 // spectral slope: 355.1 nm falls below 350.0 nm, 414.4 below 412.3, and
 // 553.8 below 549.1, all as published. What is real is the trend across

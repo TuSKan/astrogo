@@ -153,7 +153,7 @@ func ZodiacalBrightnessAt(geom ZodiacalGeometry) (float64, error) {
 // The fold is done in degrees rather than through angle.Wrap180 so that a
 // direction given a full turn away lands on exactly the same table cell. Via
 // radians it lands one ulp off, which is invisible everywhere except on a
-// grid line, where it silently picks the neighbouring interval.
+// grid line, where it silently picks the neighboring interval.
 func foldDifferentialLongitude(a angle.Angle) float64 {
 	d := math.Mod(a.Degrees(), 360)
 	if d < 0 {
@@ -191,8 +191,8 @@ func interpolateZodiacal(lon, lat float64) (float64, error) {
 	j, fj := bracketZodiacalLatitude(lat)
 
 	// Weight first, then read. A direction sitting exactly on a grid line at
-	// the edge of the excluded solar vicinity has a missing neighbour with
-	// zero weight, and refusing it because that neighbour is blank would
+	// the edge of the excluded solar vicinity has a missing neighbor with
+	// zero weight, and refusing it because that neighbor is blank would
 	// reject perfectly good tabulated points — the brightest cell in the
 	// table among them.
 	corners := [4]struct {
@@ -238,9 +238,9 @@ func zodiacalCell(i, j int) float64 {
 // An angle.Angle holds radians, so a direction given in degrees round-trips
 // through a conversion and lands within an ulp or two of where it started:
 // angle.Deg(15).Degrees() is 14.999999999999998. Without snapping, a point on
-// a grid line gets a weight of 4e-16 on the neighbouring cell — harmless for
+// a grid line gets a weight of 4e-16 on the neighboring cell — harmless for
 // an ordinary interpolation, fatal at the edge of the table's blank region,
-// where that neighbour is missing and a vanishing weight would still veto the
+// where that neighbor is missing and a vanishing weight would still veto the
 // lookup. It cost the brightest cell in the table.
 //
 // The tolerance is a fraction of an interval, so on this 5-degree grid it

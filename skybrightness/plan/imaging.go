@@ -245,7 +245,7 @@ func limitingMagnitude(surfaceMag, pixelArcsec2, background, signal float64) flo
 // Band names the passband the returned magnitudes are quoted on.
 //
 // Worth asking for rather than assuming, for two reasons. It is the sky
-// model's own band, so comparing the result against a catalogue magnitude in
+// model's own band, so comparing the result against a catalog magnitude in
 // a different filter is a mistake that produces entirely plausible numbers.
 // And it describes the magnitude *scale* rather than the wavelengths the
 // electrons came from — those are the instrument's Throughput, and the two

@@ -52,9 +52,9 @@ type scatterKernel struct {
 	// extinction is the total vertical optical depth per wavelength.
 	extinction []float64
 
-	// asymmetry and depolarisation parameterise the two phase functions.
+	// asymmetry and depolarization parameterize the two phase functions.
 	asymmetry      float64
-	depolarisation float64
+	depolarization float64
 }
 
 // newScatterKernel builds the wavelength-dependent factors for a scene.
@@ -69,7 +69,7 @@ func newScatterKernel(scene *Scene, grid unit.SpectralGrid) (*scatterKernel, err
 		scatterFraction: make([]float64, grid.Len()),
 		extinction:      make([]float64, grid.Len()),
 		asymmetry:       float64(aerosol.Asymmetry),
-		depolarisation:  atmosphere.RayleighDepolarisation,
+		depolarization:  atmosphere.RayleighDepolarization,
 	}
 
 	for i := range k.extinction {
@@ -139,7 +139,7 @@ func (k *scatterKernel) phaseAt(theta float64) (rayleigh, aerosol float64, err e
 		return 0, 0, fmt.Errorf("%w: %w", ErrScattering, err)
 	}
 
-	return atmosphere.RayleighPhaseFunction(theta, k.depolarisation), aerosol, nil
+	return atmosphere.RayleighPhaseFunction(theta, k.depolarization), aerosol, nil
 }
 
 // accumulate adds one source direction's contribution to dst.

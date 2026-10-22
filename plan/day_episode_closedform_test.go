@@ -107,7 +107,7 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 	}
 
 	// A margin so large that nothing ever short-circuits would pass the loop
-	// above trivially, so check the optimisation still fires.
+	// above trivially, so check the optimization still fires.
 	if checkedSkips < 50 {
 		t.Fatalf("the closed form short-circuited only %d times across the whole "+
 			"latitude/declination grid; it is no longer doing anything", checkedSkips)

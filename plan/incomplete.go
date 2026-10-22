@@ -10,7 +10,7 @@ import (
 //
 // # Why a result and an error together
 //
-// [VisibleTonight] queries several catalogues and fetches an ephemeris per
+// [VisibleTonight] queries several catalogs and fetches an ephemeris per
 // candidate, and any of those can fail on its own. Failing the whole query
 // because one kernel could not be fetched would be worse than useless — a
 // night's plan is still a night's plan without one asteroid, and the caller

@@ -192,7 +192,7 @@ func TestStageAndPromotePublishesOnlyCompleteContent(t *testing.T) {
 // written so that a silent restart-from-zero fails rather than passes.
 //
 // The staged prefix is deliberately wrong content of the right length. If the
-// offset is honoured, the result keeps that wrong prefix and appends only the
+// offset is honored, the result keeps that wrong prefix and appends only the
 // remainder; a restart would produce the clean body instead, which is the
 // answer that looks correct and means the feature did nothing.
 func TestStageAndPromoteResumesFromAnOffset(t *testing.T) {

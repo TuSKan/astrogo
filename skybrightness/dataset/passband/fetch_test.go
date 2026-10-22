@@ -113,7 +113,7 @@ func tempBucketURL(t *testing.T) string {
 }
 
 // TestFetchStillWorksWhenTheCacheCannotBeOpened pins the documented promise
-// that a cache is an optimisation and never a dependency.
+// that a cache is an optimization and never a dependency.
 //
 // A deployment with a misconfigured cache location must still get its filter
 // curves — slowly, one request per call, but correctly. Treating a bad cache as

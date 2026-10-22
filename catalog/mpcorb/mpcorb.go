@@ -112,7 +112,7 @@ func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], e
 // observatory reader does, deliberately: that file is ~2,700 rows and is the
 // authority on which codes exist, so one bad row means the fetch is wrong.
 // This one is over 1.5 million rows maintained by many hands, and refusing
-// the whole catalogue over a single object nobody asked for would be the
+// the whole catalog over a single object nobody asked for would be the
 // wrong trade. A caller that wants the strict reading collects the errors and
 // stops; a caller planning a night skips them.
 //

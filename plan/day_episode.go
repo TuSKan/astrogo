@@ -264,7 +264,7 @@ func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Even
 // margin of the threshold is one where those could decide the answer, so it
 // goes to the search as before.
 //
-// The margin is what makes this an optimisation rather than a second, cruder
+// The margin is what makes this an optimization rather than a second, cruder
 // implementation of the same question. A target one degree clear is not a
 // borderline case: the never-rises test's star sits 75 degrees below its
 // site's horizon.
