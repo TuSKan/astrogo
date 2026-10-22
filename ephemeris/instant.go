@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -154,6 +155,25 @@ type Observer struct {
 
 // Geocenter is the observer at the center of the Earth.
 func Geocenter() Observer { return Observer{} }
+
+// Site is the observer at ctx's site, at ctx's epoch: its geocentric position
+// and the velocity the Earth's rotation gives it ([coord.Context.ObsVec],
+// [coord.Context.ObsVel]). Ask an [Instant] at the same epoch, ctx.Time().
+//
+// An apparent place seen from a Site is SOFA's topocentric place: the light
+// time to the site itself, and the aberration of the site's whole velocity,
+// annual and diurnal at once. [coord.Context.TopocentricToObserved] then takes
+// it to the horizon:
+//
+//	app, err := ephemeris.At(p, ctx.Time()).Apparent(ephemeris.Moon, ephemeris.Site(ctx))
+//	altaz := ctx.TopocentricToObserved(app.Pos)
+//
+// The geocentric place with parallax applied afterward
+// ([coord.Context.GeocentricToObserved]) differs from it by up to 0.035″ for
+// the Moon (docs/ephemeris.md §5.3).
+func Site(ctx *coord.Context) Observer {
+	return Observer{pos: ctx.ObsVec(), vel: ctx.ObsVel()}
+}
 
 // Astrometric returns the astrometric state of target seen by obs, as SOFA
 // and JPL Horizons' quantity 1 define it: the target at the epoch its light

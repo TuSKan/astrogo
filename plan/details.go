@@ -234,8 +234,12 @@ func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Con
 	ra, dec := topoVec.ToSpherical()
 	d.RA, d.Dec = angle.Rad(ra), angle.Rad(dec)
 
-	// AltAz via the full Context pipeline (includes refraction).
-	altaz := ctx.GeocentricToObserved(vec)
+	// AltAz observed from the site itself (includes refraction).
+	altaz, err := observedPlace(mb, t, ctx)
+	if err != nil {
+		return
+	}
+
 	d.Altitude = altaz.Alt()
 	d.Azimuth = altaz.Az()
 	d.Distance = unit.AU(topoDist)

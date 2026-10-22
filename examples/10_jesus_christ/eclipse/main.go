@@ -15,11 +15,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -32,6 +32,9 @@ func main() {
 	// point of this example. See README "Data downloads & offline usage".
 	remote.EnableDownloads(0, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {
@@ -45,7 +48,7 @@ func main() {
 	}()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
-	loc, err := coord.NewGeodetic(angle.Deg(31.7683), angle.Deg(35.2137), 780.0)
+	loc, err := coord.NewEarthLocation(31.7683, 35.2137, 780.0)
 	if err != nil {
 		panic(err)
 	}
