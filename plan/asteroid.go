@@ -221,14 +221,3 @@ func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Ang
 
 	return r, delta, alpha, st, nil
 }
-
-// observedFrom is the asteroid's observed place from ctx's site at t, taken
-// from the site itself; see observedPlace.
-func (a *Asteroid) observedFrom(t time.Time, ctx *coord.Context) (coord.AltAz, error) {
-	aa, err := observedFromSite(a.provider, a.id, t, ctx)
-	if err != nil {
-		return coord.AltAz{}, fmt.Errorf("asteroid %s: %w", a.name, err)
-	}
-
-	return aa, nil
-}
