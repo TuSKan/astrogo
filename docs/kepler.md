@@ -380,7 +380,7 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    | hyperbola | 6.5 | 8.9 | 4.7 | 3.61 |
 
    The floor is the state built exactly from the correctly rounded χ. The
-   317 ulps were 0.65 m at 61 au. **Done in #PR**, with gate 4.
+   317 ulps were 0.65 m at 61 au. **Done in #842**, with gate 4.
 
 ## 8. Reproducing
 
