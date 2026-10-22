@@ -51,6 +51,59 @@ func StateFromChiExact(r0, v0 [3]float64, mu float64, chi *big.Float) (r, v [3]*
 	return stateFromChi(vecF(r0), vecF(v0), mu, chi)
 }
 
+// StateSensitivity is how far [StateExact]'s position moves when each of the
+// six components of (r0, v0) moves by its own magnitude times 2⁻⁵²: the sum
+// over components x of |∂r/∂x|·|x|·2⁻⁵², by exact differences at Prec.
+//
+// It is the error a float64 path cannot avoid, since its input is already
+// rounded by that much, and so the scale a backward-stable path's error is
+// measured on: ulps of |r| charge a path for the problem's conditioning
+// whenever |r| is small beside the start, as it is when a far state is taken
+// in to perihelion.
+func StateSensitivity(r0, v0 [3]float64, mu, dt float64) float64 {
+	const eps = 0x1p-52
+
+	br, bv := vecF(r0), vecF(v0)
+	base, _ := stateFromChi(br, bv, mu, stateChi(br, bv, mu, dt))
+
+	var total float64
+
+	for i := range 6 {
+		pr, pv := vecF(r0), vecF(v0)
+
+		x := pr[i%3]
+		if i >= 3 {
+			x = pv[i%3]
+		}
+
+		if x.Sign() == 0 {
+			continue
+		}
+
+		// A step of 2⁻¹⁰⁰ of the component, far below float64 and far above
+		// Prec, so the difference quotient is the derivative to many digits.
+		h := new(big.Float).SetPrec(Prec).SetMantExp(x, -100)
+		x.Add(x, h)
+
+		moved, _ := stateFromChi(pr, pv, mu, stateChi(pr, pv, mu, dt))
+
+		d := new(big.Float).SetPrec(Prec)
+
+		var sq float64
+
+		for j := range 3 {
+			d.Sub(moved[j], base[j])
+			f, _ := d.Float64()
+			sq += f * f
+		}
+
+		// |Δr|/|h| · |x| · eps, with |h| = |x|·2⁻¹⁰⁰.
+		total += math.Sqrt(sq) * 0x1p100 * eps
+	}
+
+	return total
+}
+
 // stateTerms are what both the root and the state need from (r₀, v₀, μ).
 type stateTerms struct {
 	rn, sigma, alpha, sqrtMu *big.Float
