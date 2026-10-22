@@ -128,19 +128,20 @@ func TestOzoneDimsWhatCrossesTheLayer(t *testing.T) {
 }
 
 // moonOzoneAirmass is the ozone airmass of the Moon as ScatteredMoonlight
-// places it in scene: where the site sees it, its apparent geocentric vector
-// through diurnal parallax and scene's refraction (#646).
+// places it in scene: where the site sees it, its apparent place seen from the
+// site itself, through scene's refraction (#646, #840).
 func moonOzoneAirmass(t *testing.T, scene *skybrightness.Scene) float64 {
 	t.Helper()
 
 	at := time.FromGo(scene.Time)
+	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 
-	moon, err := eph.At(scene.Ephemeris, at).Apparent(eph.Moon, eph.Geocenter())
+	moon, err := eph.At(scene.Ephemeris, at).Apparent(eph.Moon, eph.Site(ctx))
 	if err != nil {
 		t.Fatalf("moon apparent state: %v", err)
 	}
 
-	altaz := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()).GeocentricToObserved(moon.Pos)
+	altaz := ctx.TopocentricToObserved(moon.Pos)
 
 	x, err := atmosphere.OzoneAirmass(altaz.Alt())
 	if err != nil {

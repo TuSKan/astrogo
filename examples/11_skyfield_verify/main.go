@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -93,6 +94,9 @@ func main() {
 	// offline usage". de440 is ~114 MB; naif0012.tls (leap seconds) ~5 KB.
 	remote.EnableDownloads(200<<20, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de440")
 	if err != nil {

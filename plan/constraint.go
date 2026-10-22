@@ -337,12 +337,7 @@ func observedAltAz(obj any, t time.Time, ctx *coord.Context, pos coord.ICRS) (co
 		return aa, nil
 	}
 
-	vec, err := mb.GeocentricVec(t)
-	if err != nil {
-		return coord.AltAz{}, fmt.Errorf("plan: geocentric vector: %w", err)
-	}
-
-	return ctx.GeocentricToObserved(vec), nil
+	return observedPlace(mb, t, ctx)
 }
 
 // topocentricPosition returns the direction in which the site sees obj at t:
