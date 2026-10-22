@@ -166,3 +166,14 @@ func (p *Planet) IsSun() bool { return p.id == eph.Sun }
 
 // IsMoon returns true if this planet is the Moon.
 func (p *Planet) IsMoon() bool { return p.id == eph.Moon }
+
+// observedFrom is the planet's observed place from ctx's site at t, taken
+// from the site itself; see observedPlace.
+func (p *Planet) observedFrom(t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	aa, err := observedFromSite(p.provider, p.id, t, ctx)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("planet %s: %w", p.name, err)
+	}
+
+	return aa, nil
+}

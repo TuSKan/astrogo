@@ -124,3 +124,14 @@ func (c *Comet) distances(t time.Time) (r, delta float64, err error) {
 
 	return r, delta, nil
 }
+
+// observedFrom is the comet's observed place from ctx's site at t, taken
+// from the site itself; see observedPlace.
+func (c *Comet) observedFrom(t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	aa, err := observedFromSite(c.provider, c.id, t, ctx)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("comet %s: %w", c.name, err)
+	}
+
+	return aa, nil
+}

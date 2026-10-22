@@ -61,3 +61,14 @@ func (g *GenericBody) GeocentricVec(t time.Time) (vector.Vec3, error) {
 func (g *GenericBody) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDetails, error) {
 	return computeDetails(g, ctx, over)
 }
+
+// observedFrom is the generic body's observed place from ctx's site at t, taken
+// from the site itself; see observedPlace.
+func (g *GenericBody) observedFrom(t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	aa, err := observedFromSite(g.provider, g.id, t, ctx)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("generic body %s: %w", g.name, err)
+	}
+
+	return aa, nil
+}

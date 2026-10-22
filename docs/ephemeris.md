@@ -297,11 +297,47 @@ Barcelona, above 5° and 20° from the Sun.
 | Mars, the control | 407 | 0.0040″ | 0.0030″ |
 | the Moon | 270 | **0.035″** | 0.010″ |
 
-The estimate this replaced was 0.3″: the parallax times v/c with the Earth's
-30 km/s. That was wrong, because the Moon shares the Earth's barycentric
-velocity and only the relative 1 km/s survives in its planetary aberration —
-0.01″, as measured. Inside the 3″ topocentric contract; not inside a
-milliarcsecond. The `Instant`'s topocentric observer removes it at no cost.
+That table was measured before #831, when the geocentric apparent place was
+the geocentric state at the retarded epoch. That form carries aberration as
+the Moon's 1 km/s geocentric velocity times the light time, so taking the site
+off afterward misplaced it little.
+
+#831 made the geocentric place SOFA-order: the astrometric place, aberrated as
+a whole by the Earth's velocity. At the Moon's distance that is a 20.5″
+displacement along the geocentric line of sight, and the parallax turns the
+line of sight from the site by up to 0.95°. So the same route then misplaced
+the Moon by up to **0.333″**: Barcelona, June 2026, 271 epochs, `Default()`
+(#840). That is the 0.3″ first estimated here, for a reason other than the
+one first given.
+
+**What the route is now.** `ephemeris.Site(ctx)` is an observer at the
+Context's site, built from `ObsVec` and `ObsVel`. Its apparent place is
+SOFA's topocentric place:
+- the light time is taken to the site;
+- deflection is for the body where it is;
+- aberration uses the Earth's and the site's velocity together.
+
+`coord.Context.TopocentricToObserved` then rotates the place into the horizon
+and refracts it, with no further parallax or aberration. `plan` observes its
+own ephemeris targets this way.
+
+`TestSiteApparentIsSOFAsTopocentricPlace` holds it to `iauAtciq`/`iauAtioq` on
+the astrometric place from the site. The two differ by the deflection alone:
+Atciq deflects as for a star at infinity, 4.07 mas·cot(E/2), while the Moon at
+its distance is deflected under 0.01 mas.
+
+| | max from Atciq |
+| --- | ---: |
+| the Moon, from the Site | 22.4 mas, at E = 20° |
+| Mars, from the Site | 6.4 mas, at E = 31° |
+| the Moon, geocentric route | 333 mas |
+
+At every epoch, the test asserts that each Site place stays within the star
+deflection at its elongation plus 0.1 mas. It also asserts that the
+geocentric route exceeds that bound by more than 100 mas, so the bound can
+fail.
+
+`TopocentricToObserved` itself agrees with SOFA's `iauAtioq` to 0.0003 µas.
 
 ### 5.4 SOFA's Earth against the kernel's
 

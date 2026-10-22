@@ -76,6 +76,60 @@ func apparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// observedFromSite is id's observed place from ctx's site at t: the apparent
+// place seen from the site itself, in SOFA's order (light time to the site,
+// deflection, aberration with the Earth's and the site's velocity together),
+// rotated into the horizon and refracted. ctx is at t.
+//
+// # Why not the geocentric place and parallax
+//
+// The geocentric apparent place carries annual aberration as a displacement
+// along the geocentric line of sight, 20.5″ at the Moon's distance. Taking
+// the site off it afterward, as [coord.Context.GeocentricToObserved] does,
+// leaves that displacement pointing along a line of sight the parallax has
+// turned by up to 0.95°: the Moon was misplaced by up to 0.33″ near the
+// horizon, against SOFA's Atciq from the site (#840). For a planet the same
+// misprojection is under a milliarcsecond.
+func observedFromSite(p eph.Provider, id eph.ID, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	st, err := eph.At(p, t).Apparent(id, eph.Site(ctx))
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("plan: apparent state from the site: %w", err)
+	}
+
+	return ctx.TopocentricToObserved(st.Pos), nil
+}
+
+// observedPlace is a moving body's observed place from ctx's site at t. This
+// package's own ephemeris targets, *Planet, *Comet, *Asteroid and
+// *GenericBody, are taken from the site itself (observedFromSite). Any other
+// MovingBody goes through its geocentric vector, parallax and diurnal
+// aberration: a Satellite, whose geometric place is the convention its passes
+// are validated in against Skyfield, and any MovingBody a caller writes,
+// whose GeocentricVec is the place it offers.
+//
+// The choice is by concrete type, not by an interface: a caller's type that
+// embeds *Planet to answer GeocentricVec itself would inherit an interface
+// method, and have its own place silently replaced by the ephemeris's.
+func observedPlace(mb MovingBody, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	switch b := mb.(type) {
+	case *Planet:
+		return b.observedFrom(t, ctx)
+	case *Comet:
+		return b.observedFrom(t, ctx)
+	case *Asteroid:
+		return b.observedFrom(t, ctx)
+	case *GenericBody:
+		return b.observedFrom(t, ctx)
+	}
+
+	vec, err := mb.GeocentricVec(t)
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("plan: geocentric vector: %w", err)
+	}
+
+	return ctx.GeocentricToObserved(vec), nil
+}
+
 // geocentric is the geometric position of id about the Earth at t, with no
 // light time: where the body is, not where it is seen.
 func geocentric(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {

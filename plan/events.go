@@ -350,15 +350,15 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	observeCenter := func(t time.Time) (coord.AltAz, error) {
 		ctx := evalCtx(t)
 
-		// For solar system bodies, use the vector-based topocentric pipeline
-		// which properly corrects for diurnal parallax (critical for the Moon: ~1°).
+		// A solar-system body is observed from the site itself, which is
+		// where its diurnal parallax comes from (the Moon's ~1°).
 		if mb, ok := spec.Target.(MovingBody); ok {
-			vec, err := mb.GeocentricVec(t)
+			aa, err := observedPlace(mb, t, ctx)
 			if err != nil {
-				return coord.AltAz{}, fmt.Errorf("events: geocentric vec: %w", err)
+				return coord.AltAz{}, fmt.Errorf("events: observed place: %w", err)
 			}
 
-			return ctx.GeocentricToObserved(vec), nil
+			return aa, nil
 		}
 
 		// For deep-space / stellar targets, use the astrometric pipeline.
@@ -1438,12 +1438,12 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 		ctx := coord.NewContext(t, spec.Observer.Location(), atm)
 
 		if mb, isMoving := spec.Target.(MovingBody); isMoving {
-			vec, err := mb.GeocentricVec(t)
+			aa, err := observedPlace(mb, t, ctx)
 			if err != nil {
-				return coord.AltAz{}, fmt.Errorf("events: geocentric vec: %w", err)
+				return coord.AltAz{}, fmt.Errorf("events: observed place: %w", err)
 			}
 
-			return ctx.GeocentricToObserved(vec), nil
+			return aa, nil
 		}
 
 		pos, err := spec.Target.Position(t)

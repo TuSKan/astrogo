@@ -337,6 +337,37 @@ func (ctx *Context) Refraction() atmosphere.Refraction { return ctx.atm }
 // ~23″ for Mars at opposition).
 func (ctx *Context) ObsVec() vector.Vec3 { return ctx.obsVec }
 
+// ObsVel returns the observer's geocentric velocity in the ICRS frame
+// (AU/day): the site carried around by the Earth's rotation, about
+// 0.46 km/s·cos(latitude).
+//
+// It is SOFA's iauPvtob velocity in the celestial intermediate system, ω × r
+// with ω the Earth's rotation rate, carried to the ICRS axes by the same
+// precession-nutation matrix as [Context.ObsVec]. Its sum with the Earth's
+// barycentric velocity is the velocity Apco13 aberrates with, so an observer
+// built from ObsVec and ObsVel — [github.com/TuSKan/astrogo/ephemeris.Site] —
+// applies annual and diurnal aberration together, in SOFA's order.
+func (ctx *Context) ObsVel() vector.Vec3 {
+	// The site in the celestial intermediate system, where the Earth turns
+	// about z.
+	m := ctx.rc2i
+	o := ctx.obsVec
+	x := m[0][0]*o.X + m[0][1]*o.Y + m[0][2]*o.Z
+	y := m[1][0]*o.X + m[1][1]*o.Y + m[1][2]*o.Z
+
+	// iauPvtob's OM, 1.00273781191135448 turns per UT1 day, in rad/day.
+	const omega = 2 * math.Pi * 1.00273781191135448
+
+	vx, vy := -omega*y, omega*x
+
+	// Back to the ICRS axes: the transpose, the matrix being a rotation.
+	return vector.V3(
+		m[0][0]*vx+m[1][0]*vy,
+		m[0][1]*vx+m[1][1]*vy,
+		m[0][2]*vx+m[1][2]*vy,
+	)
+}
+
 // AstrometricToCIRS computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
 func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
@@ -409,6 +440,44 @@ func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 
 	aa := NewAltAz(ctx.refract(angle.Rad(altitude)), angle.Rad(azimuth))
 	aa.SetDist(unit.AU(topoVec.Norm()))
+
+	return aa
+}
+
+// TopocentricToObserved converts the apparent place seen from this Context's
+// site, a vector from the observer on the ICRS axes with light deflection and
+// both annual and diurnal aberration already applied, to the local observed
+// AltAz: rotated into the horizon and refracted, nothing more.
+//
+// It is [Context.GeocentricToObserved] without the two steps that one takes on
+// a geocentric vector: no observer vector is subtracted, the input being from
+// the site already, and no diurnal aberration is added, the observer's
+// velocity having been in the aberration. That is SOFA's order, iauAtciq then
+// iauAtioq for a star, applied to a body at a finite distance:
+// [github.com/TuSKan/astrogo/ephemeris.Instant.Apparent] with
+// [github.com/TuSKan/astrogo/ephemeris.Site] produces the input. Parallax taken
+// after aberration, as the geocentric route does, misplaces the Moon by up to
+// 0.035″ (docs/ephemeris.md §5.3).
+//
+// The result carries the input's length as its distance.
+func (ctx *Context) TopocentricToObserved(v vector.Vec3) AltAz {
+	tx := ctx.mat[0][0]*v.X + ctx.mat[0][1]*v.Y + ctx.mat[0][2]*v.Z
+	ty := ctx.mat[1][0]*v.X + ctx.mat[1][1]*v.Y + ctx.mat[1][2]*v.Z
+	tz := ctx.mat[2][0]*v.X + ctx.mat[2][1]*v.Y + ctx.mat[2][2]*v.Z
+
+	E := -ctx.sinLon*tx + ctx.cosLon*ty
+	N := -ctx.sinLat*ctx.cosLon*tx - ctx.sinLat*ctx.sinLon*ty + ctx.cosLat*tz
+	U := ctx.cosLat*ctx.cosLon*tx + ctx.cosLat*ctx.sinLon*ty + ctx.sinLat*tz
+
+	azimuth := math.Atan2(E, N)
+	if azimuth < 0 {
+		azimuth += 2 * math.Pi
+	}
+
+	altitude := math.Atan2(U, math.Hypot(E, N))
+
+	aa := NewAltAz(ctx.refract(angle.Rad(altitude)), angle.Rad(azimuth))
+	aa.SetDist(unit.AU(v.Norm()))
 
 	return aa
 }
