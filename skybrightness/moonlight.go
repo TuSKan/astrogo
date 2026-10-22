@@ -344,20 +344,20 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 		return nil, fmt.Errorf("skybrightness: moonlight: sun state: %w", err)
 	}
 
-	// The Moon where the site sees it: its apparent geocentric vector, taken
-	// through diurnal parallax by GeocentricToObserved. It used to be placed
-	// from the Earth's center, as a star is, which put it up to its horizontal
-	// parallax, about 0.95 degrees, above where the site sees it: a Moon at
-	// 9.2 degrees was charged 5.50 airmasses instead of 6.02, and one just
-	// below the site's horizon lit its sky (#646).
-	apparent, err := in.Apparent(eph.Moon, eph.Geocenter())
+	// The Moon where the site sees it: its apparent place seen from the site
+	// itself, in SOFA's order (#840). It used to be placed from the Earth's
+	// center, as a star is, which put it up to its horizontal parallax, about
+	// 0.95 degrees, above where the site sees it: a Moon at 9.2 degrees was
+	// charged 5.50 airmasses instead of 6.02, and one just below the site's
+	// horizon lit its sky (#646).
+	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+
+	apparent, err := in.Apparent(eph.Moon, eph.Site(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("skybrightness: moonlight: moon apparent state: %w", err)
 	}
 
-	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
-
-	altaz := ctx.GeocentricToObserved(apparent.Pos)
+	altaz := ctx.TopocentricToObserved(apparent.Pos)
 
 	geom := &moonGeometry{
 		observer:     scene.Observer,
