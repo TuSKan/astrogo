@@ -21,6 +21,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/time"
@@ -45,7 +46,7 @@ func main() {
 	defer cancel()
 
 	// Cerro Paranal: 2,635 m, and about as dark as a site gets.
-	site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewEarthLocation(-24.6272, -70.4045, 2635)
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}
@@ -58,6 +59,9 @@ func main() {
 	// Nothing in astrogo downloads a file without it.
 	ids, size := dataset.Endpoints(preset)
 	remote.EnableDownloads(size, ids...)
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
 

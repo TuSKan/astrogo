@@ -19,6 +19,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -29,6 +30,9 @@ func main() {
 	// of catalog.OpenNGC below fetches it automatically (content-checked,
 	// so a re-run only costs a HEAD probe once cached).
 	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
+	// Earth orientation, for where the site is on the turning Earth:
+	// the IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
 	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
