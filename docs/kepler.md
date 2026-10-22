@@ -335,6 +335,13 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    agreement in `perihelion_test.go`.
 3. **No bit identity with today.** The new solver is a different arithmetic
    path; the gate against today's answers is a bound, never equality.
+4. **The universal contract** (`TestUniversalContract`, phase 5). χ within 2
+   ulps of the oracle's root, and the state within those ulps carried through
+   ∂state/∂χ (|v|·r/√μ for the position, √μ/r for the velocity), plus 4 ulps
+   for the construction. Fourteen eccentricities from the circle to e = 5;
+   Δt from 10⁻⁶ to 10⁶ days, inside half a period on an ellipse. Canaried
+   twice: the old Lagrange forms fail it at 4.2 times the bound, and the
+   old series cut at |z| = 0.1 at 3.8 ulps of χ.
 
 ## 7. Phases
 
@@ -350,10 +357,30 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    orientation as P and Q, the phase by one fused multiply-add. The phase
    came with #827; the rest is **done in #832**, measured in §5.
 4. **The Earth from the base (#810),** then the per-orbit center (#803).
-5. **The universal path's own audit.** It is the stable form already and is
-   not measured here: the oracle gains the universal anomaly and the Stumpff
-   functions, and C(z) = (1 − cos √z)/z takes its cancellation-free form
-   2·sin²(√z/2)/z.
+5. **The universal path's own audit.** This document called it the stable
+   form already. Measured, it was not (#833). The oracle
+   (`internal/keplerlab/universal.go`) sums c₀ … c₃ by their series at 320
+   bits and solves for χ at 256. Against it, the shipped path lost ulps in
+   two independent places:
+
+   - **The Stumpff closed forms above the series' cut at |z| = 0.1.** C lost
+     8 ulps; S, x − sin x, lost 23 at z = 0.1 and 75 at z = −0.1.
+   - **g = Δt − χ³S/√μ and ġ = 1 − χ²C/r** cancel once r ≫ q. The universal
+     Kepler equation and 1 − z·c₃ = c₁, 1 − z·c₂ = c₀ make them
+     products.
+
+   Worst position error, in ulps of |r|:
+
+   | regime | before | Stumpff fixed only | after | floor |
+   | --- | ---: | ---: | ---: | ---: |
+   | ellipse | 41 | 16.3 | 2.6 | 0.95 |
+   | near-parabolic ellipse | 73.3 | 28.5 | 1.9 | 1.18 |
+   | parabola | 17.5 | 17.5 | 0.92 | 0.87 |
+   | near-parabolic hyperbola | 317 | 44.7 | 3.1 | 1.09 |
+   | hyperbola | 6.5 | 8.9 | 4.7 | 3.61 |
+
+   The floor is the state built exactly from the correctly rounded χ. The
+   317 ulps were 0.65 m at 61 au. **Done in #842**, with gate 4.
 
 ## 8. Reproducing
 
