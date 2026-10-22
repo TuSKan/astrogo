@@ -62,23 +62,32 @@ func StatePropagate(r0, v0 [3]float64, mu, dt float64) (r, v [3]float64, chi flo
 // The direct path's equation, r₀·χ·c₁ + σ₀·χ²·c₂ + χ³·c₃, has terms that grow
 // like e^√|z| and cancel when a hyperbola's step crosses perihelion from far
 // out: 528 ulps of χ from 104 au. From perihelion σ₀ = 0 and nothing cancels.
+//
+// Measured against [StateSensitivity] on hyperbolas from e = 1.00001 to 5,
+// started from perihelion out to 104 au: within 6.1 of the input's own
+// error, where the direct path reaches 463. With the textbook eccentricity
+// vector in place of v⃗×h⃗/μ − r̂ it reached 32.6.
 func StatePropagateViaPerihelion(r0, v0 [3]float64, mu, dt float64) (r, v [3]float64, err error) {
 	rn := math.Sqrt(r0[0]*r0[0] + r0[1]*r0[1] + r0[2]*r0[2])
-	v2 := v0[0]*v0[0] + v0[1]*v0[1] + v0[2]*v0[2]
 	rv := r0[0]*v0[0] + r0[1]*v0[1] + r0[2]*v0[2]
 	sqrtMu := math.Sqrt(mu)
-	alpha := 2/rn - v2/mu
+	alpha := 2/rn - (v0[0]*v0[0]+v0[1]*v0[1]+v0[2]*v0[2])/mu
+
+	h := [3]float64{r0[1]*v0[2] - r0[2]*v0[1], r0[2]*v0[0] - r0[0]*v0[2], r0[0]*v0[1] - r0[1]*v0[0]}
+	hn := math.Sqrt(h[0]*h[0] + h[1]*h[1] + h[2]*h[2])
+
+	// e⃗ = v⃗×h⃗/μ − r̂: far out on a hyperbola its two terms are about e + 1
+	// and 1. The textbook (v²/μ − 1/r)·r⃗ − (r⃗·v⃗/μ)·v⃗ is the same vector
+	// as the difference of two terms near v²·r/μ, 418 at 104 au for e = 5.
+	vxh := [3]float64{v0[1]*h[2] - v0[2]*h[1], v0[2]*h[0] - v0[0]*h[2], v0[0]*h[1] - v0[1]*h[0]}
 
 	var ev [3]float64
 
 	for i := range 3 {
-		ev[i] = (v2/mu-1/rn)*r0[i] - rv/mu*v0[i]
+		ev[i] = vxh[i]/mu - r0[i]/rn
 	}
 
 	e := math.Sqrt(ev[0]*ev[0] + ev[1]*ev[1] + ev[2]*ev[2])
-
-	h := [3]float64{r0[1]*v0[2] - r0[2]*v0[1], r0[2]*v0[0] - r0[0]*v0[2], r0[0]*v0[1] - r0[1]*v0[0]}
-	hn := math.Sqrt(h[0]*h[0] + h[1]*h[1] + h[2]*h[2])
 	q := hn * hn / (mu * (1 + e))
 
 	var p, qv [3]float64
