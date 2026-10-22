@@ -13,7 +13,7 @@ import (
 
 func ExamplePlanner_Observable() {
 	// Setup observatory
-	loc, _ := coord.NewGeodetic(angle.Deg(-70), angle.Deg(-30), 2400) // Chile
+	loc, _ := coord.NewEarthLocation(-30, -70, 2400) // Chile
 	site, _ := NewSite("Paranal", loc)
 
 	// Constraints
@@ -42,7 +42,7 @@ func ExamplePlanner_Observable() {
 }
 
 func ExampleObservableWindows() {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewEarthLocation(0, 0, 0)
 	site, _ := NewSite("Greenwich", loc)
 
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
@@ -66,7 +66,7 @@ func ExampleObservableWindows() {
 }
 
 func ExampleRankObservables() {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewEarthLocation(0, 0, 0)
 	site, _ := NewSite("Test", loc)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
 

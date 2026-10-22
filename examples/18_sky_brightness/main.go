@@ -45,7 +45,7 @@ func main() {
 	defer cancel()
 
 	// Cerro Paranal: 2,635 m, and about as dark as a site gets.
-	site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewEarthLocation(-24.6272, -70.4045, 2635)
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

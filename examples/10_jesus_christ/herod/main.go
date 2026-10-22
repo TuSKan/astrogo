@@ -10,15 +10,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"math"
-
-	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"log"
+	"math"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -44,7 +42,7 @@ func main() {
 	}()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
-	loc, err := coord.NewGeodetic(angle.Deg(31.7683), angle.Deg(35.2137), 780.0)
+	loc, err := coord.NewEarthLocation(31.7683, 35.2137, 780.0)
 	if err != nil {
 		panic(err)
 	}

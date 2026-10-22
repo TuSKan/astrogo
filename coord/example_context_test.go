@@ -16,7 +16,7 @@ var siriusICRS = coord.NewAstrometric(angle.Deg(101.287155), angle.Deg(-16.71611
 // quintaCalixto returns the site both examples observe from: 22.53° S,
 // 46.47° W, 835 m.
 func quintaCalixto() *coord.Geodetic {
-	site, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)
+	site, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
 	if err != nil {
 		panic(err)
 	}
