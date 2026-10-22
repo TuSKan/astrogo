@@ -60,7 +60,7 @@ const (
 )
 
 // johnsonVFromTable1 is a tophat over Johnson-Cousins V as Table 1 of the same
-// paper characterises it: effective wavelength 552.4 nm, width 90.9 nm.
+// paper characterizes it: effective wavelength 552.4 nm, width 90.9 nm.
 //
 // Still a tophat rather than the real curve, but centered and sized on their
 // own numbers rather than on a round 500 to 600, which matters more here than

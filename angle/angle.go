@@ -184,7 +184,7 @@ func (a Angle) DMSString(precision int) string {
 
 	// math.Abs rather than the negation the sign branch would otherwise do,
 	// because negative zero takes neither branch as written: -0.0 < 0 is
-	// false, so it kept its sign bit into the seconds, and FormatFloat spelt
+	// false, so it kept its sign bit into the seconds, and FormatFloat spelled
 	// that back out mid-string as "+00 deg 00' 0-0.0"" - a malformed
 	// coordinate rather than a wrong one. Negative zero is not exotic here: an
 	// angle negated, scaled by a negative, or passed through math.Asin all

@@ -124,7 +124,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 			continue
 		}
 
-		// A negative flux is a calibration artefact, not a measurement.
+		// A negative flux is a calibration artifact, not a measurement.
 		v := flux[i] * ergPerCM2PerAToSIPer
 		if v < 0 {
 			v = 0

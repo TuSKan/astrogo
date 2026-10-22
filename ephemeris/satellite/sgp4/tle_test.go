@@ -23,7 +23,7 @@ const (
 // each value read off the format by hand rather than from another parser.
 //
 // Every one of these is a column span, and an off-by-one in a column span does
-// not produce an error — it produces the neighbouring field, which is also a
+// not produce an error — it produces the neighboring field, which is also a
 // number. Asserting the whole record is the only way to see that.
 func TestParseTLEReadsEveryField(t *testing.T) {
 	t.Parallel()
@@ -383,7 +383,7 @@ func TestParsesEveryValladoElementSet(t *testing.T) {
 
 	// 33 line pairs over 32 distinct satellites: 20413 appears twice with
 	// different propagation spans, which is why this counts pairs and not
-	// catalogue numbers.
+	// catalog numbers.
 	const wantSets = 33
 
 	if len(sets) != wantSets {

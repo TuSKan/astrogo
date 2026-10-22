@@ -24,7 +24,7 @@ func quintaCalixto() *coord.Geodetic {
 	return site
 }
 
-// The task this package exists for: take a catalogue position and say where in
+// The task this package exists for: take a catalog position and say where in
 // the sky it actually is, from a place, at an instant.
 //
 // The work is in [Context]. Building one runs SOFA's Apco13, which is the

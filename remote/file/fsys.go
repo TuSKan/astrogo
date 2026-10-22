@@ -129,7 +129,7 @@ type (
 	//
 	// The answer is that the filesystem value carries the context and is
 	// constructed per operation. WithContext returns a filesystem equivalent to
-	// the receiver in every respect except that its operations honour ctx; the
+	// the receiver in every respect except that its operations honor ctx; the
 	// receiver is unchanged, so one registered filesystem serves any number of
 	// concurrent callers with different deadlines.
 	//
@@ -161,7 +161,7 @@ func WithContext(ctx context.Context, fsys fs.FS) fs.FS {
 // RequireContext returns fsys bound to ctx, or an error if fsys cannot be.
 //
 // Used on the paths that may transfer for minutes — a kernel download, a
-// catalogue fetch — where "the caller pressed ctrl-C and nothing happened" is a
+// catalog fetch — where "the caller pressed ctrl-C and nothing happened" is a
 // defect rather than an inconvenience.
 func RequireContext(ctx context.Context, fsys fs.FS) (fs.FS, error) {
 	cfs, ok := fsys.(ContextFS)

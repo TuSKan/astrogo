@@ -11,24 +11,24 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// TestACataloguesProperMotionMovesAStarByWhatItSays is the regression test for
+// TestACatalogsProperMotionMovesAStarByWhatItSays is the regression test for
 // #281, and it is written the way the bug was found rather than the way the
 // code is shaped.
 //
-// A catalogue's pmra column is μα* — the rate the star moves *across the sky*.
+// A catalog's pmra column is μα* — the rate the star moves *across the sky*.
 // So a star with 1000 mas/yr and nothing in declination travels 20 arcseconds
 // in twenty years, at any declination, and that is the whole assertion. It is
 // convention-independent: whatever the library stores internally, the star has
 // to end up 20 arcseconds from where it started.
 //
-// Before the fix it travelled 20·cos δ instead, so the measured displacement
+// Before the fix it traveled 20·cos δ instead, so the measured displacement
 // tracked the cosine exactly:
 //
 //	dec  0: 20.0000″   dec 45: 14.1421″   dec 60: 10.0000″   dec 80: 3.4730″
 //
 // Sixteen and a half arcseconds lost at δ = 80, on a value taken straight from
 // Gaia. Kapteyn's Star came out 49″ from where it is.
-func TestACataloguesProperMotionMovesAStarByWhatItSays(t *testing.T) {
+func TestACatalogsProperMotionMovesAStarByWhatItSays(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -64,11 +64,11 @@ func TestACataloguesProperMotionMovesAStarByWhatItSays(t *testing.T) {
 }
 
 // TestProperMotionSurvivesAFrameConversion checks the same claim through the
-// catalogue frames, since those cross the SOFA boundary twice and could get
+// catalog frames, since those cross the SOFA boundary twice and could get
 // the factor right once and wrong the other way.
 //
 // The magnitudes are not preserved exactly — FK4's E-terms and both
-// catalogues' spin genuinely change a star's motion — so this asserts the
+// catalogs' spin genuinely change a star's motion — so this asserts the
 // thing that must not happen: the RA component must not come back scaled by
 // cos δ, which at δ = −65° would be a factor of 2.4.
 func TestProperMotionSurvivesAFrameConversion(t *testing.T) {

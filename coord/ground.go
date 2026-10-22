@@ -14,7 +14,7 @@ import (
 var ErrNilGeodetic = errors.New("coord: geodetic location must not be nil")
 
 // meanEarthRadiusM is the IUGG mean radius R_1 = (2a + b)/3 for WGS84, in
-// meters. It is the radius that minimises the error of a spherical
+// meters. It is the radius that minimizes the error of a spherical
 // approximation to the ellipsoid over all latitudes.
 const meanEarthRadiusM = 6371008.8
 
@@ -76,7 +76,7 @@ func InitialBearing(a, b *Geodetic) (angle.Angle, error) {
 	return angle.Deg(math.Mod(deg+360, 360)), nil
 }
 
-// Offset returns the point reached from a start by travelling the given
+// Offset returns the point reached from a start by traveling the given
 // distance along a great circle on the initial bearing.
 //
 // It is the direct problem to [GroundDistance] and [InitialBearing]'s

@@ -10,9 +10,9 @@ import (
 )
 
 // The task this package exists for: how bright is a thing, as seen from here,
-// now — which is never quite the number in the catalogue.
+// now — which is never quite the number in the catalog.
 //
-// For a star the catalogue magnitude is above the atmosphere, so the only
+// For a star the catalog magnitude is above the atmosphere, so the only
 // correction is extinction: the air's coefficient times the airmass.
 func Example() {
 	// A clean night at Cerro Paranal, 2,640 m: the standard atmosphere's
@@ -38,14 +38,14 @@ func Example() {
 
 	fmt.Printf("k(V)     %.3f mag/airmass\n", k)
 	fmt.Printf("airmass  %.3f\n", airmass)
-	fmt.Printf("catalogue -1.46, observed %.2f\n", magnitude.StarApparent(-1.46, airmass, k))
+	fmt.Printf("catalog -1.46, observed %.2f\n", magnitude.StarApparent(-1.46, airmass, k))
 
 	// Patat et al. (2011) measured 0.129 to 0.131 there, around 550 nm.
 
 	// Output:
 	// k(V)     0.131 mag/airmass
 	// airmass  2.900
-	// catalogue -1.46, observed -1.08
+	// catalog -1.46, observed -1.08
 }
 
 // A Solar System body has no fixed magnitude at all: its brightness depends on

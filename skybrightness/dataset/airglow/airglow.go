@@ -517,7 +517,7 @@ func Parse(r io.Reader) (*Spectrum, error) {
 			continue
 		}
 
-		// A negative airglow is a subtraction artefact in the model that
+		// A negative airglow is a subtraction artifact in the model that
 		// produced it, not emission removed from the sky.
 		if flux < 0 {
 			flux = 0

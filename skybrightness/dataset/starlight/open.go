@@ -29,12 +29,12 @@ var ErrNoPublishedMap = errors.New("starlight: the published map does not match 
 //
 // Six per cent in V rather than the twenty Masana et al. report, because theirs
 // is a DR2 figure: DR2 lacked a counterpart for some 35,000 Hipparcos stars and
-// DR3 recovered nearly all of them. The correction shrank because the catalogue
+// DR3 recovered nearly all of them. The correction shrank because the catalog
 // improved, not because the physics changed.
 //
 // B, V and I hold all 74. R holds 66: four have no R-I in the Bright Star
-// Catalogue, one is fainter than its completeness limit, and three are
-// multiples where Hipparcos reports combined light while that catalogue reports
+// Catalog, one is fainter than its completeness limit, and three are
+// multiples where Hipparcos reports combined light while that catalog reports
 // components, so no color on offer belongs to the same object. Those eight are
 // absent from R rather than carrying an invented value.
 //
@@ -110,7 +110,7 @@ func Open(ctx context.Context) (*Map, error) {
 // map, as comment lines.
 //
 // A hosted artifact that cannot say how it was made is an unattributable
-// number. Every input that changes the values is named: the catalogue release,
+// number. Every input that changes the values is named: the catalog release,
 // the grid, the magnitude cut, the color transformation and both zero points
 // the band conversion rests on. Someone holding only the file must be able to
 // tell whether it answers their question.
@@ -127,7 +127,7 @@ func (g GaiaBuild) Header() string {
 	}
 
 	fmt.Fprintf(&b, "# bands: %s\n", strings.Join(names, " "))
-	fmt.Fprintf(&b, "# catalogue: gaiadr3.gaia_source\n")
+	fmt.Fprintf(&b, "# catalog: gaiadr3.gaia_source\n")
 	fmt.Fprintf(&b, "# grid: HEALPix order %d, NESTED, ICRS\n", g.Order)
 	fmt.Fprintf(&b, "# composition: every source Gaia observes; Gaia sees nothing brighter than G = 5\n")
 	fmt.Fprintf(&b, "# quantity: passband-averaged spectral radiance, W m^-2 sr^-1 nm^-1\n")
@@ -140,7 +140,7 @@ func (g GaiaBuild) Header() string {
 			continue
 		}
 
-		fmt.Fprintf(&b, "# colour transformation %s: G - %s polynomial in BP-RP, "+
+		fmt.Fprintf(&b, "# color transformation %s: G - %s polynomial in BP-RP, "+
 			"Gaia DR3 photometric documentation, Sect. 5.5.1, Table 5.9\n",
 			band.Name, band.Name)
 		// Both zero points, and the factor they combine into. The factor is
@@ -243,7 +243,7 @@ func (m *Map) plausibleSky() error {
 //
 //	m, _, err := BuildFromGaia(ctx, build)      // one query, about 27 minutes
 //	stars, err := FetchBrightStars(ctx, BrightStarLimitV, BrightStarMatchRadius)
-//	_, err = AddCousinsR(ctx, stars)            // R needs a second catalogue
+//	_, err = AddCousinsR(ctx, stars)            // R needs a second catalog
 //
 //	for i, name := range []string{"B", "V", "R", "I"} {
 //		err = AddBrightStars(m, name, curves[i], stars)

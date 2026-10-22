@@ -210,7 +210,7 @@ func setCard(h *Header, keyword, value, comment string) {
 // back would be a plain bug.
 //
 // Keywords the caller supplied that collide with a structural one are dropped
-// in favour of the value derived from the data, for the reason given on
+// in favor of the value derived from the data, for the reason given on
 // [encodeHDU].
 func orderedHeader(src *Header, mandatory []Card) *Header {
 	out := NewHeader()

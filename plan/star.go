@@ -28,7 +28,7 @@ type StarOption func(*Star)
 // WithProperMotion sets proper motion in RA and Dec, per Julian year.
 //
 // pmRA is the on-sky rate, mu_alpha* = dRA/dt * cos(dec) — the pmra column
-// a catalogue publishes, passed straight through. See
+// a catalog publishes, passed straight through. See
 // coord.NewICRSWithKinematics for why the distinction matters.
 func WithProperMotion(pmRA, pmDec angle.Angle) StarOption {
 	return func(s *Star) { s.pmRA = pmRA; s.pmDec = pmDec }
@@ -44,7 +44,7 @@ func WithParallax(p angle.Angle) StarOption {
 // measurable motion along the line of sight) and is tracked distinctly from
 // "no RV set" — see MeasuredRadialVelocity.
 //
-// Catalogues publish this in km/s, so the value a caller has in hand is
+// Catalogs publish this in km/s, so the value a caller has in hand is
 // almost always [unit.KmPerSec](v). Writing a bare number here would mean
 // meters per second, which is what nothing publishes.
 func WithRadialVelocity(rv unit.Velocity) StarOption {

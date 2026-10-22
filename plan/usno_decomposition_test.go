@@ -75,7 +75,7 @@ import (
 //
 // The test is still worth running, for the reason it was written: declination
 // and GHA nest, so a *large* fault in one and not the other would still be
-// localised, and USNO is the only independent implementation available. What
+// localized, and USNO is the only independent implementation available. What
 // it cannot do is resolve a half-arcsecond effect, and the bounds below are
 // set accordingly rather than to celnav's returned digits.
 //
@@ -207,8 +207,8 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 			"to say anything", len(decResiduals))
 	}
 
-	decMean := summarise(t, "declination (no Earth rotation)", decResiduals)
-	ghaMean := summarise(t, "GHA (adds Earth rotation)", ghaResiduals)
+	decMean := summarize(t, "declination (no Earth rotation)", decResiduals)
+	ghaMean := summarize(t, "GHA (adds Earth rotation)", ghaResiduals)
 
 	t.Logf("")
 	t.Logf("Reading: a bias in declination is in the apparent-place chain; one that "+
@@ -246,7 +246,7 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 	}
 
 	// The decomposition only means something if the two stages disagree. If
-	// they ever converge, the localisation this test performs has stopped
+	// they ever converge, the localization this test performs has stopped
 	// being valid and the reader needs to know before trusting its message.
 	if math.Abs(ghaMean) < math.Abs(decMean) {
 		t.Errorf("GHA bias %+.3f arcsec is no larger than the declination bias %+.3f; "+
@@ -351,11 +351,11 @@ func parseUSNOEpoch(t *testing.T, date, utcTime string) time.Time {
 	return time.Date(y, time.Month(mo), d, h, m, s, 0, time.LocationUTC)
 }
 
-// summarise logs a residual distribution and returns its signed mean.
+// summarize logs a residual distribution and returns its signed mean.
 //
 // The signed mean is the return value because it is the statistic the whole
 // test exists to read: a systematic offset vanishes in an unsigned summary.
-func summarise(t *testing.T, label string, xs []float64) float64 {
+func summarize(t *testing.T, label string, xs []float64) float64 {
 	t.Helper()
 
 	var mean float64

@@ -24,7 +24,7 @@ const simbadTAPHost = "simbad.cds.unistra.fr:80"
 // The tolerance is a degree, which is enormous by this repository's standards
 // and deliberately so: this is an identity check, not an astrometric one. The
 // failures it exists to catch were 61 and 70 degrees, and an object 0.3
-// degrees away — a catalogued source *inside* the galaxy asked for — is also
+// degrees away — a cataloged source *inside* the galaxy asked for — is also
 // the wrong object and also fails.
 func TestResolveReturnsTheObjectAsked(t *testing.T) {
 	testutil.RequireReachable(t, simbadTAPHost)

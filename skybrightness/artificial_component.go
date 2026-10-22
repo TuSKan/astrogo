@@ -30,7 +30,7 @@ var ErrNoEmitters = errors.New("skybrightness: artificial skyglow needs at least
 // # The two things the paper does not specify
 //
 // Eq. 2 needs a source radiance L_S and an airmass toward the source M_S.
-// Kocifaj & Bará (2019) Eq. 9 — the model this one generalises — defines L_S
+// Kocifaj & Bará (2019) Eq. 9 — the model this one generalizes — defines L_S
 // precisely: **the line-of-sight radiance, measured at the detector, of the
 // city located on the horizon at that azimuth.** It is what a photometer
 // pointed at the horizon in the source's direction would read, not a
@@ -217,7 +217,7 @@ func (a *ArtificialSkyglow) AddRadiance(
 // not a second implementation.
 func (s *artificialSource) addTo(dst []float64, scatter angle.Angle, airmassSource, airmassView float64) error {
 	theta := scatter.Radians()
-	molecular := atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarisation)
+	molecular := atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarization)
 
 	for i := range dst {
 		if s.arriving[i] <= 0 {
@@ -255,14 +255,14 @@ func (a *ArtificialSkyglow) Provenance() Provenance {
 		Version:          "Eq. 1-5",
 		PrimaryReference: "Kocifaj, M., Bara, S. & Falchi, F. (2022), MNRAS Letters 513, L25; arXiv:2203.09322",
 		SecondaryReferences: []string{
-			"Kocifaj, M. & Bara, S. (2019), the model this one generalises",
+			"Kocifaj, M. & Bara, S. (2019), the model this one generalizes",
 			"Bucholtz, A. (1995), Appl. Opt. 34, 2765 (Rayleigh)",
 			"Henyey, L.G. & Greenstein, J.L. (1941), ApJ 93, 70",
 			"Pickering, K.A. (2002), DIO 12, 20 (airmass)",
 		},
 		Equations: "Eq. 1 as atmosphere.CombinedPhaseFunction; Eq. 2 as AllSkyRadiance; " +
 			"Eq. 3 as OpticalParameterT; Eq. 4/5 as AsymmetryParameter",
-		ValidityDomain: "Clear sky. The asymmetry parameterisation was solved at 450 and " +
+		ValidityDomain: "Clear sky. The asymmetry parameterization was solved at 450 and " +
 			"550 nm and represents a band roughly 20-30 nm wide, so this component is " +
 			"less spectrally resolved than the grid it writes onto. Ground sources " +
 			"beyond a few kilometers, where the horizon-source geometry holds.",

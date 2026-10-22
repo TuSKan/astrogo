@@ -134,10 +134,10 @@ var (
 	// ErrUnsupportedBody is the error [Default] returns for a body its SOFA
 	// series do not place.
 	ErrUnsupportedBody = kepler.ErrUnsupportedBody
-	// ErrChainTooDeep reports a provider whose centres do not reach the Solar
-	// System barycenter within a chain any kernel nests: one whose centres
+	// ErrChainTooDeep reports a provider whose centers do not reach the Solar
+	// System barycenter within a chain any kernel nests: one whose centers
 	// loop.
-	ErrChainTooDeep = errors.New("eph: chain of centres too deep")
+	ErrChainTooDeep = errors.New("eph: chain of centers too deep")
 )
 
 // Satellite is the SGP4 orbit propagator for NORAD TLE data.

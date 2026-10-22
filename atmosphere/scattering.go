@@ -48,7 +48,7 @@ var (
 //     scattering model for the moonlit sky brightness profile based on
 //     photometry at SAAO", MNRAS 514, 208-226, doi:10.1093/mnras/stac1387.
 //   - Secondary: Bucholtz, A. (1995), Appl. Opt. 34, 2765 (Rayleigh phase
-//     function and depolarisation); Bodhaine, B. A., Wood, N. B., Dutton,
+//     function and depolarization); Bodhaine, B. A., Wood, N. B., Dutton,
 //     E. G. & Slusser, J. R. (1999), J. Atmos. Oceanic Technol. 16, 1854
 //     (Rayleigh optical depth); Henyey, L. G. & Greenstein, J. L. (1941),
 //     ApJ 93, 70.
@@ -57,7 +57,7 @@ var (
 //   - Units: optical depth dimensionless; phase functions sr^-1.
 //   - Validity: optical wavelengths; see each function.
 //
-// The phase function and depolarisation are the Bucholtz lineage Winkler
+// The phase function and depolarization are the Bucholtz lineage Winkler
 // (2022) uses, shared with the artificial-skyglow model (Kocifaj, Bara &
 // Falchi 2022), so the two components propagate through one atmosphere.
 // The Rayleigh optical depth is Bodhaine et al. (1999), for both at once:
@@ -70,12 +70,12 @@ const (
 	// 1013.5 until #592.
 	StandardPressureHPa = 1013.25
 
-	// RayleighDepolarisation is the air depolarisation factor rho adopted
+	// RayleighDepolarization is the air depolarization factor rho adopted
 	// by Winkler (2022) after Bucholtz (1995), whose tabulated values span
 	// 0.01384 to 0.01557 across the wavelength range studied. Winkler
 	// adopts 0.0148, for which (1+3rho)/(1-rho) = 1.06 — the same
 	// coefficient Krisciunas & Schaefer (1991) had fitted empirically.
-	RayleighDepolarisation = 0.0148
+	RayleighDepolarization = 0.0148
 
 	// rayleighMinNM and rayleighFitMaxNM bound the wavelengths Bodhaine et
 	// al. (1999) fitted Eq. 30 over, 250 to 1000 nm.
@@ -94,7 +94,7 @@ const (
 // with L the wavelength in micrometers. The fit reproduces their exactly
 // computed Table 3 to better than 0.05% from 250 to 1000 nm. Its local
 // exponent steepens toward the blue as the refractive index and the
-// depolarisation of air both change with wavelength, which no single power
+// depolarization of air both change with wavelength, which no single power
 // law follows. Winkler's (2022) Eq. 13, (P/1013.5)·1.229e10·λ^−4.05 after
 // Dutton et al. (1994), read 4.2% low at 330 nm, and its coefficient sits
 // 0.8% below the 0.00877 µm^4.05 Bodhaine quotes from Dutton (#592).
@@ -138,14 +138,14 @@ func RayleighOpticalDepth(lambda unit.WavelengthNM, pressureHPa float64) (unit.O
 //	p_R(theta) = 3(1-rho) / (16*pi*(1+2rho)) * [ (1+3rho)/(1-rho) + cos^2(theta) ]
 //
 // theta is the angle between the incident and scattered directions, so
-// theta = 0 is forward scattering. The depolarisation term rho accounts for
+// theta = 0 is forward scattering. The depolarization term rho accounts for
 // the anisotropy of air molecules; setting it to zero recovers the ideal
 // dipole form (1 + cos^2)*3/(16*pi).
 //
 // The function integrates to exactly 1 over the sphere, which
 // TestRayleighPhaseFunctionNormalization verifies.
-func RayleighPhaseFunction(theta float64, depolarisation float64) float64 {
-	rho := depolarisation
+func RayleighPhaseFunction(theta float64, depolarization float64) float64 {
+	rho := depolarization
 	cosT := math.Cos(theta)
 
 	prefactor := 3 * (1 - rho) / (16 * math.Pi * (1 + 2*rho))
@@ -196,7 +196,7 @@ func HenyeyGreensteinPhaseFunction(theta float64, g float64) (float64, error) {
 // reduce to the same thing, which is why one function serves both models.
 //
 // Both optical depths must be non-negative and not both zero.
-func CombinedPhaseFunction(theta float64, rayleigh, aerosol unit.OpticalDepth, g float64, depolarisation float64) (float64, error) {
+func CombinedPhaseFunction(theta float64, rayleigh, aerosol unit.OpticalDepth, g float64, depolarization float64) (float64, error) {
 	if rayleigh < 0 || aerosol < 0 {
 		return 0, fmt.Errorf("%w: rayleigh %g, aerosol %g", ErrOpticalDepth, float64(rayleigh), float64(aerosol))
 	}
@@ -211,7 +211,7 @@ func CombinedPhaseFunction(theta float64, rayleigh, aerosol unit.OpticalDepth, g
 		return 0, err
 	}
 
-	pr := RayleighPhaseFunction(theta, depolarisation)
+	pr := RayleighPhaseFunction(theta, depolarization)
 
 	return (float64(rayleigh)/total)*pr + (float64(aerosol)/total)*pm, nil
 }

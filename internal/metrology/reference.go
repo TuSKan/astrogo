@@ -72,7 +72,7 @@ type Reference struct {
 	Source string
 
 	// Dataset names the specific data used, where the reference serves more
-	// than one: a kernel filename, a catalogue release, an airglow file.
+	// than one: a kernel filename, a catalog release, an airglow file.
 	Dataset string
 
 	// SharedAncestor names the common origin when this reference and

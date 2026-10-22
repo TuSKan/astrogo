@@ -13,7 +13,7 @@ import (
 // sets at 19:03:41 UTC on 2026-07-13, so the episode for a window starting
 // at 19:04 is the next one, from the rise at 04:08:23 to the set at 19:50:30
 // on the 14th. Those are Skyfield 1.55's instants (DE440s) for the Moon's
-// apparent centre crossing the almanac horizon a generic target rises on,
+// apparent center crossing the almanac horizon a generic target rises on,
 // −0.5667° (#568); before #568 the threshold was 0° and the instants
 // 18:59:49, 04:12:15 and 19:46:53. Episode's probe once measured a refracted
 // altitude against the geometric threshold, called the Moon up, and returned

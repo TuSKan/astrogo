@@ -49,7 +49,7 @@ var historicalMention = regexp.MustCompile(`(?i)\b(since deleted|since removed|s
 // It found nine more. Three equation-to-test maps in docs/skybrightness.md
 // naming tests that had been renamed; a CLAUDE.md command line offering
 // `-run TestApparentPlace` (no longer exists) to run "a single test by name";
-// and TestCharonNeedsTheSystemParameter, cited by a neighbouring test as the
+// and TestCharonNeedsTheSystemParameter, cited by a neighboring test as the
 // counter-case establishing a scientific claim this repository had previously
 // shipped backwards twice — and never written.
 //

@@ -39,7 +39,7 @@ func AngleDifference(got, want angle.Angle) angle.Angle {
 // serves RA/Dec, azimuth/altitude, and galactic l/b. coord.Separation already
 // does this for coord.ICRS values, but reaching it from an AltAz comparison
 // means constructing an ICRS that is not one — a trick this repository's
-// topocentric suite resorted to, with a comment apologising for it.
+// topocentric suite resorted to, with a comment apologizing for it.
 //
 // The atan2-of-cross-over-dot form is used rather than the cosine rule, which
 // loses precision for small separations — and small separations are the ones

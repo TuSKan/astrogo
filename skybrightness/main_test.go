@@ -22,7 +22,7 @@ import (
 // different skies. The difference is small — a fraction of a second of UT1
 // moves the Sun by milliarcseconds — but the golden lock is 1e-12 relative,
 // and the measured divergence was **2.5e-06 on zodiacal radiance**: six
-// orders of magnitude past the lock and nowhere near a rounding artefact.
+// orders of magnitude past the lock and nowhere near a rounding artifact.
 // Locally every table passed; in CI all four failed on every platform.
 //
 // [time.RegisterModel] with [time.ZeroModel] is the documented way to ask for

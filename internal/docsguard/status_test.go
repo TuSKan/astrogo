@@ -36,7 +36,7 @@ var (
 // standing above them. Someone reading the roadmap for what to work on next
 // would have found a finished feature advertised as untouched.
 //
-// A guard that catches one field and not its neighbour is how the second
+// A guard that catches one field and not its neighbor is how the second
 // field becomes the one nobody trusts.
 //
 // # The rule

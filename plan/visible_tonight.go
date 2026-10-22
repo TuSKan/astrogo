@@ -600,7 +600,7 @@ func isFixedTarget(obs Observable) bool {
 // that could not be fetched from one that simply has no ephemeris to fetch.
 // A nil Observable with a nil error is the latter: FromCatalog produced a
 // fixed target where a small body was expected, which is a property of the
-// catalogue row, not a failure.
+// catalog row, not a failure.
 func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider, error) {
 	if !needsSmallBodyEphemeris(tgt.Kind) {
 		// A target the resolver returned with no position at all is

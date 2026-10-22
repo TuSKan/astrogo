@@ -88,7 +88,7 @@ type Query struct {
 	Components []ComponentID
 
 	// field is an incoming field already sampled over the hemisphere, for
-	// reference fidelity. Unexported because it is an optimisation SkyMap
+	// reference fidelity. Unexported because it is an optimization SkyMap
 	// applies to itself rather than a parameter of the question being asked:
 	// the answer is identical with or without it, only the cost differs.
 	field *hemisphereField

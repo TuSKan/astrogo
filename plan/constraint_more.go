@@ -85,10 +85,10 @@ func (c SunSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Contex
 // GalacticLatitude passes if the target lies at least Threshold from the
 // Galactic plane.
 //
-// Which way this cuts depends on the programme, and that is why it is stated
+// Which way this cuts depends on the program, and that is why it is stated
 // as a distance from the plane rather than as a latitude range. An
 // extragalactic survey avoids the plane because stellar crowding and dust
-// extinction there are severe; a Galactic-structure programme wants exactly
+// extinction there are severe; a Galactic-structure program wants exactly
 // that region and expresses it by inverting the sense of the constraint in
 // its own scoring rather than by a second type here.
 //
@@ -137,7 +137,7 @@ func (c GalacticLatitude) CheckCtx(
 //
 // The constraint that has nothing to do with the sky: a target of opportunity
 // with a coordination window, an instrument available for part of the night, a
-// programme whose allocation ends at a stated time. Without it those have to be
+// program whose allocation ends at a stated time. Without it those have to be
 // expressed by slicing the schedule's own span, which conflates "this target
 // cannot be observed then" with "nobody observes then".
 //

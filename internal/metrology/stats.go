@@ -24,7 +24,7 @@ type Sample struct {
 	Context string
 }
 
-// Stats summarises a suite's residuals.
+// Stats summarizes a suite's residuals.
 //
 // Percentiles and Max are computed on |Error|, because that is what a
 // contract bounds. MeanSigned, MinSigned and MaxSigned keep the signed

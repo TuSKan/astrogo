@@ -16,8 +16,8 @@ import (
 //
 // # The service under test is not the service that fails
 //
-// Every test in this file's neighbours validates astrogo against an external
-// reference — AstroPixels' phase tables, NASA's eclipse catalogues, USNO's
+// Every test in this file's neighbors validates astrogo against an external
+// reference — AstroPixels' phase tables, NASA's eclipse catalogs, USNO's
 // almanac — and each already skips when *that* service cannot be reached.
 // None of them guarded the step before: loading a DE44x kernel, which is a
 // download from NAIF at jpl.nasa.gov and an entirely different service.

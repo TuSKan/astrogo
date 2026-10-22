@@ -86,9 +86,9 @@ func TestLoadHappensOnce(t *testing.T) {
 	}
 }
 
-// TestLoadHonoursContext: the fetch now runs under the caller's context, which
+// TestLoadHonorsContext: the fetch now runs under the caller's context, which
 // is the reason for moving it out of New in the first place.
-func TestLoadHonoursContext(t *testing.T) {
+func TestLoadHonorsContext(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)

@@ -126,7 +126,7 @@ func datasumValue(sum uint32) string {
 // applyChecksum fills in an HDU's DATASUM and CHECKSUM once its bytes are
 // known.
 //
-// header is the serialised header, already padded and already carrying a
+// header is the serialized header, already padded and already carrying a
 // placeholder CHECKSUM card; data is the padded payload. The CHECKSUM value is
 // written into header in place, which is why the placeholder has to be exactly
 // as long as the value that replaces it.

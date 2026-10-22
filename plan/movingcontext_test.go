@@ -55,14 +55,14 @@ func testISS(t *testing.T) (*satellite.Satellite, *coord.Geodetic) {
 //     there would be a Context that never moved, not a cancellation.
 //
 // Until #826 this held one route to 0.1″, SetTime's figure when it rebuilt
-// hourly, and the route had cancelled the error since #812: it measured
+// hourly, and the route had canceled the error since #812: it measured
 // 0.0000″ and could not fail.
 func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 	t.Parallel()
 
 	const (
-		cancelledArcsec = 1e-5  // 0.01 mas
-		setTimeArcsec   = 0.007 // coord.Context's bracket
+		canceledArcsec = 1e-5  // 0.01 mas
+		setTimeArcsec  = 0.007 // coord.Context's bracket
 	)
 
 	sat, site := testISS(t)
@@ -77,10 +77,10 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 		bound func(obs, rng float64) float64
 		least float64
 	}{
-		{"the Context's precession-nutation", sat, func(_, _ float64) float64 { return cancelledArcsec }, 0},
+		{"the Context's precession-nutation", sat, func(_, _ float64) float64 { return canceledArcsec }, 0},
 		{"the satellite's own precession-nutation", stateOnly{sat}, func(obs, rng float64) float64 {
 			return setTimeArcsec * (1 + obs/rng)
-		}, 10 * cancelledArcsec},
+		}, 10 * canceledArcsec},
 	} {
 		ctxAt := movingContext(site, defaultAtm)
 
@@ -207,7 +207,7 @@ func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
 	ctxAt := movingContext(site, defaultAtm)
 
-	// The Crab, as an ordinary catalogue position; any fixed direction does.
+	// The Crab, as an ordinary catalog position; any fixed direction does.
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 
 	// coord.Context.SetTime's documented bound against a fresh Context.

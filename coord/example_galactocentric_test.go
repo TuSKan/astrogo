@@ -48,7 +48,7 @@ func ExampleGalactocentricFrame_FromICRS() {
 	// the Sun             R =  8178.0 pc   Z =   +20.8 pc
 }
 
-// A catalogue gives a parallax, and the frame wants parsecs.
+// A catalog gives a parallax, and the frame wants parsecs.
 func ExampleParallaxDistance() {
 	// A star at Galactic (l, b) = (120°, +15°) with a parallax of 2 mas.
 	star := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(120), angle.Deg(15)))

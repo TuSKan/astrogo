@@ -25,7 +25,7 @@ var errNotInScene = errors.New("no such body in the scene")
 const sceneLight = 86400.0 / 499.00478383615643
 
 // scene is a synthetic solar system that answers as a real provider does:
-// each body about the centre it is computed from, on a function of time.
+// each body about the center it is computed from, on a function of time.
 type scene struct {
 	epoch  time.Time
 	bodies map[eph.ID]sceneBody
@@ -34,7 +34,7 @@ type scene struct {
 	calls  map[eph.ID]int
 }
 
-// sceneBody is one body of a scene: where it is about its centre, days after
+// sceneBody is one body of a scene: where it is about its center, days after
 // the scene's epoch.
 type sceneBody struct {
 	center eph.ID
@@ -113,12 +113,12 @@ func kernelScene() *scene {
 	}
 }
 
-// TestGeometricMeetsAtTheCommonCentre: a state about a centre is the two
+// TestGeometricMeetsAtTheCommonCenter: a state about a center is the two
 // bodies' chains differenced below the first body both pass through, and
 // nothing above it is located. The Moon about the Earth in a kernel is the
 // Moon about the Earth-Moon barycenter less the Earth about it, exactly, and
 // the barycenter itself, an AU away, never enters.
-func TestGeometricMeetsAtTheCommonCentre(t *testing.T) {
+func TestGeometricMeetsAtTheCommonCenter(t *testing.T) {
 	t.Parallel()
 
 	s := kernelScene()
@@ -241,9 +241,9 @@ func (m *mixedProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
 
 func (m *mixedProvider) Close() error { return nil }
 
-// TestGeometricRefusesCentresThatLoop: a provider whose centres never reach
+// TestGeometricRefusesCentersThatLoop: a provider whose centers never reach
 // the barycenter is refused rather than walked forever.
-func TestGeometricRefusesCentresThatLoop(t *testing.T) {
+func TestGeometricRefusesCentersThatLoop(t *testing.T) {
 	t.Parallel()
 
 	s := kernelScene()
@@ -252,7 +252,7 @@ func TestGeometricRefusesCentresThatLoop(t *testing.T) {
 	s.bodies[b] = still(a, vector.V3(-1, 0, 0))
 
 	if _, err := eph.At(s, s.epoch).Geometric(a, eph.Earth); !errors.Is(err, eph.ErrChainTooDeep) {
-		t.Errorf("centres that loop: err %v, want ErrChainTooDeep", err)
+		t.Errorf("centers that loop: err %v, want ErrChainTooDeep", err)
 	}
 }
 

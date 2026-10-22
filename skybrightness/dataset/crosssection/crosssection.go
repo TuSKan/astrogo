@@ -176,7 +176,7 @@ func parseRow(line string, u WavelengthUnit) (nm, sigma float64, ok bool) {
 		return 0, 0, false
 	}
 
-	// A negative cross section is a measurement artefact at the noise floor,
+	// A negative cross section is a measurement artifact at the noise floor,
 	// not absorption; clamping keeps the optical depth physical.
 	if second < 0 {
 		second = 0

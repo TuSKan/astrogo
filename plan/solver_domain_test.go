@@ -205,8 +205,8 @@ func TestFindExtremumLandsOnKnownExtrema(t *testing.T) {
 		}
 
 		if off := math.Abs(value - c.value); off > 1e-6 {
-			t.Errorf("%s: reported value %.9f, want %.9f — a maximisation must report the "+
-				"true value, not the negated one it minimised", c.name, value, c.value)
+			t.Errorf("%s: reported value %.9f, want %.9f — a maximization must report the "+
+				"true value, not the negated one it minimized", c.name, value, c.value)
 		}
 	}
 }

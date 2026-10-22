@@ -502,3 +502,25 @@ func TestStumpffAccuracy(t *testing.T) {
 
 	t.Log("\n" + b.String())
 }
+
+// TestOracleUniversalAtPerihelion: at Δt = ±0 the oracle's χ is that same
+// signed zero, and its state is the perihelion itself: (q, 0) moving at
+// (0, v₀), v₀ = √(μ(1 + e)/q), for an ellipse, the parabola and a hyperbola.
+func TestOracleUniversalAtPerihelion(t *testing.T) {
+	for _, e := range []float64{0.5, 1, 2} {
+		for _, dt := range []float64{0, math.Copysign(0, -1)} {
+			chi := keplerlab.UniversalExact(0.7, e, gaussMu, dt)
+			if chi.Sign() != 0 || chi.Signbit() != math.Signbit(dt) {
+				t.Errorf("e = %v, Δt = %v: χ = %v, want the same zero", e, dt, chi)
+			}
+
+			x, y, vx, vy := keplerlab.UniversalStateExact(0.7, e, gaussMu, dt)
+			v0 := math.Sqrt(gaussMu * (1 + e) / 0.7)
+
+			if mustF(x) != 0.7 || mustF(y) != 0 || mustF(vx) != 0 || math.Abs(mustF(vy)-v0) > 1e-15*v0 {
+				t.Errorf("e = %v, Δt = %v: state (%v, %v) (%v, %v), want the perihelion (0.7, 0) (0, %v)",
+					e, dt, mustF(x), mustF(y), mustF(vx), mustF(vy), v0)
+			}
+		}
+	}
+}

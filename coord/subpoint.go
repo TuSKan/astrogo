@@ -23,7 +23,7 @@ import (
 //
 // # Why the position and not only the direction
 //
-// The ellipsoid normal at a point does not pass through Earth's centre; it
+// The ellipsoid normal at a point does not pass through Earth's center; it
 // is tilted from the geocentric radius by the difference between geodetic
 // and geocentric latitude, up to 11.5′ at mid-latitudes. So the point whose
 // normal is merely parallel to the body's geocentric direction sees the body

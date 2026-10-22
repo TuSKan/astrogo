@@ -16,7 +16,7 @@ import (
 // not approximately.
 //
 // One converts a Gaia flux through a color term and two zero points; the other
-// reads Johnson V straight from a catalogue. They meet in the same map, so any
+// reads Johnson V straight from a catalog. They meet in the same map, so any
 // disagreement is a seam nothing downstream could see — the map would be wrong
 // by the difference wherever the two overlap, with every value still positive
 // and plausible.
@@ -161,7 +161,7 @@ func TestAddBrightStarsRejectsUnusableInput(t *testing.T) {
 	}
 }
 
-// Hipparcos is catalogued at J1991.25 and Gaia DR3 at J2016.0. Matching
+// Hipparcos is cataloged at J1991.25 and Gaia DR3 at J2016.0. Matching
 // without propagating that quarter-century of proper motion misses genuine
 // counterparts for the nearby fast movers — which are also, unhelpfully, the
 // bright ones — and every miss becomes a star added to the map twice.
@@ -334,7 +334,7 @@ func TestCousinsRIdentity(t *testing.T) {
 	t.Parallel()
 
 	// Arcturus: V = -0.04, V-I = 1.27, R-I = 0.65 from the Bright Star
-	// Catalogue, so V-R = 0.62 and R = -0.66.
+	// Catalog, so V-R = 0.62 and R = -0.66.
 	const (
 		v    = -0.04
 		vi   = 1.27

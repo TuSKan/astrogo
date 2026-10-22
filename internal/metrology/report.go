@@ -129,7 +129,7 @@ func (s *Suite) newResult(status Status, reason string, stats Stats) Result {
 }
 
 // maxReportedViolations bounds how many individual failures a suite prints
-// before summarising the rest. A suite comparing thousands of points against
+// before summarizing the rest. A suite comparing thousands of points against
 // a broken contract would otherwise bury its own summary in its own output.
 const maxReportedViolations = 5
 
@@ -281,7 +281,7 @@ func (s *Suite) write(tb TB, res Result) {
 	// derived from program data is the file name, and FileName restricts it
 	// to alphanumerics, dot, underscore and dash — no separators — so nothing
 	// under this directory can be escaped by a suite name.
-	//nolint:gosec // G703: operator-supplied directory by design; the suite-derived component is sanitised by FileName
+	//nolint:gosec // G703: operator-supplied directory by design; the suite-derived component is sanitized by FileName
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		tb.Errorf("%v: creating %s: %v", ErrWriteReport, dir, err)
 

@@ -275,7 +275,7 @@ func MeanFluxDensity(spectrum []float64, grid unit.SpectralGrid, p Passband, min
 // redder than it is.
 //
 // Checked against the Spanish Virtual Observatory's own WavelengthPivot for
-// the five Bessell bands, all of which are energy counters: honouring the
+// the five Bessell bands, all of which are energy counters: honoring the
 // detector reproduces every one of them to four decimal places, where the
 // photon form misses by 0.33 to 0.89 per cent.
 func (p Passband) PivotWavelength() (unit.WavelengthNM, error) {

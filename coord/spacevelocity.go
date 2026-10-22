@@ -31,7 +31,7 @@ import (
 // orbit is gone, and nothing else is. In particular the **Sun's** motion is
 // still in it, so two stars with identical Galactic velocities on opposite
 // sides of the sky have space velocities differing by twice the solar motion.
-// [LSRCorrection] is the radial-velocity analogue of removing that, and the
+// [LSRCorrection] is the radial-velocity analog of removing that, and the
 // full three-dimensional version is what #335 tracks.
 //
 // # Why a parallax is required here, when [ICRSToFK5] no longer needs one
@@ -62,7 +62,7 @@ func SpaceVelocity(c ICRS) (v vector.Vec3, ok bool) {
 	}
 
 	// dRAdt because SOFA speaks the coordinate rate while this package stores
-	// the catalogue's on-sky one. See [dRAdt].
+	// the catalog's on-sky one. See [dRAdt].
 	pv, status := gofaext.Starpv(
 		c.ra.Radians(), c.dec.Radians(),
 		dRAdt(c.pmRA, c.dec), c.pmDec.Radians(),

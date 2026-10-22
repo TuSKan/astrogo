@@ -50,7 +50,7 @@ func sceneWithPressure(t *testing.T, loc *coord.Geodetic, hPa, kelvin float64) *
 // wrong place — and the value it finds there is an ordinary radiance.
 //
 // Evaluating each scene from cold and comparing against the same scene
-// evaluated after its neighbour is what makes a stale key visible: a correct
+// evaluated after its neighbor is what makes a stale key visible: a correct
 // cache gives the same answer both ways.
 func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 	t.Parallel()
