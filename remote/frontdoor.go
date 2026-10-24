@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net/url"
+	"slices"
 
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/remote/file"
@@ -175,7 +176,12 @@ func (c *Client) transportFor(id EndpointID) (*api.Client, string, error) {
 		return inner, base, nil
 	}
 
-	inner := api.NewClient(ep.Timeout, c.apiOpts...)
+	opts := c.apiOpts
+	if ep.IdempotentPost {
+		opts = append(slices.Clip(opts), api.WithIdempotentPost())
+	}
+
+	inner := api.NewClient(ep.Timeout, opts...)
 	c.transports[id] = inner
 
 	return inner, base, nil

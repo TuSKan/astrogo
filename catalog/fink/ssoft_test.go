@@ -370,13 +370,18 @@ func TestFailedLoadIsNotRetried(t *testing.T) {
 		t.Fatal("ensureLoaded against a failing server returned no error")
 	}
 
+	// The transport retries the 500 within the first load (#845), so what
+	// the provider decides is only what the second load asks.
+	asked := *calls
+
 	second := p.ensureLoaded(context.Background())
 	if second == nil {
 		t.Fatal("the second ensureLoaded returned no error")
 	}
 
-	if *calls != 1 {
-		t.Errorf("the server was asked %d times; the recorded failure was expected to be replayed", *calls)
+	if *calls != asked {
+		t.Errorf("the second load asked the server %d more times; the recorded failure was expected to be replayed",
+			*calls-asked)
 	}
 
 	if first.Error() != second.Error() {

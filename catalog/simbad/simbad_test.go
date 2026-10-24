@@ -127,8 +127,10 @@ func TestRetryTimeout(t *testing.T) {
 		return false
 	})
 
-	if attempts == 0 {
-		t.Errorf("expected multiple attempts")
+	// More than one: this asked for "multiple attempts" but checked for any,
+	// and so passed while a POST was never retried (#845).
+	if attempts < 2 {
+		t.Errorf("the 429 was sent %d time(s), want it retried", attempts)
 	}
 }
 
@@ -495,9 +497,24 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected CapObjectResolution and CapMagnitudeBrowse, got %v", caps)
 	}
 
-	// Triggers internal error paths since we didn't mock
-	_, _ = p.Resolve(context.Background(), "non_existent_body")
-	_, _ = p.Search(context.Background(), "non_existent_body")
+	// The error paths, against a server that refuses every query. This used
+	// to reach the live SIMBAD from an untagged test: 60 s while a POST went
+	// out once, four times that once it was retried (#845). A 400 is the
+	// caller's own request and is not retried.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "bad query", http.StatusBadRequest)
+	}))
+	t.Cleanup(srv.Close)
+
+	redirect(t, srv.URL)
+
+	if _, err := p.Resolve(context.Background(), "non_existent_body"); err == nil {
+		t.Error("Resolve against a refusing server returned no error")
+	}
+
+	if _, err := p.Search(context.Background(), "non_existent_body"); err == nil {
+		t.Error("Search against a refusing server returned no error")
+	}
 }
 
 // redirect points endpoint id at a test server for the duration of one
