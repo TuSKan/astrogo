@@ -340,6 +340,14 @@ type Endpoint struct {
 	// Timeout is the API request timeout (KindAPI). Zero means
 	// DefaultAPITimeout.
 	Timeout time.Duration
+	// IdempotentPost declares that a POST to this endpoint (KindAPI) is a
+	// query: sent again, it gets the same document back and changes nothing
+	// on the server, as a TAP sync query or a JSON search does. Such a POST is
+	// retried under the client's RetryPolicy, as a GET is. False sends a POST
+	// once, which is right where a POST creates something: GaiaAIPAsync's UWS
+	// job, which a blind retry could start twice. Until #845 no POST was
+	// retried, whatever the policy said.
+	IdempotentPost bool
 	// DownloadTimeout is the whole-transfer timeout (KindFile). Zero means
 	// DefaultDownloadTimeout.
 	DownloadTimeout time.Duration
@@ -419,12 +427,21 @@ const copernicusEODATAURL = "s3://eodata?endpoint=https%3A%2F%2Feodata.dataspace
 // at request-build time, never from a literal of their own.
 func defaultEndpoints() map[EndpointID]Endpoint {
 	return map[EndpointID]Endpoint{
+		// finals2000A is produced by the IERS Rapid Service/Prediction Center
+		// at USNO, and is fetched from USNO's own server. The IERS data center
+		// republishes it, and was the source until it began answering every
+		// request with a firewall page and HTTP 400 on 2026-10-26: every
+		// download failed, and every epoch fell back to zero DUT1 and polar
+		// motion, up to 8.8″ topocentric. USNO's copy was checked line for line
+		// against one the data center served in July 2026: identical over the
+		// 18,000 settled rows. USNO sends no ETag, so a cached copy is reused
+		// while its size matches the source's (see unchanged).
 		IERSFinals2000A: {
 			ID:              IERSFinals2000A,
-			URL:             "https://datacenter.iers.org/data/9/",
+			URL:             "https://maia.usno.navy.mil/ser7/",
 			Kind:            KindFile,
 			Subsystem:       "iers",
-			Description:     "IERS Earth-orientation parameters (finals2000A.all)",
+			Description:     "IERS Earth-orientation parameters (finals2000A.all), from USNO",
 			ApproxSize:      3_800_000,
 			Enabled:         true,
 			DownloadTimeout: 30 * time.Second,
@@ -519,54 +536,59 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Timeout:     30 * time.Second,
 		},
 		SIMBAD: {
-			ID:          SIMBAD,
-			URL:         "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
-			Kind:        KindAPI,
-			Subsystem:   "catalog/simbad",
-			Description: "CDS SIMBAD TAP service",
-			ApproxSize:  100_000,
-			Enabled:     true,
-			Timeout:     30 * time.Second,
+			ID:             SIMBAD,
+			URL:            "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
+			Kind:           KindAPI,
+			Subsystem:      "catalog/simbad",
+			Description:    "CDS SIMBAD TAP service",
+			ApproxSize:     100_000,
+			Enabled:        true,
+			Timeout:        30 * time.Second,
+			IdempotentPost: true,
 		},
 		VizieR: {
-			ID:          VizieR,
-			URL:         "https://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync",
-			Kind:        KindAPI,
-			Subsystem:   "catalog/vizier",
-			Description: "CDS VizieR TAP service",
-			ApproxSize:  100_000,
-			Enabled:     true,
-			Timeout:     30 * time.Second,
+			ID:             VizieR,
+			URL:            "https://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync",
+			Kind:           KindAPI,
+			Subsystem:      "catalog/vizier",
+			Description:    "CDS VizieR TAP service",
+			ApproxSize:     100_000,
+			Enabled:        true,
+			Timeout:        30 * time.Second,
+			IdempotentPost: true,
 		},
 		ESOSkyCalc: {
-			ID:          ESOSkyCalc,
-			URL:         "https://etimecalret-002.eso.org/observing/etc/",
-			Kind:        KindAPI,
-			Subsystem:   "skybrightness/dataset/airglow",
-			Description: "ESO SkyCalc Cerro Paranal Advanced Sky Model",
-			ApproxSize:  20_000_000,
-			Enabled:     true,
-			Timeout:     3 * time.Minute,
+			ID:             ESOSkyCalc,
+			URL:            "https://etimecalret-002.eso.org/observing/etc/",
+			Kind:           KindAPI,
+			Subsystem:      "skybrightness/dataset/airglow",
+			Description:    "ESO SkyCalc Cerro Paranal Advanced Sky Model",
+			ApproxSize:     20_000_000,
+			Enabled:        true,
+			Timeout:        3 * time.Minute,
+			IdempotentPost: true,
 		},
 		GaiaTAP: {
-			ID:          GaiaTAP,
-			URL:         "https://gea.esac.esa.int/tap-server/tap/sync",
-			Kind:        KindAPI,
-			Subsystem:   "catalog/gaia",
-			Description: "ESA Gaia archive TAP service",
-			ApproxSize:  100_000,
-			Enabled:     true,
-			Timeout:     30 * time.Second,
+			ID:             GaiaTAP,
+			URL:            "https://gea.esac.esa.int/tap-server/tap/sync",
+			Kind:           KindAPI,
+			Subsystem:      "catalog/gaia",
+			Description:    "ESA Gaia archive TAP service",
+			ApproxSize:     100_000,
+			Enabled:        true,
+			Timeout:        30 * time.Second,
+			IdempotentPost: true,
 		},
 		MAST: {
-			ID:          MAST,
-			URL:         "https://mast.stsci.edu/api/v0/invoke",
-			Kind:        KindAPI,
-			Subsystem:   "catalog/mast",
-			Description: "STScI MAST invoke API",
-			ApproxSize:  100_000,
-			Enabled:     true,
-			Timeout:     30 * time.Second,
+			ID:             MAST,
+			URL:            "https://mast.stsci.edu/api/v0/invoke",
+			Kind:           KindAPI,
+			Subsystem:      "catalog/mast",
+			Description:    "STScI MAST invoke API",
+			ApproxSize:     100_000,
+			Enabled:        true,
+			Timeout:        30 * time.Second,
+			IdempotentPost: true,
 		},
 		CelesTrak: {
 			ID:          CelesTrak,
@@ -579,14 +601,15 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Timeout:     30 * time.Second,
 		},
 		FINK: {
-			ID:          FINK,
-			URL:         "https://api.ztf.fink-portal.org/api/v1/ssoft",
-			Kind:        KindAPI,
-			Subsystem:   "catalog/fink",
-			Description: "FINK broker ZTF solar-system object feature table",
-			ApproxSize:  SizeVaries,
-			Enabled:     true,
-			Timeout:     120 * time.Second,
+			ID:             FINK,
+			URL:            "https://api.ztf.fink-portal.org/api/v1/ssoft",
+			Kind:           KindAPI,
+			Subsystem:      "catalog/fink",
+			Description:    "FINK broker ZTF solar-system object feature table",
+			ApproxSize:     SizeVaries,
+			Enabled:        true,
+			Timeout:        120 * time.Second,
+			IdempotentPost: true,
 		},
 		OpenNGC: {
 			ID:          OpenNGC,
@@ -750,8 +773,9 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem: "catalog/gaia, skybrightness/dataset/starlight",
 			Description: "Gaia@AIP TAP mirror; serves every Gaia release plus the Hipparcos " +
 				"crossmatch tables, and answers far faster than the ESA archive",
-			Enabled: true,
-			Timeout: 60 * time.Second,
+			Enabled:        true,
+			Timeout:        60 * time.Second,
+			IdempotentPost: true,
 			// TokenEnv holds the *name* of an environment variable, never a
 			// secret. The registry is the right place for it precisely
 			// because nothing else should have to know it.

@@ -76,6 +76,61 @@ func apparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
 	return icrs, nil
 }
 
+// seenFromTheSite reports whether mb is one of this package's own ephemeris
+// targets, *Planet, *Comet, *Asteroid or *GenericBody, whose place is taken
+// from the site itself through its Provider and EphID. Any other MovingBody
+// is placed through its GeocentricVec: a Satellite, whose geometric place is
+// the convention its passes are validated in against Skyfield, and any
+// MovingBody a caller writes, whose GeocentricVec is the place it offers.
+//
+// The choice is by concrete type, not by an interface: a caller's type that
+// embeds *Planet to answer GeocentricVec itself would inherit an interface
+// method, and have its own place silently replaced by the ephemeris's.
+func seenFromTheSite(mb MovingBody) bool {
+	switch mb.(type) {
+	case *Planet, *Comet, *Asteroid, *GenericBody:
+		return true
+	}
+
+	return false
+}
+
+// observedPlace is a moving body's observed place from ctx's site at t. ctx
+// is at t.
+//
+// A body seenFromTheSite takes the apparent place from the site itself, in
+// SOFA's order (light time to the site, deflection, aberration with the
+// Earth's and the site's velocity together), rotated into the horizon and
+// refracted. Any other goes through its geocentric vector, parallax and
+// diurnal aberration.
+//
+// # Why not the geocentric place and parallax
+//
+// The geocentric apparent place carries annual aberration as a displacement
+// along the geocentric line of sight, 20.5″ at the Moon's distance. Taking
+// the site off it afterward, as [coord.Context.GeocentricToObserved] does,
+// leaves that displacement pointing along a line of sight the parallax has
+// turned by up to 0.95°: the Moon was misplaced by up to 0.33″ near the
+// horizon, against SOFA's Atciq from the site (#840). For a planet the same
+// misprojection is under a milliarcsecond.
+func observedPlace(mb MovingBody, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	if !seenFromTheSite(mb) {
+		vec, err := mb.GeocentricVec(t)
+		if err != nil {
+			return coord.AltAz{}, fmt.Errorf("plan: geocentric vector: %w", err)
+		}
+
+		return ctx.GeocentricToObserved(vec), nil
+	}
+
+	st, err := eph.At(mb.Provider(), t).Apparent(mb.EphID(), eph.Site(ctx))
+	if err != nil {
+		return coord.AltAz{}, fmt.Errorf("plan: %s: apparent state from the site: %w", mb.Name(), err)
+	}
+
+	return ctx.TopocentricToObserved(st.Pos), nil
+}
+
 // geocentric is the geometric position of id about the Earth at t, with no
 // light time: where the body is, not where it is seen.
 func geocentric(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {

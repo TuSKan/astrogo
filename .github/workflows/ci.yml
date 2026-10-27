@@ -9,6 +9,10 @@ on:
   # matched no branch filter here and so ran no checks at all, which reads
   # as "nothing to report" rather than "nothing was run".
   pull_request:
+  # By hand, from the Actions tab or `gh workflow run ci.yml --ref <branch>`.
+  # The benchmarks run only outside pull requests, so this is the way to run
+  # them on a branch, a change to their own jobs included, before it merges.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -239,16 +243,38 @@ jobs:
   # uploaded an artifact nothing opened, so it faithfully recorded
   # "BenchmarkSwapOptimized_100 ... 149427883656 B/op" — 149 GB per operation —
   # on every merge for months while #246 was live, and reported nothing.
-  benchmarks:
-    name: Benchmarks
+  #
+  # The benchmarks run on four runners at once and are reported by one job.
+  # .github/scripts/bench-shards.sh holds the shard table, why the split is safe
+  # for the measurements (each benchmark still runs alone on its CPU) and how it
+  # is balanced. bench-plan only reads that table, so the matrix cannot drift
+  # from it.
+  bench-plan:
+    name: Benchmark shards
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
 
-    permissions:
-      contents: read
-      # Listing this workflow's earlier runs and downloading their artifacts,
-      # which is what the comparison below is built on.
-      actions: read
+    outputs:
+      shards: ${{ steps.list.outputs.shards }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: List the shards
+        id: list
+        run: echo "shards=$(bash .github/scripts/bench-shards.sh json)" >> "$GITHUB_OUTPUT"
+
+  bench-shard:
+    name: Benchmarks (${{ matrix.shard }})
+    needs: bench-plan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.bench-plan.outputs.shards) }}
 
     steps:
       - name: Checkout code
@@ -262,29 +288,86 @@ jobs:
           go-version: '1.27'
           cache: true
 
-      - name: Install benchstat
-        # Pinned, like apidiff above: a comparison tool that moves under you
-        # turns a real delta and a tooling change into the same diff.
-        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
-
       - name: Run benchmarks
-        # ./... on its own, deliberately. This used to name ./... *and* five
-        # packages, which reads as "just these five" while in fact benchmarking
-        # the whole module, since ./... already covers them. The whole module
-        # is the right scope: remote/file's ReadAt strategy benchmark is one
-        # CLAUDE.md explicitly says not to lose.
+        # The shard's packages, which together with the other shards' are the
+        # whole module: bench-shards.sh computes the last shard as everything
+        # the others leave out. The whole module is the right scope:
+        # remote/file's ReadAt strategy benchmark is one CLAUDE.md explicitly
+        # says not to lose.
+        #
+        # The list is written to a file first, so a failure of the script
+        # fails this step instead of leaving go test with no packages, which
+        # would benchmark the current directory instead.
         #
         # -count=6 rather than 3, so benchstat has the samples to say anything
         # other than "~". Affordable now: fixing #246 took the worst plan
         # benchmark from ~68 s to ~1.5 s.
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
-          go test ./... \
+          bash .github/scripts/bench-shards.sh packages "$SHARD" > packages.txt
+          go test $(cat packages.txt) \
             -run=^$ \
             -bench=. \
             -benchmem \
             -count=6 \
             -timeout=30m \
-            | tee bench.txt
+            | tee "bench-$SHARD.txt"
+
+      - name: Upload the shard's results
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bench-${{ github.sha }}-${{ matrix.shard }}
+          path: bench-${{ matrix.shard }}.txt
+          if-no-files-found: error
+          # Read only by the benchmarks job of this same run, which keeps the
+          # combined results for 90 days.
+          retention-days: 1
+
+  # Runs only when every shard succeeded: a delta missing a shard would show
+  # that shard's benchmarks as removed rather than as not run.
+  benchmarks:
+    name: Benchmarks
+    needs: bench-shard
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+
+    permissions:
+      contents: read
+      # Listing this workflow's earlier runs and downloading their artifacts,
+      # which is what the comparison below is built on.
+      actions: read
+
+    env:
+      # No checkout here, so gh is told the repository rather than reading it
+      # from a git remote.
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.27'
+          # Nothing is built here but benchstat, and with no checkout there is
+          # no go.sum to key a cache on.
+          cache: false
+
+      - name: Install benchstat
+        # Pinned, like apidiff above: a comparison tool that moves under you
+        # turns a real delta and a tooling change into the same diff.
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20260908200009-22c9c6c9d4da
+
+      - name: Collect the shards
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: bench-${{ github.sha }}-*
+          merge-multiple: true
+          path: shards
+
+      - name: Combine the shards
+        # One file, in the format the single-runner job wrote, so a delta can
+        # be taken against a run from before the split as well as after it.
+        run: cat shards/bench-*.txt > bench.txt
 
       - name: Compare against the previous run on this branch
         env:
@@ -294,22 +377,27 @@ jobs:
 
           summary() { cat >> "$GITHUB_STEP_SUMMARY"; }
 
-          previous=$(gh run list \
+          run=$(gh run list \
             --workflow ci.yml \
             --branch "$GITHUB_REF_NAME" \
             --status success \
             --limit 20 \
             --json databaseId,headSha \
-            --jq "[.[] | select(.headSha != \"$GITHUB_SHA\")][0].databaseId // empty")
+            --jq "[.[] | select(.headSha != \"$GITHUB_SHA\")][0] // empty | \"\(.databaseId) \(.headSha)\"")
 
-          if [ -z "$previous" ]; then
+          if [ -z "$run" ]; then
             echo '_No earlier successful run on this branch to compare against._' | summary
             exit 0
           fi
 
-          # A missing artifact is the ordinary case once retention lapses, so
-          # this reports and moves on rather than failing the job.
-          if ! gh run download "$previous" --dir previous 2>/dev/null; then
+          previous=${run% *}
+          previous_sha=${run#* }
+
+          # By name: that run also holds its shards' one-day artifacts, and
+          # the combined results are the ones kept for 90 days. A missing
+          # artifact is the ordinary case once retention lapses, so this
+          # reports and moves on rather than failing the job.
+          if ! gh run download "$previous" --name "benchmarks-$previous_sha" --dir previous 2>/dev/null; then
             echo "_Run $previous kept no downloadable benchmark artifact (90-day retention)._" | summary
             exit 0
           fi

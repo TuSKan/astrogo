@@ -53,6 +53,13 @@ import (
 
 const finkBaseURL = "https://api.ztf.fink-portal.org"
 
+// finkHost is what each FINK test dials before asking anything. Unreachable,
+// FINK cost every request a 30 s dial timeout, and since a POST through
+// remote is retried, catalog/fink's three lookups in TestFINK_EndToEndSHG1G2
+// spent 363 s finding that out: enough to run the package past go test's
+// ten-minute limit (#847). The pre-check answers in at most ten seconds.
+const finkHost = "api.ztf.fink-portal.org:443"
+
 // finkSSOQuery returns FINK's observations of numberOrDesig, fetched once per
 // test run (#501).
 //
@@ -285,6 +292,8 @@ func TestFINK_SSOEndpoint(t *testing.T) {
 		t.Skip("skipping network test in short mode")
 	}
 
+	testutil.RequireReachable(t, finkHost)
+
 	records := finkSSOQuery(t, "8467", false, true)
 	if len(records) < 10 {
 		t.Fatalf("expected ≥10 observations for 8467 (Benoitcarry), got %d", len(records))
@@ -310,6 +319,8 @@ func TestFINK_EndToEndSHG1G2(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping network test in short mode")
 	}
+
+	testutil.RequireReachable(t, finkHost)
 
 	// Step 1: Get fitted parameters from SSOFT via the provider.
 	prov := fink.New()
@@ -500,6 +511,8 @@ func TestFINK_ReducedMagnitudeConsistency(t *testing.T) {
 		t.Skip("skipping network test in short mode")
 	}
 
+	testutil.RequireReachable(t, finkHost)
+
 	records := finkSSOQuery(t, "8467", false, true)
 	if len(records) < 10 {
 		t.Fatalf("expected ≥10 observations, got %d", len(records))
@@ -545,6 +558,8 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping network test in short mode")
 	}
+
+	testutil.RequireReachable(t, finkHost)
 
 	// Get spin parameters from the provider.
 	prov := fink.New()
@@ -634,6 +649,8 @@ func TestFINK_ResidualStatistics(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping network test in short mode")
 	}
+
+	testutil.RequireReachable(t, finkHost)
 
 	records := finkSSOQuery(t, "8467", true, true)
 	if len(records) < 10 {

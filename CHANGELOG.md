@@ -7,6 +7,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-10-27
+
+### Added
+- **`docs/ephemeris.md` and `docs/kepler.md`: the ephemeris and two-body designs,
+with every claim measured.** `internal/workload` benchmarks nine ephemeris
+workloads and prototypes the record cache and per-epoch instant bit for bit;
+`internal/keplerlab` holds Kepler solvers to a 256-bit oracle. No production
+code changes. (#814)
+- **`satellite.Satellite.StateCtx` (since renamed LocateCtx, #803) and `coord.Context.TEMEToGCRS`** place a
+satellite with the precession-nutation a Context already holds. `plan.LookAngle`
+uses them, so a six-hour pass search takes 2.6 ms where it took 78 ms, and a
+look angle no longer depends on how far the Context has moved from its epoch. (#821)
+- **`ephemeris.Site(ctx)`, an observer at a `coord.Context`'s site**, with
+`Context.ObsVel` for the site's velocity and `Context.TopocentricToObserved`
+to take a place seen from the site to the horizon. (#846)
+
+### Changed — BREAKING
+- **`ephemeris.ID` is a NAIF code, and nothing else.** Planets' centers and
+their system barycenters have their own names (`eph.Jupiter` is 599,
+`eph.JupiterBarycenter` 5), providers answer the code asked for or refuse it,
+a satellite is −100000 − its NORAD number, and `SmallBodyID` reports validity
+beside the ID. The default provider's Earth is the geocenter again, not the
+Earth-Moon barycenter. (#823)
+- **`kepler.SolveKepler` is Markley's method on an exactly reduced mean anomaly,
+within 2 ulps of the exact root everywhere up to e = 1 − 2⁻⁵³, and 1.75×
+faster.** It answers in [−π, π] rather than [0, 2π) and refuses |M| ≥ 2⁵² with
+`ErrPhaseUnresolved`; the classical state no longer loses what 1 − e has. (#827)
+- **`plan.Oppositions` scans the alignment with the Sun at a step Kepler's second
+law bounds, and refines each opposition on the apparent places: the same
+oppositions as its daily sweep, 175–320× faster.** It needs the Sun as one of
+its two bodies (`ErrOppositionNeedsSun`); `EventSolver.Find` no longer reports a
+conjunction's wrap as an opposition. (#828)
+- **A provider `Locate`s each body about its own center, and `ephemeris.At`
+composes an `Instant` whose apparent place follows SOFA's order**: against
+Horizons the tail falls from 32 to 2 mas, and an astrometric place on a kernel
+from about 200 µs to 2 µs. `State`, `ApparentState`, `AstrometricState`,
+`Position`, `Velocity`, the `Center` type and `State.Require` are removed. (#831)
+- **`atmosphere.RayleighDepolarisation` is since renamed `RayleighDepolarization`**,
+as the repository's prose, messages and identifiers move to American English
+throughout; `internal/docsguard` now fails on a British spelling. (#839)
+
+### Changed
+- The `examples` module requires v0.21.0, so it resolves against the current release for anyone who fetches it directly. (#805)
+- **A JPL kernel's sky at one instant is 47× faster from disk, and allocates
+nothing** (355 → 7.6 µs, 188 → 0 allocations). An `spk.Reader` now keeps each
+segment's directory and last evaluated record, bit-identically; a kernel on
+disk, in `mem://` or in memory now costs the same. (#816)
+- **Goroutines sharing one kernel no longer queue on its chunk cache.** A hit
+takes no lock and a miss is read with none held, so sixteen goroutines
+evaluating the Moon from de440s take 481 ns per state in aggregate where they
+took 2,052 — what the same kernel costs in memory with no cache at all. (#820)
+- **`coord.Context.SetTime` interpolates the precession-nutation state across a
+day instead of rebuilding it every hour**, and places the observer at the new
+instant. A day of altitudes at 15-minute ticks takes 0.48 ms where it took
+3.4, and a moved Context is within 0.007″ of a fresh one where it drifted to
+0.07″. (#822)
+- **`kepler.Elements.StateAt` takes 45% less time.** The constructors and the `With`
+methods compute an orbit's epoch-independent quantities once, its orientation
+as the perifocal axes P and Q, instead of on every call. (#832)
+
+### Fixed
+- Two `catalog/mpcorb` tests counted rows with a bare `for range` over `Read`'s `iter.Seq2`, discarding each row's error, so a row that failed to parse still passed as read. Both now fail on it. CI lints with golangci-lint v2.15, whose `errcheck` reports this pattern. (#806)
+- **An SPK type 2 or 3 segment's final instant read past its last record.** The
+segment's own directory was evaluated as Chebyshev coefficients, with no error:
+de440s put the Earth 6×10⁶¹ km from the Earth-Moon barycenter at the last instant
+it covers. That instant now uses the last record, and a directory that does not
+describe the epoch is reported as a corrupt kernel. (#808)
+- **`spk.EvaluateSegment` evaluated a type 2/3 segment's last record for a whole
+record interval past its end.** The polynomial ran at τ up to 3, forty times the
+true value a record out, with no error; an epoch outside its record's interval
+is now refused. `jpl.Provider` never asked for one. (#817)
+- **`kepler.Provider` placed a heliocentric orbit with SOFA's `Epv00` Earth even
+over a JPL base** — 4.0 km rms and 11.7 km at worst from de440s, 1.6″ for a body
+at 0.01 AU — while the Sun in the same place came from the kernel. The orbit is
+now made geocentric with the base's own Sun; without `WithBase` the result is
+unchanged to the bit. (#818)
+- **`jpl.Provider` chained a kernel's segments whatever their reference frame**
+and labeled the result ICRF, so an ECLIPJ2000 kernel came out 23.4° off with
+no error. A kernel holding a segment in any frame but J2000 is now refused
+whole, with `jpl.ErrUnsupportedFrame`; every kernel astrogo fetches is J2000. (#819)
+- **The test that holds a satellite's look angle to a fresh Context's failed on
+main** once #822 made a moved Context accurate enough to hide its control. It
+now probes mid-bracket, where the interpolation's error peaks, and holds the
+look angle to 0.01 mas. (#826)
+- **The test holding `SatellitePasses`' moving Context to a fresh one could not
+fail**: since #812 its route cancels the Context's error (0.0000″ against a
+pre-#822 0.1″). It now holds that route to 0.01 mas, and a route where the error
+shows to SetTime's ≲0.007″ times the satellite's parallax amplification. (#830)
+- **The asteroid phase laws' tests could not fail on a wrong spline knot or
+mapping coefficient**: they read back their own tables. All four laws are now
+held to sbpy's published values at 1e-8 mag, which they meet to 5e-9. (#836)
+- **A phase law that reflects no light returned a magnitude 75 fainter, not
++Inf**: `AsteroidHG` at 180°, `AsteroidHG1G2` (and HG12, HG12*, sHG1G2) past a
+basis function's zero, and `SatelliteApparent`'s sphere at 180° gave H + 75. (#837)
+- **The universal-variable path (`kepler.FromPerihelion`) lost up to 317 ulps of
+position** to cancellation in the Stumpff functions and in g and ġ far from
+perihelion. Every regime is now within 4.7 ulps, held to a 256-bit oracle. (#842)
+- **Two Jerusalem examples placed the city about 470 km off**, with latitude and
+longitude swapped in `coord.NewGeodetic`. The examples, docs and `Example`
+functions now build sites with `coord.NewEarthLocation`, and every online
+example imports `remote/eop` for real Earth orientation. `internal/docsguard`
+holds both. (#844)
+- **The Moon's observed place was up to 0.33″ off near the horizon**, from
+annual aberration applied at the geocenter and then turned by parallax.
+`plan` and `skybrightness` now observe their bodies from the site itself, in
+SOFA's order. (#846)
+- **`PostForm` and `PostJSON` were never retried**, whatever the `RetryPolicy`
+said, so one slow SIMBAD answer failed a TAP query. An endpoint registered
+`IdempotentPost` now has its POSTs retried; every TAP and JSON query endpoint
+is, and `GaiaAIPAsync`, whose POST creates a job, is not. (#847)
+- **`internal/docsguard`'s README check could leave its scratch package behind
+on Windows**, where a second test run's repository walkers read it as part of
+the module. The cleanup now waits until the directory is gone, and fails the
+test and names it if it is not. (#848)
+- **`TargetDetails`' RA and Dec for a moving body carried annual aberration**,
+up to 21″ from the astrometric place they are documented as. They are now that
+place, seen from the site, and the elongation is measured to the Sun placed the
+same way. (#850)
+- **A CAMS file the HDF5 decoder refused as corrupt was not reported as
+`cams.ErrMalformed`**; only a decoder panic was. scigolib/hdf5 v0.14.2, which
+this release moves to, now refuses such files itself, so the reader marks
+either way the same. (#851)
+- **The AD 33 eclipse example computed the sunset and moonrise of Julian 5 April
+for an eclipse on the 3rd**, building a historical date with the Gregorian
+`time.Date`. Historical dates in the examples and `docs/JESUS.md` now use
+`time.DateJulianCal`, the doc quotes what the code and NASA's canon give, and
+docsguard refuses a pre-1583 `time.Date` in code a user copies. (#854)
+- **`time`'s IERS oracle tests failed while the IERS timescale service refused
+every request** with a firewall 400. They now skip when a control request that
+cannot be wrong is refused too, and still fail when it is answered. (#855)
+- **Earth orientation was never downloaded while the IERS data center refused
+every request** with a firewall 400, so every epoch used zero DUT1 and polar
+motion. `remote.IERSFinals2000A` now fetches finals2000A from its producer, the
+IERS Rapid Service/Prediction Center at USNO. (#857)
+
 ## [0.21.0] — 2026-10-20
 
 ### Added
@@ -3037,7 +3172,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/TuSKan/astrogo/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/TuSKan/astrogo/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/TuSKan/astrogo/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/TuSKan/astrogo/compare/v0.18.0...v0.19.0
