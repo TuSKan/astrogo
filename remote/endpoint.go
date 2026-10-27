@@ -427,12 +427,21 @@ const copernicusEODATAURL = "s3://eodata?endpoint=https%3A%2F%2Feodata.dataspace
 // at request-build time, never from a literal of their own.
 func defaultEndpoints() map[EndpointID]Endpoint {
 	return map[EndpointID]Endpoint{
+		// finals2000A is produced by the IERS Rapid Service/Prediction Center
+		// at USNO, and is fetched from USNO's own server. The IERS data center
+		// republishes it, and was the source until it began answering every
+		// request with a firewall page and HTTP 400 on 2026-10-26: every
+		// download failed, and every epoch fell back to zero DUT1 and polar
+		// motion, up to 8.8″ topocentric. USNO's copy was checked line for line
+		// against one the data center served in July 2026: identical over the
+		// 18,000 settled rows. USNO sends no ETag, so a cached copy is reused
+		// while its size matches the source's (see unchanged).
 		IERSFinals2000A: {
 			ID:              IERSFinals2000A,
-			URL:             "https://datacenter.iers.org/data/9/",
+			URL:             "https://maia.usno.navy.mil/ser7/",
 			Kind:            KindFile,
 			Subsystem:       "iers",
-			Description:     "IERS Earth-orientation parameters (finals2000A.all)",
+			Description:     "IERS Earth-orientation parameters (finals2000A.all), from USNO",
 			ApproxSize:      3_800_000,
 			Enabled:         true,
 			DownloadTimeout: 30 * time.Second,
