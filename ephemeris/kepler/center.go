@@ -83,11 +83,13 @@ type centerChoice struct {
 // kernel, where every trans-Neptunian object measured fits about the
 // barycenter to under a kilometer at 30 days.
 //
-// Only a set referred to the Sun with no satellite modifier is considered: a
-// Laplace plane, a secular precession and a period describe a satellite's mean
-// elements, not an osculating heliocentric orbit.
+// Only an osculating set referred to the Sun is considered. A Laplace plane, a
+// secular precession and a period describe a satellite's mean elements, and
+// [PlutoElements] are fitted to Pluto's path over two and a half centuries:
+// the state of either at its epoch is not the body's, so a refit through it
+// would be a different orbit, which for Pluto missed by 1.96 AU (#877).
 func fitCenter(el Elements, base core.Provider) (Elements, error) {
-	if el.CentralBody().ID != core.Sun || el.plane != nil || el.precession.rate() != 0 || el.periodDays != 0 {
+	if el.CentralBody().ID != core.Sun || el.plane != nil || el.precession.rate() != 0 || el.periodDays != 0 || el.fitted {
 		return el, nil
 	}
 

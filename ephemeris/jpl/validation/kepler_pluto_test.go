@@ -106,6 +106,11 @@ func plutoContract() metrology.Contract {
 // arcminutes to a degree. A caller who reads "offline ephemeris" and gets the
 // same quality for Pluto as for Mars would be wrong by two orders of
 // magnitude, and now the table says so.
+//
+// It measures eph.Default() itself, which registers the elements. It used to
+// measure kepler.New()'s base, which propagates them directly and never goes
+// through Register, so when #872 made Register refit a far orbit about the
+// barycenter it missed Default's Pluto reaching 1.96 AU from DE440 (#877).
 func TestKeplerPlutoAgainstDE440(t *testing.T) {
 	suite := metrology.NewSuite("ephemeris.kepler.pluto", plutoReference(), plutoContract())
 
@@ -130,7 +135,7 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 		lastYear  = 2050
 	)
 
-	base := kepler.New()
+	def := eph.Default()
 
 	for y := firstYear; y <= lastYear; y++ {
 		for _, mo := range []time.Month{time.January, time.April, time.July, time.October} {
@@ -141,7 +146,7 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 				t.Fatalf("DE440 State(Pluto) at %s: %v", at.Format(isoDate), werr)
 			}
 
-			got, gerr := eph.At(base, at).Geometric(core.PlutoBarycenter, core.Earth)
+			got, gerr := eph.At(def, at).Geometric(core.PlutoBarycenter, core.Earth)
 			if gerr != nil {
 				t.Fatalf("Kepler State(Pluto) at %s: %v", at.Format(isoDate), gerr)
 			}

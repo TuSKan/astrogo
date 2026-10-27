@@ -78,8 +78,9 @@ func New(opts ...Option) *Provider {
 // Jupiter's orbit, the barycenter for a Centaur, a trans-Neptunian object or a
 // long-period comet far out. [Provider.Locate] then reports which. A refit
 // places the state about the barycenter through the base's Sun, and fails
-// when the base cannot place the Sun there. A satellite's set, or one with a
-// satellite modifier, is kept as given.
+// when the base cannot place the Sun there. A satellite's set, one with a
+// satellite modifier, and [PlutoElements], which are fitted rather than
+// osculating, are kept as given.
 //
 // Not safe to call concurrently with State — populate every body a
 // Provider will ever answer before sharing it across concurrent
@@ -134,12 +135,19 @@ func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
 // Close releases no resources — Provider holds no files or caches.
 func (p *Provider) Close() error { return nil }
 
-// PlutoElements are Pluto's classical heliocentric osculating elements at
-// J2000.0, in the J2000 mean ecliptic frame.
+// PlutoElements are Pluto's classical heliocentric elements at J2000.0, in
+// the J2000 mean ecliptic frame.
 //
 // The T=0 row of E. M. Standish (JPL/Caltech Solar System Dynamics Group),
 // "Keplerian Elements for Approximate Positions of the Major Planets",
 // Table 1, valid 1800-2050.
+//
+// They are not osculating. Standish fitted them to Pluto's path over
+// 1800-2050, so the orbit they describe about the Sun is the approximation,
+// and their state at J2000 is not Pluto's. [Provider.Register] keeps them
+// about the Sun for that reason. Refit about the barycenter through that
+// state, as a far body's osculating set would be, they missed DE440 by up to
+// 1.96 AU over the window, against 0.14 about the Sun (#877).
 //
 // They live here rather than a layer up because the default base needs them:
 // SOFA has no analytical Pluto, and without one a satellite registered about
@@ -158,6 +166,8 @@ var plutoElements = func() Elements {
 	if err != nil {
 		panic(fmt.Sprintf("kepler: built-in Pluto elements are invalid: %v", err))
 	}
+
+	el.fitted = true
 
 	return el
 }()

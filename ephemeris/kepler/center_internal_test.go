@@ -233,6 +233,30 @@ func TestRegisterKeepsWhatIsNotAHeliocentricOrbit(t *testing.T) {
 	}
 }
 
+// TestRegisterKeepsPlutosFittedElementsAboutTheSun: Standish's elements are
+// fitted to Pluto's path, not osculating, so Register keeps them about the
+// Sun (#877). The same numbers as an ordinary set are refit, which shows the
+// mark, not the orbit, is what keeps them.
+func TestRegisterKeepsPlutosFittedElementsAboutTheSun(t *testing.T) {
+	t.Parallel()
+
+	pluto := PlutoElements()
+
+	if got := registered(t, pluto); got.CentralBody() != pluto.CentralBody() || got.state != nil {
+		t.Errorf("Register refit Standish's Pluto about %v, want it kept about the Sun", got.CentralBody().ID)
+	}
+
+	same, err := NewElements(pluto.Epoch(), pluto.SemiMajorAxis(), pluto.Eccentricity(),
+		pluto.Inclination(), pluto.AscendingNode(), pluto.ArgPeriapsis(), pluto.MeanAnomaly())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := registered(t, same).CentralBody().ID; got != core.SolarSystemBarycenter {
+		t.Errorf("the same orbit as an osculating set is fitted about %v, want the barycenter at 39 AU", got)
+	}
+}
+
 // TestCenterChoiceCrossesOverBeyondJupiter logs what each fit leaves out across
 // distances, and holds the crossover between the main belt and Saturn's orbit,
 // where the study (#803) found the better fit changes.
