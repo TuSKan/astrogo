@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"math/rand/v2"
+	"runtime"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -118,7 +119,7 @@ func readEverything(tb testing.TB, fsys remote.FS, data []byte) int {
 // allocate terabytes. #795 held this target back: the decoder's own local
 // heap, allocated from its declared size, was a path it could not close, and
 // this table's claim is never-panics. scigolib/hdf5 v0.14.2 bounds that
-// allocation and every other one sized from file metadata.
+// allocation, and checkExtent the contiguous slice it does not.
 func FuzzOpen(f *testing.F) {
 	fixture := fixtureBytes(f)
 	f.Add(fixture)
@@ -153,7 +154,8 @@ const (
 
 // TestOpenSurvivesCorruptions overwrites one to four of the fixture's bytes
 // with random values, in corruptSweep variants from a fixed seed, and opens
-// and reads each in full. None may end the process.
+// and reads each in full. None may end the process, or allocate more than a
+// file of the fixture's size could need.
 //
 // The bytes are drawn from the file's structure: the runs of its non-zero
 // bytes, zeros inside them included, 6,097 of its 426,636 bytes between long
@@ -168,6 +170,18 @@ const (
 // scigolib/hdf5 v0.14.2 it completes, which is the measurement: a fatal
 // out-of-memory is not an error this test could report, it is the end of the
 // test binary.
+//
+// That much measures the machine as well as the reader. With v0.14.2 the
+// sweep passed here while variants 334 and 744 asked for 40.9 and 50.7 GB, for
+// contiguous planes with a corrupted element size, which this machine could
+// commit and Linux and Windows CI could not. -short stops before both, and
+// TestReadPlaneRefusesAnElementSizeTheFileCannotHold holds that case in every
+// mode. So each variant's allocations are held to
+// what the fixture's bytes could hold at DEFLATE's largest expansion, the
+// bound checkExtent applies to compressed data: anything more was sized from
+// a declaration no file of this size could keep. TotalAlloc is the process's,
+// so a parallel test's allocations count too; they are megabytes, against
+// 440 MB, and the largest variant allocates 3 MB.
 func TestOpenSurvivesCorruptions(t *testing.T) {
 	t.Parallel()
 
@@ -187,16 +201,28 @@ func TestOpenSurvivesCorruptions(t *testing.T) {
 
 	rng := rand.New(rand.NewPCG(794, 795))
 	read := 0
+	limit := uint64(deflateMaxRatio * len(fixture))
 
-	for range n {
+	for i := range n {
 		b := bytes.Clone(fixture)
 
 		for range 1 + rng.IntN(4) {
 			b[structure[rng.IntN(len(structure))]] = byte(rng.IntN(256))
 		}
 
+		var before, after runtime.MemStats
+
+		runtime.ReadMemStats(&before)
+
 		if readEverything(t, fsys, b) > 0 {
 			read++
+		}
+
+		runtime.ReadMemStats(&after)
+
+		if allocated := after.TotalAlloc - before.TotalAlloc; allocated > limit {
+			t.Errorf("variant %d allocated %d bytes reading a %d-byte file, more than one could hold, %d",
+				i, allocated, len(fixture), limit)
 		}
 	}
 
