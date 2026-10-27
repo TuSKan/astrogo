@@ -184,7 +184,12 @@ func fetchAstroPixelsPage(t *testing.T, startYear int) string {
 	url := fmt.Sprintf("https://astropixels.com/ephemeris/phasescat/phases%04d.html", startYear)
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	// The client's timeout already bounds the request; the context carries
+	// the same deadline, where a reader of the request can see it (#849).
+	ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request for %s: %v", url, err)
 	}

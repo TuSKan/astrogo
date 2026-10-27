@@ -3,6 +3,7 @@
 package plan_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -17,8 +18,22 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
+
+// horizonsContext bounds one request to Horizons by what astrogo's own client allows
+// the endpoint: its registered Timeout, or remote.DefaultAPITimeout when it
+// registers none. A hung service then fails the request, which skips, rather
+// than the whole package at go test's timeout (#849).
+func horizonsContext() (context.Context, context.CancelFunc) {
+	timeout := remote.DefaultAPITimeout
+	if ep, ok := remote.Lookup(remote.JPLHorizons); ok && ep.Timeout > 0 {
+		timeout = ep.Timeout
+	}
+
+	return context.WithTimeout(context.Background(), timeout)
+}
 
 // horizonsRangeRate fetches JPL Horizons' own topocentric range-rate
 // (quantity 20, the second column of the pair) for one body, at one instant,
@@ -31,7 +46,10 @@ func horizonsRangeRate(t *testing.T, command, tlistJD string) float64 {
 		"&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'&QUANTITIES='20'&TLIST='%s'"+
 		"&CSV_FORMAT='YES'&OBJ_DATA='NO'", command, tlistJD)
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}

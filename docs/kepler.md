@@ -25,12 +25,13 @@ shows is never ill-conditioned in relative terms.
 
 ## 1. What exists
 
-`ephemeris/kepler` propagates two ways:
+`ephemeris/kepler` propagates three ways:
 
 | path | used for | how |
 | --- | --- | --- |
 | classical | `NewElements` (0 ≤ e < 1) | `SolveKepler` for E, then x = a(cos E − e), y = a√(1−e²)·sin E, Ė = n/(1 − e·cos E) (`perifocalClassical`) |
 | universal | `FromPerihelion` (any e ≥ 0) | universal anomaly χ by bracketed Newton, Stumpff functions, Lagrange coefficients (`perifocalUniversal`) |
+| from a state | `FromState` (any e ≥ 0) | an ellipse by universal variables from the state itself, with its σ₀ = r⃗·v⃗/√μ term (`fromStateDirect`); an open orbit along the universal path from its perihelion, found by the eccentricity vector v⃗×h⃗/μ − r̂ (#803) |
 
 Both end in `orient`: three rotations of the position and three of the
 velocity, each computing its own sine and cosine, then the rotation by the
@@ -294,7 +295,7 @@ canaried by substituting the IAU 2006 obliquity for the elements' IAU 1976 one
 
 **No new type.** `Elements` is already an immutable value validated at
 construction; it carries the prepared quantities in unexported fields set by
-`NewElements` and `FromPerihelion`, and `StateAt` stays the one entry point.
+`NewElements`, `FromPerihelion` and `FromState`, and `StateAt` stays the one entry point.
 An orbit with secular apsidal precession rotates P and Q about the orbit
 normal by Δω = ω̇·Δt: one `Sincos` on the calls that need it.
 

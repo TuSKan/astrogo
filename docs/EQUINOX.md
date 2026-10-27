@@ -34,6 +34,8 @@ The Sun's ecliptic longitude crosses 0° (vernal equinox), 90° (summer solstice
 3. Refining to sub-second precision via Chandrupatla's method
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 events, _ := plan.Seasons(2026, prov)
 for _, e := range events {
     fmt.Printf("%-20s %s\n", e.Season, e.Time.In(brtz).Format("Jan 02 15:04:05"))
@@ -83,6 +85,8 @@ of the Earth being near aphelion during July.
 ## Earth's Apsides
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 apsides, _ := plan.Apsides(2026, prov)
 ```
 
