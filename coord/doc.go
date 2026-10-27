@@ -94,7 +94,9 @@
 // Because it is a translation rather than a rotation, it needs a position
 // rather than a direction, and how much it matters depends entirely on
 // distance: [SunBarycentric] runs to 0.009 AU, which is half a degree seen
-// from one AU and nine milliarcseconds seen from a parsec.
+// from one AU and nine milliarcseconds seen from a parsec. It is SOFA's
+// barycenter, about 115 km from a JPL kernel's, so a position from a kernel
+// is better moved with that kernel's own Sun; see SunBarycentric.
 //
 // # Offsets from a target
 //

@@ -53,6 +53,23 @@ import (
 // [Context.HeliocentricRVCorrection] uses for the velocity.
 //
 // The epoch is used on the TDB scale, which is what Epv00 is defined for.
+//
+// # Whose barycenter
+//
+// SOFA's, which is not a JPL kernel's. Epv00 was fit to DE405, and against
+// DE440 this Sun is 107 to 122 km away over 1972-2100, sampled quarterly: a
+// translation that drifts by tens of kilometers in a century.
+// TestSunBarycentricAgainstDE440 holds that range. Epv00's own documented
+// error against DE405 is 13.4 km at most, so most of it is the barycenter
+// itself. That is consistent with DE440's counting trans-Neptunian masses
+// DE405's does not: Eris alone, 8·10⁻⁹ of the Sun's mass at 96 AU, moves a
+// barycenter about 118 km toward itself, close to where the offset points.
+//
+// Within a calculation that takes everything from SOFA, it cancels. A
+// position from a JPL kernel should be moved to the Sun with that kernel's
+// own Sun, which its provider locates about the barycenter; moved with
+// [BarycentricToHeliocentric], it carries the offset, 0.16″ seen from one AU
+// (#875).
 func SunBarycentric(t time.Time) (vector.Vec3, error) {
 	d1, d2 := t.TDB().JDParts()
 
