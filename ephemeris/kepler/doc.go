@@ -61,6 +61,17 @@
 // having to choose between a planet's system and body values — a choice that
 // is wrong by 12% at Pluto.
 //
+// A heliocentric set given to [Provider.Register] can be stored about the
+// Solar System barycenter instead (#803). Far from the Sun the planets pull
+// the Sun about as hard as they pull the body, and a two-body fit about the
+// barycenter, with the Sun and every planet inside the body's distance as its
+// mass, leaves out far less. Measured against Horizons 30 days from the
+// epoch, it puts a trans-Neptunian object within 0.03 to 0.46 km, where the
+// heliocentric fit is off by 866 to 885. Register keeps whichever fit leaves
+// the smaller perturbing acceleration at the osculation epoch — the Sun inside
+// Jupiter's orbit, the barycenter for a Centaur and beyond — and
+// [Provider.Locate] reports the center it chose.
+//
 // # What a satellite orbit here is not
 //
 // Two things are missing before a planetary satellite computed this way

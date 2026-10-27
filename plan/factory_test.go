@@ -223,6 +223,13 @@ func TestFromCatalog_OpenOrbitPropagatesFromPerihelion(t *testing.T) {
 // CometEls.txt published it on 2026-09-23: a closed orbit, but in comet form
 // only, so its semi-major axis is zero and only the perihelion form can
 // build it.
+//
+// At its 2026 osculation epoch Hale-Bopp is about 50 AU out, where a fit about
+// the barycenter leaves out less than one about the Sun, so the provider refits
+// it there (#803). The refit is a different conic through the same 2026 state
+// and passes perihelion in 1997 at 0.917 AU, not the published q of 0.925;
+// what the two share is the comet's distance from the Sun at the epoch the
+// elements osculate at.
 func TestFromCatalog_CometFileRowPropagates(t *testing.T) {
 	tp := time.FromJDParts(2450536.5, 0.0319, time.TT)
 
@@ -244,8 +251,28 @@ func TestFromCatalog_CometFileRowPropagates(t *testing.T) {
 		t.Fatal("FromCatalog did not build a *plan.Comet from a comet-form-only element set")
 	}
 
-	if r := perihelionDistanceAt(t, comet, tp); math.Abs(r-0.925246) > 1e-12 {
-		t.Errorf("%.12f AU from the Sun at perihelion, want q = 0.925246", r)
+	st, err := comet.Provider().Locate(comet.EphID(), c.Epoch)
+	if err != nil {
+		t.Fatalf("Locate: %v", err)
+	}
+
+	if st.Center != eph.SolarSystemBarycenter {
+		t.Errorf("Hale-Bopp at its 2026 epoch is fitted about %v, want the barycenter", st.Center)
+	}
+
+	published, err := eph.ElementsFromPerihelion(c.Epoch, tp, c.PerihelionDistance, c.Eccentricity,
+		c.Inclination, c.AscendingNode, c.ArgPeriapsis)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, _, err := published.StateAt(c.Epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r := perihelionDistanceAt(t, comet, c.Epoch); math.Abs(r-want.Norm()) > 1e-12 {
+		t.Errorf("%.12f AU from the Sun at the osculation epoch, want the published elements' %.12f", r, want.Norm())
 	}
 }
 
