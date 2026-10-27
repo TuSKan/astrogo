@@ -358,6 +358,10 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    orientation as P and Q, the phase by one fused multiply-add. The phase
    came with #827; the rest is **done in #832**, measured in §5.
 4. **The Earth from the base (#810),** then the per-orbit center (#803).
+   **Done in #872:** `Register` keeps a heliocentric set about the Sun or
+   refits it about the barycenter, whichever leaves the smaller perturbing
+   acceleration at the epoch; the rule and its measurement are in
+   `ephemeris/kepler/center.go`.
 5. **The universal path's own audit.** This document called it the stable
    form already. Measured, it was not (#833). The oracle
    (`internal/keplerlab/universal.go`) sums c₀ … c₃ by their series at 320
