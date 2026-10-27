@@ -191,7 +191,7 @@ func Site(ctx *coord.Context) Observer {
 // Center is the Earth.
 func (in *Instant) Astrometric(target ID, obs Observer) (State, error) {
 	var a astrometric
-	if err := in.astrometric(target, obs, &a); err != nil {
+	if err := in.astrometric(target, obs, &a, true); err != nil {
 		return State{}, err
 	}
 
@@ -205,6 +205,14 @@ type astrometric struct {
 	pos, vel vector.Vec3 // the astrometric state
 	ob, ov   vector.Vec3 // the observer, barycentric, at t
 	then     Instant     // at t − τ
+	target   ID
+
+	// When the solve carried B rather than evaluating it at t − τ (#791):
+	// B, the target about it at t − τ, and the target barycentric then.
+	carried bool
+	carry   carrier
+	rel, tb vector.Vec3
+	tau     float64
 }
 
 // Apparent returns the apparent state of target seen by obs, in SOFA's order
@@ -224,8 +232,14 @@ type astrometric struct {
 // moves back with the target. Against Horizons' quantity 2 that scattered
 // 9.8 mas in right ascension, and SOFA's order 1.7 mas.
 func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
+	return in.apparent(target, obs, true)
+}
+
+// apparent is [Instant.Apparent], with the carry (#791) allowed or not: the
+// exact path is what the carried one is tested against.
+func (in *Instant) apparent(target ID, obs Observer, carryAllowed bool) (State, error) {
 	var a astrometric
-	if err := in.astrometric(target, obs, &a); err != nil {
+	if err := in.astrometric(target, obs, &a, carryAllowed); err != nil {
 		return State{}, err
 	}
 
@@ -240,7 +254,7 @@ func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
 	dir := unitArray(a.pos)
 
 	if target != Sun {
-		q, err := a.then.Geometric(target, Sun)
+		q, err := a.sunToTarget(sun)
 		if err != nil {
 			return State{}, fmt.Errorf("ephemeris: the Sun at the retarded epoch for light deflection: %w", err)
 		}
@@ -272,6 +286,23 @@ func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
 	}, nil
 }
 
+// sunToTarget is the target about the Sun at t − τ, where the light left it,
+// for the deflection. A solve that carried the Sun has it already; one that
+// carried the Earth has the target's barycentric place then, and the Sun's is
+// carried back linearly from sun, its state at t, which its 3.1e-7 m/s² at
+// most moves by a fraction of a micrometer over the Moon's light time.
+// Otherwise it is evaluated at t − τ.
+func (a *astrometric) sunToTarget(sun State) (State, error) {
+	switch {
+	case a.carried && a.carry.id == Sun:
+		return State{Pos: a.rel}, nil
+	case a.carried:
+		return State{Pos: a.tb.Sub(sun.Pos.Sub(sun.Vel.MulScalar(a.tau)))}, nil
+	}
+
+	return a.then.Geometric(a.target, Sun)
+}
+
 // locate is [github.com/TuSKan/astrogo/ephemeris/core.Provider.Locate] at the Instant's epoch, remembered.
 func (in *Instant) locate(id ID) (State, error) {
 	for i := range in.n {
@@ -295,6 +326,28 @@ func (in *Instant) locate(id ID) (State, error) {
 	}
 
 	return st, nil
+}
+
+// retarded is the target's barycentric state at a.then, τ days before t: the
+// target about B evaluated there and B carried back from t when carry is set,
+// and the whole chain evaluated there when it is not. It records which, for
+// the deflection.
+func (a *astrometric) retarded(target ID, c carrier, carry bool, tau float64) (State, error) {
+	a.carried, a.tau = carry, tau
+	if !carry {
+		return a.then.Geometric(target, SolarSystemBarycenter)
+	}
+
+	rel, err := a.then.Geometric(target, c.id)
+	if err != nil {
+		return State{}, err
+	}
+
+	bPos, bVel := c.at(tau)
+
+	a.carry, a.rel, a.tb = c, rel.Pos, rel.Pos.Add(bPos)
+
+	return State{Pos: a.tb, Vel: rel.Vel.Add(bVel)}, nil
 }
 
 // observer returns the observer's barycentric position and velocity at the
@@ -321,7 +374,7 @@ func (in *Instant) observer(obs Observer) (pos, vel vector.Vec3, err error) {
 // on τ stands for. A further evaluation is a full provider read at a new
 // epoch — on the analytical ephemeris an Epv00, 34 µs — so stopping at the
 // first one that is good enough is the point.
-func (in *Instant) astrometric(target ID, obs Observer, a *astrometric) error {
+func (in *Instant) astrometric(target ID, obs Observer, a *astrometric, carryAllowed bool) error {
 	var err error
 
 	if a.ob, a.ov, err = in.observer(obs); err != nil {
@@ -342,6 +395,19 @@ func (in *Instant) astrometric(target ID, obs Observer, a *astrometric) error {
 	// at t.
 	tau := p0.Norm() / (lightAUPerDay + p0.Unit().Dot(now.Vel))
 
+	a.target = target
+
+	var (
+		carry    carrier
+		canCarry bool
+	)
+
+	if carryAllowed {
+		if carry, canCarry, err = in.carrierFor(target); err != nil {
+			return fmt.Errorf("ephemeris: %v: %w", target, err)
+		}
+	}
+
 	for range lightTimeMaxIter {
 		a.then = Instant{p: in.p, t: in.t.Add(unit.Days(-tau))}
 
@@ -351,7 +417,7 @@ func (in *Instant) astrometric(target ID, obs Observer, a *astrometric) error {
 		// at the epoch the provider was given.
 		tau = in.t.Sub(a.then.t).Days()
 
-		st, err := a.then.Geometric(target, SolarSystemBarycenter)
+		st, err := a.retarded(target, carry, canCarry && tau <= carry.maxTau, tau)
 		if err != nil {
 			return fmt.Errorf("ephemeris: %v retarded by light time: %w", target, err)
 		}

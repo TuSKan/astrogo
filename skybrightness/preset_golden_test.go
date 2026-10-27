@@ -79,6 +79,12 @@ const goldenTol = 1e-12
 // aberration along the geocentric line of sight, up to 0.33 arcseconds near
 // the horizon.
 //
+// #791 moved Observatory's moonlight rows by 2e-12 to 1e-11 relative, and
+// nothing else past the lock. The light-time solve carries the Earth back over
+// the Moon's 1.3 s instead of evaluating it again at the retarded epoch, which
+// moves the Moon's place by a few microarcseconds, the analytical series' own
+// rounding at the Moon's distance.
+//
 // #592 moved every component row by up to 0.2 per cent, Observatory's
 // moonlight by 0.81, and the totals by at most 1.3e-4 relative. The Rayleigh
 // optical depth is Bodhaine et al.'s (1999) now, 0.7 per cent below the
@@ -364,7 +370,7 @@ var observatoryGolden = []goldenRow{
 	{90, skybrightness.Extragalactic, 1.2565010926711747e-11},
 	{90, skybrightness.Zodiacal, 1.6932342549546409e-09},
 	{90, skybrightness.AirglowContinuum, 2.6468258597986148e-09},
-	{90, skybrightness.Moonlight, 1.0244785763349711e-07},
+	{90, skybrightness.Moonlight, 1.0244785763273655e-07},
 	{90, skybrightness.Artificial, 8.4719605297296167e-08},
 	{90, totalSurfaceBrightness, 17.275891270604269},
 
@@ -373,7 +379,7 @@ var observatoryGolden = []goldenRow{
 	{60, skybrightness.Extragalactic, 1.2560383201151721e-11},
 	{60, skybrightness.Zodiacal, 1.7406086097754482e-09},
 	{60, skybrightness.AirglowContinuum, 3.0331446089703345e-09},
-	{60, skybrightness.Moonlight, 8.9325092729279675e-08},
+	{60, skybrightness.Moonlight, 8.9325092728372555e-08},
 	{60, skybrightness.Artificial, 1.1758632803258909e-07},
 	{60, totalSurfaceBrightness, 17.166795509565581},
 
@@ -382,7 +388,7 @@ var observatoryGolden = []goldenRow{
 	{30, skybrightness.Extragalactic, 1.2512122338289786e-11},
 	{30, skybrightness.Zodiacal, 1.0929706713183126e-09},
 	{30, skybrightness.AirglowContinuum, 4.924201610094471e-09},
-	{30, skybrightness.Moonlight, 7.4884757783489108e-08},
+	{30, skybrightness.Moonlight, 7.4884757783186506e-08},
 	{30, skybrightness.Artificial, 2.6080072391243097e-07},
 	{30, totalSurfaceBrightness, 16.650234407902303},
 
@@ -391,7 +397,7 @@ var observatoryGolden = []goldenRow{
 	{10, skybrightness.Extragalactic, 1.2073047611820291e-11},
 	{10, skybrightness.Zodiacal, 9.1684283378512596e-10},
 	{10, skybrightness.AirglowContinuum, 9.2301364630354105e-09},
-	{10, skybrightness.Moonlight, 1.3113286534315557e-07},
+	{10, skybrightness.Moonlight, 1.3113286534286229e-07},
 	{10, skybrightness.Artificial, 7.8275133537989355e-07},
 	{10, totalSurfaceBrightness, 15.576594999507197},
 }

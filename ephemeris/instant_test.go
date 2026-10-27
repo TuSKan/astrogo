@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -547,17 +548,21 @@ func TestApparentOfDegenerateGeometry(t *testing.T) {
 //
 // Except the Moon's, by what the analytical series can resolve. SOFA reads
 // time as (d1 − J2000) + d2, which near JD 2.46e6 resolves 1.6e-12 days,
-// 0.16 µs, and the light time is solved about the barycenter, where the Moon
-// moves with the Earth at 30 km/s: one quantum is 4.7 mm, 2.7 µas at perigee,
-// and a pass can land in the next one. It was invisible when the light time
-// was solved about the Earth, where the Moon moves 1 km/s.
+// 0.16 µs, and the Earth moves 4.8 mm about the barycenter in that time: 2.7
+// µas at the Moon's perigee. The loop carries the Earth back from its state
+// at t (#791) while the pass here evaluates it at t − τ, so each side holds a
+// quantum of its own and they can differ by two, on top of the microarcsecond
+// the carry may spend. A planet is too far for either to show.
 func TestAstrometricHasConverged(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
 
+	// One epoch quantum at the Earth's barycentric speed, in AU.
+	quantum := 4.8e-3 / constants.IAU.AstronomicalUnit.Value
+
 	for _, id := range []eph.ID{eph.Moon, eph.Sun, eph.Venus, eph.MarsBarycenter, eph.JupiterBarycenter, eph.NeptuneBarycenter} {
-		var worst float64
+		var worst, worstBound, worstRatio float64
 
 		for d := 0; d < 365; d += 7 {
 			tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
@@ -579,16 +584,20 @@ func TestAstrometricHasConverged(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			worst = math.Max(worst, arcsecBetween(target.Pos.Sub(earth.Pos), settled.Pos))
+			bound := 1e-6
+			if id == eph.Moon {
+				bound += 2 * quantum / settled.Pos.Norm() * 180 / math.Pi * 3600
+			}
+
+			// Each sample against its own bound: the Moon's moves with its
+			// distance.
+			if got := arcsecBetween(target.Pos.Sub(earth.Pos), settled.Pos); got/bound > worstRatio {
+				worst, worstBound, worstRatio = got, bound, got/bound
+			}
 		}
 
-		bound := 1e-6
-		if id == eph.Moon {
-			bound = 3e-6
-		}
-
-		if worst > bound {
-			t.Errorf("one more light-time pass moves %v by %.3g″, over %.0g″", id, worst, bound)
+		if worstRatio > 1 {
+			t.Errorf("one more light-time pass moves %v by %.3g″, over %.3g″ there", id, worst, worstBound)
 		}
 	}
 }
