@@ -37,6 +37,8 @@ type config struct {
 	authScheme  string
 	authToken   string
 	retryPolicy RetryPolicy
+
+	idempotentPost bool
 }
 
 // Option customizes a NewClient call.
@@ -93,6 +95,19 @@ func WithAuthToken(scheme, token string) Option {
 // queries is what a limiter notices first.
 func WithMinInterval(d time.Duration) Option {
 	return func(c *config) { c.minInterval = d }
+}
+
+// WithIdempotentPost declares that a POST through this client is a query:
+// sent again, it gets the same answer back and changes nothing on the server,
+// as a TAP sync query or a JSON search does. Such a POST is retried under the
+// client's [RetryPolicy], as a GET is.
+//
+// Without it a POST is sent once, whatever the policy says. resty retries only
+// the methods HTTP defines as idempotent, and a POST that creates something,
+// a UWS job, could create a second. Until #845 that was every POST, so no TAP
+// query was ever retried: one slow SIMBAD answer failed the query.
+func WithIdempotentPost() Option {
+	return func(c *config) { c.idempotentPost = true }
 }
 
 // Client issues paced, retried requests against a base URL given per call.
@@ -157,6 +172,7 @@ func NewClient(timeout time.Duration, opts ...Option) *Client {
 	rc := resty.New().
 		SetTimeout(cfg.timeout).
 		SetRetryCount(cfg.retries).
+		SetRetryAllowNonIdempotent(cfg.idempotentPost).
 		SetHeader("User-Agent", cfg.userAgent).
 		AddRetryConditions(retryCondition(cfg.retryPolicy))
 
