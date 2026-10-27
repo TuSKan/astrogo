@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // Static errors for the Horizons response parser. err113 wants these declared
@@ -58,6 +59,19 @@ func noDataBlock(body string) error {
 	}
 
 	return fmt.Errorf("%w: %s", errNoEphemerisData, head)
+}
+
+// horizonsContext bounds one request to Horizons by what astrogo's own client allows
+// the endpoint: its registered Timeout, or remote.DefaultAPITimeout when it
+// registers none. A hung service then fails the request, which skips, rather
+// than the whole package at go test's timeout (#849).
+func horizonsContext() (context.Context, context.CancelFunc) {
+	timeout := remote.DefaultAPITimeout
+	if ep, ok := remote.Lookup(remote.JPLHorizons); ok && ep.Timeout > 0 {
+		timeout = ep.Timeout
+	}
+
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 // errHorizonsUnavailable marks a response that is not a Horizons API
@@ -169,7 +183,10 @@ func fetchVector(command, bodyName string, startStr, stopStr string) (*StateVect
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
 	// 4. Execute the request
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the request: %w", err)
 	}
@@ -289,7 +306,10 @@ func fetchVectorSeries(command, bodyName, startStr, stopStr, stepStr string) ([]
 
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		fmt.Sprintf("%s?%s", baseURL, encodedQuery), nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the request: %w", err)
@@ -413,7 +433,10 @@ func fetchObserverTable(command, bodyName string, lon, lat, height float64, star
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the request: %w", err)
 	}
@@ -597,7 +620,10 @@ func fetchObserverSeries(command, bodyName string, lon, lat, height float64, sta
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := fmt.Sprintf("%s?%s", baseURL, encodedQuery)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the request: %w", err)
 	}

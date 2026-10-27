@@ -3,6 +3,7 @@
 package kepler_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/internal/horizons"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
@@ -92,13 +94,34 @@ func TestHorizonsStatusIsRecognizedAsAnOutage(t *testing.T) {
 	}
 }
 
+// horizonsContext bounds one request to Horizons by what astrogo's own client allows
+// the endpoint: its registered Timeout, or remote.DefaultAPITimeout when it
+// registers none. A hung service then fails the request, which skips, rather
+// than the whole package at go test's timeout (#849).
+func horizonsContext() (context.Context, context.CancelFunc) {
+	timeout := remote.DefaultAPITimeout
+	if ep, ok := remote.Lookup(remote.JPLHorizons); ok && ep.Timeout > 0 {
+		timeout = ep.Timeout
+	}
+
+	return context.WithTimeout(context.Background(), timeout)
+}
+
 // horizonsGet issues a GET against the Horizons API and returns the
 // $$SOE/$$EOE-delimited data block.
 func horizonsGet(params url.Values) (string, error) {
 	encoded := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := "https://ssd.jpl.nasa.gov/api/horizons.api?" + encoded
 
-	resp, err := http.Get(reqURL) //nolint:noctx // fixed, trusted host; network-tagged test, not production code
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("horizons request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("horizons request: %w", err)
 	}

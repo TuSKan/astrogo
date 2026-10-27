@@ -31,7 +31,10 @@ func jovicentric(t *testing.T, naif int, startTDB, stopTDB, step string) map[flo
 		naif, strings.ReplaceAll(startTDB, " ", "%20"),
 		strings.ReplaceAll(stopTDB, " ", "%20"), step)
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}

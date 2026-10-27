@@ -19,6 +19,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -52,7 +53,12 @@ type imcceCard struct {
 func fetchIMCCE(t *testing.T, name string) (H, G float64) {
 	t.Helper()
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/"+name, nil)
+	// SsODNet is not a registered endpoint, so the bound is the default one
+	// astrogo's client gives an endpoint that registers no timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), remote.DefaultAPITimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ssp.imcce.fr/webservices/ssodnet/api/ssocard/"+name, nil)
 	if err != nil {
 		t.Fatalf("building the IMCCE request: %v", err)
 	}
