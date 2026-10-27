@@ -117,7 +117,7 @@ They are ordinary untagged tests, so they run in every CI job and block a merge.
 
 Add a contract when you can state *why* a path must not allocate, not merely that it currently doesn't.
 
-**The Benchmarks CI job reports, and never fails.** It runs on push to main and posts a `benchstat` delta against the previous successful run into the job summary. `-count=6`, not 3: with three samples benchstat cannot compute a confidence interval and prints `± ∞` for every row.
+**The Benchmarks CI job reports, and never fails.** It runs on push to main (or by hand, `gh workflow run ci.yml --ref <branch>`) and posts a `benchstat` delta against the previous successful run into the job summary. `-count=6`, not 3: with three samples benchstat cannot compute a confidence interval and prints `± ∞` for every row. The benchmarks run on four runners at once, in shards that [.github/scripts/bench-shards.sh](.github/scripts/bench-shards.sh) defines and balances. Splitting across runners is safe where running packages in parallel on one runner is not, which is why `go test` serializes benchmark runs: each benchmark still runs alone on its machine. A new package needs no listing, since the last shard is every package the others leave out.
 
 **Profiling is a manual, periodic step, not a CI gate** — the same rule as extended fuzzing above, for the same reason. A flame graph cannot be usefully diffed by a machine, and the finding that motivated all of this came from *reading* `pprof -top` and noticing that `io.ReadAll` had no business appearing in a scheduler. What automates is the scalar assertion you write afterwards, once you know what the number should be.
 
