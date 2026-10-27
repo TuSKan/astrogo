@@ -250,7 +250,15 @@ func elementsFromTarget(c catalog.Target) (eph.Elements, error) {
 		el, err = eph.NewElements(c.Epoch, c.SemiMajorAxis, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis, c.MeanAnomaly)
 	} else {
-		el, err = eph.ElementsFromPerihelion(c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+		// The osculation epoch, where the source published one: the MPC's
+		// comet file carries it, falling back itself to the perihelion time
+		// for an unperturbed orbit, and that is the fallback here too.
+		epoch := c.Epoch
+		if epoch.IsZero() {
+			epoch = c.PerihelionTime
+		}
+
+		el, err = eph.ElementsFromPerihelion(epoch, c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
 	}
 

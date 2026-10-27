@@ -184,14 +184,14 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 }
 
 // ElementsFromPerihelion constructs a validated set of heliocentric
-// osculating elements from a perihelion time, perihelion distance and
-// eccentricity — the form the Minor Planet Center publishes comets in — for
-// any e >= 0: ellipse, parabola or hyperbola. The angles are referred to the
-// J2000 ecliptic frame. See [kepler.FromPerihelion].
-func ElementsFromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
+// osculating elements, osculating at epoch, from a perihelion time,
+// perihelion distance and eccentricity — the form the Minor Planet Center
+// publishes comets in — for any e >= 0: ellipse, parabola or hyperbola. The
+// angles are referred to the J2000 ecliptic frame. See [kepler.FromPerihelion].
+func ElementsFromPerihelion(epoch, perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis angle.Angle,
 ) (Elements, error) {
-	el, err := kepler.FromPerihelion(perihelionTime, perihelionDistance, eccentricity,
+	el, err := kepler.FromPerihelion(epoch, perihelionTime, perihelionDistance, eccentricity,
 		inclination, ascendingNode, argPeriapsis)
 	if err != nil {
 		return Elements{}, fmt.Errorf("eph: elements from perihelion: %w", err)

@@ -27,7 +27,7 @@ type cometElements struct {
 func (c cometElements) build(t *testing.T) kepler.Elements {
 	t.Helper()
 
-	el, err := kepler.FromPerihelion(time.FromJDParts(c.tp, 0, time.TDB), unit.AU(c.q), c.e,
+	el, err := kepler.FromPerihelion(time.FromJDParts(c.tp, 0, time.TDB), time.FromJDParts(c.tp, 0, time.TDB), unit.AU(c.q), c.e,
 		angle.Deg(c.incl), angle.Deg(c.node), angle.Deg(c.argPeri))
 	if err != nil {
 		t.Fatalf("%s: FromPerihelion: %v", c.name, err)
@@ -458,7 +458,7 @@ func TestFromPerihelionRejectsWhatNoOrbitHas(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		_, err := kepler.FromPerihelion(tp, tc.q, tc.e, tc.incl, angle.Zero(), angle.Zero())
+		_, err := kepler.FromPerihelion(tp, tp, tc.q, tc.e, tc.incl, angle.Zero(), angle.Zero())
 		if !errors.Is(err, tc.want) {
 			t.Errorf("%s: FromPerihelion = %v, want %v", tc.name, err, tc.want)
 		}

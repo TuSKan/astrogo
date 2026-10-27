@@ -29,10 +29,9 @@
 // Because planetary perturbations are not modeled, a propagated
 // position's accuracy drifts away from the epoch the elements osculate at:
 // typically arcseconds within days, arcminutes within months, for a
-// main-belt asteroid's osculating elements. That is [Elements.Epoch] for a
-// set built by NewElements. For one built by FromPerihelion, Epoch is the
-// perihelion time, and the osculation epoch is whichever one the elements
-// were published with. For higher-accuracy positions over
+// main-belt asteroid's osculating elements. That is [Elements.Epoch], for
+// either form: FromPerihelion takes the osculation epoch beside the perihelion
+// time it propagates from. For higher-accuracy positions over
 // longer spans, use a real SPK-kernel-backed provider instead — see
 // [github.com/TuSKan/astrogo/ephemeris.NewProvider] with
 // [github.com/TuSKan/astrogo/ephemeris.SmallBody].

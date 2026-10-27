@@ -77,7 +77,7 @@ func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
 		t.Fatalf("NewElements: %v", err)
 	}
 
-	hyperbola, err := FromPerihelion(epoch, unit.AU(0.5), 1.3, angle.Deg(10), angle.Deg(20), angle.Deg(30))
+	hyperbola, err := FromPerihelion(epoch, epoch, unit.AU(0.5), 1.3, angle.Deg(10), angle.Deg(20), angle.Deg(30))
 	if err != nil {
 		t.Fatalf("FromPerihelion: %v", err)
 	}

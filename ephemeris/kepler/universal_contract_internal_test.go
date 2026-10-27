@@ -43,7 +43,7 @@ func TestUniversalContract(t *testing.T) {
 	const eps = 0x1p-52
 
 	for _, e := range []float64{0, 0.5, 0.9, 0.99, 0.999, 0.99999, 1 - 1e-8, 1, 1 + 1e-8, 1.00001, 1.001, 1.2, 2, 5} {
-		el, err := FromPerihelion(epoch, unit.AU(1), e, 0, 0, 0)
+		el, err := FromPerihelion(epoch, epoch, unit.AU(1), e, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("e = %v: %v", e, err)
 		}

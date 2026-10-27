@@ -196,8 +196,9 @@ type Target struct {
 	// form and [github.com/TuSKan/astrogo/ephemeris.ElementsFromPerihelion]
 	// the comet form, so an orbit with e >= 1 needs the second:
 	//
-	//	el, err := eph.ElementsFromPerihelion(t.PerihelionTime, t.PerihelionDistance,
-	//		t.Eccentricity, t.Inclination, t.AscendingNode, t.ArgPeriapsis)
+	//	el, err := eph.ElementsFromPerihelion(t.Epoch, t.PerihelionTime,
+	//		t.PerihelionDistance, t.Eccentricity, t.Inclination, t.AscendingNode,
+	//		t.ArgPeriapsis)
 	HasElements bool
 	// HasM1 is true if the target has M1.
 	HasM1 bool
