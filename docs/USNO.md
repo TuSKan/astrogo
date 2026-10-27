@@ -190,7 +190,7 @@ Algorithm: Chandrupatla root-finding on Moon–Sun ecliptic elongation crossing
 ## Earth's Seasons — 2020–2035
 
 Twenty equinoxes and solstices across the 18.6-year nutation cycle, measured
-live on 2026-10-09. USNO gives whole minutes, so half a minute of any Δ is
+live on 2026-10-27. USNO gives whole minutes, so half a minute of any Δ is
 its rounding. The table here used to show 2026 at 2 to 4 minutes, from before
 #414 added the missing nutation in longitude.
 
