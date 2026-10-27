@@ -55,7 +55,8 @@ type perturber struct {
 // barycenter, since the Sun is carried linearly: every planet system at its
 // perihelion. Summed, 3.11e-7 m/s², 74% of it Jupiter's; a Sun carried over
 // τ ≤ 2.60 h stays within carryTolerance, which holds the planets out to
-// Saturn and leaves Uranus and Neptune to the exact solve.
+// Saturn, Uranus while its light time is under that (it runs from 2.5 to
+// 2.8 h), and leaves Neptune to the exact solve.
 var sunResidual = []perturber{
 	{constants.Ephemeris.MercurySystemGravitationalParameter.Value, 0.30750},
 	{constants.Ephemeris.VenusSystemGravitationalParameter.Value, 0.71843},
@@ -70,7 +71,7 @@ var sunResidual = []perturber{
 // earthResidual is what the Earth's model, the Sun's pull at t, leaves out:
 // the Moon, at a distance it never comes within (350,000 km, below every
 // perigee), and each planet at its nearest to the Earth, the gap between the
-// Earth's orbit and its own. Summed, 4.06e-5 m/s², nearly all the Moon's; an
+// Earth's orbit and its own. Summed, 4.07e-5 m/s², nearly all the Moon's; an
 // Earth carried over τ ≤ 71.5 s stays within carryTolerance, where the Moon's
 // light time is 1.3 s.
 var earthResidual = []perturber{

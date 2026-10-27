@@ -43,7 +43,7 @@ func carryEpochs(t *testing.T) []time.Time {
 // models leave out, residual × τ²/2, of where Default puts them at t − τ.
 //
 // This is the bound the carry rests on, held at its own end, where a wrong
-// model is metres out: an Earth carried without the Sun's pull misses by
+// model is meters out: an Earth carried without the Sun's pull misses by
 // 15 m at 71.5 s, against a bound of 10 cm. Compared through a place, the same
 // mistake would be 2.7 µas for the Moon, under the exact path's own rounding.
 func TestCarriedBodyStaysWithinItsResidual(t *testing.T) {

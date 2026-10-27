@@ -537,12 +537,34 @@ because every option needs them and they change no API. B is the contract —
 it is the only option in which §3 can be written down as a type. C waits for
 a workload that shows a need; nothing measured here does.
 
-One detail of #803 changes. It proposed taking the centers at the retarded
-epoch from the instant by Taylor extrapolation, with a stated error per
-center. With records cached an evaluation is about 200 ns (§5.1), so the
-instant evaluates the target's whole chain at t − τ instead: exact, with no
-error budget to state, for a few hundred nanoseconds per iteration. Only the
-observer is held at t, which is what the definition says.
+One detail of #803 changed twice. It proposed taking the centers at the
+retarded epoch from the instant by Taylor extrapolation, with a stated error
+per center. The review dropped that: with records cached an evaluation is
+about 200 ns (§5.1), so the instant evaluated the target's whole chain at
+t − τ instead, exact, with no error budget to state. Only the observer is
+held at t, which is what the definition says.
+
+That premise holds for a kernel and fails for `Default`, where the
+evaluation at t − τ is SOFA's `Epv00`, 34 µs, and was half of every apparent
+place (#791). So the extrapolation is back, for one body and under a bound.
+The target is evaluated at t − τ about B, the first body its chain shares
+with the Earth's, and B is carried back from its state at t:
+
+- **The Earth**, for the Moon: under the Sun's pull, while τ ≤ 71.5 s.
+- **The Sun**, for the planets: linearly, while τ ≤ 2.60 h.
+
+Those are the light times over which what each model leaves out moves a place
+by at most 1 µas, a·τ/2c. That is the Moon's pull on the Earth, 4.07e-5 m/s²,
+and every planet's on the Sun at its perihelion, 3.11e-7 m/s². Beyond them B
+is evaluated, as before, so Neptune and Uranus for part of its year keep two
+evaluations.
+
+On `Default` through 2026, every carried place is within 1 µas of the exact
+one, plus the exact path's own rounding at the target's distance. The worst
+are the Moon at 4.96 µas, inside the 6.51 µas that rounding allows there, and
+Uranus at 0.69 µas. Every place out to Saturn takes one `Epv00` series
+instead of two. On a JPL kernel, B is the Earth-Moon or the Solar System
+barycenter, so nothing is carried for a planet.
 
 ## 8. Correctness gates
 
