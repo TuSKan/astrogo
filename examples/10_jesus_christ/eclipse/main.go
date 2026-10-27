@@ -66,8 +66,8 @@ func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
 
 	// Search window: afternoon/evening of April 3, AD 33
-	tStart := time.Date(33, time.April, 3, 12, 0, 0, 0, time.LocationUTC)
-	tEnd := time.Date(33, time.April, 4, 0, 0, 0, 0, time.LocationUTC)
+	tStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
+	tEnd := time.DateJulianCal(33, 4, 4, 0, 0, 0)
 
 	// ── Sunset ──
 	_, sunSet, err := plan.SunriseSunset(tStart, tEnd, site, prov)
@@ -92,8 +92,8 @@ func main() {
 	}
 
 	// ── Lunar Eclipse ──
-	eStart := time.Date(33, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
-	eEnd := time.Date(33, time.May, 1, 0, 0, 0, 0, time.LocationUTC)
+	eStart := time.DateJulianCal(33, 3, 1, 0, 0, 0)
+	eEnd := time.DateJulianCal(33, 5, 1, 0, 0, 0)
 
 	eclipses, err := plan.LunarEclipses(eStart, eEnd, prov)
 	if err != nil {
@@ -122,18 +122,29 @@ func main() {
 	}
 
 	// ── Timeline Summary ──
+	//
+	// astrogo finds the eclipse's greatest phase but not its contacts, so the
+	// end of the umbral phase is NASA's, from the Five Millennium Canon as
+	// EclipseWise publishes it: U4 at 16:12:52.2 UT1, with ΔT = 10191.3 s.
+	// What follows from it is computed against this program's moonrise.
+	umbraEnds := time.DateJulianCal(33, 4, 3, 16, 12, 52)
+
 	if sunSet != nil && moonRise != nil && len(eclipses) > 0 {
 		fmt.Println()
 		fmt.Println("  ── Timeline ──")
-		fmt.Printf("  Eclipse maximum:   %s UTC (Moon below horizon)\n",
-			eclipses[0].Time.FormatJulian("15:04"))
+		fmt.Printf("  Eclipse maximum:   %s UTC\n", eclipses[0].Time.FormatJulian("15:04"))
+		fmt.Printf("  Moonrise:          %s UTC\n", moonRise.Time.FormatJulian("15:04"))
 		fmt.Printf("  Sunset:            %s UTC\n", sunSet.Time.FormatJulian("15:04"))
-		fmt.Printf("  Moonrise:          %s UTC (Moon rises partially eclipsed)\n",
-			moonRise.Time.FormatJulian("15:04"))
+		fmt.Printf("  Umbral phase ends: %s UTC (NASA)\n", umbraEnds.FormatJulian("15:04"))
 		fmt.Println()
-		fmt.Println("  For ~30 minutes after moonrise, the Moon hung low on the")
-		fmt.Println("  eastern horizon, partially darkened and tinted red by")
-		fmt.Println("  Rayleigh scattering in Earth's atmosphere — a 'blood moon'.")
+
+		if moonRise.Time.Before(umbraEnds) {
+			fmt.Printf("  The Moon rose %.0f minutes before the umbral phase ended:\n",
+				umbraEnds.Sub(moonRise.Time).Minutes())
+			fmt.Println("  low in the east, partially darkened and tinted red.")
+		} else {
+			fmt.Println("  The umbral phase had ended before the Moon rose.")
+		}
 	}
 
 	// ══════════════════════════════════════════════════════════════════
@@ -145,8 +156,8 @@ func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 
-	pilateStart := time.Date(26, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	pilateEnd := time.Date(37, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	pilateStart := time.DateJulianCal(26, 1, 1, 0, 0, 0)
+	pilateEnd := time.DateJulianCal(37, 1, 1, 0, 0, 0)
 
 	allEclipses, err := plan.LunarEclipses(pilateStart, pilateEnd, prov)
 	if err != nil {
