@@ -38,7 +38,7 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Twenty-three packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-four packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -65,6 +65,7 @@ Twenty-three packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds
 | `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
 | `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
 | `skybrightness/dataset/raster` | `FuzzOpen` | GeoTIFFs from a third-party mirror (VIIRS), or any file a caller opens |
+| `atmosphere/dataset/cams` | `FuzzOpen` | CAMS NetCDF-4 files, through scigolib/hdf5, which sizes allocations from what a file declares (#794) |
 
 **Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
 

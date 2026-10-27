@@ -179,12 +179,14 @@ func guarded(key, op string, fn func() error, content bool) (err error) {
 // the bytes of the file holding it.
 const deflateMaxRatio = 1032
 
-// datasetShape matches the dataspace and the chunk shape in the description
-// the decoder gives of a dataset, Dataset.Info: "1D array [n]",
-// "2D array [n x m]", "3D array [a b c]", and "chunked (chunks=[a b c])".
+// datasetShape matches the dataspace, the chunk shape and the element size in
+// the description the decoder gives of a dataset, Dataset.Info: "1D array [n]",
+// "2D array [n x m]", "3D array [a b c]", "chunked (chunks=[a b c])", and the
+// datatype's "float (size=8 bytes)".
 var (
 	datasetShape = regexp.MustCompile(`\d+D array \[([0-9 x]*)\]`)
 	chunkShape   = regexp.MustCompile(`chunked \(chunks=\[([0-9 ]*)\]\)`)
+	valueSize    = regexp.MustCompile(`\(size=([0-9]+) bytes\)`)
 )
 
 // whole is checkExtent's n for a read of the entire dataset. No read asks for
@@ -221,6 +223,22 @@ func shapeProduct(dims string) uint64 {
 	}
 
 	return n
+}
+
+// elementSize is the bytes per value the decoder's description of a dataset
+// declares, and whether the description could be read at all.
+func elementSize(info string) (uint64, bool) {
+	m := valueSize.FindStringSubmatch(info)
+	if m == nil {
+		return 0, false
+	}
+
+	size, err := strconv.ParseUint(m[1], 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return size, true
 }
 
 // saturatingMul is a·b, or the largest uint64 where that overflows.
@@ -299,14 +317,16 @@ func (cf *File) Var(name string) (*Var, error) {
 // hold, before the decoder allocates a buffer for it.
 //
 // The decoder sizes its buffer from what the file declares: a dataset's
-// dataspace for Read, the chunk shape for a chunked one. It never checks that
-// against the file, and one corrupted byte made it ask for 8.8 TB, which ended
-// the process with a fatal error no recover could catch (#794). Every value
-// takes at least a byte, so contiguous or compact data cannot have more
-// values than the file has bytes, and chunked data, which is compressed,
-// cannot have more than deflateMaxRatio times that. A real CAMS file is far
-// inside both: a 0.4° global plane is 406,000 values in a file of tens of
-// megabytes.
+// dataspace for Read, the chunk shape for a chunked one, and in every read the
+// datatype's size per value. It does not check all of that against the file:
+// one corrupted byte made it ask for 8.8 TB, which ended the process with a
+// fatal error no recover could catch (#794), and v0.14.2's own bounds leave out
+// the contiguous slice ReadPlane reads, where a corrupted element size asked
+// for 40.9 GB to hold 12 values. Contiguous or compact data is stored in the
+// file, so its values cannot take more bytes than the file has, and chunked
+// data, which is compressed, cannot take more than deflateMaxRatio times that.
+// A real CAMS file is far inside both: a 0.4° global plane is 406,000 values,
+// 3.2 MB even at 8 bytes each, in a file of tens of megabytes.
 //
 // whole, passed as n, asks about the entire dataset, as Read reads it, whose
 // size is taken from its declared dataspace.
@@ -315,11 +335,12 @@ func (cf *File) Var(name string) (*Var, error) {
 //
 // This package does not take shape from that string: it is the decoder's own
 // format, not a convention, and shape comes from NetCDF-4 metadata (see the
-// package doc). Here it is the only place the declared dataspace and chunk
-// shape can be seen before a read sizes a buffer from them, so it is read as
-// a bound, and the bound fails closed: a description it cannot read refuses
-// the read rather than skip the check, and TestCheckExtentReadsTheDecoders
-// Description pins the format against the version in go.mod.
+// package doc). Here it is the only place the declared dataspace, chunk shape
+// and element size can be seen before a read sizes a buffer from them, so it
+// is read as a bound, and the bound fails closed: a description it cannot read
+// refuses the read rather than skip the check, and
+// TestCheckExtentReadsTheDecodersDescription pins the format against the
+// version in go.mod.
 func (cf *File) checkExtent(ds *hdf5.Dataset, n uint64) error {
 	info, err := ds.Info()
 	if err != nil {
@@ -346,9 +367,14 @@ func (cf *File) checkExtent(ds *hdf5.Dataset, n uint64) error {
 		n = declared
 	}
 
-	if n > limit {
-		return fmt.Errorf("%w: %s: %s declares %d values, more than a %d-byte file could hold",
-			ErrMalformed, cf.key, ds.Name(), n, cf.size)
+	size, ok := elementSize(info)
+	if !ok {
+		return fmt.Errorf("%w: %s: %s: cannot read its element size from %q", ErrMalformed, cf.key, ds.Name(), info)
+	}
+
+	if saturatingMul(n, size) > limit {
+		return fmt.Errorf("%w: %s: %s declares %d values of %d bytes, more than a %d-byte file could hold",
+			ErrMalformed, cf.key, ds.Name(), n, size, cf.size)
 	}
 
 	return nil

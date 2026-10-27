@@ -54,35 +54,35 @@ const fillValue = 9.969209968386687e+36
 // Returns a remote.FS rooted at the temp dir the fixture was written
 // into, plus its key within that bucket — the same (bucket, key) shape
 // Open takes, so a test caller never touches a raw OS path.
-func synthFixture(t *testing.T) (remote.FS, string) {
-	t.Helper()
+func synthFixture(tb testing.TB) (remote.FS, string) {
+	tb.Helper()
 
 	const key = "synthetic.nc"
 
-	dir := t.TempDir()
+	dir := tb.TempDir()
 	path := filepath.Join(dir, key)
 
 	fw, err := hdf5.CreateForWrite(path, hdf5.CreateTruncate)
 	if err != nil {
-		t.Fatalf("CreateForWrite: %v", err)
+		tb.Fatalf("CreateForWrite: %v", err)
 	}
 
-	writeDimScale(t, fw, "/longitude", hdf5.Float32, []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
-	writeDimScale(t, fw, "/latitude", hdf5.Float32, []float32{90, 0, -90}, 1, "degrees_north", "latitude")
-	writeLevelDim(t, fw, []int32{1, 2}, 2)
-	writeTimeDim(t, fw, []int32{1078200}, 3)
+	writeDimScale(tb, fw, "/longitude", hdf5.Float32, []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
+	writeDimScale(tb, fw, "/latitude", hdf5.Float32, []float32{90, 0, -90}, 1, "degrees_north", "latitude")
+	writeLevelDim(tb, fw, []int32{1, 2}, 2)
+	writeTimeDim(tb, fw, []int32{1078200}, 3)
 
 	// aermr01: (time, level, latitude, longitude) = (1,2,3,4).
 	aermr, err := fw.CreateDataset("/aermr01", hdf5.Float64, []uint64{1, 2, 3, 4})
 	if err != nil {
-		t.Fatalf("CreateDataset aermr01: %v", err)
+		tb.Fatalf("CreateDataset aermr01: %v", err)
 	}
 
-	mustWriteAttr(t, aermr, "_Netcdf4Coordinates", []int32{3, 2, 1, 0})
-	mustWriteAttr(t, aermr, "_FillValue", fillValue)
-	mustWriteAttr(t, aermr, "missing_value", fillValue)
-	mustWriteAttr(t, aermr, "units", "kg kg**-1")
-	mustWriteAttr(t, aermr, "long_name", "Sea Salt Aerosol (test)")
+	mustWriteAttr(tb, aermr, "_Netcdf4Coordinates", []int32{3, 2, 1, 0})
+	mustWriteAttr(tb, aermr, "_FillValue", fillValue)
+	mustWriteAttr(tb, aermr, "missing_value", fillValue)
+	mustWriteAttr(tb, aermr, "units", "kg kg**-1")
+	mustWriteAttr(tb, aermr, "long_name", "Sea Salt Aerosol (test)")
 
 	aermrData := make([]float64, 1*2*3*4)
 
@@ -100,23 +100,23 @@ func synthFixture(t *testing.T) (remote.FS, string) {
 	aermrData[len(aermrData)-1] = fillValue
 
 	if err := aermr.Write(aermrData); err != nil {
-		t.Fatalf("Write aermr01: %v", err)
+		tb.Fatalf("Write aermr01: %v", err)
 	}
 
 	if err := aermr.Close(); err != nil {
-		t.Fatalf("Close aermr01 writer: %v", err)
+		tb.Fatalf("Close aermr01 writer: %v", err)
 	}
 
 	// lnsp: (time, latitude, longitude) = (1,3,4) — no level axis.
 	lnsp, err := fw.CreateDataset("/lnsp", hdf5.Float64, []uint64{1, 3, 4})
 	if err != nil {
-		t.Fatalf("CreateDataset lnsp: %v", err)
+		tb.Fatalf("CreateDataset lnsp: %v", err)
 	}
 
-	mustWriteAttr(t, lnsp, "_Netcdf4Coordinates", []int32{3, 1, 0})
-	mustWriteAttr(t, lnsp, "_FillValue", fillValue)
-	mustWriteAttr(t, lnsp, "units", "~")
-	mustWriteAttr(t, lnsp, "long_name", "Logarithm of surface pressure")
+	mustWriteAttr(tb, lnsp, "_Netcdf4Coordinates", []int32{3, 1, 0})
+	mustWriteAttr(tb, lnsp, "_FillValue", fillValue)
+	mustWriteAttr(tb, lnsp, "units", "~")
+	mustWriteAttr(tb, lnsp, "long_name", "Logarithm of surface pressure")
 
 	lnspData := make([]float64, 1*3*4)
 
@@ -130,112 +130,112 @@ func synthFixture(t *testing.T) (remote.FS, string) {
 	}
 
 	if err := lnsp.Write(lnspData); err != nil {
-		t.Fatalf("Write lnsp: %v", err)
+		tb.Fatalf("Write lnsp: %v", err)
 	}
 
 	if err := lnsp.Close(); err != nil {
-		t.Fatalf("Close lnsp writer: %v", err)
+		tb.Fatalf("Close lnsp writer: %v", err)
 	}
 
 	if err := fw.Close(); err != nil {
-		t.Fatalf("Close FileWriter: %v", err)
+		tb.Fatalf("Close FileWriter: %v", err)
 	}
 
-	url := testutil.FileURL(t, dir)
+	url := testutil.FileURL(tb, dir)
 
 	bucket, err := remote.OpenFS(context.Background(), url)
 	if err != nil {
-		t.Fatalf("Open fixture bucket: %v", err)
+		tb.Fatalf("Open fixture bucket: %v", err)
 	}
 
 	return bucket, key
 }
 
-func writeDimScale(t *testing.T, fw *hdf5.FileWriter, name string, dtype hdf5.Datatype, data any, dimid int32, units, longName string) {
-	t.Helper()
+func writeDimScale(tb testing.TB, fw *hdf5.FileWriter, name string, dtype hdf5.Datatype, data any, dimid int32, units, longName string) {
+	tb.Helper()
 
-	n := reflectLen(t, data)
+	n := reflectLen(tb, data)
 
 	ds, err := fw.CreateDataset(name, dtype, []uint64{uint64(n)})
 	if err != nil {
-		t.Fatalf("CreateDataset %s: %v", name, err)
+		tb.Fatalf("CreateDataset %s: %v", name, err)
 	}
 
-	mustWriteAttr(t, ds, "CLASS", "DIMENSION_SCALE")
-	mustWriteAttr(t, ds, "NAME", name[1:])
-	mustWriteAttr(t, ds, "_Netcdf4Dimid", dimid)
+	mustWriteAttr(tb, ds, "CLASS", "DIMENSION_SCALE")
+	mustWriteAttr(tb, ds, "NAME", name[1:])
+	mustWriteAttr(tb, ds, "_Netcdf4Dimid", dimid)
 
 	if units != "" {
-		mustWriteAttr(t, ds, "units", units)
+		mustWriteAttr(tb, ds, "units", units)
 	}
 
-	mustWriteAttr(t, ds, "long_name", longName)
+	mustWriteAttr(tb, ds, "long_name", longName)
 
 	if err := ds.Write(data); err != nil {
-		t.Fatalf("Write %s: %v", name, err)
+		tb.Fatalf("Write %s: %v", name, err)
 	}
 
 	if err := ds.Close(); err != nil {
-		t.Fatalf("Close %s writer: %v", name, err)
+		tb.Fatalf("Close %s writer: %v", name, err)
 	}
 }
 
-func writeLevelDim(t *testing.T, fw *hdf5.FileWriter, data []int32, dimid int32) {
-	t.Helper()
+func writeLevelDim(tb testing.TB, fw *hdf5.FileWriter, data []int32, dimid int32) {
+	tb.Helper()
 
 	ds, err := fw.CreateDataset("/level", hdf5.Int32, []uint64{uint64(len(data))})
 	if err != nil {
-		t.Fatalf("CreateDataset level: %v", err)
+		tb.Fatalf("CreateDataset level: %v", err)
 	}
 
-	mustWriteAttr(t, ds, "CLASS", "DIMENSION_SCALE")
-	mustWriteAttr(t, ds, "NAME", "level")
-	mustWriteAttr(t, ds, "_Netcdf4Dimid", dimid)
-	mustWriteAttr(t, ds, "long_name", "model_level_number") // real CAMS files carry no "units" here
+	mustWriteAttr(tb, ds, "CLASS", "DIMENSION_SCALE")
+	mustWriteAttr(tb, ds, "NAME", "level")
+	mustWriteAttr(tb, ds, "_Netcdf4Dimid", dimid)
+	mustWriteAttr(tb, ds, "long_name", "model_level_number") // real CAMS files carry no "units" here
 
 	if err := ds.Write(data); err != nil {
-		t.Fatalf("Write level: %v", err)
+		tb.Fatalf("Write level: %v", err)
 	}
 
 	if err := ds.Close(); err != nil {
-		t.Fatalf("Close level writer: %v", err)
+		tb.Fatalf("Close level writer: %v", err)
 	}
 }
 
-func writeTimeDim(t *testing.T, fw *hdf5.FileWriter, data []int32, dimid int32) {
-	t.Helper()
+func writeTimeDim(tb testing.TB, fw *hdf5.FileWriter, data []int32, dimid int32) {
+	tb.Helper()
 
 	ds, err := fw.CreateDataset("/time", hdf5.Int32, []uint64{uint64(len(data))})
 	if err != nil {
-		t.Fatalf("CreateDataset time: %v", err)
+		tb.Fatalf("CreateDataset time: %v", err)
 	}
 
-	mustWriteAttr(t, ds, "CLASS", "DIMENSION_SCALE")
-	mustWriteAttr(t, ds, "NAME", "time")
-	mustWriteAttr(t, ds, "_Netcdf4Dimid", dimid)
-	mustWriteAttr(t, ds, "units", "hours since 1900-01-01 00:00:00.0")
-	mustWriteAttr(t, ds, "long_name", "time")
-	mustWriteAttr(t, ds, "calendar", "gregorian")
+	mustWriteAttr(tb, ds, "CLASS", "DIMENSION_SCALE")
+	mustWriteAttr(tb, ds, "NAME", "time")
+	mustWriteAttr(tb, ds, "_Netcdf4Dimid", dimid)
+	mustWriteAttr(tb, ds, "units", "hours since 1900-01-01 00:00:00.0")
+	mustWriteAttr(tb, ds, "long_name", "time")
+	mustWriteAttr(tb, ds, "calendar", "gregorian")
 
 	if err := ds.Write(data); err != nil {
-		t.Fatalf("Write time: %v", err)
+		tb.Fatalf("Write time: %v", err)
 	}
 
 	if err := ds.Close(); err != nil {
-		t.Fatalf("Close time writer: %v", err)
+		tb.Fatalf("Close time writer: %v", err)
 	}
 }
 
-func mustWriteAttr(t *testing.T, ds *hdf5.DatasetWriter, name string, value any) {
-	t.Helper()
+func mustWriteAttr(tb testing.TB, ds *hdf5.DatasetWriter, name string, value any) {
+	tb.Helper()
 
 	if err := ds.WriteAttribute(name, value); err != nil {
-		t.Fatalf("WriteAttribute %s: %v", name, err)
+		tb.Fatalf("WriteAttribute %s: %v", name, err)
 	}
 }
 
-func reflectLen(t *testing.T, data any) int {
-	t.Helper()
+func reflectLen(tb testing.TB, data any) int {
+	tb.Helper()
 
 	switch d := data.(type) {
 	case []float32:
@@ -243,7 +243,7 @@ func reflectLen(t *testing.T, data any) int {
 	case []int32:
 		return len(d)
 	default:
-		t.Fatalf("reflectLen: unsupported type %T", data)
+		tb.Fatalf("reflectLen: unsupported type %T", data)
 
 		return 0
 	}

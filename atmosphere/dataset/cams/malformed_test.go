@@ -101,6 +101,51 @@ func TestOpenRefusesAMalformedFile(t *testing.T) {
 	}
 }
 
+// TestReadPlaneRefusesAnElementSizeTheFileCannotHold: the decoder sizes a
+// plane's buffer as its values times the datatype's size per value, and
+// v0.14.2 does not bound that product for the contiguous slice ReadPlane
+// reads. CI found it: a corrupted element size asked for 40.9 GB to hold
+// aermr01's 12 values, and ended the test binary on Linux and on Windows.
+//
+// Each offset is the third byte of the size in a float64 variable's datatype
+// message, 08 00 00 00, so 0x10 there declares 1 MiB and 8 bytes a value.
+func TestReadPlaneRefusesAnElementSizeTheFileCannotHold(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name   string
+		offset int
+	}{
+		{"aermr01", 286194},
+		{"lnsp", 356441},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fsys, key := corruptFixture(t, tt.offset, 0x10)
+
+			cf, err := Open(context.Background(), fsys, key)
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+
+			defer func() { _ = cf.Close() }()
+
+			v, err := cf.Var(tt.name)
+			if err != nil {
+				t.Fatalf("Var: %v", err)
+			}
+
+			_, err = v.ReadPlane(0, 0)
+
+			want := tt.name + " declares 12 values of 1048584 bytes"
+			if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), want) {
+				t.Errorf("ReadPlane = %v, want ErrMalformed saying %q", err, want)
+			}
+		})
+	}
+}
+
 // errDecoderRefused stands for an error the decoder returns about the file.
 var errDecoderRefused = errors.New("local heap data: size exceeds maximum")
 
@@ -167,6 +212,10 @@ func TestCheckExtentReadsTheDecodersDescription(t *testing.T) {
 			t.Errorf("%s: the bound cannot read %q: the decoder's format changed", ds.Name(), info)
 		}
 
+		if _, ok := elementSize(info); !ok {
+			t.Errorf("%s: the bound cannot read the element size in %q: the decoder's format changed", ds.Name(), info)
+		}
+
 		seen++
 	})
 
@@ -190,6 +239,24 @@ func TestCheckExtentReadsTheDecodersDescription(t *testing.T) {
 		got, ok := declaredValues(tt.info)
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("declaredValues(%q) = %d, %v; want %d, %v", tt.info, got, ok, tt.want, tt.ok)
+		}
+	}
+
+	// The datatype's size is "bytes"; the layout's, in a compact or contiguous
+	// description, is not, and must not be read as the element size.
+	for _, tt := range []struct {
+		info string
+		want uint64
+		ok   bool
+	}{
+		{"Dataset: float (size=8 bytes), 4D array [1 2 3 4], contiguous (address=0x45D21, size=192)", 8, true},
+		{"Dataset: integer (size=4 bytes), 1D array [2], contiguous (address=0x238C7, size=8)", 4, true},
+		{"Dataset: float (size=4294967295 bytes), 1D array [3], chunked (chunks=[3 4])", math.MaxUint32, true},
+		{"Dataset: integer, scalar, compact (size=4)", 0, false},
+	} {
+		got, ok := elementSize(tt.info)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("elementSize(%q) = %d, %v; want %d, %v", tt.info, got, ok, tt.want, tt.ok)
 		}
 	}
 }
