@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func TestIERSOracleMatchesTheRecord(t *testing.T) {
 	// Probe once before the loop so a service outage skips immediately rather
 	// than after 28 failed requests.
 	if _, err := deltaAT(ctx, client, "2017-01-01 00:00:00"); err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, iersControl(ctx))
 		t.Fatalf("the IERS timescale service returned an unexpected error: %v", err)
 	}
 
@@ -75,7 +76,7 @@ func TestIERSOracleMatchesTheRecord(t *testing.T) {
 
 		got, err := deltaAT(ctx, client, at)
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, iersControl(ctx))
 			t.Errorf("%s: %v", at, err)
 
 			continue
@@ -122,7 +123,7 @@ func TestIERSOracleConfirmsTheBoundaryConvention(t *testing.T) {
 		} {
 			got, err := deltaAT(ctx, client, q.at)
 			if err != nil {
-				testutil.SkipOnUpstreamFailure(t, err)
+				testutil.SkipOnDegradedService(t, err, iersControl(ctx))
 				t.Errorf("%s: %v", q.at, err)
 
 				continue
@@ -136,6 +137,56 @@ func TestIERSOracleConfirmsTheBoundaryConvention(t *testing.T) {
 		}
 	}
 }
+
+// iersControl is the request [testutil.SkipOnDegradedService] sends when the
+// service answers a 4xx: ΔAT at 2017-01-01 00:00:00, which it has always
+// answered "37", as a plain net/http GET outside astrogo's client, so that it
+// cannot share a defect with the request under test. Its deadline is the
+// endpoint's registered timeout.
+//
+// On 2026-10-26 the service answered every request, this one included, with
+// a firewall page and HTTP 400, "Request Rejected" (#853). Through
+// SkipOnUpstreamFailure alone that 400 read as astrogo's own bad request, and
+// both oracle tests failed instead of skipping.
+func iersControl(ctx context.Context) func() error {
+	return func() error {
+		ep, ok := remote.Lookup(remote.IERSTimescales)
+		if !ok {
+			return errIERSControl
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, ep.Timeout)
+		defer cancel()
+
+		q := url.Values{"param": {"leapseconds"}, "datetime": {"2017-01-01 00:00:00"}}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.URL+"?"+q.Encode(), nil)
+		if err != nil {
+			return fmt.Errorf("control: %w", err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("control: %w", err)
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		if err != nil {
+			return fmt.Errorf("control: reading the reply: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"Value":"37"`) {
+			return fmt.Errorf("%w: HTTP %d: %s", errIERSControl, resp.StatusCode, truncate(strings.TrimSpace(string(body))))
+		}
+
+		return nil
+	}
+}
+
+// errIERSControl is the timescale service failing its control request.
+var errIERSControl = errors.New("the IERS timescale service failed its control request")
 
 // deltaAT asks the service for TAI-UTC at one instant.
 //

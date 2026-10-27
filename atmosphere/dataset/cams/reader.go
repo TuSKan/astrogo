@@ -118,7 +118,7 @@ func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
 	}
 
 	if err := decode(key, "index", cf.index); err != nil {
-		_ = decode(key, "close", hf.Close)
+		_ = release(key, hf.Close)
 		_ = os.Remove(tmpPath)
 
 		return nil, err
@@ -127,14 +127,34 @@ func Open(ctx context.Context, fsys remote.FS, key string) (*File, error) {
 	return cf, nil
 }
 
-// decode runs one call into the HDF5 decoder, turning a panic inside it into
-// an error wrapping [ErrMalformed] (#794).
+// decode runs one call into the HDF5 decoder that reads the file's content,
+// and makes whatever goes wrong inside it an error wrapping [ErrMalformed]
+// (#794): a panic, and an error the decoder returns.
+//
+// A panic is the index or nil dereference a malformed structure leads a
+// decoder into. A returned error is the decoder recognizing the structure as
+// malformed itself: from scigolib/hdf5 v0.14.2 a local heap claiming 720 PB is
+// refused as "exceeds maximum" where it used to panic, and the file is just as
+// corrupt either way. The file is a scratch copy this package wrote a moment
+// before, so the decoder's error is about its content, not the disk.
 //
 // It cannot catch everything. A failed allocation is a fatal error in Go, not
 // a panic, and no deferred recover sees it; that is what checkExtent is for,
-// before any read that sizes a buffer from the file. This catches the rest:
-// the index or nil dereference a malformed structure leads a decoder into.
-func decode(key, op string, fn func() error) (err error) {
+// before any read that sizes a buffer from the file.
+func decode(key, op string, fn func() error) error {
+	return guarded(key, op, fn, true)
+}
+
+// release closes the decoder, turning a panic inside it into an error wrapping
+// [ErrMalformed] as decode does. An error Close returns is the operating
+// system's, closing the scratch file, and is returned as such.
+func release(key string, fn func() error) error {
+	return guarded(key, "close", fn, false)
+}
+
+// guarded is decode and release: the panic made an error, and a returned
+// error marked malformed when it comes from reading the file.
+func guarded(key, op string, fn func() error, content bool) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%w: %s: %s: the decoder failed: %v", ErrMalformed, key, op, r)
@@ -142,6 +162,10 @@ func decode(key, op string, fn func() error) (err error) {
 	}()
 
 	if err := fn(); err != nil {
+		if content && !errors.Is(err, ErrMalformed) {
+			return fmt.Errorf("%w: %s: %s: %w", ErrMalformed, key, op, err)
+		}
+
 		return fmt.Errorf("cams: %s: %s: %w", key, op, err)
 	}
 
@@ -214,7 +238,7 @@ func (cf *File) Close() error {
 	cf.mu.Lock()
 	defer cf.mu.Unlock()
 
-	err := decode(cf.key, "close", cf.hf.Close)
+	err := release(cf.key, cf.hf.Close)
 
 	if cf.scratchPath != "" {
 		if rmErr := os.Remove(cf.scratchPath); rmErr != nil && err == nil {

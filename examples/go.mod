@@ -13,7 +13,7 @@ module github.com/TuSKan/astrogo/examples
 
 go 1.27
 
-require github.com/TuSKan/astrogo v0.21.0
+require github.com/TuSKan/astrogo v0.22.0
 
 require (
 	github.com/andybalholm/brotli v1.2.3 // indirect
@@ -24,11 +24,11 @@ require (
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hebl/gofa v1.19.1 // indirect
-	github.com/klauspost/compress v1.20.1 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
-	github.com/klauspost/pgzip v1.2.7 // indirect
+	github.com/klauspost/pgzip v1.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
-	github.com/scigolib/hdf5 v0.14.1 // indirect
+	github.com/scigolib/hdf5 v0.14.2 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/net v0.60.0 // indirect

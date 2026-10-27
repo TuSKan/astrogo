@@ -56,6 +56,9 @@ type RetryPolicy func(Attempt) bool
 // A 4xx is never retried. It describes the request, and repeating an identical
 // request cannot change it.
 //
+// A POST reaches the policy only from a client built [WithIdempotentPost];
+// from any other it is sent once, since repeating it might do something twice.
+//
 // Exported so a custom policy can defer to it rather than restate it:
 //
 //	api.WithRetryPolicy(func(a api.Attempt) bool {
