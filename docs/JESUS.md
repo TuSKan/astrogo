@@ -258,6 +258,8 @@ We can verify these eclipses computationally with `astrogo`
 (see [`examples/10_jesus_christ/herod/`](../examples/10_jesus_christ/herod/) for the full program):
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 defer prov.Close()
 
@@ -342,6 +344,8 @@ compute this directly with `astrogo`
 (see [`examples/10_jesus_christ/born/`](../examples/10_jesus_christ/born/) for the full program):
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 defer prov.Close()
 
@@ -557,6 +561,8 @@ We can detect this eclipse with `astrogo`
 (see [`examples/10_jesus_christ/eclipse/`](../examples/10_jesus_christ/eclipse/) for the full simulation):
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 defer prov.Close()
 
@@ -591,6 +597,8 @@ the Moon rising partially eclipsed, low on the horizon, darkened and tinted a du
 reddish-copper. Then, as the sky darkened, it would have hung in the penumbra until 17:34 UT.
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 // Compute moonrise over Jerusalem on April 3, AD 33
 loc, _ := coord.NewEarthLocation(31.7683, 35.2137, 780.0)
 site, _ := plan.NewSite("Jerusalem", loc, plan.WithTimeZone(time.LocationUTC))

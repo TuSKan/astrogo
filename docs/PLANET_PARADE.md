@@ -53,13 +53,15 @@ longitudes fall within a span of less than 180°, they're all in the same half o
 When the span is less than 90°, the clustering is tight.
 
 ```go
-prov, _ := eph.NewProvider(eph.Planets, "de442")
+import "github.com/TuSKan/astrogo/plan"
+
+prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de442")
 defer prov.Close()
 
 t := time.Date(2025, time.February, 28, 19, 0, 0, 0, time.LocationUTC)
 ctx := coord.NewContext(t, loc, atmosphere.AtAltitude(760))
 
-planets := []plan.Target{
+planets := []plan.Observable{
     plan.NewMercury(prov), plan.NewVenus(prov), plan.NewMars(prov),
     plan.NewJupiter(prov), plan.NewSaturn(prov),
     plan.NewUranus(prov), plan.NewNeptune(prov),
@@ -113,14 +115,16 @@ From São Paulo on February 28, 2025 (computed with JPL DE442):
 | Astronomical dusk | 19:52:44 | Sun below −18° — full darkness |
 
 ```go
-prov, _ := eph.NewProvider(eph.Planets, "de442")
+import "github.com/TuSKan/astrogo/plan"
+
+prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de442")
 defer prov.Close()
 
 loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
 
 day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
-next := day.Add(24 * time.Hour)
+next := day.Add(unit.Days(1))
 
 _, sunset, _ := plan.SunriseSunset(day, next, site, prov)
 _, civilDusk, _ := plan.CivilDawnDusk(day, next, site, prov)
@@ -214,6 +218,8 @@ can identify the closest pairings.
 ### Near-Conjunctions (February 15 – March 15, 2025)
 
 ```go
+import "github.com/TuSKan/astrogo/plan"
+
 appulses, _ := plan.Appulses(searchStart, searchEnd,
     plan.NewMercury(prov), plan.NewSaturn(prov))
 ```
