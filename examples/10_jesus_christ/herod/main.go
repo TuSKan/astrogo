@@ -65,8 +65,8 @@ func main() {
 
 	// Search for all lunar eclipses from 5 BC to AD 1
 	// Astronomical years: 5 BC = -4, 1 BC = 0, AD 1 = 1
-	start := time.Date(-4, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
+	end := time.DateJulianCal(2, 1, 1, 0, 0, 0)
 
 	eclipses, err := plan.LunarEclipses(start, end, prov)
 	if err != nil {
