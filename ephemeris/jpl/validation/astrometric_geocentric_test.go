@@ -325,7 +325,10 @@ func fetchGeocentricSeries(command, bodyName, quantity, startStr, stopStr, stepS
 	encodedQuery := strings.ReplaceAll(params.Encode(), "+", "%20")
 	reqURL := "https://ssd.jpl.nasa.gov/api/horizons.api?" + encodedQuery
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, reqURL, nil)
+	ctx, cancel := horizonsContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the request: %w", err)
 	}

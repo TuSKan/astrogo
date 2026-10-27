@@ -29,6 +29,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/fink"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -50,6 +51,19 @@ import (
 //
 // API: https://api.ztf.fink-portal.org
 // Reference: Carry et al. (2024), A&A, 689, A252.
+
+// finkContext bounds one request to FINK by what astrogo's own client allows
+// the endpoint: its registered Timeout, or remote.DefaultAPITimeout when it
+// registers none. A hung service then fails the request, which skips, rather
+// than the whole package at go test's timeout (#849).
+func finkContext() (context.Context, context.CancelFunc) {
+	timeout := remote.DefaultAPITimeout
+	if ep, ok := remote.Lookup(remote.FINK); ok && ep.Timeout > 0 {
+		timeout = ep.Timeout
+	}
+
+	return context.WithTimeout(context.Background(), timeout)
+}
 
 const finkBaseURL = "https://api.ztf.fink-portal.org"
 
@@ -211,7 +225,10 @@ func finkPost(t *testing.T, body map[string]any) []map[string]any {
 		t.Fatalf("FINK SSO JSON marshal failed: %v", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, finkBaseURL+"/api/v1/sso", bytes.NewReader(raw))
+	ctx, cancel := finkContext()
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, finkBaseURL+"/api/v1/sso", bytes.NewReader(raw))
 	if err != nil {
 		t.Fatalf("FINK SSO request build failed: %v", err)
 	}
