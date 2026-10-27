@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/internal/horizons"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -216,7 +217,16 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 
 		if payload.Error != "" {
+			// A fault on Horizons' own server arrives the way a refusal does,
+			// and is somebody else's outage rather than a bad query; it
+			// carries the sentinel every path to Horizons uses for one (#858).
+			if horizons.ServerFault(payload.Error) {
+				yield(resolve.Target{}, fmt.Errorf("%w: %w: %s", ErrAPIError, horizons.ErrServerFault, payload.Error))
+				return
+			}
+
 			yield(resolve.Target{}, fmt.Errorf("%w: %s", ErrAPIError, payload.Error))
+
 			return
 		}
 

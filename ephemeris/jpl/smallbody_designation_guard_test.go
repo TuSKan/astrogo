@@ -103,7 +103,11 @@ func TestHorizonsRefusalIsReported(t *testing.T) {
 		t.Skip("Horizons now generates an SPK for 101955; the refusal this covers is gone")
 	}
 
-	if !errors.Is(err, spk.ErrHorizonsRefused) {
+	// The expected error is a refusal that is not a fault on Horizons' server:
+	// a fault wraps ErrHorizonsRefused too (see ErrHorizonsInternalFault), and
+	// on 2026-10-26 one went straight past this branch to the assertion on
+	// Horizons' sentence below (#858).
+	if !errors.Is(err, spk.ErrHorizonsRefused) || errors.Is(err, spk.ErrHorizonsInternalFault) {
 		// See TestBareNumberDoesNotReturnADifferentBody for why this is inside
 		// the branch.
 		skipIfHorizonsCouldNotAnswer(t, err)

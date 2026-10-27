@@ -8,6 +8,8 @@ import (
 	"net"
 	"syscall"
 	"testing"
+
+	"github.com/TuSKan/astrogo/internal/horizons"
 )
 
 // httpStatusError is any error carrying an HTTP status, matched structurally. Using a
@@ -22,6 +24,11 @@ func (e *httpStatusError) HTTPStatus() int { return e.code }
 
 // errStaticParse stands in for a decode failure, which is astrogo's problem.
 var errStaticParse = errors.New("invalid character 'x'")
+
+// errHorizonsRefusal is Horizons declining a request, in its own words: a
+// permanent fact about what was asked for, which no retry will change.
+var errHorizonsRefusal = errors.New("jpl: horizons declined to generate an SPK: " +
+	"SPK creation is not available for pre-computed objects in the major body index")
 
 func TestUpstreamFailureClassification(t *testing.T) {
 	timeout := &net.DNSError{IsTimeout: true}
@@ -56,6 +63,11 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		{"403 forbidden", &httpStatusError{403}, true},
 		{"wrapped 403", fmt.Errorf("norad: fetch failed: %w", &httpStatusError{403}), true},
 
+		// Horizons reporting a fault on its own server, in the body of a 200,
+		// which every path to it wraps as the same sentinel (#858).
+		{"Horizons server fault", fmt.Errorf("jpl: API error: %w: wldini(): missing required file LTKERNL",
+			horizons.ErrServerFault), true},
+
 		// We sent a bad request: exactly what these tests exist to catch.
 		{"400 bad request", &httpStatusError{400}, false},
 		{"404 not found", &httpStatusError{404}, false},
@@ -65,6 +77,7 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		// wrong — the URL moved, or the service grew an auth requirement.
 		{"401 unauthorized", &httpStatusError{401}, false},
 		{"parse failure", errStaticParse, false},
+		{"Horizons refusal", errHorizonsRefusal, false},
 
 		// The network never carried the request. Delegated to Unreachable
 		// rather than restated here, and these cases are the reason a caller

@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/TuSKan/astrogo/internal/horizons"
 )
 
 // Static errors for the Horizons response parser. err113 wants these declared
@@ -40,6 +42,22 @@ type StateVector struct {
 	Vel     []float64 `json:"vel"`
 	UnitPos string    `json:"unit_pos"`
 	UnitVel string    `json:"unit_vel"`
+}
+
+// noDataBlock is the error for an answer with no $$SOE/$$EOE block.
+//
+// Horizons reports a fault on its own server in place of the table, in a body
+// that is otherwise its usual text. That is an outage, which skipIfHorizonsDown
+// skips on through testutil (#858). Anything else is errNoEphemerisData, with
+// the start of what came back.
+func noDataBlock(body string) error {
+	head := body[:min(len(body), 500)]
+
+	if horizons.ServerFault(body) {
+		return fmt.Errorf("%w: %s", horizons.ErrServerFault, head)
+	}
+
+	return fmt.Errorf("%w: %s", errNoEphemerisData, head)
 }
 
 // errHorizonsUnavailable marks a response that is not a Horizons API
@@ -180,7 +198,7 @@ func fetchVector(command, bodyName string, startStr, stopStr string) (*StateVect
 
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, fmt.Errorf("%w: %s", errNoEphemerisData, responseStr[:int(math.Min(float64(len(responseStr)), 500))])
+		return nil, noDataBlock(responseStr)
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
@@ -301,7 +319,7 @@ func fetchVectorSeries(command, bodyName, startStr, stopStr, stepStr string) ([]
 
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, errNoEphemerisData
+		return nil, noDataBlock(responseStr)
 	}
 
 	lines := strings.Split(strings.TrimSpace(responseStr[soeIdx+6:eoeIdx]), "\n")
@@ -424,7 +442,7 @@ func fetchObserverTable(command, bodyName string, lon, lat, height float64, star
 
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, errNoEphemerisData
+		return nil, noDataBlock(responseStr)
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]
@@ -611,7 +629,7 @@ func fetchObserverSeries(command, bodyName string, lon, lat, height float64, sta
 
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, errNoEphemerisData
+		return nil, noDataBlock(responseStr)
 	}
 
 	csvBlock := responseStr[soeIdx+6 : eoeIdx]

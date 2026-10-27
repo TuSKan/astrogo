@@ -1,6 +1,10 @@
 package spk
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/TuSKan/astrogo/internal/horizons"
+)
 
 // Sentinel errors for SPK operations.
 var (
@@ -46,14 +50,12 @@ var (
 	// of its internal variables. Nothing a caller can send produces that, and
 	// the same two requests succeeded again within the hour.
 	//
-	// # On matching a third party's error text
-	//
-	// It is fragile, and it is the only signal available: the status is 200
-	// and the JSON shape is identical either way. It is kept safe by being
-	// deliberately narrow rather than clever — see horizonsInternalFault. A
-	// fault mode this does not recognize stays an ordinary refusal and fails
-	// loudly, which is the right default for a signal nobody has seen before.
-	ErrHorizonsInternalFault = errors.New("jpl: horizons could not generate an SPK because of a fault on its own server")
+	// It is the one value every path to Horizons reports such a fault with,
+	// the name lookup in catalog/jpl included, so errors.Is recognizes the
+	// outage whichever path met it (#858). The phrases it is recognized by,
+	// and why matching a third party's text is safe here, are documented
+	// where they live, in astrogo's internal horizons package.
+	ErrHorizonsInternalFault = horizons.ErrServerFault
 
 	// ErrCorruptSPK indicates a malformed SPK binary kernel.
 	ErrCorruptSPK = errors.New("jpl/spk: corrupt file")
