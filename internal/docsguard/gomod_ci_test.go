@@ -99,8 +99,11 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	}
 
 	// A pin that stops matching is worse than a mismatched one: the guard
-	// keeps passing while guarding nothing. Eight is the count today, and the
-	// ninth should arrive with this number updated.
+	// keeps passing while guarding nothing. Nine is the count today, and the
+	// tenth should arrive with this number updated. The ninth was the
+	// benchmarks job's own setup for benchstat, when the benchmarks themselves
+	// moved to a matrix of shards (#863): the matrix is one step, run four
+	// times.
 	//
 	// It went from six to seven twice, in parallel and independently: once when
 	// the Validation workflow split its network tier into its own job (#123),
@@ -113,7 +116,7 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	// eight pins were asserted as seven, and gone on passing while guarding one
 	// fewer than it claimed. Counting is what made two independently correct
 	// edits visibly incompatible.
-	const wantPins = 8
+	const wantPins = 9
 
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
