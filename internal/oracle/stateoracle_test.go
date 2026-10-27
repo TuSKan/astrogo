@@ -1,16 +1,14 @@
-package keplerlab_test
+package oracle
 
 import (
 	"math"
 	"math/big"
 	"testing"
-
-	"github.com/TuSKan/astrogo/internal/keplerlab"
 )
 
 // relErr is |a − b|/|b| at the oracle's precision, as a float64.
 func relErr(a, b *big.Float) float64 {
-	d := new(big.Float).SetPrec(keplerlab.Prec).Sub(a, b)
+	d := new(big.Float).SetPrec(Prec).Sub(a, b)
 	if b.Sign() == 0 {
 		f, _ := d.Float64()
 
@@ -46,8 +44,8 @@ func TestStateOracleIsThePerihelionOracleAtPerihelion(t *testing.T) {
 	} {
 		e := tc.v0*tc.v0*tc.q/tc.mu - 1
 
-		r, v := keplerlab.StateExact([3]float64{tc.q, 0, 0}, [3]float64{0, tc.v0, 0}, tc.mu, tc.dt)
-		x, y, vx, vy := keplerlab.UniversalStateExact(tc.q, e, tc.mu, tc.dt)
+		r, v := StateExact([3]float64{tc.q, 0, 0}, [3]float64{0, tc.v0, 0}, tc.mu, tc.dt)
+		x, y, vx, vy := UniversalStateExact(tc.q, e, tc.mu, tc.dt)
 
 		// 2^−256 is 1e-77; the series and the root give up some bits.
 		const tol = 1e-60
@@ -85,7 +83,7 @@ func TestStateOracleRetracesItsSteps(t *testing.T) {
 		{"a hyperbola", [3]float64{1.2, -0.3, 0.5}, [3]float64{0.012, 0.025, -0.004}, -800},
 		{"inbound, near-parabolic", [3]float64{3, 2, 1}, [3]float64{-0.007, -0.006, -0.002}, 400},
 	} {
-		r1, v1 := keplerlab.StateExact(tc.r0, tc.v0, gaussMu, tc.dt)
+		r1, v1 := StateExact(tc.r0, tc.v0, gaussMu, tc.dt)
 
 		var a, b [3]float64
 		for i := range 3 {
@@ -96,10 +94,10 @@ func TestStateOracleRetracesItsSteps(t *testing.T) {
 		// Back from the float64 nearest the forward state: that rounding,
 		// carried back, is what bounds the return, not the oracle. Measured,
 		// it is at most 7.9e-15 here, on the hyperbola.
-		r2, _ := keplerlab.StateExact(a, b, gaussMu, -tc.dt)
+		r2, _ := StateExact(a, b, gaussMu, -tc.dt)
 
 		for i := range 3 {
-			want := new(big.Float).SetPrec(keplerlab.Prec).SetFloat64(tc.r0[i])
+			want := new(big.Float).SetPrec(Prec).SetFloat64(tc.r0[i])
 			if err := relErr(r2[i], want); err > 1e-13 {
 				t.Errorf("%s: component %d returns %.3g away", tc.name, i, err)
 			}

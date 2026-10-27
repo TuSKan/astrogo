@@ -4,11 +4,13 @@ The design for astrogo's two-body propagation: what `kepler.SolveKepler` and
 `Elements.StateAt` should promise, measured against an exact reference, and the
 algorithm that keeps the promise.
 
-**Status: design, no production change.** The measurements come from
+**Status: shipped.** Every phase in §7 is done. The measurements came from
 `internal/keplerlab`, a test-only package added with this document: a
 multiprecision oracle, seven candidate solvers, and the contract test the
-proposal passes. The orbit-center question (heliocentric or barycentric fits)
-is #803's second half and is not re-argued here.
+proposal passes. The oracle remains, as `internal/oracle`, for the contract
+tests; the candidates and the measurements were removed in #874 and are kept
+at commit ec5be0d5 (§8). The orbit-center question (heliocentric or
+barycentric fits) is #803's second half and is not re-argued here.
 
 **Recommendation in one paragraph.** Replace the solver with Markley's (1995)
 starter and fifth-order correction evaluated on a *stable* residual, solve on
@@ -127,8 +129,8 @@ is given.
 
 ## 3. The candidates
 
-Each implemented from its primary source in `internal/keplerlab`, and none
-copied: the methods are published mathematics, and no published code is used.
+Each implemented from its primary source in `internal/keplerlab` (at
+ec5be0d5, §8), and none copied: the methods are published mathematics, and no published code is used.
 
 | | source | license of the source | idea |
 | --- | --- | --- | --- |
@@ -254,7 +256,7 @@ epoch):
 
 The proposed 4.7 at e = 0.99 is the contract working as §2.3 says: E's 1.5
 ulps carried through a sensitivity of about 1.8, plus the construction's own.
-`TestProposedContract` asserts it per point against the exact ∂state/∂E.
+`TestSolveKeplerContract` asserts it per point against the exact ∂state/∂E.
 
 In kilometers, from an exact solution of the same two-body problem — the
 arithmetic's error, not the model's:
@@ -324,10 +326,10 @@ ephemeris layer's (docs/ephemeris.md §6.2).
 
 ## 6. Correctness gates
 
-1. **The oracle contract.** `TestProposedContract` moves into
-   `ephemeris/kepler`'s own tests with the oracle: E within 2 ulps of the exact
-   root, symmetry bit for bit, and the state within §2.3's bound, over the
-   whole sweep (thinned under `-short`). It was canaried twice: the naive
+1. **The oracle contract.** The lab's `TestProposedContract`, since deleted,
+   moved into `ephemeris/kepler`'s own tests as `TestSolveKeplerContract`: E
+   within 2 ulps of the exact root, symmetry bit for bit, and the state within
+   §2.3's bound, over the whole sweep (thinned under `-short`). It was canaried twice: the naive
    residual in place of the stable one fails it at 7,172 points, and
    x = a(cos E − e) in place of the stable form at 2,314.
 2. **What already guards the package stays:** the Horizons comparisons
@@ -353,7 +355,7 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    The answer's range changes, so the fragment is `Changed — BREAKING`, though
    every caller in the module uses E only as an angle. **Done in #827**, as
    `TestSolveKeplerContract`; the "production" rows above are what it
-   replaced, and `internal/keplerlab` keeps that solver so §3.2 reproduces.
+   replaced, and `internal/keplerlab` kept that solver so §3.2 reproduces.
 3. **Prepared `Elements`.** The derived quantities at construction, the
    orientation as P and Q, the phase by one fused multiply-add. The phase
    came with #827; the rest is **done in #832**, measured in §5.
@@ -364,7 +366,7 @@ ephemeris layer's (docs/ephemeris.md §6.2).
    `ephemeris/kepler/center.go`.
 5. **The universal path's own audit.** This document called it the stable
    form already. Measured, it was not (#833). The oracle
-   (`internal/keplerlab/universal.go`) sums c₀ … c₃ by their series at 320
+   (`internal/oracle/universal.go`) sums c₀ … c₃ by their series at 320
    bits and solves for χ at 256. Against it, the shipped path lost ulps in
    two independent places:
 
@@ -389,12 +391,16 @@ ephemeris layer's (docs/ephemeris.md §6.2).
 
 ## 8. Reproducing
 
+The candidates and the measurements were removed in #874, once every phase
+above had shipped. The oracle they were measured against stays, as
+`internal/oracle`, and `ephemeris/kepler`'s contract tests hold the shipped
+code to it in every CI job: `TestSolveKeplerContract`, `TestUniversalContract`
+and `TestFromStateContract`. To rerun the measurements, check out the last
+commit that has them:
+
 ```bash
+git worktree add ../keplerlab ec5be0d5
+cd ../keplerlab
 go test -count=1 -v -run 'Test' ./internal/keplerlab/
 go test -tags=validation -run='^$' -bench=. -count=6 ./internal/keplerlab/ | tee kepler.txt
 ```
-
-The tests are untagged and run in every CI job on all three platforms. The
-benchmarks are behind the `validation` tag, so CI's Benchmarks job — every
-untagged benchmark, six times, on each push to main — does not repeat a
-comparison this document has already made.
