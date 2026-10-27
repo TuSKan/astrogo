@@ -354,7 +354,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 			sepSuite, crossSuite, elevSuite)
 	}
 
-	var nCompared int
+	var nCompared, nOutages int
 
 	for _, body := range bodies {
 		for _, ns := range sites {
@@ -375,6 +375,8 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 				// 500 that comes back is an outage like any other.
 				if reason, ok := testutil.UpstreamFailure(err); ok || errors.Is(err, errHorizonsUnavailable) {
 					t.Logf("fetch %s @ %s: Horizons did not answer (%s): %v", body.name, ns.name, reason, err)
+
+					nOutages++
 
 					continue
 				}
@@ -493,6 +495,13 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 	}
 
 	if nCompared == 0 {
+		// Every pair lost to an outage is nothing to compare, not a coverage
+		// gap: on 2026-10-26 a fault on Horizons' own server took all of them,
+		// and this failed asking for the site and epochs to be checked (#858).
+		if nOutages > 0 {
+			t.Skipf("Horizons did not answer for any of the %d pairs it was asked for; nothing compared", nOutages)
+		}
+
 		t.Fatal("no above-horizon comparison points across the whole matrix — check site/epoch coverage")
 	}
 

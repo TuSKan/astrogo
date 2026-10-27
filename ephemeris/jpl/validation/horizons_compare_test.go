@@ -57,7 +57,11 @@ func loadCases(t *testing.T) []*StateVector {
 
 	for _, c := range horizonsCases() {
 		sv, err := fetchVector(strconv.Itoa(c.naifID), c.name, start, stop)
-		if errors.Is(err, errHorizonsUnavailable) {
+
+		// Horizons not answering, in any of the ways testutil knows (a fault
+		// on its own server among them, #858), or with its HTML error page:
+		// the caller records NOT VERIFIED. Anything else is astrogo's.
+		if _, ok := testutil.UpstreamFailure(err); ok || errors.Is(err, errHorizonsUnavailable) {
 			return nil
 		}
 
