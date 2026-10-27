@@ -17,7 +17,8 @@
 // the two forms they are published in: [NewElements] takes a semi-major axis
 // and mean anomaly, the asteroid form, and is elliptical only;
 // [FromPerihelion] takes a perihelion distance and time, the form the Minor
-// Planet Center publishes comets in, and accepts any e >= 0. That matters
+// Planet Center publishes comets in, and accepts any e >= 0. [FromState]
+// takes a state vector instead, any conic, about whatever center it is given. That matters
 // because the comets people observe are near-parabolic: 118 of the 959 in
 // the MPC's comet file had e >= 1 when #374 counted them, among them
 // C/2023 A3, C/2022 E3 and C/2021 A1.

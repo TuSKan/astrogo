@@ -19,13 +19,15 @@ func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 // referred to the J2000 mean ecliptic and equinox — the frame in which
 // MPC- and JPL-published orbital elements are conventionally given.
 //
-// They come in the two forms elements are published in. [NewElements] takes
-// a semi-major axis and a mean anomaly at an epoch, the asteroid form, and
-// is elliptical only (0 <= e < 1). [FromPerihelion] takes a perihelion
-// distance and time, the comet form, and accepts any e >= 0: ellipse,
-// parabola or hyperbola.
+// They come in the two forms elements are published in, and a third for a
+// state vector. [NewElements] takes a semi-major axis and a mean anomaly at an
+// epoch, the asteroid form, and is elliptical only (0 <= e < 1).
+// [FromPerihelion] takes a perihelion distance and time, the comet form, and
+// accepts any e >= 0: ellipse, parabola or hyperbola. [FromState] takes a
+// position and velocity in the ICRF, any conic, and reports the same elements
+// derived from them.
 //
-// Elements is always constructed via one of the two, which validate
+// Elements is always constructed via one of the three, which validate
 // immediately — there is no way to hold an Elements value whose fields
 // haven't already passed Validate.
 type Elements struct {
@@ -58,6 +60,11 @@ type Elements struct {
 	// and the central body's mass parameter. Zero means derive it.
 	periodDays float64
 
+	// state is the state a set built by FromState was given, from which it
+	// is propagated; every other field but epoch and central is then derived
+	// from it, for reporting. Nil for the other two forms.
+	state *stateVector
+
 	// prep is what StateAt derives from the elements and not from the epoch,
 	// computed once by the constructors and the With methods (docs/kepler.md
 	// §5).
@@ -85,6 +92,10 @@ type prepared struct {
 	// sqrtMu its root, v0 the speed at perihelion and period the orbit's in
 	// days, zero when it does not close: the perihelion form.
 	mu, alpha, sqrtMu, v0, period float64
+
+	// tau is the time from perihelion to the epoch, in days, of an open orbit
+	// built by FromState, which is propagated along its perihelion path.
+	tau float64
 
 	// p and q are the perifocal x and y in the ICRF, at the epoch's argument
 	// of periapsis.
@@ -435,7 +446,8 @@ func (el Elements) WithCentralBody(body CentralBody) Elements {
 }
 
 // Epoch is the osculation epoch MeanAnomaly is given at; for a set built by
-// [FromPerihelion], the perihelion time.
+// [FromPerihelion], the perihelion time, and for one built by [FromState], the
+// state's.
 func (el Elements) Epoch() time.Time { return el.epoch }
 
 // SemiMajorAxis is the orbit's semi-major axis: positive for an ellipse,
@@ -464,7 +476,7 @@ func (el Elements) PerihelionDistance() unit.Length {
 }
 
 // Eccentricity satisfies 0 <= e < 1 for a set built by [NewElements], and
-// e >= 0 for one built by [FromPerihelion].
+// e >= 0 for one built by [FromPerihelion] or [FromState].
 func (el Elements) Eccentricity() float64 { return el.eccentricity }
 
 // Inclination is the orbit's inclination in the J2000 ecliptic frame.
@@ -479,7 +491,9 @@ func (el Elements) AscendingNode() angle.Angle { return el.ascendingNode }
 func (el Elements) ArgPeriapsis() angle.Angle { return el.argPeriapsis }
 
 // MeanAnomaly is the mean anomaly at Epoch; zero for a set built by
-// [FromPerihelion], whose epoch is the perihelion time.
+// [FromPerihelion], whose epoch is the perihelion time. For an open orbit
+// built by [FromState] it is the hyperbolic mean anomaly n·(t − T), with
+// n = √(μ/|a|³), and zero on an exact parabola.
 func (el Elements) MeanAnomaly() angle.Angle { return el.meanAnomaly }
 
 // Validate reports whether el's fields are finite and within the range its
@@ -494,6 +508,10 @@ func (el Elements) MeanAnomaly() angle.Angle { return el.meanAnomaly }
 // infinite semi-major axis precisely because e >= 1, and the caller needs to
 // hear that, not that the data is bad.
 func (el Elements) Validate() error {
+	if el.state != nil {
+		return el.validateStateForm()
+	}
+
 	if el.perihelion != 0 {
 		return el.validatePerihelionForm()
 	}
@@ -615,7 +633,9 @@ const elementsEclipticObliquity = 84381.448 * math.Pi / 648000
 //
 // A set built by [NewElements] is propagated through Kepler's equation in
 // the eccentric anomaly; one built by [FromPerihelion], of any eccentricity,
-// by universal variables from its perihelion state.
+// by universal variables from its perihelion state; one built by [FromState]
+// from its state, an ellipse directly and an open orbit through its
+// perihelion.
 //
 // This is two-body motion only: planetary perturbations are not modeled,
 // so accuracy drifts away from Epoch — arcseconds within days, arcminutes
@@ -634,6 +654,10 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 	}
 
 	dtDays := t.Sub(el.epoch).Days()
+
+	if el.state != nil {
+		return el.stateAt(dtDays)
+	}
 
 	var posPf, velPf vector.Vec3
 	if el.perihelion != 0 {
@@ -656,6 +680,12 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 func (el *Elements) prepare() {
 	el.prep = prepared{}
 	if el.Validate() != nil {
+		return
+	}
+
+	if el.state != nil {
+		el.prepareState()
+
 		return
 	}
 
