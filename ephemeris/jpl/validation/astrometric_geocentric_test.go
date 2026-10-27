@@ -355,7 +355,7 @@ func fetchGeocentricSeries(command, bodyName, quantity, startStr, stopStr, stepS
 
 	eoeIdx := strings.Index(responseStr, "$$EOE")
 	if soeIdx == -1 || eoeIdx == -1 {
-		return nil, errNoEphemerisData
+		return nil, noDataBlock(responseStr)
 	}
 
 	var rows []astrometricRow

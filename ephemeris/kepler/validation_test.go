@@ -15,6 +15,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/internal/horizons"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -121,6 +122,12 @@ func horizonsGet(params url.Values) (string, error) {
 	eoe := strings.Index(s, "$$EOE")
 
 	if soe == -1 || eoe == -1 {
+		// A fault on Horizons' own server comes in place of the table, and is
+		// an outage, which SkipOnUpstreamFailure skips on (#858).
+		if horizons.ServerFault(s) {
+			return "", fmt.Errorf("%w: %.500s", horizons.ErrServerFault, s)
+		}
+
 		return "", fmt.Errorf("%w: %.500s", errNoDataBlock, s)
 	}
 

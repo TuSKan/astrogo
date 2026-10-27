@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/internal/horizons"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -244,8 +245,47 @@ func TestJPLErrorResponse(t *testing.T) {
 			t.Fatalf("Unexpected error mapping: %v", err)
 		}
 
+		// A refusal is about the query, so a live test must fail on it.
+		if errors.Is(err, horizons.ErrServerFault) {
+			t.Fatalf("a refusal reported as a fault on Horizons' server: %v", err)
+		}
+
 		return false
 	})
+}
+
+// TestJPLServerFaultIsRecognized: the fault that failed 45 live tests on
+// 2026-10-26, served the way Horizons served it, is still an API error, and
+// one a live test skips on as somebody else's outage (#858).
+func TestJPLServerFaultIsRecognized(t *testing.T) {
+	jsonPayload := `{
+  "signature": {"version": "1.2", "source": "NASA/JPL Horizons API"},
+  "error": "wldini(): missing required file LTKERNL; ;  ERROR in VLRDC: Var not declared: IP_ADDR"
+}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if _, err := fmt.Fprint(w, jsonPayload); err != nil {
+			t.Errorf("failed to write response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	redirect(t, server.URL)
+
+	_, err := New().Resolve(context.Background(), "Moon")
+	if !errors.Is(err, ErrAPIError) || !errors.Is(err, horizons.ErrServerFault) {
+		t.Fatalf("Resolve = %v, want ErrAPIError and horizons.ErrServerFault", err)
+	}
+
+	if !strings.Contains(err.Error(), "missing required file LTKERNL") {
+		t.Errorf("error does not carry Horizons' explanation: %v", err)
+	}
+
+	if _, upstream := testutil.UpstreamFailure(err); !upstream {
+		t.Errorf("testutil.UpstreamFailure(%v) = false: a live test would fail on JPL's outage", err)
+	}
 }
 
 func TestProviderInterface(t *testing.T) {

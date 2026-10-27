@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/horizons"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -47,11 +48,25 @@ func TestMoonAbsoluteMagnitudesAreHorizons(t *testing.T) {
 
 			var payload struct {
 				Result string `json:"result"`
+				Error  string `json:"error"`
 			}
 
 			if err := remote.Default().GetJSON(ctx, remote.JPLHorizons, "", params, &payload); err != nil {
 				testutil.SkipOnUpstreamFailure(t, err)
 				t.Fatalf("Horizons %d: %v", m.naifID, err)
+			}
+
+			// Horizons answers in "error" instead of "result" when it cannot
+			// serve the request. A fault on its own server is an outage; read
+			// as a result, it was "publishes no V(1,0)" for seven moons on
+			// 2026-10-26 (#858).
+			if payload.Error != "" {
+				if horizons.ServerFault(payload.Error) {
+					testutil.SkipOnUpstreamFailure(t,
+						fmt.Errorf("horizons %d: %w: %s", m.naifID, horizons.ErrServerFault, payload.Error))
+				}
+
+				t.Fatalf("Horizons %d: %s", m.naifID, payload.Error)
 			}
 
 			match := horizonsAbsoluteMagnitudeRe.FindStringSubmatch(payload.Result)
