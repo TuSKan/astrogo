@@ -24,7 +24,9 @@ type Option func(*config)
 // WithBase sets the core.Provider a Provider delegates to for any body
 // ID other than the one it propagates from Elements — in particular for
 // core.Sun, which every consumer (magnitude/elongation computations,
-// plan.Asteroid's own helioGeometry) expects to be answerable. Defaults
+// plan.Asteroid's own helioGeometry) expects to be answerable, and which
+// [Provider.Register] places about the Solar System barycenter to refit an
+// orbit there. Defaults
 // to a small internal SOFA-only source (Sun/Moon/planets, no kernel or
 // network access) when not set.
 func WithBase(p core.Provider) Option {
@@ -68,6 +70,17 @@ func New(opts ...Option) *Provider {
 // them first. A Provider with id already registered silently overwrites
 // the prior entry — the same last-write-wins semantics a plain map has.
 //
+// It also chooses the center the orbit is fitted about (#803). A
+// heliocentric set is kept about the Sun, or refit through its state at the
+// osculation epoch about the Solar System barycenter, with the Sun and every
+// planet inside the body's distance as the central mass, whichever leaves the
+// smaller perturbing acceleration there: the Sun for an asteroid inside
+// Jupiter's orbit, the barycenter for a Centaur, a trans-Neptunian object or a
+// long-period comet far out. [Provider.Locate] then reports which. A refit
+// places the state about the barycenter through the base's Sun, and fails
+// when the base cannot place the Sun there. A satellite's set, or one with a
+// satellite modifier, is kept as given.
+//
 // Not safe to call concurrently with State — populate every body a
 // Provider will ever answer before sharing it across concurrent
 // readers (e.g. plan.VisibleTonight's candidate-gathering pipeline
@@ -78,15 +91,21 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 		return err
 	}
 
-	p.elements[id] = el
+	fitted, err := fitCenter(el, p.base)
+	if err != nil {
+		return err
+	}
+
+	p.elements[id] = fitted
 
 	return nil
 }
 
 // Locate returns id's state at t about the center its orbit is fitted
-// about: the Sun for heliocentric elements, the parent planet for a
-// satellite's ([Elements.CentralBody]). A body with no elements registered is
-// the base provider's to locate.
+// about: the Sun or the Solar System barycenter for heliocentric elements, as
+// Register chose, the parent planet for a satellite's
+// ([Elements.CentralBody]). A body with no elements registered is the base
+// provider's to locate.
 //
 // It used to answer geocentric, placing a heliocentric orbit against the
 // base's Sun, and before #810 against SOFA's Epv00 whatever the base was.
