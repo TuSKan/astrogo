@@ -57,8 +57,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn Conjunctions, 7 BC (astronomical year −6):")
 
-	s1 := time.Date(-6, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	e1 := time.Date(-5, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	s1 := time.DateJulianCal(-6, 1, 1, 0, 0, 0)
+	e1 := time.DateJulianCal(-5, 1, 1, 0, 0, 0)
 
 	conjs, err := plan.Conjunctions(s1, e1, jupiter, saturn)
 	if err != nil {
@@ -128,8 +128,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Venus Conjunction, June 17, 2 BC:")
 	// Astronomical year: 2 BC = year −1
-	s2 := time.Date(-1, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
-	e2 := time.Date(-1, time.July, 15, 0, 0, 0, 0, time.LocationUTC)
+	s2 := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
+	e2 := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
 	conjs2, err := plan.Conjunctions(s2, e2, jupiter, venus)
 	if err != nil {
@@ -160,8 +160,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn geometry, 3–2 BC (for comparison):")
 
-	s3 := time.Date(-2, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	e3 := time.Date(0, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	s3 := time.DateJulianCal(-2, 1, 1, 0, 0, 0)
+	e3 := time.DateJulianCal(0, 1, 1, 0, 0, 0)
 
 	conjs3, err := plan.Conjunctions(s3, e3, jupiter, saturn)
 	if err != nil {

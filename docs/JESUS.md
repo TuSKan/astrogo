@@ -117,17 +117,19 @@ same solar noon position it would today. The difference between Terrestrial Time
 physicist's perfectly uniform clock) and Universal Time (UT1, which tracks the actual
 rotation of the Earth) is called ΔT.
 
-For the first century AD, ΔT is approximately **7000–8000 seconds** (around 2 hours).
-This is critically important: it shifts the local time of eclipses and moonrises by roughly
-two hours.
+For the first century AD, ΔT is approximately **10,000 seconds** (about 2.8 hours):
+`astrogo` uses 10,202 s for 3 April AD 33, NASA's eclipse canon 10,191 s and JPL Horizons
+10,128 s. This is critically important. An eclipse or a moonrise is computed in TT, from the
+ephemeris, and only ΔT says what clock time on the turning Earth it fell at.
 
 The `astrogo` time package handles this natively:
 
 ```go
 import "github.com/TuSKan/astrogo/time"
 
-// Create a timestamp in UTC, AD 33
-t := time.Date(33, time.April, 3, 15, 0, 0, 0, time.LocationUTC)
+// 3 April AD 33, 15:00 UT. Dates before the 1582 reform are Julian calendar dates:
+// time.Date is the proleptic Gregorian calendar, two days apart in the first century.
+t := time.DateJulianCal(33, 4, 3, 15, 0, 0)
 
 // Convert to Terrestrial Time (deterministic, no Earth orientation data needed)
 tt := t.TT()
@@ -256,14 +258,14 @@ We can verify these eclipses computationally with `astrogo`
 (see [`examples/10_jesus_christ/herod/`](../examples/10_jesus_christ/herod/) for the full program):
 
 ```go
-eph, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
-defer eph.Close()
+prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
+defer prov.Close()
 
 // Search for all lunar eclipses from 5 BC to AD 1
-start := time.Date(-4, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-end   := time.Date(2, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
+end   := time.DateJulianCal(2, 1, 1, 0, 0, 0)
 
-eclipses, _ := plan.LunarEclipses(start, end, eph)
+eclipses, _ := plan.LunarEclipses(start, end, prov)
 for _, e := range eclipses {
     fmt.Printf("Eclipse: %s  |β|=%.3f°  γ=%.3f\n",
         e.Time.FormatJulian("2006-01-02 15:04"), e.EclipticLatitude.Degrees(), e.Gamma)
@@ -340,24 +342,29 @@ compute this directly with `astrogo`
 (see [`examples/10_jesus_christ/born/`](../examples/10_jesus_christ/born/) for the full program):
 
 ```go
-eph, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
-defer eph.Close()
+prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
+defer prov.Close()
 
-jupiter := plan.NewBody(ephemeris.Jupiter, eph)
-venus   := plan.NewBody(ephemeris.Venus, eph)
+jupiter := plan.NewJupiter(prov)
+venus   := plan.NewVenus(prov)
 
 // Jupiter-Venus conjunction, June 2 BC (astronomical year -1)
-s := time.Date(-1, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
-e := time.Date(-1, time.July, 15, 0, 0, 0, 0, time.LocationUTC)
+s := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
+e := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
-conjs, _ := plan.Appulses(s, e, jupiter, venus)
+conjs, _ := plan.Conjunctions(s, e, jupiter, venus)
 for _, c := range conjs {
-    fmt.Printf("%s  (min sep: %.4f° ≈ %.1f arcmin)\n",
-        c.Time.FormatJulian("2006-01-02 15:04"), c.Value, c.Value*60)
+    jPos, _ := jupiter.Position(c.Time)
+    vPos, _ := venus.Position(c.Time)
+    sep := coord.Separation(jPos, vPos)
+    fmt.Printf("%s  (sep: %.4f° ≈ %.1f arcmin)\n",
+        c.Time.FormatJulian("2006-01-02 15:04 MST"), sep.Degrees(), sep.Degrees()*60)
 }
+// Output:
+// -0001-06-17 18:00 UTC  (sep: 0.0079° ≈ 0.5 arcmin)
 ```
 
-The result: a separation of just **0.009° — approximately 0.5 arcminutes**. The human
+The result: a separation of just **0.0079° — approximately 0.5 arcminutes**. The human
 eye's resolving limit is roughly 1 arcminute. At half that threshold, Jupiter (magnitude
 −1.8) and Venus (magnitude −3.9) would have been **physically indistinguishable** to any
 naked-eye observer — appearing as a single, blazingly bright point of light on the
@@ -550,13 +557,13 @@ We can detect this eclipse with `astrogo`
 (see [`examples/10_jesus_christ/eclipse/`](../examples/10_jesus_christ/eclipse/) for the full simulation):
 
 ```go
-eph, _ := jpl.NewProvider(jpl.WithSource(jpl.Planets), jpl.WithKernel("de441_part-1"))
-defer eph.Close()
+prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
+defer prov.Close()
 
-start := time.Date(33, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
-end   := time.Date(33, time.May, 1, 0, 0, 0, 0, time.LocationUTC)
+start := time.DateJulianCal(33, 3, 1, 0, 0, 0)
+end   := time.DateJulianCal(33, 5, 1, 0, 0, 0)
 
-eclipses, _ := plan.LunarEclipses(start, end, eph)
+eclipses, _ := plan.LunarEclipses(start, end, prov)
 for _, e := range eclipses {
     fmt.Printf("Lunar Eclipse: %s\n", e.Time.FormatJulian("2006-01-02 15:04 MST"))
     fmt.Printf("  Ecliptic Latitude: %.3f°\n", e.EclipticLatitude.Degrees())
@@ -564,39 +571,41 @@ for _, e := range eclipses {
 }
 ```
 
-The maximum eclipse occurred at approximately **14:47 UT** — which corresponds to roughly
-**16:47 local Jerusalem time** after applying the ΔT correction for the first century.
+`astrogo` puts the maximum eclipse at **14:48:22 UT**. NASA's canon (Espenak, via
+EclipseWise) gives 14:47:46.8 UT1, and its contacts frame the rest of the evening: the partial
+phase began at 13:22:46 UT and ended at **16:12:52 UT**, and the penumbral phase ended at
+17:34:13 UT. Jerusalem's local mean time is 2 h 21 min ahead of UT, so the maximum fell at
+about 17:09 local mean time.
 
 But the Moon hadn't risen yet.
 
 ### The Moonrise Moment
 
-The Moon rose in the East just after sunset in Jerusalem, at approximately **17:45 local
-time**. At that moment, the eclipse was already past maximum — but the **umbral phase was
-still in progress**. The Moon would not fully exit the umbra until approximately
-**18:21 UT** (~20:21 local time).
+The full Moon rose in the east at **15:53 UT**, at azimuth 96°, about nine minutes before the
+Sun set at 16:02 UT. JPL Horizons agrees to the minute: moonrise 15:53 UT at azimuth 95.9°,
+sunset 16:03 UT. The eclipse was past maximum, but the **umbral phase was still in
+progress**: it ended at 16:12:52 UT, NASA's last umbral contact.
 
-This means that for approximately **30 minutes after moonrise**, anyone looking east from
-Jerusalem would have seen the Moon rising partially eclipsed — its upper portion darkened,
-glowing with a dull reddish-copper hue.
+So for about **20 minutes after moonrise**, anyone looking east from Jerusalem would have seen
+the Moon rising partially eclipsed, low on the horizon, darkened and tinted a dull
+reddish-copper. Then, as the sky darkened, it would have hung in the penumbra until 17:34 UT.
 
 ```go
 // Compute moonrise over Jerusalem on April 3, AD 33
 loc, _ := coord.NewEarthLocation(31.7683, 35.2137, 780.0)
 site, _ := plan.NewSite("Jerusalem", loc, plan.WithTimeZone(time.LocationUTC))
 
-dayStart := time.Date(33, time.April, 3, 12, 0, 0, 0, time.LocationUTC)
-dayEnd   := time.Date(33, time.April, 3, 20, 0, 0, 0, time.LocationUTC)
+dayStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
+dayEnd   := time.DateJulianCal(33, 4, 3, 20, 0, 0)
 
-rise, _, _ := plan.MoonriseMoonset(dayStart, dayEnd, site, eph)
+rise, _, _ := plan.MoonriseMoonset(dayStart, dayEnd, site, prov)
 if rise != nil {
     fmt.Printf("Moonrise: %s (Az: %s)\n",
         rise.Time.FormatJulian("15:04:05 MST"),
         rise.Azimuth)
 }
-// Output (approximate):
-// Moonrise: 15:45:00 UTC (Az: ~97°)
-// (Local time ≈ 17:45, accounting for ΔT and Jerusalem longitude)
+// Output:
+// Moonrise: 15:53:07 UTC (Az: 95.9478°)
 ```
 
 ### What Would It Have Looked Like?
