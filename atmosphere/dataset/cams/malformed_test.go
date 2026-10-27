@@ -74,7 +74,11 @@ func TestOpenRefusesAMalformedFile(t *testing.T) {
 		{"a dimension scale claiming 2.2 trillion values", 5368, 0x02, "longitude declares 2199023255556 values"},
 		{"a string attribute claiming 386 MB in 16 bytes", 5824, 0x17, `attribute "CLASS" declares`},
 		{"an integer attribute claiming 16 GB in 4 bytes", 5953, 0xf2, `attribute "_Netcdf4Dimid" declares`},
-		{"a panic inside the decoder's Open", 63, 0x0a, "the decoder failed"},
+		// Until scigolib/hdf5 v0.14.2 this byte led the decoder into a panic,
+		// which decode recovers as "the decoder failed"; v0.14.2 refuses the
+		// 720 PB local heap it makes on its own. Either way the file is
+		// malformed, and the panic path is TestDecodeTurnsAPanicIntoAnError's.
+		{"a local heap claiming 720 PB, refused by the decoder", 63, 0x0a, "exceeds maximum"},
 	}
 
 	for _, tt := range tests {
@@ -97,6 +101,9 @@ func TestOpenRefusesAMalformedFile(t *testing.T) {
 	}
 }
 
+// errDecoderRefused stands for an error the decoder returns about the file.
+var errDecoderRefused = errors.New("local heap data: size exceeds maximum")
+
 func TestDecodeTurnsAPanicIntoAnError(t *testing.T) {
 	t.Parallel()
 
@@ -110,6 +117,18 @@ func TestDecodeTurnsAPanicIntoAnError(t *testing.T) {
 
 	if err := decode("file.nc", "walk", func() error { return nil }); err != nil {
 		t.Errorf("decode of a call that succeeds = %v, want nil", err)
+	}
+
+	// An error the decoder returns about the file is the file being
+	// malformed, as a panic is; closing it is not about its content.
+	refused := errDecoderRefused
+
+	if err := decode("file.nc", "open", func() error { return refused }); !errors.Is(err, ErrMalformed) || !errors.Is(err, refused) {
+		t.Errorf("decode of a call the decoder refuses = %v, want ErrMalformed wrapping the decoder's error", err)
+	}
+
+	if err := release("file.nc", func() error { return refused }); errors.Is(err, ErrMalformed) || !errors.Is(err, refused) {
+		t.Errorf("release of a failing close = %v, want the close error, not ErrMalformed", err)
 	}
 }
 

@@ -5,8 +5,8 @@ go 1.27
 require (
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/hebl/gofa v1.19.1
-	github.com/klauspost/pgzip v1.2.7
-	github.com/scigolib/hdf5 v0.14.1
+	github.com/klauspost/pgzip v1.3.0
+	github.com/scigolib/hdf5 v0.14.2
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/sync v0.24.0
 	resty.dev/v3 v3.0.0-rc.4
@@ -20,7 +20,7 @@ require (
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/klauspost/compress v1.20.1 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
