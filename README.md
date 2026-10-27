@@ -762,7 +762,7 @@ This is the same trade-off made by production observatory schedulers (ESO/VLT SC
 
 ### IERS Earth Orientation Parameters
 
-Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP data ([finals2000A](https://maia.usno.navy.mil/ser7/finals2000A.all), from the IERS Rapid Service/Prediction Centre at USNO). Without it:
+Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP data ([finals2000A](https://maia.usno.navy.mil/ser7/finals2000A.all), from the IERS Rapid Service/Prediction Center at USNO). Without it:
 
 | Metric | With EOP | Without EOP |
 |--------|----------|-------------|

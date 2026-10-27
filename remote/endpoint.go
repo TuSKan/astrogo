@@ -427,7 +427,7 @@ const copernicusEODATAURL = "s3://eodata?endpoint=https%3A%2F%2Feodata.dataspace
 // at request-build time, never from a literal of their own.
 func defaultEndpoints() map[EndpointID]Endpoint {
 	return map[EndpointID]Endpoint{
-		// finals2000A is produced by the IERS Rapid Service/Prediction Centre
+		// finals2000A is produced by the IERS Rapid Service/Prediction Center
 		// at USNO, and is fetched from USNO's own server. The IERS data center
 		// republishes it, and was the source until it began answering every
 		// request with a firewall page and HTTP 400 on 2026-10-26: every
