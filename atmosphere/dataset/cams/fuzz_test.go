@@ -3,6 +3,7 @@ package cams
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"math/rand/v2"
 	"testing"
@@ -32,11 +33,32 @@ func fixtureBytes(tb testing.TB) []byte {
 	return b
 }
 
+// camsErrors are the errors this package reports a file with. A malformed file
+// may produce any of them; what it may not produce is anything else, such as
+// a decoder's own error passed through, which would leave a caller unable to
+// tell a bad file from a broken reader.
+var camsErrors = []error{
+	ErrMalformed, ErrVariableNotFound, ErrUnsupportedAxis, ErrUnexpectedAttributeType,
+	ErrNoLevelDimension, ErrIndexOutOfRange,
+}
+
+// isCAMSError reports whether err is one of camsErrors.
+func isCAMSError(err error) bool {
+	for _, want := range camsErrors {
+		if errors.Is(err, want) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // readEverything opens data as a CAMS file and reads every plane of every
-// variable the fixture holds, from a bucket it writes it to. Errors are what a
-// malformed file should produce; what it guards is that nothing panics and
-// nothing ends the process, which no recover could catch (#794).
-func readEverything(tb testing.TB, fsys remote.FS, data []byte) {
+// variable the fixture holds, from a bucket it writes it to, and returns how
+// many planes it read. Every error has to be one of this package's own; what
+// is guarded beyond that is that nothing panics and nothing ends the process,
+// which no recover could catch (#794).
+func readEverything(tb testing.TB, fsys remote.FS, data []byte) int {
 	tb.Helper()
 
 	ctx := context.Background()
@@ -47,14 +69,24 @@ func readEverything(tb testing.TB, fsys remote.FS, data []byte) {
 
 	cf, err := Open(ctx, fsys, "fuzz.nc")
 	if err != nil {
-		return
+		if !isCAMSError(err) {
+			tb.Errorf("Open = %v, not one of this package's errors", err)
+		}
+
+		return 0
 	}
 
 	defer func() { _ = cf.Close() }()
 
+	planes := 0
+
 	for _, name := range []string{"aermr01", "lnsp", "longitude", "latitude", "level", "time"} {
 		v, err := cf.Var(name)
 		if err != nil {
+			if !isCAMSError(err) {
+				tb.Errorf("Var(%q) = %v, not one of this package's errors", name, err)
+			}
+
 			continue
 		}
 
@@ -64,9 +96,19 @@ func readEverything(tb testing.TB, fsys remote.FS, data []byte) {
 		}
 
 		for level := range levels {
-			_, _ = v.ReadPlane(0, level)
+			if _, err := v.ReadPlane(0, level); err != nil {
+				if !isCAMSError(err) {
+					tb.Errorf("%s.ReadPlane(0, %d) = %v, not one of this package's errors", name, level, err)
+				}
+
+				continue
+			}
+
+			planes++
 		}
 	}
+
+	return planes
 }
 
 // FuzzOpen feeds Open arbitrary bytes and reads everything it opens.
@@ -144,6 +186,7 @@ func TestOpenSurvivesCorruptions(t *testing.T) {
 	}
 
 	rng := rand.New(rand.NewPCG(794, 795))
+	read := 0
 
 	for range n {
 		b := bytes.Clone(fixture)
@@ -152,8 +195,17 @@ func TestOpenSurvivesCorruptions(t *testing.T) {
 			b[structure[rng.IntN(len(structure))]] = byte(rng.IntN(256))
 		}
 
-		readEverything(t, fsys, b)
+		if readEverything(t, fsys, b) > 0 {
+			read++
+		}
 	}
+
+	// A reader that refused every variant would pass this vacuously.
+	if read == 0 {
+		t.Fatalf("none of %d variants read a plane: the sweep exercised nothing past Open", n)
+	}
+
+	t.Logf("%d of %d corrupted variants still read at least one plane", read, n)
 }
 
 // structureOffsets lists the offsets of data's structure: every byte of each
