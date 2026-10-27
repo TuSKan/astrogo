@@ -68,7 +68,7 @@ func TestFromStateReportsTheOrbit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hyperbola, err := kepler.FromPerihelion(epoch, unit.AU(1.5), 1.2,
+	hyperbola, err := kepler.FromPerihelion(epoch, epoch, unit.AU(1.5), 1.2,
 		angle.Deg(25), angle.Deg(130), angle.Deg(-40))
 	if err != nil {
 		t.Fatal(err)

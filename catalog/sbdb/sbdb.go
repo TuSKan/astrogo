@@ -860,7 +860,9 @@ var datedWindow = unit.Days(30)
 // at an end of the window. A comet falling toward the Sun at the start and
 // receding at the end passed perihelion inside it, and gets q.
 func sunDistanceAround(q, e float64, tp, at time.Time) float64 {
-	el, err := kepler.FromPerihelion(tp, unit.AU(q), e, angle.Zero(), angle.Zero(), angle.Zero())
+	// Only the distance from the Sun is read, which no epoch or angle
+	// changes: the orbit is taken as osculating at its perihelion.
+	el, err := kepler.FromPerihelion(tp, tp, unit.AU(q), e, angle.Zero(), angle.Zero(), angle.Zero())
 	if err != nil {
 		return q
 	}

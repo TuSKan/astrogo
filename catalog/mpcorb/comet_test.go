@@ -152,7 +152,7 @@ func TestReadReadsAFileOfBothFormats(t *testing.T) {
 // distance at its own perihelion time.
 func TestEveryCometRowPropagates(t *testing.T) {
 	for _, c := range readAll(t, cometFixture()) {
-		el, err := eph.ElementsFromPerihelion(c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+		el, err := eph.ElementsFromPerihelion(c.Epoch, c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
 		if err != nil {
 			t.Fatalf("%s: ElementsFromPerihelion: %v", c.Name, err)

@@ -103,7 +103,7 @@ func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
 	tp := time.FromJDParts(2458826.0528, 0, time.TDB)
 
 	for _, e := range []float64{0.5, 1, 3.356476} {
-		el, err := ElementsFromPerihelion(tp, unit.AU(2.006521), e,
+		el, err := ElementsFromPerihelion(tp, tp, unit.AU(2.006521), e,
 			angle.Deg(44.0526), angle.Deg(308.1477), angle.Deg(209.1237))
 		if err != nil {
 			t.Fatalf("e = %v: ElementsFromPerihelion: %v", e, err)
@@ -130,12 +130,12 @@ func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
 		}
 	}
 
-	_, err := ElementsFromPerihelion(tp, unit.AU(2), -0.5, angle.Zero(), angle.Zero(), angle.Zero())
+	_, err := ElementsFromPerihelion(tp, tp, unit.AU(2), -0.5, angle.Zero(), angle.Zero(), angle.Zero())
 	if !errors.Is(err, kepler.ErrUnsupportedOrbit) {
 		t.Errorf("e = -0.5: err = %v, want kepler.ErrUnsupportedOrbit", err)
 	}
 
-	_, err = ElementsFromPerihelion(tp, 0, 1, angle.Zero(), angle.Zero(), angle.Zero())
+	_, err = ElementsFromPerihelion(tp, tp, 0, 1, angle.Zero(), angle.Zero(), angle.Zero())
 	if !errors.Is(err, kepler.ErrInvalidElements) {
 		t.Errorf("q = 0: err = %v, want kepler.ErrInvalidElements", err)
 	}

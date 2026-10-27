@@ -38,9 +38,15 @@ type Elements struct {
 
 	// perihelion is the perihelion distance of a set built by
 	// FromPerihelion, which is propagated by universal variables from its
-	// perihelion state at epoch; semiMajorAxis and meanAnomaly are then
-	// unused. Zero means the mean-anomaly form NewElements builds.
+	// perihelion state at perihelionTime; semiMajorAxis is then unused, and
+	// meanAnomaly is derived for reporting. Zero means the mean-anomaly form
+	// NewElements builds.
 	perihelion unit.Length
+
+	// perihelionTime is when a set built by FromPerihelion passes
+	// perihelion, where its propagation starts. epoch is then the osculation
+	// epoch the elements were published for.
+	perihelionTime time.Time
 
 	// central is the body the elements are referred to. The zero value
 	// means the Sun, so an Elements built by NewElements and never given a
@@ -308,8 +314,8 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 }
 
 // FromPerihelion constructs a validated set of heliocentric osculating
-// elements from a perihelion time, perihelion distance and eccentricity —
-// the form the Minor Planet Center publishes comets in — for any
+// elements, osculating at epoch, from a perihelion time, perihelion distance
+// and eccentricity — the form the Minor Planet Center publishes comets in — for any
 // eccentricity e >= 0: an ellipse, a parabola or a hyperbola. The angles are
 // referred to the J2000 ecliptic, as for [NewElements].
 //
@@ -321,15 +327,17 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 // universal variables from its perihelion state, one path for all three
 // conics that stays well conditioned as e crosses 1.
 //
-// [Elements.Epoch] reports perihelionTime and [Elements.MeanAnomaly] zero,
-// since that is where the propagation starts. A published comet orbit
-// osculates at an epoch of its own, which is usually not the perihelion
-// time, and it is near that epoch that two-body motion is closest to the
-// real orbit; see this package's doc comment.
+// epoch is the osculation epoch the elements were published for: CometEls
+// and SBDB both carry it beside the perihelion time, which it usually is not.
+// It is near that epoch that two-body motion is closest to the real orbit, and
+// so where a refit about another center has to happen (#803); see this
+// package's doc comment. [Elements.Epoch] reports it, and
+// [Elements.MeanAnomaly] the mean anomaly there. An orbit published without
+// one, unperturbed, osculates at its perihelion time: pass that for both.
 //
 // Orbital elements are published with the perihelion distance in
 // astronomical units, so it is almost always [unit.AU](q) here.
-func FromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
+func FromPerihelion(epoch, perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis angle.Angle,
 ) (Elements, error) {
 	if !finite(perihelionDistance.AU()) || perihelionDistance <= 0 {
@@ -338,7 +346,7 @@ func FromPerihelion(perihelionTime time.Time, perihelionDistance unit.Length, ec
 	}
 
 	el := Elements{
-		epoch: perihelionTime, perihelion: perihelionDistance, eccentricity: eccentricity,
+		epoch: epoch, perihelionTime: perihelionTime, perihelion: perihelionDistance, eccentricity: eccentricity,
 		inclination: inclination, ascendingNode: ascendingNode, argPeriapsis: argPeriapsis,
 	}
 	if err := el.Validate(); err != nil {
@@ -445,9 +453,8 @@ func (el Elements) WithCentralBody(body CentralBody) Elements {
 	return el
 }
 
-// Epoch is the osculation epoch MeanAnomaly is given at; for a set built by
-// [FromPerihelion], the perihelion time, and for one built by [FromState], the
-// state's.
+// Epoch is the osculation epoch MeanAnomaly is given at, for every form: for a
+// set built by [FromState], the state's.
 func (el Elements) Epoch() time.Time { return el.epoch }
 
 // SemiMajorAxis is the orbit's semi-major axis: positive for an ellipse,
@@ -490,10 +497,10 @@ func (el Elements) AscendingNode() angle.Angle { return el.ascendingNode }
 // ecliptic frame.
 func (el Elements) ArgPeriapsis() angle.Angle { return el.argPeriapsis }
 
-// MeanAnomaly is the mean anomaly at Epoch; zero for a set built by
-// [FromPerihelion], whose epoch is the perihelion time. For an open orbit
-// built by [FromState] it is the hyperbolic mean anomaly n·(t − T), with
-// n = √(μ/|a|³), and zero on an exact parabola.
+// MeanAnomaly is the mean anomaly at Epoch. For a set built by
+// [FromPerihelion] or [FromState] it is n·(Epoch − T) from the perihelion time
+// T: within (−π, π] on an ellipse, the hyperbolic mean anomaly on a hyperbola,
+// with n = √(μ/|a|³), and zero on an exact parabola.
 func (el Elements) MeanAnomaly() angle.Angle { return el.meanAnomaly }
 
 // Validate reports whether el's fields are finite and within the range its
@@ -653,17 +660,24 @@ func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
 		el.prepare()
 	}
 
+	// The orientation drifts from the epoch the angles are given at; the
+	// perihelion form's anomaly runs from its perihelion time.
 	dtDays := t.Sub(el.epoch).Days()
 
 	if el.state != nil {
 		return el.stateAt(dtDays)
 	}
 
+	sinceStart := dtDays
+	if el.perihelion != 0 {
+		sinceStart = t.Sub(el.perihelionTime).Days()
+	}
+
 	var posPf, velPf vector.Vec3
 	if el.perihelion != 0 {
-		posPf, velPf, err = el.perifocalUniversal(dtDays)
+		posPf, velPf, err = el.perifocalUniversal(sinceStart)
 	} else {
-		posPf, velPf, err = el.perifocalClassical(dtDays)
+		posPf, velPf, err = el.perifocalClassical(sinceStart)
 	}
 
 	if err != nil {
@@ -726,6 +740,20 @@ func (el *Elements) prepare() {
 
 		pr.sqrtMu = math.Sqrt(pr.mu)
 		pr.v0 = math.Sqrt(pr.mu * (1 + e) / q) // speed at perihelion, from vis-viva
+
+		// The mean anomaly at the osculation epoch, n·(t − T), for
+		// reporting: an ellipse's reduced to (−π, π], a hyperbola's
+		// Danby's, and none on an exact parabola.
+		since := el.epoch.Sub(el.perihelionTime).Days()
+
+		switch {
+		case pr.alpha > 0:
+			el.meanAnomaly = angle.Rad(math.Remainder(math.Sqrt(pr.mu*pr.alpha*pr.alpha*pr.alpha)*since, 2*math.Pi))
+		case pr.alpha < 0:
+			el.meanAnomaly = angle.Rad(math.Sqrt(-pr.mu*pr.alpha*pr.alpha*pr.alpha) * since)
+		default:
+			el.meanAnomaly = 0
+		}
 	}
 
 	pr.p = el.toICRF(vector.V3(1, 0, 0))

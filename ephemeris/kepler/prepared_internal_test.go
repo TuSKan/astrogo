@@ -115,7 +115,9 @@ func TestABareLiteralIsPreparedWhenAsked(t *testing.T) {
 func TestAnInvalidatedSetIsReported(t *testing.T) {
 	t.Parallel()
 
-	el, err := FromPerihelion(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	tp := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+
+	el, err := FromPerihelion(tp, tp,
 		unit.AU(1.1), 1.2, angle.Deg(40), angle.Deg(10), angle.Deg(20))
 	if err != nil {
 		t.Fatal(err)

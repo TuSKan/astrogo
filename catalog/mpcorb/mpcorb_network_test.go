@@ -290,7 +290,7 @@ func TestOpenParsesTheCometFile(t *testing.T) {
 			open++
 		}
 
-		el, err := eph.ElementsFromPerihelion(c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+		el, err := eph.ElementsFromPerihelion(c.Epoch, c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
 		if err != nil {
 			t.Fatalf("%s: ElementsFromPerihelion: %v", c.Name, err)
