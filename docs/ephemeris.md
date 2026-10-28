@@ -277,7 +277,7 @@ included.
 
 ### 5.2 Native segments against the barycentric route
 
-`TestNativeMoonAgreesWithTheBarycentricRoute`: the Moon about the Earth from
+`TestNativeMoonAgreesWithTheBarycentricRoute` (since deleted, at 3b1d36ca; §10): the Moon about the Earth from
 segments 301 and 399, against the difference of two geocentric states, 100
 epochs over 2026–27. They differ by at most **3.0×10⁻⁸ km** (30 µm); Triton
 about Neptune by **1.0×10⁻⁶ km** (1 mm). That is rounding at the barycentric
@@ -286,7 +286,7 @@ distance instead, and is 3.6–3.8× cheaper (B5).
 
 ### 5.3 Parallax before or after aberration
 
-`TestObservedPlaceParallaxAndAberrationOrder`: today's observed place against
+`TestObservedPlaceParallaxAndAberrationOrder` (since deleted, at 3b1d36ca; §10): today's observed place against
 the SOFA-order one — the astrometric place from the site's barycentric
 position, then `iauAtciq`'s deflection and aberration with the site's own
 velocity — with refraction off in both, hourly through June 2026 from
@@ -341,7 +341,7 @@ fail.
 
 ### 5.4 SOFA's Earth against the kernel's
 
-`TestEpv00EarthAgainstTheKernel`: `Epv00`'s heliocentric Earth against
+`TestEpv00EarthAgainstTheKernel` (since deleted, at 3b1d36ca; §10): `Epv00`'s heliocentric Earth against
 de440s's, 2000 epochs over 1900–2100: **4.00 km rms, 11.71 km max** (1942).
 SOFA documents 3.7 and 11.2 km against DE405. This is the Earth every Kepler
 body is placed against today (#810).
@@ -627,6 +627,15 @@ Performance is reported and never gates (CLAUDE.md); these gate.
 ```bash
 go test -tags=integration -run='^$' -bench=. -count=6 ./internal/workload/ | tee new.txt
 benchstat old.txt new.txt
+```
+
+The experiments of §5 were removed in #891, once every decision they informed
+had shipped; the workload benchmarks stay. To rerun the experiments, check out
+the last commit that has them:
+
+```bash
+git worktree add ../workload 3b1d36ca
+cd ../workload
 go test -tags=integration -count=1 -v -run 'Test' ./internal/workload/
 ```
 

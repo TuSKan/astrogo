@@ -11,4 +11,8 @@
 // cost of reading is separated from the cost of evaluating. Where repeated
 // work is the question, a benchmark also reports how many provider calls and
 // kernel reads one operation makes.
+//
+// The experiments that settled docs/ephemeris.md's design questions, which
+// logged answers rather than measuring workloads, were removed once every
+// decision they informed had shipped (#891). Commit 3b1d36ca has them.
 package workload
