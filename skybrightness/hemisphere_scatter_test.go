@@ -1,6 +1,7 @@
 package skybrightness
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"testing"
@@ -310,6 +311,40 @@ func TestScatterIntoEmptyFieldChangesNothing(t *testing.T) {
 		for i := range b {
 			if into[id][i] != b[i] {
 				t.Fatalf("%s wavelength %d changed: %g -> %g", id, i, b[i], into[id][i])
+			}
+		}
+	}
+}
+
+// A phase function that cannot be evaluated stops the sum, wrapped in
+// ErrScattering with the cause still reachable, and nothing is written for the
+// ring it failed in. An asymmetry of 1 is singular, and is what
+// HenyeyGreensteinPhaseFunction refuses; a scene cannot reach it through the
+// atmosphere builder, so the kernel is set up directly.
+func TestScatterIntoReportsAFailingPhaseFunction(t *testing.T) {
+	t.Parallel()
+
+	grid := DefaultOpticalGrid()
+
+	kernel := aerosolKernel(t)
+	kernel.asymmetry = 1
+
+	f := syntheticField(t, grid, 3, scatterIDs, 0)
+	ids := scatterIDs[:len(scatterIDs)-1]
+	into := intoBuffers(ids, grid.Len())
+	before := intoBuffers(ids, grid.Len())
+
+	err := f.scatterInto(nil, kernel, coord.NewAltAz(angle.Deg(45), angle.Deg(0)), into)
+
+	if !errors.Is(err, ErrScattering) || !errors.Is(err, atmosphere.ErrAsymmetry) {
+		t.Fatalf("err = %v, want ErrScattering wrapping atmosphere.ErrAsymmetry", err)
+	}
+
+	for id, b := range before {
+		for i := range b {
+			if into[id][i] != b[i] {
+				t.Fatalf("%s wavelength %d changed to %g from %g though the first ring failed",
+					id, i, into[id][i], b[i])
 			}
 		}
 	}
