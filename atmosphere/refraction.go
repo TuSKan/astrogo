@@ -43,7 +43,8 @@ type RefractionModel interface {
 // second, parallel pressure/temperature representation.
 //
 // Pressure is in hPa, Temperature in °C, Humidity a fraction from 0 to 1,
-// and Wavelength in micrometers.
+// and Wavelength in micrometers, zero for the visual default (see
+// [Refraction.EffectiveWavelength]).
 type Refraction struct {
 	Model       RefractionModel
 	Pressure    float64
@@ -77,6 +78,28 @@ func (r Refraction) EffectiveModel() RefractionModel {
 	default:
 		return RefractionNone{}
 	}
+}
+
+// standardWavelength is the visual wavelength, in micrometers, that
+// [StandardRefraction] refracts at and a zero Wavelength stands for.
+const standardWavelength = 0.55
+
+// EffectiveWavelength returns the wavelength, in micrometers, that SOFA's
+// refraction is computed at, which is never zero.
+//
+// A zero Wavelength is the visual default, [StandardRefraction]'s 0.55 µm, as
+// a nil Model is the default model ([Refraction.EffectiveModel]). Until #904
+// a zero reached SOFA's iauRefco as given, which clamps a wavelength to its
+// domain of 0.1 µm and up: deep ultraviolet, where dry air refracts twice as
+// much as in the visible. Every [Builder]-made Atmosphere carried that zero,
+// so its refraction was twice the real one from 10° to the zenith, while
+// [RefractionBennett] read the same zero as its own 0.50169 µm.
+func (r Refraction) EffectiveWavelength() float64 {
+	if r.Wavelength == 0 {
+		return standardWavelength
+	}
+
+	return r.Wavelength
 }
 
 // RefractFromTrue is the refraction that carries a true geometric altitude to
@@ -184,8 +207,10 @@ func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle
 		return 0
 	}
 
-	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
+	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.EffectiveWavelength())
 
+	// The raw wavelength below: the hand-over is Bennett-NA's, which reads a
+	// zero as its own wavelength, the almanac's.
 	return angle.Rad(refraction.FromTrue(trueAlt.Radians(), refa, refb, env.Pressure, env.Temperature, env.Wavelength))
 }
 
@@ -197,7 +222,7 @@ func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) an
 		return 0
 	}
 
-	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.Wavelength)
+	refa, refb := gofaext.Refco(env.Pressure, env.Temperature, env.Humidity, env.EffectiveWavelength())
 
 	return angle.Rad(refraction.FromApparent(obsAlt.Radians(), refa, refb, env.Pressure, env.Temperature, env.Wavelength))
 }
@@ -216,7 +241,7 @@ func StandardRefraction() Refraction {
 		Pressure:    1013.25,
 		Temperature: 15.0,
 		Humidity:    0.5,
-		Wavelength:  0.55,
+		Wavelength:  standardWavelength,
 	}
 }
 

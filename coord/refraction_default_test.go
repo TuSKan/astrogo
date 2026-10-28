@@ -129,6 +129,59 @@ func TestNilModelMatchesExplicitSOFAModel(t *testing.T) {
 		"%.6f above 5 deg, %.6f above 10 deg", above, worst[0], worst[1], worst[2])
 }
 
+// TestContextRefractsAZeroWavelengthAtTheVisualDefault: a Context takes its
+// SOFA constants from NewContext's own Refco call, not through atmosphere, so
+// the zero-wavelength default has to hold here too (#904).
+//
+// A zero used to reach Refco as 0.1 µm, SOFA's clamp, and every Context built
+// from a Builder's atmosphere refracted twice as much as it should: the
+// skybrightness Moon and Sun among them. The default is substituted before
+// any arithmetic, so the two Contexts must agree to the bit from 10° up.
+// Below, SOFA hands over to Bennett-NA, which reads a zero as its own
+// wavelength, the almanac's, and the two differ by its 0.4% of dispersion.
+func TestContextRefractsAZeroWavelengthAtTheVisualDefault(t *testing.T) {
+	t.Parallel()
+
+	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	site := paranalSite(t)
+
+	air := seaLevelAir()
+	zero := air
+	zero.Wavelength = 0
+
+	ctxAir := coord.NewContext(when, site, air)
+	ctxZero := coord.NewContext(when, site, zero)
+
+	above := 0
+
+	for i := range 400 {
+		th := float64(i) * 0.7853981633974483
+		ph := float64(i) * 0.24
+
+		v := vector.Vec3{
+			X: math.Cos(ph) * math.Cos(th),
+			Y: math.Cos(ph) * math.Sin(th),
+			Z: math.Sin(ph),
+		}.MulScalar(1e10)
+
+		a, b := ctxAir.GeocentricToObserved(v), ctxZero.GeocentricToObserved(v)
+		if a.Alt().Degrees() < 10 {
+			continue
+		}
+
+		above++
+
+		if a.Alt() != b.Alt() {
+			t.Errorf("at %.3f° the zero wavelength puts the direction %.3f″ higher than 0.55 µm does",
+				a.Alt().Degrees(), (b.Alt() - a.Alt()).Arcseconds())
+		}
+	}
+
+	if above < 50 {
+		t.Fatalf("only %d of 400 directions were above the horizon", above)
+	}
+}
+
 // TestDisperseReportsDispersionWhereReduceAppliedRefraction is the second half
 // of the nil-model defect.
 //

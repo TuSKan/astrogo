@@ -122,7 +122,9 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 		p = 0.0
 	}
 
-	ctx.refa, ctx.refb = gofaext.Refco(p, atm.Temperature, atm.Humidity, atm.Wavelength)
+	// The effective wavelength: a zero reached SOFA as 0.1 µm, its clamp, and
+	// doubled the refraction (#904).
+	ctx.refa, ctx.refb = gofaext.Refco(p, atm.Temperature, atm.Humidity, atm.EffectiveWavelength())
 	ctx.build(t)
 
 	return ctx
