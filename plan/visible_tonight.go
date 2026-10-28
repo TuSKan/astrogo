@@ -97,16 +97,10 @@ type visibleTonightConfig struct {
 	air                   *atmosphere.Atmosphere
 }
 
-// The air VisibleTonight assumes when the caller names none, and the
-// wavelength its V magnitudes are dimmed at.
+// The wavelength VisibleTonight's V magnitudes are dimmed at. The ozone column
+// its default air carries is [atmosphere.SubtropicalOzoneDU], shared with
+// skybrightness/dataset's default scene so the two cannot drift (#906).
 const (
-	// defaultOzoneDU is the ozone column: 258 DU, the mean Patat et al.
-	// (2011, A&A 527, A91) derive at Paranal (RMS 14 DU), against the median
-	// of 257.4 Buton et al. (2013, A&A 549, A8) give Mauna Kea. Both sites are
-	// subtropical, and Buton et al. note that their 260 DU mean over Hawaii is
-	// lower than the worldwide one, so a site at higher latitude has more.
-	defaultOzoneDU = 258
-
 	// vPivotNM is the pivot wavelength of Bessell's V passband, the band
 	// catalog V magnitudes are in: 547.77 nm for SVO's Generic/Bessell.V, an
 	// energy-counting profile. One wavelength stands in for the band because
@@ -892,7 +886,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 // none; see WithAtmosphere.
 func defaultNightAir(site *Site) (*atmosphere.Atmosphere, error) {
 	air, err := atmosphere.ContinentalCleanAerosol(site.Height(), atmosphere.CleanMountainAOD550).
-		Ozone(defaultOzoneDU).
+		Ozone(atmosphere.SubtropicalOzoneDU).
 		Build()
 	if err != nil {
 		return nil, fmt.Errorf("plan: visible tonight: default air: %w", err)
