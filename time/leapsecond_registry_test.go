@@ -217,8 +217,10 @@ func TestRegisterLeapSecondsRefusesToRestateTheRecord(t *testing.T) {
 //
 // Every leap second so far has been positive, and Earth's rotation has been
 // speeding up: a negative one — skipping 23:59:59 rather than inserting
-// 23:59:60 — is now considered plausible before leap seconds end in 2035
-// (Agnew 2024; Malkin 2024). The ITU-R has permitted it since 1972.
+// 23:59:60 — was considered plausible before leap seconds ended (Agnew 2024;
+// Malkin 2024), and the ITU-R permitted it from 1972. None was ever applied,
+// and under Resolution 5 of the 28th CGPM (2026) none will be; the validator
+// still accepts one for a table that a future decision might bring (#879).
 //
 // A validator written around "each entry is one more than the last" would
 // reject the first real one, at the worst possible moment.

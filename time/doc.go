@@ -69,26 +69,30 @@
 // The EOP path degrades rather than failing: a pre-seeded cache object, then
 // a network fetch if consent was granted, then zero EOP with a one-time
 // warning. Zero EOP is a real answer with real error — up to about 0.9 s of
-// UT1 — so a caller who needs to know which of the three it got asks
+// UT1 before 20 May 2027, and more after — so a caller who needs to know which
+// of the three it got asks
 // [EOPSource]. [Time.UT1] is the exception and reports the failure instead of
 // degrading.
 //
-// That 0.9 s is borrowed, not intrinsic. It is the bound leap seconds keep
-// |UT1−UTC| inside, and CGPM Resolution 4 (2022) commits to abandoning leap
-// seconds by 2035; after that UT1−UTC grows without bound, and the zero-EOP
-// degradation grows with it. Levine, Tavella & Milton (2023) estimate that a
-// tolerance of one minute would mean an adjustment roughly once a century.
+// That 0.9 s is borrowed, not intrinsic. It is the bound leap seconds kept
+// |UT1−UTC| inside, and they have ended. Resolution 5 of the 28th CGPM (2026)
+// makes UTC continuous from 20 May 2027 and raises the limit on |UT1−UTC| to
+// 3600 s. IERS Bulletin C 72 announced no leap second for December 2026, and
+// June 2027 falls after that date, so 2016-12-31 was the last and TAI − UTC
+// stays 37 s. From 20 May 2027 UT1−UTC drifts with the Earth's rotation, and
+// the zero-EOP degradation drifts with it; the warning says which side of that
+// date an epoch is on.
 //
 // The data path is unaffected: this package reads full UT1−UTC from
 // finals2000A, not the 0.1 s-resolution DUT1 a time signal broadcasts, so it
-// has no 0.9 s assumption of its own to unlearn. Only the stated bound goes
-// stale, and only for the caller who has no EOP data at all.
+// has no 0.9 s assumption of its own to unlearn. Only the stated bound changes,
+// and only for the caller who has no EOP data at all.
 //
 // A bulletin ends, about a year past its issue, and the epochs after it are
 // the one place this package forecasts UT1. It holds ΔT = TT − UT1 at its
 // value on the bulletin's last day, continuous with the measurement, rather
-// than pinning UT1 to UTC, which leap seconds stop justifying in 2035, or
-// following the Espenak & Meeus (2006) extrapolation, which was 6.2 s high in
+// than pinning UT1 to UTC, which leap seconds stop justifying on 20 May 2027,
+// or following the Espenak & Meeus (2006) extrapolation, which was 6.2 s high in
 // 2026 against a ΔT the bulletin shows flat since 2020. [DeltaT] is that same
 // value at every epoch, so no conversion disagrees with it, and
 // [DeltaTUncertainty] grows from the bulletin's end (#696).
@@ -144,9 +148,9 @@
 //     epoch where the question arises.
 //
 // This is not a defect this package can fix — the host clock is the host's —
-// and it is worth knowing rather than discovering. The window is also
-// shrinking: the most recent leap second was 2016-12-31, none is currently
-// scheduled, and the 2022 CGPM resolution abandons them by 2035.
+// and it is worth knowing rather than discovering. It is also a property of
+// past instants only: the most recent leap second was 2016-12-31, and under
+// Resolution 5 of the 28th CGPM (2026) there will be no other.
 //
 // # 23:59:60
 //

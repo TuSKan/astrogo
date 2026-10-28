@@ -28,9 +28,9 @@ type leapStep struct {
 // system was initialized with ΔAT already at 10 s. Levine, Tavella & Milton
 // (2023) count "27 leap events", and 27 + that baseline is the 28 rows below.
 //
-// The record is also nearly final. CGPM Resolution 4 (2022) commits to ending
-// leap seconds by 2035, so this table will gain at most one or two more rows —
-// possibly including the first negative one — and then stop for good.
+// The record is also final. Resolution 5 of the 28th CGPM (2026) makes UTC
+// continuous from 20 May 2027, and IERS Bulletin C 72 announced no leap second
+// before it, so this table gains no more rows (#879).
 //
 // That makes it the one place where a golden table is genuinely ground truth
 // rather than a snapshot of current behavior, and where pinning it is

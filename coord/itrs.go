@@ -22,7 +22,8 @@ import (
 //   - **Earth rotation angle**, the daily spin, which is by far the largest
 //     term and is driven by UT1 rather than by a uniform clock — which is why
 //     DUT1 matters and why a missing IERS bulletin costs up to 0.9 s of
-//     rotation, about 14 arcseconds at the equator.
+//     rotation, about 14 arcseconds at the equator, while leap seconds bound
+//     UT1−UTC — and whatever it has drifted to after they end on 2027-05-20.
 //   - **Polar motion**, the wander of the rotation axis within the Earth
 //     itself, a few tenths of an arcsecond of Chandler and annual wobble.
 //
