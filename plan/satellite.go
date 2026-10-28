@@ -276,12 +276,29 @@ func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, e
 }
 
 // SatellitePass represents a single pass of a satellite over an observer.
+//
+// A pass already above the minimum elevation when the search window opens,
+// or still above it when the window closes, is cut off at that edge rather
+// than dropped: its Rise or Set is then the window's start or end, not a
+// crossing, and RiseCutOff or SetCutOff says so. Its Culmination is the
+// highest point inside the window, which on a cut-off pass can be the edge
+// itself, and its Duration is the time inside the window.
 type SatellitePass struct {
 	Name        string        // Satellite name
-	Rise        PassEvent     // AOS (Acquisition of Signal)
+	Rise        PassEvent     // AOS (Acquisition of Signal), or the window's start
 	Culmination PassEvent     // TCA (Time of Closest Approach / max elevation)
-	Set         PassEvent     // LOS (Loss of Signal)
-	Duration    time.Duration // Total pass duration
+	Set         PassEvent     // LOS (Loss of Signal), or the window's end
+	Duration    time.Duration // Total pass duration, inside the window
+
+	// RiseCutOff reports that the satellite was already above the minimum
+	// elevation when the window opened, so Rise is the window's start and the
+	// real rise is earlier.
+	RiseCutOff bool
+
+	// SetCutOff reports that the satellite was still above the minimum
+	// elevation when the window closed, so Set is the window's end and the
+	// real set is later.
+	SetCutOff bool
 }
 
 // PassEvent captures a time + topocentric coordinates for pass events.
@@ -293,7 +310,10 @@ type PassEvent struct {
 }
 
 // SatellitePasses computes all passes of a satellite over an observer site
-// within the given time window, filtered by minimum elevation.
+// within the given time window, filtered by minimum elevation. A pass in
+// progress when the window opens or closes is cut off at that edge and
+// marked, as [SatellitePass] describes, so a window opened during a pass, or
+// lying wholly inside one, still returns it (#896).
 //
 // The function uses a grid-sampling approach with 30-second steps (appropriate
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
@@ -410,6 +430,40 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 		currentPass *SatellitePass
 	)
 
+	// closePass ends the pass in progress at setTime, a set crossing or the
+	// window's end, and finds its culmination between its two ends.
+	closePass := func(setTime time.Time) error {
+		var err error
+
+		if currentPass.Set, err = passEvent(setTime); err != nil {
+			return fmt.Errorf("set: %w", err)
+		}
+
+		currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
+
+		if currentPass.Culmination, err = findCulmination(prov, id, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
+			return fmt.Errorf("culmination: %w", err)
+		}
+
+		passes = append(passes, *currentPass)
+		currentPass = nil
+
+		return nil
+	}
+
+	// A pass already above the threshold when the window opens has no rise
+	// crossing inside it. Until #896 its set was then ignored and the pass
+	// dropped, so asking during a pass found none. It is opened at the
+	// window's start instead, and marked.
+	if vals[0] > 0 {
+		rise, err := passEvent(times[0])
+		if err != nil {
+			return nil, fmt.Errorf("satellite passes: window start: %w", err)
+		}
+
+		currentPass = &SatellitePass{Name: name, Rise: rise, RiseCutOff: true}
+	}
+
 	// The samples bracket each crossing, so every failure from here on is the
 	// propagation failing, and is returned: a pass dropped, or reported
 	// without its culmination, is indistinguishable from a sky without one
@@ -439,19 +493,19 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 				return nil, fmt.Errorf("satellite passes: set near %v: %w", times[i], err)
 			}
 
-			if currentPass.Set, err = passEvent(setTime); err != nil {
-				return nil, fmt.Errorf("satellite passes: set: %w", err)
+			if err := closePass(setTime); err != nil {
+				return nil, fmt.Errorf("satellite passes: %w", err)
 			}
+		}
+	}
 
-			currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
+	// And one still above it when the window closes is closed at the
+	// window's end, which the last sample always is.
+	if currentPass != nil {
+		currentPass.SetCutOff = true
 
-			// Find culmination (max elevation) between rise and set.
-			if currentPass.Culmination, err = findCulmination(prov, id, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
-				return nil, fmt.Errorf("satellite passes: culmination: %w", err)
-			}
-
-			passes = append(passes, *currentPass)
-			currentPass = nil
+		if err := closePass(times[len(times)-1]); err != nil {
+			return nil, fmt.Errorf("satellite passes: window end: %w", err)
 		}
 	}
 

@@ -159,9 +159,21 @@ func main() {
 
 		for i, pass := range passes {
 			fmt.Printf("  ┌─── Pass %d ──────────────────────────────────────────────┐\n", i+1)
-			printPassEvent("AOS (Rise)", pass.Rise, loc)
+			// A pass in progress when the 24 hours begin or end is cut off
+			// there: its first or last event is the window's edge, not a
+			// rise or a set.
+			riseLabel, setLabel := "AOS (Rise)", "LOS (Set) "
+			if pass.RiseCutOff {
+				riseLabel = "Win. start"
+			}
+
+			if pass.SetCutOff {
+				setLabel = "Win. end  "
+			}
+
+			printPassEvent(riseLabel, pass.Rise, loc)
 			printPassEvent("TCA (Max) ", pass.Culmination, loc)
-			printPassEvent("LOS (Set) ", pass.Set, loc)
+			printPassEvent(setLabel, pass.Set, loc)
 			fmt.Printf("  │  Duration:    %s\n", fmtDuration(pass.Duration))
 			fmt.Println("  └──────────────────────────────────────────────────────────┘")
 
