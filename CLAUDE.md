@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 go test ./...                       # all packages, default (unit) tests
 go test ./coord/...                 # single package
 go test -run TestCIRSToObserved ./coord/...      # single test by name
-go test -race -short -count=1 ./... # race detector (CI runs this)
+go test -race -short -count=1 ./... # race detector (CI runs this in two shards, without internal/docsguard)
 
 # Build-tagged test suites (see "Build tags" below)
 go test -tags=integration ./...     # tests against external APIs / offline caches

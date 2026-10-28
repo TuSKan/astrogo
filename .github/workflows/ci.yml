@@ -212,9 +212,26 @@ jobs:
         shell: bash
         run: bash ./.github/scripts/api-diff.sh "$(git rev-parse HEAD^1)" "${{ github.event.pull_request.number }}"
 
-  race-detection:
-    name: Race Detection
+  # The race detector runs on two runners, and Race Detection, the check the
+  # main branch requires, passes when both do (#888).
+  #
+  # Split because one runner was six and a half minutes of four CPUs shared
+  # by everything: plan alone takes about as long as every other package
+  # together, so it gets a runner to itself and the rest share the other.
+  # Splitting runners is safe here for the same reason it is for the
+  # benchmarks: each test still runs exactly as it did.
+  #
+  # internal/docsguard is left out of the race run. It checks files and runs
+  # go build, has no shared state for the detector to find a race in, and
+  # cost this job two minutes of CPU; the ordinary job runs it on every OS.
+  race-shard:
+    name: Race shard (${{ matrix.shard }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [plan, others]
 
     steps:
       - name: Checkout code
@@ -228,8 +245,86 @@ jobs:
           go-version: '1.27'
           cache: true
 
+      # -json, so the next step can say where the time went (#888): a test that
+      # grows under the race detector is otherwise invisible until it times
+      # out, as plan did in #763. The log below is what go test would have
+      # printed: every package's result line, every failing test's output in
+      # full, and any build output.
       - name: Run tests with race detector
-        run: go test -race -short -count=1 ./...
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -uo pipefail
+
+          module=github.com/TuSKan/astrogo
+          if [ "$SHARD" = plan ]; then
+            packages=$module/plan
+          else
+            packages=$(go list ./... | grep -v -x -e "$module/plan" -e "$module/internal/docsguard")
+          fi
+
+          # shellcheck disable=SC2086 # one package path per word
+          go test -race -short -count=1 -json $packages > race.json
+          status=$?
+
+          jq -rj --slurp '
+            (map(select(.Action == "fail" and .Test != null) | {key: "\(.Package) \(.Test)", value: true})
+              | from_entries) as $failed
+            | .[]
+            | select(.Action == "build-output"
+                or (.Action == "output" and (.Test == null or $failed["\(.Package) \(.Test)"])))
+            | .Output' race.json || status=1
+
+          exit "$status"
+
+      - name: Report the slowest tests
+        if: always()
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+
+          [ -s race.json ] || exit 0
+
+          # Seconds, package, test: one row per line, slowest first. A
+          # parallel test's time includes waiting for a slot, so read these
+          # as where the time went rather than as each test's own cost.
+          # Subtests are ranked with the rest: a parent whose subtests are
+          # parallel returns before they run and reports almost nothing,
+          # which is how fourteen seconds of kepler's oracle sweep went
+          # unseen (#888).
+          rows() {
+            jq -r "$1"' | [.Elapsed, (.Package | sub("^github.com/TuSKan/astrogo/?"; "")), .Test // ""] | @tsv' race.json \
+              | sort -t$'\t' -k1,1 -rn \
+              | awk -F'\t' -v n="$2" 'NR <= n { printf "| %.1f | `%s` | %s |\n", $1, ($2 == "" ? "." : $2), $3 }'
+          }
+
+          # Into the job summary, and the log too, where gh run view can read it.
+          {
+            echo "## Race detector, $SHARD: where the time went"
+            echo
+            echo "| seconds | package | |"
+            echo "|---:|---|---|"
+            rows 'select((.Action == "pass" or .Action == "fail") and .Test == null and .Elapsed != null)' 10
+            echo
+            echo "| seconds | package | test or subtest |"
+            echo "|---:|---|---|"
+            rows 'select((.Action == "pass" or .Action == "fail") and .Test != null)' 25
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  race-detection:
+    name: Race Detection
+    runs-on: ubuntu-latest
+    needs: race-shard
+    if: always()
+
+    steps:
+      - name: Every shard passed
+        env:
+          RESULT: ${{ needs.race-shard.result }}
+        run: |
+          echo "race shards: $RESULT"
+          [ "$RESULT" = success ]
 
   # These numbers are recorded and compared, but nothing here fails a build.
   #

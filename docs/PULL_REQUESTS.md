@@ -282,7 +282,7 @@ across a list.
 | check | note |
 | :--- | :--- |
 | Lint and Test | three platforms; the untagged lint trap in §5 lands here |
-| Race Detection | `-race -short` |
+| Race Detection | `-race -short`, on two runners: `plan`, and everything else but `internal/docsguard`. Each shard's summary lists its slowest packages and tests |
 | Integration Tests | external APIs; see §7 before assuming it is your change |
 | codecov/patch | 70% of changed lines |
 | codecov/project | 70% floor, not a ratchet |

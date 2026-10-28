@@ -61,8 +61,15 @@ func stateContractStart(t *testing.T, mu, e, tau float64) (r, v [3]float64) {
 // TestFromStateContract propagates states on fourteen conics, from the circle
 // to e = 5, started at four places on each, over intervals from 10⁻⁶ to 10⁶
 // days either side, within half a period on an ellipse, and holds every one
-// to the oracle: every second decade, or under -short every third and from
-// two of the four places. One subtest per conic, in parallel.
+// to the oracle: every second decade from all four places. One subtest per
+// conic, in parallel.
+//
+// Under -short it takes every fourth decade from one place, the one away from
+// perihelion, where the state's r·v term matters and an open orbit starts 3000
+// days out. That is still every conic. -short is what the race job runs, and
+// the oracle's 256-bit arithmetic is single-goroutine work the race detector
+// slows about ninefold and can never fault: the full sweep cost that job some
+// two minutes (#888), and the ordinary job runs all of it on every OS.
 func TestFromStateContract(t *testing.T) {
 	t.Parallel()
 
@@ -70,7 +77,7 @@ func TestFromStateContract(t *testing.T) {
 
 	decades, places := 2, []int{0, 1, 2, 3}
 	if testing.Short() {
-		decades, places = 3, []int{0, 3}
+		decades, places = 4, []int{3}
 	}
 
 	probe, err := FromState(epoch, vector.V3(1, 0, 0), vector.V3(0, 0.017, 0), sunCenter)
