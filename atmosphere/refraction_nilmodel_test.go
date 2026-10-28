@@ -216,6 +216,66 @@ func TestRefractionBennettDispersesLikeSOFA(t *testing.T) {
 	}
 }
 
+// TestZeroWavelengthRefractsAtTheVisualDefault: a zero Wavelength is the
+// visual default, 0.55 µm, as a nil Model is the default model.
+//
+// Until #904 a zero reached SOFA's iauRefco as given, which clamps a
+// wavelength to 0.1 µm: twice the refraction, 114.29″ against 57.08″ at 45°.
+// Every Builder-made Atmosphere carried that zero, so SurfaceAtAltitude's air
+// refracted twice as much as the AtAltitude air it was built from.
+func TestZeroWavelengthRefractsAtTheVisualDefault(t *testing.T) {
+	t.Parallel()
+
+	std := atmosphere.StandardRefraction()
+	zero := std
+	zero.Wavelength = 0
+
+	if got := zero.EffectiveWavelength(); got != std.Wavelength {
+		t.Fatalf("a zero wavelength is effectively %g µm, want the standard %g", got, std.Wavelength)
+	}
+
+	// The same computation once the default is substituted, so to the bit,
+	// from 10° up, where SOFA's A·tan z + B·tan³ z is all there is. Below,
+	// it hands over to Bennett-NA, which reads a zero as its own wavelength,
+	// the almanac's 0.50169 µm, and so refracts 0.4% less than at 0.55.
+	for _, deg := range []float64{90, 45, 20, 10} {
+		alt := angle.Deg(deg)
+
+		if got, want := zero.RefractFromTrue(alt), std.RefractFromTrue(alt); got != want {
+			t.Errorf("%v° true: a zero wavelength refracts %.3f″, the standard air %.3f″",
+				deg, got.Arcseconds(), want.Arcseconds())
+		}
+
+		if got, want := zero.RefractFromApparent(alt), std.RefractFromApparent(alt); got != want {
+			t.Errorf("%v° apparent: a zero wavelength refracts %.3f″, the standard air %.3f″",
+				deg, got.Arcseconds(), want.Arcseconds())
+		}
+	}
+
+	// What a Builder makes is the air AtAltitude describes. The builder sets
+	// no humidity, which moves the refraction by about 0.1%; the wavelength
+	// moved it by a factor of two.
+	built, err := atmosphere.NewBuilder().SurfaceAtAltitude(2635).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	got, isa := built.Refraction(), atmosphere.AtAltitude(2635)
+
+	if got.Wavelength != isa.Wavelength {
+		t.Errorf("a built atmosphere refracts at %g µm, AtAltitude at %g", got.Wavelength, isa.Wavelength)
+	}
+
+	for _, deg := range []float64{45, 20} {
+		r, want := got.RefractFromTrue(angle.Deg(deg)), isa.RefractFromTrue(angle.Deg(deg))
+
+		if ratio := r.Arcseconds() / want.Arcseconds(); math.Abs(ratio-1) > 0.005 {
+			t.Errorf("%v°: the built atmosphere refracts %.3f″, AtAltitude's air %.3f″ (×%.3f)",
+				deg, r.Arcseconds(), want.Arcseconds(), ratio)
+		}
+	}
+}
+
 // fractionalDispersion is the refraction difference between 0.40 and 0.70 µm
 // as a fraction of the refraction at 0.55 µm, under env's model.
 func fractionalDispersion(env atmosphere.Refraction, alt angle.Angle) float64 {

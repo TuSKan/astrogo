@@ -315,7 +315,11 @@ type Builder struct {
 // NewBuilder starts a builder with standard-atmosphere defaults (1013.25
 // hPa, 288.15 K), no aerosol, no clouds, zero albedo.
 func NewBuilder() *Builder {
-	return &Builder{s: Atmosphere{surface: Refraction{Pressure: 1013.25, Temperature: 288.15 - 273.15}}}
+	// The wavelength is set so that a built atmosphere says what it refracts
+	// at; a zero would refract there too, through EffectiveWavelength (#904).
+	return &Builder{s: Atmosphere{surface: Refraction{
+		Pressure: 1013.25, Temperature: 288.15 - 273.15, Wavelength: standardWavelength,
+	}}}
 }
 
 // Surface sets surface pressure (hPa) and temperature (K) on the Atmosphere's
