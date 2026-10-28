@@ -445,7 +445,9 @@ type Provider interface {
 
 The record cache goes into `spk`; `AstrometricState` takes the Earth from
 `p.State(SolarSystemBarycenter, t)` once #809 maps it; Kepler takes its Earth
-from the base (#810).
+from the base (#810). (Written against the interface as it was: #803 since
+renamed `State` to `Locate` and replaced `AstrometricState` with
+`Instant.Astrometric`.)
 
 - **For:** no caller changes; most of 6.2.3's gain.
 - **Against:** a geocentric-only interface cannot say "about Neptune", so a

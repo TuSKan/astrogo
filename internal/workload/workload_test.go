@@ -54,7 +54,7 @@ func apparentPlace(p core.Provider, id core.ID, t time.Time) (core.State, error)
 
 // measure runs op once outside the clock — the first call of anything pays
 // for lazy loads that are not its cost — zeroes the counters, times op, and
-// reports what one op cost in State calls and kernel reads. Either
+// reports what one op cost in Locate calls and kernel reads. Either
 // counter may be nil.
 func measure(b *testing.B, cp *countingProvider, f *readCounter, op func() error) {
 	b.Helper()
@@ -146,7 +146,7 @@ func BenchmarkOneBodyOneEpoch(b *testing.B) {
 
 // BenchmarkSkyOneEpoch (B2): many bodies at one epoch, a planner's sky at one
 // instant, from one Instant: the Earth is located once for the whole sky
-// (#803), where each geocentric State used to re-derive it.
+// (#803), where each geocentric lookup used to re-derive it.
 func BenchmarkSkyOneEpoch(b *testing.B) {
 	geometric := func(in *eph.Instant, id core.ID) error {
 		_, err := in.Geometric(id, eph.Earth)
@@ -423,7 +423,7 @@ func BenchmarkSkyFromSite(b *testing.B) {
 }
 
 // BenchmarkEventSearch (B7): plan's root finders call the provider many times
-// per event, and that count is what a faster State would divide.
+// per event, and that count is what a faster Locate would divide.
 func BenchmarkEventSearch(b *testing.B) {
 	site, err := plan.NewSite("Barcelona", barcelona(b))
 	if err != nil {
@@ -516,7 +516,7 @@ func BenchmarkSatellite(b *testing.B) {
 		})
 	})
 
-	// The same through a Context, as a look angle takes it (#812): StateCtx
+	// The same through a Context, as a look angle takes it (#812): LocateCtx
 	// with the precession-nutation the Context holds. The pass moves one
 	// Context minute by minute, rebuilding it each hour, as plan's pass search
 	// does.

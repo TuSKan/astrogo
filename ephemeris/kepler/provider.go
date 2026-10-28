@@ -82,11 +82,8 @@ func New(opts ...Option) *Provider {
 // satellite modifier, and [PlutoElements], which are fitted rather than
 // osculating, are kept as given.
 //
-// Not safe to call concurrently with State — populate every body a
-// Provider will ever answer before sharing it across concurrent
-// readers (e.g. plan.VisibleTonight's candidate-gathering pipeline
-// registers every Kepler-eligible candidate sequentially before its
-// concurrent evaluation phase begins reading via State).
+// Not safe to call concurrently with Locate: register every body a
+// Provider will ever answer before sharing it across concurrent readers.
 func (p *Provider) Register(id core.ID, el Elements) error {
 	if err := el.Validate(); err != nil {
 		return err
