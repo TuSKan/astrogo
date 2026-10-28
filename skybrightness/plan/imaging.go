@@ -167,6 +167,20 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // carry; what this returns is the depth reached for a sky-colored source,
 // which is the same convention a sky-limited exposure-time calculator uses.
 //
+// # Above the atmosphere, as a catalog quotes it
+//
+// The calibration above is made at the ground: the surface brightness and the
+// electrons are both the sky that reaches the instrument. A target's catalog
+// or ephemeris magnitude is not; it is the light before the air dims it, and
+// that is what [plan.LimitingMagnitudeConstraint] compares this against. So
+// the source is dimmed along its own line of sight first, by the scene's own
+// air through [atmosphere.Atmosphere.ExtinctionToward] at every wavelength,
+// weighted by the sky-colored spectrum and the instrument's response, and the
+// magnitude returned is the one above the atmosphere. Until #893 it was the
+// one at the ground, deeper by the target's whole extinction. Measured at
+// Paranal through a V filter, that was 0.11 mag at the zenith and 0.57 at ten
+// degrees, where V's own extinction is 0.11 and 0.60.
+//
 // # Put the filter in the throughput, or the band label is a half-truth
 //
 // The two halves of the calibration are measured over different wavelength
@@ -181,9 +195,12 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // internally consistent — a sky-colored source really would produce that
 // rate — but it is not a filter magnitude, and it does not respond to airmass
 // the way one would: extinction is wavelength-dependent, so a broadband rate
-// and a V-band brightness diverge as a target sinks. Measured at Paranal, a
-// filterless setup lost only 0.09 magnitudes of depth between the zenith and
-// ten degrees where the V-band sky brightened by 0.69.
+// and a V-band brightness diverge as a target sinks. Measured at Paranal
+// between the zenith and ten degrees, where the V-band sky brightens by 0.69,
+// a V filter loses 0.79 magnitudes of depth and a filterless setup only 0.24.
+// The target's own dimming is part of the gap: a dark sky is red, so is the
+// sky-colored source, and through no filter the air takes 0.06 mag of it at
+// the zenith and 0.21 at ten degrees, against V's 0.11 and 0.57.
 //
 // So declare the filter. [Imaging.Band] reports which one the magnitudes are
 // on, and the answer is fully meaningful only when the instrument passes that
@@ -225,21 +242,70 @@ func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64
 			ErrSpec, float64(background), float64(signal))
 	}
 
+	transmitted, err := targetTransmission(scene.Atmosphere, est, i.spec.Instrument, alt)
+	if err != nil {
+		return 0, fmt.Errorf("skybrightness/plan: target extinction: %w", err)
+	}
+
 	return limitingMagnitude(surface, i.pixelArcsec2,
-		float64(background), float64(signal)), nil
+		float64(background), float64(signal), transmitted), nil
 }
 
 // limitingMagnitude is the conversion described above, split out so it can be
 // checked against worked arithmetic without a radiance engine, a network and
-// 145 MB of reference data standing between the test and the four numbers it
+// 145 MB of reference data standing between the test and the five numbers it
 // is actually about.
-func limitingMagnitude(surfaceMag, pixelArcsec2, background, signal float64) float64 {
+func limitingMagnitude(surfaceMag, pixelArcsec2, background, signal, transmitted float64) float64 {
 	// What one pixel's worth of sky would be as a point source.
 	pixelMag := surfaceMag - 2.5*math.Log10(pixelArcsec2)
 
 	// That pixel produces `background` electrons per second, so `signal`
-	// electrons per second is this much fainter.
-	return pixelMag + 2.5*math.Log10(background/signal)
+	// electrons per second is this much fainter at the ground, and brighter
+	// than that above the air, which passes only `transmitted` of it.
+	return pixelMag + 2.5*math.Log10(background/signal) + 2.5*math.Log10(transmitted)
+}
+
+// targetTransmission is the fraction of a sky-colored source's detected
+// photons that survive the air between it and the instrument, arriving from
+// apparent altitude alt: the estimate's spectrum dimmed by
+// [atmosphere.Atmosphere.ExtinctionToward] at each wavelength, against the
+// same spectrum undimmed, both through the instrument's own response.
+//
+// The sky's own spectrum, because that is the color LimitingMagnitudeAt
+// already assumes the source has; and the instrument's response rather than
+// the band's, because it is the instrument's electrons the threshold counts.
+func targetTransmission(
+	air *atmosphere.Atmosphere, est *skybrightness.Estimate, inst optics.Instrument, alt angle.Angle,
+) (float64, error) {
+	grid := est.Grid()
+	sky := est.SpectralRadiance()
+	dimmed := make([]float64, grid.Len())
+
+	for k := range dimmed {
+		a, err := air.ExtinctionToward(grid.At(k), alt)
+		if err != nil {
+			return 0, err
+		}
+
+		dimmed[k] = sky[k] * math.Pow(10, -0.4*a)
+	}
+
+	through, err := inst.PhotonRate(dimmed, grid)
+	if err != nil {
+		return 0, err
+	}
+
+	all, err := est.PhotonRate(inst)
+	if err != nil {
+		return 0, err
+	}
+
+	if !(through > 0) || !(all > 0) {
+		return 0, fmt.Errorf("%w: %g of %g photons survive the air at %v",
+			ErrSpec, float64(through), float64(all), alt)
+	}
+
+	return float64(through) / float64(all), nil
 }
 
 // Band names the passband the returned magnitudes are quoted on.

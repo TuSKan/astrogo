@@ -10,6 +10,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/magnitude"
@@ -346,6 +347,142 @@ func TestDepthFollowsTheSky(t *testing.T) {
 	}
 
 	t.Logf("depth at 85° = %.3f, at 20° = %.3f", high, low)
+}
+
+// groundDepth rebuilds, from the same public pieces LimitingMagnitudeAt uses,
+// the depth at the ground: what a source must deliver after the air, quoted
+// on the sky's magnitude scale. It returns the scene too, so a test can ask
+// the scene's own air what it takes.
+func groundDepth(
+	t *testing.T, sky *localSky, spec sbplan.Spec, when time.Time, alt, az angle.Angle,
+) (float64, *skybrightness.Scene) {
+	t.Helper()
+
+	scene, err := sky.Scene(spec.Site, when.GoTime(), spec.Air)
+	if err != nil {
+		t.Fatalf("Scene: %v", err)
+	}
+
+	est, err := sky.Direction(context.Background(), scene, alt, az)
+	if err != nil {
+		t.Fatalf("Direction: %v", err)
+	}
+
+	surface, err := sky.SurfaceBrightness(est)
+	if err != nil {
+		t.Fatalf("SurfaceBrightness: %v", err)
+	}
+
+	background, err := est.ElectronRate(spec.Instrument)
+	if err != nil {
+		t.Fatalf("ElectronRate: %v", err)
+	}
+
+	signal, err := spec.Instrument.LimitingSignal(background, spec.Exposure, spec.AperturePixels, spec.SNR)
+	if err != nil {
+		t.Fatalf("LimitingSignal: %v", err)
+	}
+
+	pixelArcsec2 := spec.Instrument.PixelSolidAngle.Steradians() / constants.ArcsecondSquaredToSteradian
+
+	return sbplan.LimitingMagnitude(surface, pixelArcsec2, float64(background), float64(signal), 1), scene
+}
+
+// TestDepthIsQuotedAboveTheAtmosphere: the depth is compared against catalog
+// and ephemeris magnitudes, which are the light before the air dims it, so
+// the source is dimmed along its own line of sight before the comparison.
+// Until #893 it was not, and the depth was too deep by the target's whole
+// extinction.
+//
+// The instrument sees one wavelength, 550 nm, so the dimming has one right
+// answer and no weighting to hide behind: exactly what
+// atmosphere.ExtinctionToward says the scene's own air takes there.
+func TestDepthIsQuotedAboveTheAtmosphere(t *testing.T) {
+	sky := newLocalSky(t)
+	spec := testSpec(t, sky)
+	spec.Air = atmosphere.RuralAerosol(2635, atmosphere.CleanMountainAOD550)
+	spec.Instrument.Throughput = []optics.Throughput{{
+		Name:         "550 nm line filter",
+		WavelengthNM: []unit.WavelengthNM{549, 550, 551},
+		Efficiency:   []float64{0, 1, 0},
+		Reference:    "synthetic, for tests",
+	}}
+
+	img, err := sbplan.NewImaging(spec)
+	if err != nil {
+		t.Fatalf("NewImaging: %v", err)
+	}
+
+	when := testEpoch()
+
+	for _, deg := range []float64{90, 20} {
+		alt, az := angle.Deg(deg), angle.Deg(0)
+
+		got, err := img.LimitingMagnitudeAt(when, alt, az)
+		if err != nil {
+			t.Fatalf("LimitingMagnitudeAt(%v°): %v", deg, err)
+		}
+
+		ground, scene := groundDepth(t, sky, spec, when, alt, az)
+
+		extinction, err := scene.Atmosphere.ExtinctionToward(550, alt)
+		if err != nil {
+			t.Fatalf("ExtinctionToward: %v", err)
+		}
+
+		// A canary: air this fixture cannot tell from none would let the
+		// comparison below pass with the term missing.
+		if extinction < 0.05 {
+			t.Fatalf("the fixture's air takes only %.4f mag at %v°", extinction, deg)
+		}
+
+		if shift := ground - got; math.Abs(shift-extinction) > 1e-9 {
+			t.Errorf("at %v° the depth is %.6f mag shallower than at the ground, want the "+
+				"air's %.6f at 550 nm", deg, shift, extinction)
+		}
+	}
+}
+
+// TestDepthDimsABandWithinItsEdges: through a filter the dimming is an
+// average over the wavelengths the instrument sees, so it lies between what
+// the air takes at the filter's two edges. Weighting by the wrong response,
+// the whole grid rather than the filter's part of it, puts it outside.
+func TestDepthDimsABandWithinItsEdges(t *testing.T) {
+	sky := newLocalSky(t)
+	spec := testSpec(t, sky)
+	spec.Air = atmosphere.RuralAerosol(2635, atmosphere.CleanMountainAOD550)
+
+	img, err := sbplan.NewImaging(spec)
+	if err != nil {
+		t.Fatalf("NewImaging: %v", err)
+	}
+
+	when := testEpoch()
+	alt, az := angle.Deg(20), angle.Deg(0)
+
+	got, err := img.LimitingMagnitudeAt(when, alt, az)
+	if err != nil {
+		t.Fatalf("LimitingMagnitudeAt: %v", err)
+	}
+
+	ground, scene := groundDepth(t, sky, spec, when, alt, az)
+
+	// testInstrument's filter passes 500 to 600 nm, and extinction falls
+	// toward the red.
+	red, err := scene.Atmosphere.ExtinctionToward(600, alt)
+	if err != nil {
+		t.Fatalf("ExtinctionToward(600): %v", err)
+	}
+
+	blue, err := scene.Atmosphere.ExtinctionToward(500, alt)
+	if err != nil {
+		t.Fatalf("ExtinctionToward(500): %v", err)
+	}
+
+	if shift := ground - got; !(shift > red && shift < blue) {
+		t.Errorf("the band is dimmed %.4f mag, outside its edges' %.4f (600 nm) to %.4f (500 nm)",
+			shift, red, blue)
+	}
 }
 
 // TestLimitingMagnitudeAtReportsWhichStepFailed: several things can fail

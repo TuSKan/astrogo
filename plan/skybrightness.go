@@ -41,6 +41,10 @@ const defaultLimMagRamp = 0.5
 type SkyDepth interface {
 	// LimitingMagnitudeAt returns the faintest detectable magnitude looking
 	// at (alt, az) at time t. A brighter sky gives a smaller number.
+	//
+	// The magnitude is the one above the atmosphere, which is what a catalog
+	// and an ephemeris quote and what the constraint compares it against, so
+	// an implementation dims the source by the air toward (alt, az) itself.
 	LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error)
 }
 
