@@ -260,10 +260,14 @@ jobs:
           # Seconds, package, test: one row per line, slowest first. A
           # parallel test's time includes waiting for a slot, so read these
           # as where the time went rather than as each test's own cost.
+          # Subtests are ranked with the rest: a parent whose subtests are
+          # parallel returns before they run and reports almost nothing,
+          # which is how fourteen seconds of kepler's oracle sweep went
+          # unseen (#888).
           rows() {
             jq -r "$1"' | [.Elapsed, (.Package | sub("^github.com/TuSKan/astrogo/?"; "")), .Test // ""] | @tsv' race.json \
-              | sort -t$'\t' -k1,1 -rn | head -n "$2" \
-              | awk -F'\t' '{ printf "| %.1f | `%s` | %s |\n", $1, ($2 == "" ? "." : $2), $3 }'
+              | sort -t$'\t' -k1,1 -rn \
+              | awk -F'\t' -v n="$2" 'NR <= n { printf "| %.1f | `%s` | %s |\n", $1, ($2 == "" ? "." : $2), $3 }'
           }
 
           {
@@ -273,9 +277,9 @@ jobs:
             echo "|---:|---|---|"
             rows 'select((.Action == "pass" or .Action == "fail") and .Test == null and .Elapsed != null)' 10
             echo
-            echo "| seconds | package | test |"
+            echo "| seconds | package | test or subtest |"
             echo "|---:|---|---|"
-            rows 'select((.Action == "pass" or .Action == "fail") and .Test != null and (.Test | contains("/") | not))' 20
+            rows 'select((.Action == "pass" or .Action == "fail") and .Test != null)' 25
           } >> "$GITHUB_STEP_SUMMARY"
 
   # These numbers are recorded and compared, but nothing here fails a build.
