@@ -228,8 +228,55 @@ jobs:
           go-version: '1.27'
           cache: true
 
+      # -json, so the next step can say where the time went (#888): a test that
+      # grows under the race detector is otherwise invisible until it times
+      # out, as plan did in #763. The log below is what go test would have
+      # printed: every package's result line, every failing test's output in
+      # full, and any build output.
       - name: Run tests with race detector
-        run: go test -race -short -count=1 ./...
+        run: |
+          set -uo pipefail
+
+          go test -race -short -count=1 -json ./... > race.json
+          status=$?
+
+          jq -rj --slurp '
+            (map(select(.Action == "fail" and .Test != null) | {key: "\(.Package) \(.Test)", value: true})
+              | from_entries) as $failed
+            | .[]
+            | select(.Action == "build-output"
+                or (.Action == "output" and (.Test == null or $failed["\(.Package) \(.Test)"])))
+            | .Output' race.json || status=1
+
+          exit "$status"
+
+      - name: Report the slowest tests
+        if: always()
+        run: |
+          set -euo pipefail
+
+          [ -s race.json ] || exit 0
+
+          # Seconds, package, test: one row per line, slowest first. A
+          # parallel test's time includes waiting for a slot, so read these
+          # as where the time went rather than as each test's own cost.
+          rows() {
+            jq -r "$1"' | [.Elapsed, (.Package | sub("^github.com/TuSKan/astrogo/?"; "")), .Test // ""] | @tsv' race.json \
+              | sort -t$'\t' -k1,1 -rn | head -n "$2" \
+              | awk -F'\t' '{ printf "| %.1f | `%s` | %s |\n", $1, ($2 == "" ? "." : $2), $3 }'
+          }
+
+          {
+            echo "## Race detector: where the time went"
+            echo
+            echo "| seconds | package | |"
+            echo "|---:|---|---|"
+            rows 'select((.Action == "pass" or .Action == "fail") and .Test == null and .Elapsed != null)' 10
+            echo
+            echo "| seconds | package | test |"
+            echo "|---:|---|---|"
+            rows 'select((.Action == "pass" or .Action == "fail") and .Test != null and (.Test | contains("/") | not))' 20
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # These numbers are recorded and compared, but nothing here fails a build.
   #
