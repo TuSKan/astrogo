@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// stateOnly is a provider with State alone, which is all LookAngle sees of a
+// stateOnly is a provider with Locate alone, which is all LookAngle sees of a
 // planet's provider. The probes below wrap the satellite in it to stay on that
 // route: the satellite's own takes its precession-nutation from the Context,
 // so through a moved Context it answers almost exactly as through a fresh one
@@ -21,10 +21,10 @@ import (
 type stateOnly struct{ eph.Provider }
 
 // TestLookAngleTakesASatelliteFromTheContext: given a satellite, LookAngle
-// places it through the Context's own precession-nutation, StateCtx, rather
-// than State's fresh evaluation at the Context's instant. A moved Context is
+// places it through the Context's own precession-nutation, LocateCtx, rather
+// than Locate's fresh evaluation at the Context's instant. A moved Context is
 // the probe, since there the two differ; exact equality, since the value must
-// be StateCtx's through this Context and nothing else.
+// be LocateCtx's through this Context and nothing else.
 func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 	sat, err := satellite.NewFromTLE("ISS (ZARYA)", issLine1, issLine2)
 	if err != nil {
@@ -45,7 +45,7 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 
 		st, err := sat.LocateCtx(sat.ID(), derived)
 		if err != nil {
-			t.Fatalf("StateCtx: %v", err)
+			t.Fatalf("LocateCtx: %v", err)
 		}
 
 		want := derived.GeocentricToObserved(st.Pos)
@@ -56,7 +56,7 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 		}
 
 		if got.Alt() != want.Alt() || got.Az() != want.Az() {
-			t.Errorf("dt=%v: LookAngle returned alt %v az %v, but StateCtx through the "+
+			t.Errorf("dt=%v: LookAngle returned alt %v az %v, but LocateCtx through the "+
 				"Context gives alt %v az %v (%.4f and %.4f arcsec apart)",
 				dt, got.Alt(), got.Az(), want.Alt(), want.Az(),
 				(got.Alt() - want.Alt()).Arcseconds(), (got.Az() - want.Az()).Arcseconds())
@@ -104,7 +104,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 
 		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 		if err != nil {
-			t.Fatalf("State: %v", err)
+			t.Fatalf("Geometric: %v", err)
 		}
 
 		want := derived.GeocentricToObserved(st.Pos)
@@ -174,7 +174,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 
 		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 		if err != nil {
-			t.Fatalf("State: %v", err)
+			t.Fatalf("Geometric: %v", err)
 		}
 
 		reduction := coord.NewReducer(site, at, defaultAtm).Reduce(st.Pos)

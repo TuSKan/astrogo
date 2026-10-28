@@ -49,7 +49,7 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// 2. Create Provider from Target TLE
 	// ═══════════════════════════════════════════════════════════════════════
-	header("SGP4 Propagation (via Provider.State)")
+	header("SGP4 Propagation (via eph.At(...).Geometric)")
 
 	prov, err := eph.NewProvider(context.Background(), eph.Satellites, target.Name,
 		eph.WithTLE(target.TLELine1, target.TLELine2))

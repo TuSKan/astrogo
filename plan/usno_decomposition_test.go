@@ -258,7 +258,7 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 // geocentricApparent returns the geocentric apparent declination and Greenwich
 // Hour Angle of a body, in degrees, in the navigator's convention.
 //
-// The astrometric place comes from [eph.AstrometricState] — light-time
+// The astrometric place comes from [eph.Instant.Astrometric] — light-time
 // corrected, no aberration — which is what Atci13 expects as input. Atci13
 // then applies precession-nutation, annual aberration and light deflection
 // geocentrically, and returns the equation of the origins alongside.
@@ -269,7 +269,7 @@ func geocentricApparent(t *testing.T, p eph.Provider, id eph.ID, epoch time.Time
 
 	state, err := eph.At(p, epoch).Astrometric(id, eph.Geocenter())
 	if err != nil {
-		t.Fatalf("AstrometricState(%s): %v", id, err)
+		t.Fatalf("Astrometric(%s): %v", id, err)
 	}
 
 	var astrometric coord.Astrometric

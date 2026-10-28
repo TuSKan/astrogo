@@ -53,7 +53,7 @@ func TestRegister_RejectsInvalidElements(t *testing.T) {
 	testutil.AssertErrorIs(t, err, kepler.ErrUnsupportedOrbit)
 }
 
-func TestProvider_State_PropagatedBody(t *testing.T) {
+func TestProvider_Locate_PropagatedBody(t *testing.T) {
 	const id core.ID = 1_000_000
 
 	el := testElementsForProvider(t)
@@ -71,9 +71,9 @@ func TestProvider_State_PropagatedBody(t *testing.T) {
 	}
 }
 
-func TestProvider_State_DefaultBase_SunMoonPlanets(t *testing.T) {
+func TestProvider_Locate_DefaultBase_SunMoonPlanets(t *testing.T) {
 	// A propagated ID that never matches any of the queried bodies below,
-	// so every case here exercises Provider.State's delegation to the
+	// so every case here exercises Provider.Locate's delegation to the
 	// default sofaBase, and sofaBase's own per-body switch.
 	const propagatedID core.ID = 1_000_000
 
@@ -102,19 +102,19 @@ func TestProvider_State_DefaultBase_SunMoonPlanets(t *testing.T) {
 		t.Run(b.name, func(t *testing.T) {
 			st, err := eph.At(p, tm).Geometric(b.id, core.Earth)
 			if err != nil {
-				t.Fatalf("State(%s): %v", b.name, err)
+				t.Fatalf("Geometric(%s): %v", b.name, err)
 			}
 
 			// Earth's own geocentric position is ~0 (it's the origin);
 			// every other body must be a real, non-degenerate distance.
 			if b.name != "Earth" && st.Distance() == 0 {
-				t.Errorf("State(%s): Distance() = 0, want a real nonzero geocentric distance", b.name)
+				t.Errorf("Geometric(%s): Distance() = 0, want a real nonzero geocentric distance", b.name)
 			}
 		})
 	}
 }
 
-func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
+func TestProvider_Locate_DefaultBase_UnsupportedBody(t *testing.T) {
 	const propagatedID core.ID = 1_000_000
 
 	p := kepler.New()
@@ -127,7 +127,7 @@ func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
 	// so that a satellite of Pluto can be placed, so the gap it stood for is
 	// gone; an unnamed body still falls through.
 	if _, err := eph.At(p, tm).Geometric(core.PlutoBarycenter, core.Earth); err != nil {
-		t.Errorf("State(Pluto) = %v; the default base answers it now", err)
+		t.Errorf("Geometric(Pluto) = %v; the default base answers it now", err)
 	}
 
 	_, err := eph.At(p, tm).Geometric(core.ID(987_654), core.Earth)
@@ -136,7 +136,7 @@ func TestProvider_State_DefaultBase_UnsupportedBody(t *testing.T) {
 
 // mockBaseProvider is a minimal core.Provider double for verifying
 // WithBase actually overrides the default sofaBase, and that
-// Provider.State wraps a base-provider error rather than passing it
+// Provider.Locate wraps a base-provider error rather than passing it
 // through unwrapped or swallowing it.
 type mockBaseProvider struct {
 	called  bool
@@ -156,7 +156,7 @@ func (m *mockBaseProvider) Locate(core.ID, time.Time) (core.State, error) {
 
 func (m *mockBaseProvider) Close() error { return nil }
 
-func TestProvider_State_WithBase_Override(t *testing.T) {
+func TestProvider_Locate_WithBase_Override(t *testing.T) {
 	const propagatedID core.ID = 1_000_000
 
 	mock := &mockBaseProvider{}
@@ -167,15 +167,15 @@ func TestProvider_State_WithBase_Override(t *testing.T) {
 	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	if _, err := eph.At(p, tm).Geometric(core.Sun, core.Earth); err != nil {
-		t.Fatalf("State(Sun): %v", err)
+		t.Fatalf("Geometric(Sun): %v", err)
 	}
 
 	if !mock.called {
-		t.Error("WithBase's provider was never called — Provider.State did not delegate to it")
+		t.Error("WithBase's provider was never called — Provider.Locate did not delegate to it")
 	}
 }
 
-func TestProvider_State_WithBase_WrapsError(t *testing.T) {
+func TestProvider_Locate_WithBase_WrapsError(t *testing.T) {
 	const propagatedID core.ID = 1_000_000
 
 	mock := &mockBaseProvider{wantErr: errMockBase}
@@ -199,9 +199,8 @@ func TestProvider_Close(t *testing.T) {
 }
 
 // TestProvider_MultiBody confirms two distinct registered bodies on one
-// shared Provider each answer their own State correctly — the core new
-// capability this generalization exists for (plan.VisibleTonight sharing
-// one Provider across every Kepler-eligible candidate in a night's run).
+// shared Provider are each located correctly — the capability this
+// generalization exists for: one Provider answering for many bodies.
 func TestProvider_MultiBody(t *testing.T) {
 	el1 := testElementsForProvider(t)
 
