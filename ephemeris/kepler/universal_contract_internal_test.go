@@ -5,13 +5,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/keplerlab"
+	"github.com/TuSKan/astrogo/internal/oracle"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // The universal path's contract (#833), held against the 256-bit oracle in
-// internal/keplerlab, in the classical contract's shape: the universal anomaly
+// internal/oracle, in the classical contract's shape: the universal anomaly
 // χ within contractUniversalChiULPs of the exact root, and the perifocal state
 // within those ulps carried through ∂state/∂χ, plus contractUniversalStateULPs
 // for the construction — of |r| for the position, and of |v| for the
@@ -62,7 +62,7 @@ func TestUniversalContract(t *testing.T) {
 			}
 
 			for _, d := range []float64{dt, -dt} {
-				wantChi := keplerlab.UniversalExact(q, e, mu, d)
+				wantChi := oracle.UniversalExact(q, e, mu, d)
 
 				chi, err := solveUniversal(q, e, alpha, sqrtMu, d)
 				if err != nil {
@@ -78,8 +78,8 @@ func TestUniversalContract(t *testing.T) {
 					t.Fatalf("e = %v, Δt = %v d: %v", e, d, err)
 				}
 
-				wx, wy, wvx, wvy := keplerlab.UniversalStateExact(q, e, mu, d)
-				r, v := keplerlab.Norm(wx, wy), keplerlab.Norm(wvx, wvy)
+				wx, wy, wvx, wvy := oracle.UniversalStateExact(q, e, mu, d)
+				r, v := oracle.Norm(wx, wy), oracle.Norm(wvx, wvy)
 
 				vScale := v
 				if alpha > 0 {
@@ -90,11 +90,11 @@ func TestUniversalContract(t *testing.T) {
 				posBound := contractUniversalChiULPs*eps*absChi*v*r/math.Sqrt(mu) + contractUniversalStateULPs*eps*r
 				velBound := contractUniversalChiULPs*eps*absChi*math.Sqrt(mu)/r + contractUniversalStateULPs*eps*vScale
 
-				if got := keplerlab.AbsErr(pos.X, pos.Y, wx, wy); !(got <= posBound) || pos.Z != 0 {
+				if got := oracle.AbsErr(pos.X, pos.Y, wx, wy); !(got <= posBound) || pos.Z != 0 {
 					t.Errorf("e = %v, Δt = %v d: position %.3g times its bound from the oracle's", e, d, got/posBound)
 				}
 
-				if got := keplerlab.AbsErr(vel.X, vel.Y, wvx, wvy); !(got <= velBound) || vel.Z != 0 {
+				if got := oracle.AbsErr(vel.X, vel.Y, wvx, wvy); !(got <= velBound) || vel.Z != 0 {
 					t.Errorf("e = %v, Δt = %v d: velocity %.3g times its bound from the oracle's", e, d, got/velBound)
 				}
 			}
@@ -104,7 +104,7 @@ func TestUniversalContract(t *testing.T) {
 
 // relULPs is |got − want|/|want| in units of 2⁻⁵².
 func relULPs(got float64, want *big.Float) float64 {
-	d := new(big.Float).SetPrec(keplerlab.Prec).SetFloat64(got)
+	d := new(big.Float).SetPrec(oracle.Prec).SetFloat64(got)
 	d.Sub(d, want)
 	d.Quo(d, want)
 	f, _ := d.Float64()
@@ -115,8 +115,8 @@ func relULPs(got float64, want *big.Float) float64 {
 // TestStumpffSeriesMeetsTheClosedForm checks the switch at |z| = 4, where the
 // Maclaurin series hands over to the closed forms: on either side of it, for
 // both signs of z, the two agree on all four functions to the few ulps each
-// is accurate to (internal/keplerlab's TestStumpffAccuracy). And at zero the
-// series gives the limits exactly.
+// is accurate to, as stumpff's doc comment records them against the oracle.
+// And at zero the series gives the limits exactly.
 func TestStumpffSeriesMeetsTheClosedForm(t *testing.T) {
 	closed := func(z float64) [4]float64 {
 		if z > 0 {

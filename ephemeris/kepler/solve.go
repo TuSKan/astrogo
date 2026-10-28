@@ -10,7 +10,7 @@ import "math"
 
 // twoPi is 2π as an unevaluated sum of three float64s, each the rounding of
 // what the earlier ones leave. TestTwoPiIsThreeExactParts holds it to 2π
-// from internal/keplerlab's oracle.
+// from internal/oracle.
 var twoPi = [3]float64{0x1.921fb54442d18p+02, 0x1.1a62633145c07p-52, -0x1.f1976b7ed8fbcp-108}
 
 // reduceExact is m less the nearest multiple of 2π, for |m| < 2⁵²: the

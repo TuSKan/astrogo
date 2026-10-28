@@ -1,4 +1,4 @@
-package keplerlab_test
+package oracle
 
 import (
 	"math"
@@ -9,10 +9,10 @@ import (
 // TestOraclePiAgrees: two unrelated algorithms for π agree to the precision
 // range reduction needs, and both round to math.Pi.
 func TestOraclePiAgrees(t *testing.T) {
-	a, b := machinPi(reducePrec), agmPi(reducePrec)
+	a, b := MachinPi(ReducePrec), AGMPi(ReducePrec)
 
-	d := new(big.Float).SetPrec(reducePrec).Sub(a, b)
-	if d.Sign() != 0 && d.MantExp(nil) > -int(reducePrec)+8 {
+	d := new(big.Float).SetPrec(ReducePrec).Sub(a, b)
+	if d.Sign() != 0 && d.MantExp(nil) > -int(ReducePrec)+8 {
 		t.Errorf("Machin and AGM disagree at 2^%d", d.MantExp(nil))
 	}
 
@@ -24,21 +24,21 @@ func TestOraclePiAgrees(t *testing.T) {
 // TestOracleSinCos: sin²+cos² = 1 to the working precision, sin(π/6) = 1/2,
 // and the series agrees with math.Sin and math.Cos to a float64 ulp.
 func TestOracleSinCos(t *testing.T) {
-	sixth := new(big.Float).SetPrec(prec).Quo(new(big.Float).SetPrec(prec).Set(pi()), newI(6))
+	sixth := new(big.Float).SetPrec(Prec).Quo(new(big.Float).SetPrec(Prec).Set(Pi()), newI(6))
 
-	s, _ := sinCos(sixth)
-	if d := new(big.Float).SetPrec(prec).Sub(s, newF(0.5)); d.Sign() != 0 && d.MantExp(nil) > -int(prec)+8 {
+	s, _ := SinCos(sixth)
+	if d := new(big.Float).SetPrec(Prec).Sub(s, newF(0.5)); d.Sign() != 0 && d.MantExp(nil) > -int(Prec)+8 {
 		t.Errorf("sin(π/6) − 1/2 = 2^%d", d.MantExp(nil))
 	}
 
 	for _, x := range []float64{1e-300, 1e-8, 0.3, 1, 2.5, 3.14159, -3, 4} {
-		s, c := sinCos(newF(x))
+		s, c := SinCos(newF(x))
 
-		one := new(big.Float).SetPrec(prec).Mul(s, s)
-		one.Add(one, new(big.Float).SetPrec(prec).Mul(c, c))
+		one := new(big.Float).SetPrec(Prec).Mul(s, s)
+		one.Add(one, new(big.Float).SetPrec(Prec).Mul(c, c))
 		one.Sub(one, newI(1))
 
-		if one.Sign() != 0 && one.MantExp(nil) > -int(prec)+8 {
+		if one.Sign() != 0 && one.MantExp(nil) > -int(Prec)+8 {
 			t.Errorf("x = %v: sin²+cos²−1 = 2^%d", x, one.MantExp(nil))
 		}
 
@@ -54,10 +54,10 @@ func TestOracleSinCos(t *testing.T) {
 func TestOracleSolvesKepler(t *testing.T) {
 	for _, e := range []float64{0, 0.5, 0.99, 1 - 0x1p-30, math.Nextafter(1, 0)} {
 		for _, m := range []float64{1e-300, 1e-12, 1e-4, 0.5, 3, -2, math.Pi, 2 * math.Pi, 1e10, math.MaxFloat64} {
-			bigE := solveExact(m, e)
+			bigE := SolveExact(m, e)
 
-			f, _ := keplerResidual(bigE, newF(e), reduce(m))
-			if f.Sign() != 0 && f.MantExp(nil) > bigE.MantExp(nil)-int(prec)+12 {
+			f, _ := Residual(bigE, newF(e), Reduce(m))
+			if f.Sign() != 0 && f.MantExp(nil) > bigE.MantExp(nil)-int(Prec)+12 {
 				t.Errorf("e = %v, M = %v: residual 2^%d at E = %s", e, m, f.MantExp(nil), bigE.Text('g', 20))
 			}
 		}
