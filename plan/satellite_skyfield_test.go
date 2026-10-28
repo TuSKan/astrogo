@@ -89,6 +89,109 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 		if d := math.Abs(p.Culmination.Elevation.Degrees() - w.maxElevDeg); d > 0.01 {
 			t.Errorf("pass %d: highest elevation %.3f°, Skyfield %.3f°", i+1, p.Culmination.Elevation.Degrees(), w.maxElevDeg)
 		}
+
+		// The window opens and closes with the ISS below 10°, so every one
+		// of these is a whole pass.
+		if p.RiseCutOff || p.SetCutOff {
+			t.Errorf("pass %d is marked cut off (rise %v, set %v) inside a window that holds all of it",
+				i+1, p.RiseCutOff, p.SetCutOff)
+		}
+	}
+}
+
+// TestSatellitePassesCutOffAtTheWindowEdges: a pass in progress when the
+// window opens or closes is reported, cut off at that edge and marked so.
+// Until #896 it was dropped, and a window opened during the 79.6° pass found
+// nothing.
+//
+// The pass is Skyfield's third above, 04-20 from 03:03:34.10 to 03:10:17.07,
+// culminating at 03:06:56.58. Its real ends are held to Skyfield's to the
+// second, as TestSatellitePassesAgreeWithSkyfield holds them, and its cut
+// ends are the window's own edges exactly.
+func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
+	t.Parallel()
+
+	sat := newISSProvider(t)
+
+	observer, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), unit.Meters(760))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	at := func(h, m int, s float64) time.Time {
+		whole := math.Floor(s)
+
+		return time.Date(2026, time.April, 20, h, m, int(whole), int((s-whole)*1e9), time.LocationUTC)
+	}
+
+	rise, culmination, set := at(3, 3, 34.10), at(3, 6, 56.58), at(3, 10, 17.07)
+
+	for _, tc := range []struct {
+		name                        string
+		start, end                  time.Time
+		riseCutOff, setCutOff       bool
+		wantRise, wantCulm, wantSet time.Time
+		culmIsPeak                  bool // whether the window holds the real culmination
+	}{
+		{"opens mid-pass", at(3, 6, 0), at(4, 0, 0), true, false, at(3, 6, 0), culmination, set, true},
+		{"closes mid-pass", at(2, 0, 0), at(3, 6, 0), false, true, rise, at(3, 6, 0), at(3, 6, 0), false},
+		{"lies inside the pass", at(3, 5, 0), at(3, 8, 0), true, true, at(3, 5, 0), culmination, at(3, 8, 0), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			passes, err := SatellitePasses(sat, sat.ID(), "ISS", tc.start, tc.end, observer, angle.Deg(10))
+			if err != nil {
+				t.Fatalf("SatellitePasses: %v", err)
+			}
+
+			if len(passes) != 1 {
+				t.Fatalf("%d passes, want the one the window cuts", len(passes))
+			}
+
+			p := passes[0]
+
+			if p.RiseCutOff != tc.riseCutOff || p.SetCutOff != tc.setCutOff {
+				t.Errorf("RiseCutOff %v, SetCutOff %v; want %v, %v", p.RiseCutOff, p.SetCutOff, tc.riseCutOff, tc.setCutOff)
+			}
+
+			// A cut end is the window's edge exactly; a real one is
+			// Skyfield's crossing, to the second.
+			for _, e := range []struct {
+				name      string
+				got, want time.Time
+				cut       bool
+			}{
+				{"rise", p.Rise.Time, tc.wantRise, tc.riseCutOff},
+				{"set", p.Set.Time, tc.wantSet, tc.setCutOff},
+			} {
+				off := e.got.Sub(e.want).Seconds()
+
+				if e.cut && off != 0 {
+					t.Errorf("cut %s at %v, want the window's edge %v", e.name, e.got, e.want)
+				}
+
+				if !e.cut && math.Abs(off) > 1 {
+					t.Errorf("%s %+.2f s from Skyfield's", e.name, off)
+				}
+			}
+
+			if off := p.Culmination.Time.Sub(tc.wantCulm).Seconds(); math.Abs(off) > 1 {
+				t.Errorf("culmination %+.2f s from %v", off, tc.wantCulm)
+			}
+
+			// Inside the window the highest point is the real one; cut before
+			// it, the highest point is the window's end, lower than 79.625°.
+			if got := p.Culmination.Elevation.Degrees(); tc.culmIsPeak && math.Abs(got-79.625) > 0.01 {
+				t.Errorf("highest elevation %.3f°, Skyfield 79.625°", got)
+			} else if !tc.culmIsPeak && got >= 79.625 {
+				t.Errorf("highest elevation %.3f° in a window that ends before the 79.625° culmination", got)
+			}
+
+			if want, _ := time.ToGoDuration(p.Set.Time.Sub(p.Rise.Time)); p.Duration != want {
+				t.Errorf("Duration %v, want the %v from Rise to Set", p.Duration, want)
+			}
+		})
 	}
 }
 
