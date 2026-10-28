@@ -91,3 +91,67 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 		}
 	}
 }
+
+// TestSatellitePassesFindAPassThatBarelyClearsTheThreshold: a pass above
+// minElevation for less than the 30 s sampling step can fall between two
+// samples below it, and until #897 it was found or not depending on where the
+// window started.
+//
+// Skyfield's fourth pass above culminates at 13.852° at 16:30:05.01. Above
+// 13.84° it is up for about a dozen seconds, so thirty window starts a second
+// apart put the samples everywhere across it, and each must find it. Above
+// 13.86°, just over the peak, none may.
+func TestSatellitePassesFindAPassThatBarelyClearsTheThreshold(t *testing.T) {
+	t.Parallel()
+
+	sat := newISSProvider(t)
+
+	observer, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), unit.Meters(760))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	culmination := time.Date(2026, time.April, 20, 16, 30, 5, 10_000_000, time.LocationUTC)
+
+	for offset := range 30 {
+		start := time.Date(2026, time.April, 20, 16, 0, offset, 0, time.LocationUTC)
+		end := start.Add(unit.Seconds(3600))
+
+		passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, observer, angle.Deg(13.84))
+		if err != nil {
+			t.Fatalf("SatellitePasses from 16:00:%02d: %v", offset, err)
+		}
+
+		if len(passes) != 1 {
+			t.Errorf("window from 16:00:%02d: %d passes above 13.84°, want the one culminating at 13.852°",
+				offset, len(passes))
+
+			continue
+		}
+
+		p := passes[0]
+
+		if !p.Rise.Time.Before(p.Culmination.Time) || !p.Culmination.Time.Before(p.Set.Time) {
+			t.Errorf("window from 16:00:%02d: rise %v, culmination %v and set %v are out of order",
+				offset, p.Rise.Time, p.Culmination.Time, p.Set.Time)
+		}
+
+		if off := p.Culmination.Time.Sub(culmination).Seconds(); math.Abs(off) > 1 {
+			t.Errorf("window from 16:00:%02d: culmination %+.2f s from Skyfield's", offset, off)
+		}
+
+		if d := math.Abs(p.Culmination.Elevation.Degrees() - 13.852); d > 0.01 {
+			t.Errorf("window from 16:00:%02d: highest elevation %.3f°, Skyfield 13.852°",
+				offset, p.Culmination.Elevation.Degrees())
+		}
+
+		above, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, observer, angle.Deg(13.86))
+		if err != nil {
+			t.Fatalf("SatellitePasses from 16:00:%02d above 13.86°: %v", offset, err)
+		}
+
+		if len(above) != 0 {
+			t.Errorf("window from 16:00:%02d: %d passes above 13.86°, over a 13.852° peak", offset, len(above))
+		}
+	}
+}

@@ -297,7 +297,10 @@ type PassEvent struct {
 //
 // The function uses a grid-sampling approach with 30-second steps (appropriate
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
-// for sub-second rise/set boundary refinement.
+// for sub-second rise/set boundary refinement. A pass above minElevation for
+// less than one step can lie wholly between two samples, so every sampled
+// maximum below it is refined to its true peak, which finds such a pass
+// wherever the window starts (#897).
 //
 // id is the satellite's NAIF code, the one prov answers for — for a
 // satellite.Satellite, its ID(). name labels the returned passes.
@@ -388,6 +391,17 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 		vals = append(vals, v)
 	}
 
+	// A pass that clears minElevation for less than one step can fall
+	// between two samples that are both below it. Until #897 it was not
+	// found at all, or was, depending on where the window started. Its peak
+	// now joins the samples.
+	times, vals, err := withSteppedOverPeaks(times, vals, evalEl, func(from, to time.Time) (time.Time, error) {
+		return peakTime(prov, id, ctxAt, from, to)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("satellite passes: %w", err)
+	}
+
 	// Find rise/set crossings and build passes.
 	solver := NewEventSolver(step, refineTol)
 
@@ -457,6 +471,33 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 	ctxAt func(time.Time) *coord.Context, start, end time.Time,
 ) (PassEvent, error) {
+	bestTime, err := peakTime(prov, id, ctxAt, start, end)
+	if err != nil {
+		return PassEvent{}, err
+	}
+
+	ctx := coord.NewContext(bestTime, observer, defaultAtm)
+
+	altaz, err := LookAngle(prov, id, ctx)
+	if err != nil {
+		return PassEvent{}, err
+	}
+
+	return PassEvent{
+		Time:      bestTime,
+		Azimuth:   altaz.Az(),
+		Elevation: altaz.Alt(),
+		Range:     altaz.Dist(),
+	}, nil
+}
+
+// peakTime is the instant of highest elevation between start and end, by
+// sampling at 5-second intervals and refining the best of them at 1 second,
+// through ctxAt. It is findCulmination without the full Context its reported
+// event is computed from, which is all withSteppedOverPeaks needs.
+func peakTime(prov eph.Provider, id eph.ID,
+	ctxAt func(time.Time) *coord.Context, start, end time.Time,
+) (time.Time, error) {
 	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
@@ -464,7 +505,7 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 	for t := start; !t.After(end); t = t.Add(step) {
 		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
-			return PassEvent{}, err
+			return time.Time{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
@@ -487,7 +528,7 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 	for t := refineStart; !t.After(refineEnd); t = t.Add(unit.Seconds(1)) {
 		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
-			return PassEvent{}, err
+			return time.Time{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
@@ -496,17 +537,87 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 		}
 	}
 
-	ctx := coord.NewContext(bestTime, observer, defaultAtm)
+	return bestTime, nil
+}
 
-	altaz, err := LookAngle(prov, id, ctx)
-	if err != nil {
-		return PassEvent{}, err
+// withSteppedOverPeaks returns the samples with the peak of every pass the
+// grid stepped over inserted among them, in time order.
+//
+// A sampled maximum that is not above zero is where such a pass would be: the
+// true peak lies between the samples on either side of it, and peakAt finds
+// it. A peak that clears zero is added, and the samples on either side of it
+// then bracket its rise and set; one that does not is the answer, that
+// nothing reached the threshold there. A maximum already above zero has a
+// sign change on each side and needs nothing.
+func withSteppedOverPeaks(
+	times []time.Time, vals []float64,
+	eval func(time.Time) (float64, error),
+	peakAt func(from, to time.Time) (time.Time, error),
+) ([]time.Time, []float64, error) {
+	// The peaks found, each beside the sample it was found around. The
+	// samples are copied only when there is one to insert, which a window
+	// with no grazing pass never has.
+	type steppedOver struct {
+		i int
+		t time.Time
+		v float64
 	}
 
-	return PassEvent{
-		Time:      bestTime,
-		Azimuth:   altaz.Az(),
-		Elevation: altaz.Alt(),
-		Range:     altaz.Dist(),
-	}, nil
+	var found []steppedOver
+
+	for i := 1; i < len(times)-1; i++ {
+		if vals[i] > 0 || vals[i] <= vals[i-1] || vals[i] < vals[i+1] {
+			continue
+		}
+
+		peak, err := peakAt(times[i-1], times[i+1])
+		if err != nil {
+			return nil, nil, fmt.Errorf("peak near %v: %w", times[i], err)
+		}
+
+		before := peak.Before(times[i]) && peak.After(times[i-1])
+		after := peak.After(times[i]) && peak.Before(times[i+1])
+
+		if !before && !after {
+			continue
+		}
+
+		v, err := eval(peak)
+		if err != nil {
+			return nil, nil, fmt.Errorf("peak at %v: %w", peak, err)
+		}
+
+		if v > 0 {
+			found = append(found, steppedOver{i: i, t: peak, v: v})
+		}
+	}
+
+	if len(found) == 0 {
+		return times, vals, nil
+	}
+
+	outT := make([]time.Time, 0, len(times)+len(found))
+	outV := make([]float64, 0, len(vals)+len(found))
+
+	k := 0
+
+	for i := range times {
+		var p *steppedOver
+		if k < len(found) && found[k].i == i {
+			p = &found[k]
+			k++
+		}
+
+		if p != nil && p.t.Before(times[i]) {
+			outT, outV = append(outT, p.t), append(outV, p.v)
+		}
+
+		outT, outV = append(outT, times[i]), append(outV, vals[i])
+
+		if p != nil && p.t.After(times[i]) {
+			outT, outV = append(outT, p.t), append(outV, p.v)
+		}
+	}
+
+	return outT, outV, nil
 }
