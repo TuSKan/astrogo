@@ -692,70 +692,83 @@ func TestUSNO_JulianDate(t *testing.T) {
 
 // ── Test: Perihelion/Aphelion ────────────────────────────────────────────────
 
+// TestUSNO_Apsides holds the Earth's perihelion and aphelion to USNO's over
+// five years, within usnoTolerance like every other event in this file.
+//
+// Until #894 this was one year at two hours, against VALIDATION.md's one
+// minute. Measured over these five years the largest residual is 39 s.
 func TestUSNO_Apsides(t *testing.T) {
 	requireUSNO(t)
 
-	url := "https://aa.usno.navy.mil/api/seasons?year=2026"
-	body := usnoGet(t, url)
-
-	var resp usnoSeasonsResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		t.Fatalf("Failed to parse Seasons response: %v", err)
-	}
-
 	eph := newEph(t)
 
-	// Compute astrogo apsides for 2026
-	apsides, err := plan.Apsides(2026, eph)
-	if err != nil {
-		t.Fatalf("Apsides failed: %v", err)
-	}
-
-	// Map USNO phenom names to our Apsis types
 	apsisMap := map[string]plan.Apsis{
 		"Perihelion": plan.ApsisPerihelion,
 		"Aphelion":   plan.ApsisAphelion,
 	}
 
-	for _, entry := range resp.Data {
-		expectedApsis, ok := apsisMap[entry.Phenom]
-		if !ok {
-			continue // Skip Equinox/Solstice
+	for year := 2024; year <= 2028; year++ {
+		body := usnoGet(t, fmt.Sprintf("https://aa.usno.navy.mil/api/seasons?year=%d", year))
+
+		var resp usnoSeasonsResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			t.Fatalf("%d: failed to parse Seasons response: %v", year, err)
 		}
 
-		h, m, ok := parseUSNOTime(entry.Time)
-		if !ok {
-			continue
+		apsides, err := plan.Apsides(year, eph)
+		if err != nil {
+			t.Fatalf("Apsides(%d): %v", year, err)
 		}
 
-		usnoTime := time.Date(entry.Year, time.Month(entry.Month), entry.Day, h, m, 0, 0, time.LocationUTC)
+		compared := 0
 
-		// Find matching astrogo apsis
-		found := false
+		for _, entry := range resp.Data {
+			expectedApsis, ok := apsisMap[entry.Phenom]
+			if !ok {
+				continue // an equinox or a solstice
+			}
 
-		for _, a := range apsides {
-			if a.Apsis != expectedApsis {
+			// An error rather than a skip: a time this cannot read would
+			// otherwise leave the year compared on one apsis, or none.
+			h, m, ok := parseUSNOTime(entry.Time)
+			if !ok {
+				t.Errorf("%d %s: cannot read USNO's time %q", year, entry.Phenom, entry.Time)
+
 				continue
 			}
 
-			delta := math.Abs(a.Time.Sub(usnoTime).Minutes())
-			t.Logf("%-12s  USNO=%s  astrogo=%s  Δ=%.0f min  (%.6f AU)",
-				a.Apsis,
-				usnoTime.Format("2006-01-02 15:04"),
-				a.Time.Format("2006-01-02 15:04"),
-				delta, a.Distance)
+			usnoTime := time.Date(entry.Year, time.Month(entry.Month), entry.Day, h, m, 0, 0, time.LocationUTC)
+			found := false
 
-			if delta > 120 { // 2-hour tolerance (USNO rounds to nearest minute)
-				t.Errorf("%s: Δ=%.0f min exceeds 120 min tolerance", a.Apsis, delta)
+			for _, a := range apsides {
+				if a.Apsis != expectedApsis {
+					continue
+				}
+
+				delta := math.Abs(a.Time.Sub(usnoTime).Seconds())
+				t.Logf("%-10s  USNO=%s  astrogo=%s  Δ=%2.0f s  (%.6f AU)",
+					a.Apsis,
+					usnoTime.Format("2006-01-02 15:04"),
+					a.Time.Format("2006-01-02 15:04:05"),
+					delta, a.Distance.AU())
+
+				if delta > usnoTolerance*60 {
+					t.Errorf("%d %s: Δ=%.0f s exceeds %.0f min", year, a.Apsis, delta, usnoTolerance)
+				}
+
+				found = true
+				compared++
+
+				break
 			}
 
-			found = true
-
-			break
+			if !found {
+				t.Errorf("%d %s: no matching astrogo event found", year, entry.Phenom)
+			}
 		}
 
-		if !found {
-			t.Errorf("%s: no matching astrogo event found", entry.Phenom)
+		if compared != 2 {
+			t.Errorf("%d: compared %d apsides, want a perihelion and an aphelion", year, compared)
 		}
 	}
 }
@@ -1342,6 +1355,9 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 // sites. Neither caught a body rising on its center instead of its upper
 // limb: with each semi-diameter removed, the Sun's worst residual was 2.1 min
 // and the Moon's 2.3, and the Moon's test still passed (#684).
+//
+// The Earth's perihelion and aphelion are held to it too, since #894: they
+// were within 39 s over 2024-2028, and had been checked at two hours.
 const usnoTolerance = 1.0
 
 // usnoEventKinds maps the USNO phenomena compareUSNOEvents holds astrogo to.
