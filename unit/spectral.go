@@ -24,6 +24,11 @@ var (
 	// not sampled in strictly increasing wavelength order.
 	ErrSourceNotIncreasing = errors.New("unit: source wavelengths must be strictly increasing")
 
+	// ErrSourceWavelength is returned when a curve's wavelength is not
+	// positive and finite. NaN passes every ordering check, so the order
+	// alone let one through (#900).
+	ErrSourceWavelength = errors.New("unit: source wavelengths must be positive and finite")
+
 	// ErrGridMismatch is returned when an operation receives a value slice
 	// whose length does not match the grid it is supposed to lie on.
 	ErrGridMismatch = errors.New("unit: value count does not match spectral grid")
@@ -175,12 +180,8 @@ func (g SpectralGrid) Resample(dst []float64, src []WavelengthNM, values []float
 		return nil
 	}
 
-	// One pass, the same order as the resample itself.
-	for i := 1; i < len(src); i++ {
-		if src[i] <= src[i-1] {
-			return fmt.Errorf("%w: src[%d] = %g does not exceed src[%d] = %g",
-				ErrSourceNotIncreasing, i, float64(src[i]), i-1, float64(src[i-1]))
-		}
+	if err := ValidateWavelengths(src); err != nil {
+		return err
 	}
 
 	j := 0
@@ -215,6 +216,32 @@ func (g SpectralGrid) Resample(dst []float64, src []WavelengthNM, values []float
 
 		frac := float64(lambda-src[j]) / span
 		dst[i] = values[j] + frac*(values[j+1]-values[j])
+	}
+
+	return nil
+}
+
+// ValidateWavelengths reports whether axis can sample a curve: every
+// wavelength positive and finite, in strictly increasing order. The error
+// wraps [ErrSourceWavelength] or [ErrSourceNotIncreasing] and names the
+// sample.
+//
+// It is the one check [SpectralGrid.Resample] applies to its source, and the
+// one a tabulated curve's own validation should apply, so that a curve is
+// refused where it is built rather than where it is first resampled. Order
+// alone is not enough: NaN fails every comparison, so a NaN wavelength
+// passed an ordering check, as did an infinite or negative one, and each
+// went on to give a NaN or a plausible-looking wrong answer (#900).
+func ValidateWavelengths(axis []WavelengthNM) error {
+	for i, w := range axis {
+		if !isPositiveFinite(float64(w)) {
+			return fmt.Errorf("%w: sample %d is %g nm", ErrSourceWavelength, i, float64(w))
+		}
+
+		if i > 0 && w <= axis[i-1] {
+			return fmt.Errorf("%w: sample %d = %g nm does not exceed sample %d = %g nm",
+				ErrSourceNotIncreasing, i, float64(w), i-1, float64(axis[i-1]))
+		}
 	}
 
 	return nil

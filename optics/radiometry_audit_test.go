@@ -1,6 +1,7 @@
 package optics_test
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -83,5 +84,45 @@ func TestPhotonRateWeightsByWavelengthNotEnergy(t *testing.T) {
 	if redRate <= blueRate {
 		t.Errorf("the red block gave %.6g photons against the blue block's %.6g; the same energy "+
 			"at a longer wavelength is always more photons", float64(redRate), float64(blueRate))
+	}
+}
+
+// A throughput's wavelengths are positive and finite, not only increasing
+// (#900). A NaN one passed the order check and gave a NaN photon rate and
+// background with no error, which SNR then refused as a bad background.
+func TestThroughputRefusesAWavelengthThatIsNot(t *testing.T) {
+	t.Parallel()
+
+	grid, err := unit.NewSpectralGrid(400, 1, 401)
+	if err != nil {
+		t.Fatalf("NewSpectralGrid: %v", err)
+	}
+
+	sky := make([]float64, grid.Len())
+	for i := range sky {
+		sky[i] = 1e-9
+	}
+
+	for _, bad := range []float64{math.NaN(), math.Inf(1), -500, 0} {
+		th := optics.Throughput{
+			Name:         "filter",
+			WavelengthNM: []unit.WavelengthNM{500, unit.WavelengthNM(bad), 600},
+			Efficiency:   []float64{1, 1, 1},
+		}
+
+		if err := th.Validate(); !errors.Is(err, optics.ErrThroughputShape) || !errors.Is(err, unit.ErrSourceWavelength) {
+			t.Errorf("%g nm: Validate = %v, want ErrThroughputShape and unit.ErrSourceWavelength", bad, err)
+		}
+
+		inst := optics.Instrument{
+			Name:            "with a broken filter",
+			CollectingArea:  unit.SquareMeters(1),
+			PixelSolidAngle: unit.Steradians(1e-11),
+			Throughput:      []optics.Throughput{th},
+		}
+
+		if rate, err := inst.BackgroundRate(sky, grid); err == nil {
+			t.Errorf("%g nm: BackgroundRate = %v with no error", bad, rate)
+		}
 	}
 }

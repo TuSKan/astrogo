@@ -127,13 +127,15 @@ func (c CrossSection) Validate() error {
 			ErrCrossSectionShape, c.Species, len(c.WavelengthNM), len(c.Sigma))
 	}
 
+	// Positive and finite as well as increasing: the order check alone let a
+	// NaN wavelength through (#900).
+	if err := unit.ValidateWavelengths(c.WavelengthNM); err != nil {
+		return fmt.Errorf("%w: %q: %w", ErrCrossSectionShape, c.Species, err)
+	}
+
 	for i, a := range c.Sigma {
 		if s := a.SquareCentimeters(); s < 0 || math.IsNaN(s) || math.IsInf(s, 0) {
 			return fmt.Errorf("%w: %q sample %d = %g cm²", ErrCrossSectionValue, c.Species, i, s)
-		}
-
-		if i > 0 && c.WavelengthNM[i] <= c.WavelengthNM[i-1] {
-			return fmt.Errorf("%w: %q not increasing at sample %d", ErrCrossSectionShape, c.Species, i)
 		}
 	}
 

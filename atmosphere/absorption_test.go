@@ -172,14 +172,31 @@ func TestCrossSectionValidation(t *testing.T) {
 			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, 2}, Sigma: []unit.Area{unit.SquareCentimeters(1), unit.SquareCentimeters(-1)}},
 			atmosphere.ErrCrossSectionValue,
 		},
+		// A NaN wavelength passed the order check alone (#900); refused as a
+		// wavelength, under this package's sentinel and unit's.
+		{
+			"NaN wavelength",
+			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{1, unit.WavelengthNM(math.NaN()), 3}, Sigma: []unit.Area{unit.SquareCentimeters(1), unit.SquareCentimeters(1), unit.SquareCentimeters(1)}},
+			unit.ErrSourceWavelength,
+		},
+		{
+			"negative wavelength",
+			atmosphere.CrossSection{Species: "x", WavelengthNM: []unit.WavelengthNM{-3, -2, -1}, Sigma: []unit.Area{unit.SquareCentimeters(1), unit.SquareCentimeters(1), unit.SquareCentimeters(1)}},
+			unit.ErrSourceWavelength,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if err := tc.cs.Validate(); !errors.Is(err, tc.want) {
+			err := tc.cs.Validate()
+			if !errors.Is(err, tc.want) {
 				t.Errorf("Validate = %v, want %v", err, tc.want)
+			}
+
+			if errors.Is(tc.want, unit.ErrSourceWavelength) && !errors.Is(err, atmosphere.ErrCrossSectionShape) {
+				t.Errorf("Validate = %v, want it under ErrCrossSectionShape too", err)
 			}
 		})
 	}

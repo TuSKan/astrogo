@@ -106,13 +106,16 @@ func (s SourceSpectrum) scale() ([]float64, error) {
 			ErrSpectrum, n, len(s.Shape), len(s.Response))
 	}
 
+	// Positive and finite as well as ascending: an infinite wavelength made the
+	// overlap infinite and scaled every radiance to zero, and a negative axis
+	// passed outright (#900).
+	if err := unit.ValidateWavelengths(s.WavelengthNM); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSpectrum, err)
+	}
+
 	var overlap float64
 
 	for i := 1; i < n; i++ {
-		if s.WavelengthNM[i] <= s.WavelengthNM[i-1] {
-			return nil, fmt.Errorf("%w: wavelengths are not ascending at index %d", ErrSpectrum, i)
-		}
-
 		// Trapezoid over the shape-response product.
 		lo := s.Shape[i-1] * s.Response[i-1]
 		hi := s.Shape[i] * s.Response[i]

@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/passband"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // profile renders a VOTable with the PARAM block where the service actually
@@ -210,5 +211,23 @@ func TestParseFindsMetadataAtEitherDepth(t *testing.T) {
 		len(inTable.WavelengthNM) != len(atResource.WavelengthNM) {
 		t.Errorf("the two placements parsed differently: %+v against %+v",
 			inTable, atResource)
+	}
+}
+
+// A profile whose wavelength column holds something that is not a
+// wavelength is refused (#900). strconv.ParseFloat reads "NaN" and "+Inf" as
+// numbers, and the parsed band went through on its order alone, so a corrupt
+// download became a passband whose every magnitude was NaN.
+func TestParseRefusesAWavelengthThatIsNot(t *testing.T) {
+	t.Parallel()
+
+	for _, bad := range []float64{math.NaN(), math.Inf(1), -5300} {
+		rows := goodRows()
+		rows[2][0] = bad
+
+		_, err := passband.Parse(strings.NewReader(profile(goodParams(), rows)))
+		if !errors.Is(err, passband.ErrService) || !errors.Is(err, unit.ErrSourceWavelength) {
+			t.Errorf("a %g Å wavelength: err = %v, want ErrService and unit.ErrSourceWavelength", bad, err)
+		}
 	}
 }
