@@ -141,6 +141,23 @@ func TestSourceSpectrumRejectsBadInput(t *testing.T) {
 			Shape:        []float64{1, 1},
 			Response:     []float64{0, 0},
 		}},
+		// Not wavelengths at all (#900). An infinite one made the overlap
+		// infinite and every radiance zero; a negative axis passed outright.
+		{"infinite wavelength", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, unit.WavelengthNM(math.Inf(1))},
+			Shape:        []float64{1, 1},
+			Response:     []float64{1, 1},
+		}},
+		{"negative wavelengths", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{-900, -500},
+			Shape:        []float64{1, 1},
+			Response:     []float64{1, 1},
+		}},
+		{"NaN wavelength", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, unit.WavelengthNM(math.NaN()), 900},
+			Shape:        []float64{1, 1, 1},
+			Response:     []float64{1, 1, 1},
+		}},
 	}
 
 	for _, tc := range cases {
