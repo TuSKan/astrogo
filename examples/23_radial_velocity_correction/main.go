@@ -76,8 +76,16 @@ func main() {
 			log.Fatalf("heliocentric correction: %v", err)
 		}
 
+		// The exact composition, as the note below explains, not
+		// siriusMeasured + baryCorr.
+		corrected, err := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(siriusMeasured))
+		if err != nil {
+			log.Fatalf("barycentric radial velocity: %v", err)
+		}
+
+		// unit.Velocity holds m/s; KmPerSec is what the column says.
 		fmt.Printf("  %s    %+8.3f km/s   %+8.3f km/s   %+8.3f km/s\n",
-			t.Format("2006-01-02"), baryCorr, helioCorr, siriusMeasured+baryCorr)
+			t.Format("2006-01-02"), baryCorr.KmPerSec(), helioCorr.KmPerSec(), corrected.KmPerSec())
 	}
 
 	fmt.Println()

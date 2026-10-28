@@ -62,7 +62,7 @@ func main() {
 	fmt.Println("── Osculating elements (JPL SBDB, epoch below) ─────────────────────")
 	fmt.Println()
 	fmt.Printf("  Epoch            %s TDB\n", target.Epoch.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Semi-major axis  %.6f AU\n", target.SemiMajorAxis)
+	fmt.Printf("  Semi-major axis  %.6f AU\n", target.SemiMajorAxis.AU())
 	fmt.Printf("  Eccentricity     %.6f\n", target.Eccentricity)
 	fmt.Printf("  Inclination      %s\n", target.Inclination.DMSString(1))
 	fmt.Printf("  Ascending node   %s\n", target.AscendingNode.DMSString(1))
