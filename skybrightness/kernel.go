@@ -142,11 +142,47 @@ func (k *scatterKernel) phaseAt(theta float64) (rayleigh, aerosol float64, err e
 	return atmosphere.RayleighPhaseFunction(theta, k.depolarization), aerosol, nil
 }
 
+// sumRingSample adds one sample's radiance into the two running sums of its
+// ring: r*coefRayleigh and r*coefAerosol, where each coefficient is the
+// sample's solid angle times one phase-function value.
+//
+// Two multiply-adds per wavelength, and nothing that varies only with the ring.
+// [scatterKernel.applyRing] closes the sums.
+func sumRingSample(sumRayleigh, sumAerosol, source []float64, coefRayleigh, coefAerosol float64) {
+	sumRayleigh, sumAerosol = sumRayleigh[:len(source)], sumAerosol[:len(source)]
+
+	for i, radiance := range source {
+		sumRayleigh[i] += radiance * coefRayleigh
+		sumAerosol[i] += radiance * coefAerosol
+	}
+}
+
+// applyRing closes a ring's sums: it weights each by its share of the
+// extinction, applies the ring's path factor, adds the result to dst, and
+// clears the sums ready for the next ring.
+//
+// What [scatterKernel.accumulate] does per sample, done once for all of a
+// ring's samples. Every factor it applies is constant around the ring.
+func (k *scatterKernel) applyRing(dst, sumRayleigh, sumAerosol, path []float64) {
+	n := len(dst)
+	sumRayleigh, sumAerosol, path = sumRayleigh[:n], sumAerosol[:n], path[:n]
+	rayleighWeight, aerosolWeight := k.rayleighWeight[:n], k.aerosolWeight[:n]
+
+	for i := range dst {
+		dst[i] += path[i] * (rayleighWeight[i]*sumRayleigh[i] + aerosolWeight[i]*sumAerosol[i])
+	}
+
+	clear(sumRayleigh)
+	clear(sumAerosol)
+}
+
 // accumulate adds one source direction's contribution to dst.
 //
-// The innermost loop of the whole model: one multiply-add chain per
-// wavelength, with every transcendental already evaluated by pathFactor and
-// phaseAt.
+// The per-sample form of the integral: one multiply-add chain per wavelength,
+// with every transcendental already evaluated by pathFactor and phaseAt. The
+// integral itself goes through [sumRingSample] and [scatterKernel.applyRing],
+// which factor this same sum by ring; this is the form they are held to, and
+// the definition a reader checks them against.
 func (k *scatterKernel) accumulate(
 	dst, source, path []float64, dOmega, phaseRayleigh, phaseAerosol float64,
 ) {
