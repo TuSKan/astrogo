@@ -235,6 +235,36 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	}
 }
 
+// TestDefaultsPlutoIsStandishsAboutTheSun: Default registers Standish's
+// elements for Pluto, which the base also propagates, and both must be the
+// same orbit about the Sun. The elements are fitted to Pluto's path, not
+// osculating, so a refit about the barycenter through their J2000 state would
+// be a different orbit; one was, and missed DE440 by up to 1.96 AU (#877).
+func TestDefaultsPlutoIsStandishsAboutTheSun(t *testing.T) {
+	def, base := Default(), NewMovingBodyProvider()
+
+	for _, at := range []time.Time{
+		time.Date(1800, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		time.J2000(),
+		time.Date(2050, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	} {
+		got, err := def.Locate(core.PlutoBarycenter, at)
+		if err != nil {
+			t.Fatalf("Default's Pluto: %v", err)
+		}
+
+		want, err := base.Locate(core.PlutoBarycenter, at)
+		if err != nil {
+			t.Fatalf("the base's Pluto: %v", err)
+		}
+
+		if got != want || got.Center != core.Sun {
+			t.Errorf("at %v Default's Pluto is %v about %v; want the base's Standish orbit, %v about %v",
+				at, got.Pos, got.Center, want.Pos, want.Center)
+		}
+	}
+}
+
 // TestDefaultAnswersEveryNamedBody checks Default's own doc claim: "No named
 // core.ID this library defines returns ErrUnsupportedBody from here."
 //

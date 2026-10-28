@@ -71,6 +71,12 @@ type Elements struct {
 	// from it, for reporting. Nil for the other two forms.
 	state *stateVector
 
+	// fitted marks a set fitted to a body's path over an interval rather
+	// than osculating at its epoch: [PlutoElements]. Its state at the epoch
+	// is not the body's, so Provider.Register keeps it about the center it
+	// was fitted about (#877).
+	fitted bool
+
 	// prep is what StateAt derives from the elements and not from the epoch,
 	// computed once by the constructors and the With methods (docs/kepler.md
 	// §5).
