@@ -24,6 +24,19 @@ const (
 // it dims a source by: 2.5 log10(e).
 const magnitudesPerOpticalDepth = 2.5 * math.Log10E
 
+// SubtropicalOzoneDU is a subtropical observatory's total ozone column, in
+// Dobson units: 258 DU, the mean Patat et al. (2011, A&A 527, A91) derive at
+// Paranal (RMS 14 DU), against the median of 257.4 Buton et al. (2013, A&A
+// 549, A8) give Mauna Kea. Buton et al. note that their 260 DU mean over
+// Hawaii is lower than the worldwide one, so a site at higher latitude has
+// more.
+//
+// It is the column astrogo's default night air carries, in
+// plan.VisibleTonight and in skybrightness/dataset.Sky.Scene, so that a
+// star's extinction and the sky behind it see the same ozone. An Atmosphere
+// itself defaults to none, which is no real night (#906).
+const SubtropicalOzoneDU = 258
+
 // Extinction returns the extinction coefficient of this air at wavelength
 // lambda, in magnitudes per airmass: what a star loses to it for each airmass
 // of path, so that m = m0 + k * X.

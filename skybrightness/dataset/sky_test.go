@@ -288,3 +288,70 @@ func TestOneSkyServesManySites(t *testing.T) {
 			"two", low, high)
 	}
 }
+
+// TestTheDefaultSceneCarriesOzone: a nil builder is a clear night, and a clear
+// night has ozone.
+//
+// Until #906 the default carried none. Every component crossing the layer
+// has applied ozone absorption since #632, but on the default path that
+// absorption was exactly 1, and the sky came out 0.024 mag too bright at the
+// zenith and 0.127 at 10° at Paranal. The default is now the column
+// plan.VisibleTonight's air carries. Its effect has to grow toward the
+// horizon, as the ozone airmass does.
+func TestTheDefaultSceneCarriesOzone(t *testing.T) {
+	t.Parallel()
+
+	sky, err := dataset.NewSky(skybrightness.GAMBONSWeb, skyInputs(t))
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	site := skySite(t)
+	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
+
+	def, err := sky.Scene(site, when, nil)
+	if err != nil {
+		t.Fatalf("Scene(nil): %v", err)
+	}
+
+	if got := def.Atmosphere.Ozone(); got != atmosphere.SubtropicalOzoneDU {
+		t.Fatalf("the default scene carries %g DU of ozone, want %d", float64(got), atmosphere.SubtropicalOzoneDU)
+	}
+
+	// The same air with nothing absorbing, which is what the default was.
+	none, err := sky.Scene(site, when, atmosphere.NewBuilder().SurfaceAtAltitude(site.Height()))
+	if err != nil {
+		t.Fatalf("Scene without ozone: %v", err)
+	}
+
+	brightness := func(scene *skybrightness.Scene, deg float64) float64 {
+		t.Helper()
+
+		est, err := sky.Direction(t.Context(), scene, angle.Deg(deg), angle.Deg(0))
+		if err != nil {
+			t.Fatalf("Direction(%g°): %v", deg, err)
+		}
+
+		sb, err := sky.SurfaceBrightness(est)
+		if err != nil {
+			t.Fatalf("SurfaceBrightness(%g°): %v", deg, err)
+		}
+
+		return sb
+	}
+
+	prev := 0.0
+
+	for _, deg := range []float64{90, 30, 10} {
+		dimmer := brightness(def, deg) - brightness(none, deg)
+
+		if !(dimmer > prev) {
+			t.Errorf("at %g° the ozone dims the default sky by %.4f mag, not more than the %.4f "+
+				"higher up; it absorbs, and its path grows toward the horizon", deg, dimmer, prev)
+		}
+
+		t.Logf("%g°: the default sky is %.4f mag dimmer than with no ozone", deg, dimmer)
+
+		prev = dimmer
+	}
+}

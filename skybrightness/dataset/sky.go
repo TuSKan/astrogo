@@ -156,8 +156,9 @@ func consentAdvice(p skybrightness.Preset, err error) error {
 // # Surface conditions are yours, and easy
 //
 // A nil builder means a clear atmosphere at the site's own elevation, with
-// surface pressure and temperature from the ICAO standard profile. A non-nil
-// one is used exactly as given, and should carry
+// surface pressure and temperature from the ICAO standard profile and the
+// ozone column of [atmosphere.SubtropicalOzoneDU]. A non-nil one is used
+// exactly as given, ozone included, and should carry
 // [atmosphere.Builder.SurfaceAtAltitude] with the site's height unless the
 // caller has real readings.
 //
@@ -178,8 +179,13 @@ func (s *Sky) Scene(
 	if air == nil {
 		// Nil is unambiguous: the caller has expressed no atmosphere at all,
 		// so a clear one at the right elevation is a default rather than an
-		// override.
-		air = atmosphere.NewBuilder().SurfaceAtAltitude(site.Height())
+		// override. Clear is not empty: it carries the ozone every real night
+		// has, the column plan.VisibleTonight's default air carries. Without
+		// it the default sky was 0.024 mag too bright at the zenith and 0.127
+		// at 10° (#906).
+		air = atmosphere.NewBuilder().
+			SurfaceAtAltitude(site.Height()).
+			Ozone(atmosphere.SubtropicalOzoneDU)
 	}
 
 	air, err := s.preset.Transfer(air)
