@@ -3,6 +3,7 @@ package unit_test
 import (
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/unit"
@@ -52,6 +53,57 @@ func TestResampleRefusesUnsortedSource(t *testing.T) {
 		if math.Abs(dst[i]-want) > 1e-12 {
 			t.Errorf("resampling onto the source's own points gave dst[%d] = %g, want %g", i, dst[i], want)
 		}
+	}
+}
+
+// A wavelength must be positive and finite, as well as in order (#900).
+//
+// NaN fails every comparison, so the order check alone let a NaN wavelength
+// through, and an infinite or negative one too while the order held. Each
+// went on to a NaN, or to a plausible wrong answer: a passband at −600 to
+// −500 nm had a pivot wavelength of 546.6 nm. Every bad value is tried at
+// the first, a middle and the last sample, since an order check that starts
+// at the second sample never looks at the first on its own.
+func TestValidateWavelengthsRefusesAnAxisNoCurveCanHave(t *testing.T) {
+	t.Parallel()
+
+	grid, err := unit.NewSpectralGrid(400, 50, 5)
+	if err != nil {
+		t.Fatalf("NewSpectralGrid: %v", err)
+	}
+
+	good := []unit.WavelengthNM{400, 450, 500, 550, 600}
+	values := []float64{0.0, 0.2, 1.0, 0.2, 0.0}
+	dst := make([]float64, grid.Len())
+
+	if err := unit.ValidateWavelengths(good); err != nil {
+		t.Fatalf("a valid axis is refused: %v", err)
+	}
+
+	for _, bad := range []float64{math.NaN(), math.Inf(1), math.Inf(-1), 0, -500} {
+		for _, at := range []int{0, 2, 4} {
+			axis := append([]unit.WavelengthNM(nil), good...)
+			axis[at] = unit.WavelengthNM(bad)
+
+			// Each sample is checked for being a wavelength before its order
+			// is, so a bad value is reported as what it is.
+			if err := unit.ValidateWavelengths(axis); !errors.Is(err, unit.ErrSourceWavelength) {
+				t.Errorf("%g at sample %d: err = %v, want ErrSourceWavelength", bad, at, err)
+			}
+
+			if err := grid.Resample(dst, axis, values, 0); !errors.Is(err, unit.ErrSourceWavelength) {
+				t.Errorf("%g at sample %d: Resample err = %v, want ErrSourceWavelength", bad, at, err)
+			}
+		}
+	}
+
+	// The sample is named, so the caller can find it in a file.
+	axis := append([]unit.WavelengthNM(nil), good...)
+	axis[2] = unit.WavelengthNM(math.NaN())
+
+	err = unit.ValidateWavelengths(axis)
+	if !errors.Is(err, unit.ErrSourceWavelength) || !strings.Contains(err.Error(), "sample 2") {
+		t.Errorf("a NaN at sample 2: err = %v, want ErrSourceWavelength naming sample 2", err)
 	}
 }
 

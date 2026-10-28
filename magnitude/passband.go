@@ -132,6 +132,13 @@ func (p Passband) Validate() error {
 			ErrPassbandEmpty, p.Name, len(p.WavelengthNM), len(p.Response))
 	}
 
+	// Positive and finite as well as increasing: a NaN wavelength passed the
+	// order check alone, and a band at negative wavelengths had a plausible
+	// pivot (#900).
+	if err := unit.ValidateWavelengths(p.WavelengthNM); err != nil {
+		return fmt.Errorf("%w: %q: %w", ErrPassbandEmpty, p.Name, err)
+	}
+
 	var total float64
 
 	for i, r := range p.Response {
@@ -140,11 +147,6 @@ func (p Passband) Validate() error {
 		}
 
 		total += r
-
-		if i > 0 && p.WavelengthNM[i] <= p.WavelengthNM[i-1] {
-			return fmt.Errorf("%w: %q wavelengths not strictly increasing at %d",
-				ErrPassbandEmpty, p.Name, i)
-		}
 	}
 
 	if total == 0 {

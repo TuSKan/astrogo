@@ -78,6 +78,46 @@ func TestPassbandValidate(t *testing.T) {
 	}
 }
 
+// A passband's wavelengths are positive and finite, not only increasing
+// (#900). Each of these validated before: a NaN gave 101 NaN weights and a
+// NaN pivot, an infinity a NaN pivot, and a band at −600 to −500 nm a
+// pivot of 546.6 nm, all with no error. They come from downloaded SVO
+// profiles as easily as from code, since strconv.ParseFloat reads "NaN".
+func TestPassbandRefusesAWavelengthThatIsNot(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		axis []unit.WavelengthNM
+	}{
+		{"NaN", []unit.WavelengthNM{500, unit.WavelengthNM(math.NaN()), 600}},
+		{"infinite", []unit.WavelengthNM{500, 550, unit.WavelengthNM(math.Inf(1))}},
+		{"negative", []unit.WavelengthNM{-600, -550, -500}},
+		{"zero", []unit.WavelengthNM{0, 550, 600}},
+	} {
+		p := magnitude.Passband{
+			Name:            tc.name,
+			WavelengthNM:    tc.axis,
+			Response:        []float64{1, 1, 1},
+			Detector:        magnitude.EnergyIntegrating,
+			VegaZeroPointJy: 3636,
+		}
+
+		err := p.Validate()
+		if !errors.Is(err, magnitude.ErrPassbandEmpty) || !errors.Is(err, unit.ErrSourceWavelength) {
+			t.Errorf("%s: Validate = %v, want ErrPassbandEmpty and unit.ErrSourceWavelength", tc.name, err)
+		}
+
+		if pivot, err := p.PivotWavelength(); err == nil {
+			t.Errorf("%s: PivotWavelength = %v with no error", tc.name, pivot)
+		}
+
+		if _, _, err := p.Weights(mustGrid(t, 400, 401)); err == nil {
+			t.Errorf("%s: Weights gave no error", tc.name)
+		}
+	}
+}
+
 // The band-averaged value of a flat spectrum is that same flat value,
 // whatever the response shape or normalization — the defining property of
 // a weighted mean, and the first thing a wrong normalization breaks.

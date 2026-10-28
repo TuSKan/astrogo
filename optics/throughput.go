@@ -50,13 +50,15 @@ func (t Throughput) Validate() error {
 			ErrThroughputShape, t.Name, len(t.WavelengthNM), len(t.Efficiency))
 	}
 
+	// Positive and finite as well as increasing: a NaN wavelength passed the
+	// order check alone and gave a NaN photon rate with no error (#900).
+	if err := unit.ValidateWavelengths(t.WavelengthNM); err != nil {
+		return fmt.Errorf("%w: %q: %w", ErrThroughputShape, t.Name, err)
+	}
+
 	for i, e := range t.Efficiency {
 		if e < 0 || e > 1 || math.IsNaN(e) || math.IsInf(e, 0) {
 			return fmt.Errorf("%w: %q sample %d = %g", ErrThroughputEfficiency, t.Name, i, e)
-		}
-
-		if i > 0 && t.WavelengthNM[i] <= t.WavelengthNM[i-1] {
-			return fmt.Errorf("%w: %q not increasing at sample %d", ErrThroughputShape, t.Name, i)
 		}
 	}
 
