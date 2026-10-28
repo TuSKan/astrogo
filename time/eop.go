@@ -189,12 +189,9 @@ func logEOPUnavailable(mjd float64, cause error) {
 	// EnableDownloads alone then consents to a fetch nothing will make.
 	//
 	// The 0.9 s is not a property of this code. It is the bound leap seconds
-	// keep |UT1-UTC| inside, and CGPM Resolution 4 (2022) commits to abandoning
-	// leap seconds by 2035 -- after which UT1-UTC grows without bound and this
-	// figure goes stale. Levine, Tavella & Milton (2023) estimate that a
-	// 1-minute tolerance would mean an adjustment roughly once a century, so
-	// the degradation this warning describes gets slowly and permanently worse
-	// from 2035 rather than staying at 0.9 s. See #147.
+	// kept |UT1-UTC| inside, and they end on [continuousUTC]: from that date
+	// UT1-UTC drifts with the Earth's rotation, limited only to an hour, so the
+	// error this warning states depends on the epoch it is about (#147, #879).
 	//
 	// The cause says which step failed: no loader registered, no cached
 	// bulletin and no consent to fetch one, or a bulletin that does not reach
@@ -204,11 +201,19 @@ func logEOPUnavailable(mjd float64, cause error) {
 		causeText = cause.Error()
 	}
 
+	topocentric, ut1 := "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
+		"up to 0.9 s, the bound leap seconds kept |UT1-UTC| inside"
+	if mjd >= continuousUTC {
+		topocentric, ut1 = "15 arcsec for every second UT1-UTC has drifted, which no leap second bounds",
+			"whatever |UT1-UTC| has drifted to: UTC is continuous from 2027-05-20, "+
+				"and the limit is 3600 s (CGPM 2026 Resolution 5)"
+	}
+
 	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
 		"mjd", mjd,
 		"cause", causeText,
-		"topocentric_error", "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
-		"ut1_error", "~0.9 s until leap seconds end in 2035, unbounded after",
+		"topocentric_error", topocentric,
+		"ut1_error", ut1,
 		"remedy", `import _ "github.com/TuSKan/astrogo/remote/eop", then `+
 			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, "+
 			"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately")
@@ -256,6 +261,14 @@ func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
 	return eop, nil, nil
 }
 
+// continuousUTC is 2027-05-20 as a UTC Modified Julian Date: the day
+// Resolution 5 of the 28th CGPM (2026) makes UTC continuous, raising the limit
+// on |UT1−UTC| from the 0.9 s leap seconds kept it inside to 3600 s. IERS
+// Bulletin C 72 announced no leap second for December 2026, and the next
+// opportunity, June 2027, falls after it, so the last leap second was
+// 2016-12-31 and TAI − UTC stays 37 s (#879).
+const continuousUTC = 61545
+
 // errNothingLoaded is the cause given when the zero default answered and the
 // lazy load reported no error of its own.
 var errNothingLoaded = errors.New("time: no EOP bulletin loaded")
@@ -271,8 +284,8 @@ var errNothingLoaded = errors.New("time: no EOP bulletin loaded")
 // Past the bulletin nobody measures UT1, so every value is a forecast. This
 // one used to be DUT1 = 0, UT1 pinned to UTC, which freezes ΔT at the
 // leap-second count; nobody chose that, and it stops being even approximately
-// true once leap seconds end, by 2035 under CGPM Resolution 4 (2022), after
-// which UT1 − UTC grows without bound. The extrapolation on offer, Espenak &
+// true once leap seconds end on [continuousUTC], after which UT1 − UTC drifts
+// with the Earth's rotation, limited only to an hour. The extrapolation on offer, Espenak &
 // Meeus (2006), was already 6.2 s high in 2026 and climbs 0.6 s a year, while
 // the bulletin shows ΔT flat since 2020 and published forecasts past 2030
 // disagree in sign. So the held value is the measured one, continuous with

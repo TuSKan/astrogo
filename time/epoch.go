@@ -23,10 +23,11 @@ func (t Time) MJD() float64 {
 // or 420 m of ground position at the equator — not the "few hundred ms" this
 // comment claimed before the bound was checked.
 //
-// That bound is also temporary. CGPM Resolution 4 (27th CGPM, 2022) ends leap
-// seconds by 2035, after which UT1-UTC grows without limit and this fallback
-// degrades without limit alongside it. Callers that silently discard the
-// returned error will degrade silently with it.
+// That bound held only while leap seconds did. Resolution 5 of the 28th CGPM
+// (2026) makes UTC continuous from 20 May 2027 and raises the limit on
+// |UT1-UTC| to 3600 s, so from that date this fallback drifts with UT1-UTC
+// itself (#879). Callers that silently discard the returned error will drift
+// silently with it.
 func (t Time) GAST() (angle.Angle, error) {
 	ut1, err := t.UT1()
 	if err != nil {

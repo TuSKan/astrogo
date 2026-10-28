@@ -766,9 +766,11 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 
 | Metric | With EOP | Without EOP |
 |--------|----------|-------------|
-| UT1 accuracy | <50 ms | ~0.9 s (UT1 ≈ UTC fallback) |
-| Topocentric alt/az, against JPL Horizons | p50 0.4″, max 2.1″ | up to 13.5″ (0.9 s of Earth rotation); 8.8″ measured on the Horizons corpus |
+| UT1 accuracy | <50 ms | ~0.9 s (UT1 ≈ UTC fallback), until 2027-05-20; after it, whatever UT1−UTC has drifted to |
+| Topocentric alt/az, against JPL Horizons | p50 0.4″, max 2.1″ | up to 13.5″ (0.9 s of Earth rotation) until 2027-05-20, 15″ per second of drift after; 8.8″ measured on the Horizons corpus |
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
+
+The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the 28th CGPM (2026) makes UTC continuous from 2027-05-20, with |UT1−UTC| allowed to reach an hour, so after that date only EOP data says where UT1 is.
 
 The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 

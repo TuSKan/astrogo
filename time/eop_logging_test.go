@@ -89,3 +89,41 @@ func TestEOPWarningReachesTheDefaultLogger(t *testing.T) {
 			"never learn that EOP were unavailable")
 	}
 }
+
+// TestEOPWarningSaysWhenLeapSecondsStopBoundingTheError: the 0.9 s the warning
+// states is the bound leap seconds kept |UT1−UTC| inside, and UTC is continuous
+// from 2027-05-20 (#879). Before that day the warning states the bound; from it
+// on, nothing holds UT1−UTC to 0.9 s and the warning must not say so.
+func TestEOPWarningSaysWhenLeapSecondsStopBoundingTheError(t *testing.T) {
+	// Not parallel: it swaps the process-wide logger.
+	defer logging.Set(nil)
+
+	for _, tc := range []struct {
+		name      string
+		mjd       float64
+		want, not string
+	}{
+		{"the day before continuous UTC", continuousUTC - 1, `ut1_error="up to 0.9 s`, "3600 s"},
+		{"the day it begins", continuousUTC, "3600 s", "up to 0.9 s"},
+		{"a decade after", continuousUTC + 3653, "3600 s", "13.5 arcsec"},
+	} {
+		var buf bytes.Buffer
+
+		logging.Set(slog.New(slog.NewTextHandler(&buf, nil)))
+		logEOPUnavailable(tc.mjd, errNothingLoaded)
+
+		if out := buf.String(); !strings.Contains(out, tc.want) || strings.Contains(out, tc.not) {
+			t.Errorf("%s (MJD %v): the warning should say %q and not %q:\n%s", tc.name, tc.mjd, tc.want, tc.not, out)
+		}
+	}
+}
+
+// TestContinuousUTCIsTheDateTheCGPMSet holds the hand-written MJD to the date
+// Resolution 5 of the 28th CGPM (2026) sets: 20 May 2027.
+func TestContinuousUTCIsTheDateTheCGPMSet(t *testing.T) {
+	t.Parallel()
+
+	if got := Date(2027, May, 20, 0, 0, 0, 0, LocationUTC).MJD(); got != continuousUTC {
+		t.Errorf("2027-05-20 is MJD %v, but continuousUTC is %v", got, float64(continuousUTC))
+	}
+}
