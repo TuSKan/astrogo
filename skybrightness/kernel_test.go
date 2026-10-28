@@ -15,12 +15,12 @@ import (
 //
 // Internal to this file rather than shared with the external tests, because
 // scatterKernel is unexported and this has to be an in-package test.
-func kernelScene(t *testing.T) *Scene {
-	t.Helper()
+func kernelScene(tb testing.TB) *Scene {
+	tb.Helper()
 
 	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635) // Paranal
 	if err != nil {
-		t.Fatalf("NewGeodetic: %v", err)
+		tb.Fatalf("NewGeodetic: %v", err)
 	}
 
 	return &Scene{
