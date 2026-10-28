@@ -284,7 +284,7 @@ func targetTransmission(
 	for k := range dimmed {
 		a, err := air.ExtinctionToward(grid.At(k), alt)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("at %g nm: %w", float64(grid.At(k)), err)
 		}
 
 		dimmed[k] = sky[k] * math.Pow(10, -0.4*a)
@@ -292,12 +292,12 @@ func targetTransmission(
 
 	through, err := inst.PhotonRate(dimmed, grid)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("dimmed source: %w", err)
 	}
 
 	all, err := est.PhotonRate(inst)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("undimmed source: %w", err)
 	}
 
 	if !(through > 0) || !(all > 0) {
