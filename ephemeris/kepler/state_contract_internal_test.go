@@ -6,15 +6,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/keplerlab"
+	"github.com/TuSKan/astrogo/internal/oracle"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // FromState's contract (#803), held against the 256-bit oracle in
-// internal/keplerlab: the propagated position and velocity each within
+// internal/oracle: the propagated position and velocity each within
 // contractStateCond times what the input's own rounding causes,
-// keplerlab.StateSensitivity — Σ|∂r/∂x|·|x|·ε and Σ|∂v/∂x|·|x|·ε over the six
+// oracle.StateSensitivity — Σ|∂r/∂x|·|x|·ε and Σ|∂v/∂x|·|x|·ε over the six
 // components.
 //
 // That scale and not ulps: a state far out propagated to near perihelion is
@@ -37,7 +37,7 @@ func stateContractStart(t *testing.T, mu, e, tau float64) (r, v [3]float64) {
 
 	v0 := math.Sqrt(mu * (1 + e))
 
-	br, bv := keplerlab.StateExact([3]float64{1, 0, 0}, [3]float64{0, v0, 0}, mu, tau)
+	br, bv := oracle.StateExact([3]float64{1, 0, 0}, [3]float64{0, v0, 0}, mu, tau)
 
 	var pr, pv [3]float64
 	for i := range 3 {
@@ -119,8 +119,8 @@ func TestFromStateContract(t *testing.T) {
 							t.Fatalf("τ %g, Δt %g: %v", tau, d, err)
 						}
 
-						wr, wv := keplerlab.StateExact(r0, v0, mu, d)
-						posSens, velSens := keplerlab.StateSensitivity(r0, v0, mu, d)
+						wr, wv := oracle.StateExact(r0, v0, mu, d)
+						posSens, velSens := oracle.StateSensitivity(r0, v0, mu, d)
 
 						cond := dist3(pos, wr) / posSens
 						velCond := dist3(vel, wv) / velSens
@@ -145,7 +145,7 @@ func dist3(got vector.Vec3, want [3]*big.Float) float64 {
 	var s float64
 
 	for i, g := range [3]float64{got.X, got.Y, got.Z} {
-		d := new(big.Float).SetPrec(keplerlab.Prec).SetFloat64(g)
+		d := new(big.Float).SetPrec(oracle.Prec).SetFloat64(g)
 		d.Sub(d, want[i])
 		f, _ := d.Float64()
 		s += f * f

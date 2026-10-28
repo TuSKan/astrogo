@@ -7,13 +7,13 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/internal/keplerlab"
+	"github.com/TuSKan/astrogo/internal/oracle"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // The numerical contract docs/kepler.md sets, held against the 256-bit oracle
-// in internal/keplerlab.
+// in internal/oracle.
 //
 // The anomaly bound is the measured worst case, 1.52 ulps, with a margin of
 // under one ulp, so it fails on a regression of a single ulp's worth of care
@@ -35,7 +35,7 @@ const (
 // float64s, each the rounding of what the earlier ones leave of 2π at 1356
 // bits.
 func TestTwoPiIsThreeExactParts(t *testing.T) {
-	if want := keplerlab.TwoPi(); twoPi != want {
+	if want := oracle.TwoPi(); twoPi != want {
 		t.Errorf("twoPi = %x, want %x", twoPi, want)
 	}
 }
@@ -49,7 +49,7 @@ func TestTwoPiIsThreeExactParts(t *testing.T) {
 func TestSolveKeplerContract(t *testing.T) {
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	for _, e := range keplerlab.Eccentricities() {
+	for _, e := range oracle.Eccentricities() {
 		for _, z := range []float64{0, math.Copysign(0, -1)} {
 			got, err := SolveKepler(angle.Rad(z), e)
 			if err != nil || got.Radians() != 0 || math.Signbit(got.Radians()) != math.Signbit(z) {
@@ -57,7 +57,7 @@ func TestSolveKeplerContract(t *testing.T) {
 			}
 		}
 
-		for _, m := range keplerlab.MeanAnomalies(testing.Short()) {
+		for _, m := range oracle.MeanAnomalies(testing.Short()) {
 			if m == 0 {
 				continue
 			}
@@ -68,9 +68,9 @@ func TestSolveKeplerContract(t *testing.T) {
 			}
 
 			got := ea.Radians()
-			exactE := keplerlab.SolveExact(m, e)
+			exactE := oracle.SolveExact(m, e)
 
-			if rel, _ := keplerlab.ErrorOf(got, exactE); !(rel <= contractAnomalyULPs) {
+			if rel, _ := oracle.ErrorOf(got, exactE); !(rel <= contractAnomalyULPs) {
 				t.Errorf("e = %v, M = %v: E off by %.3g ulps, contract %d", e, m, rel, contractAnomalyULPs)
 			}
 
@@ -96,19 +96,19 @@ func TestSolveKeplerContract(t *testing.T) {
 			aM := el.semiMajorAxis.Meters()
 			n := math.Sqrt(el.CentralBody().GM/(aM*aM*aM)) * constants.Derived.JulianDaySeconds.Value
 
-			wx, wy, wvx, wvy := keplerlab.StateFromE(a, e, n, exactE)
-			dPos, dVel := keplerlab.Sensitivity(a, e, n, exactE)
+			wx, wy, wvx, wvy := oracle.StateFromE(a, e, n, exactE)
+			dPos, dVel := oracle.Sensitivity(a, e, n, exactE)
 
 			ef, _ := exactE.Float64()
 			anomaly := contractAnomalyULPs * 0x1p-52 * math.Abs(ef)
 
-			allowPos := dPos*anomaly + contractStateULPs*0x1p-52*keplerlab.Norm(wx, wy)
-			if d := keplerlab.AbsErr(pos.X, pos.Y, wx, wy); !(d <= allowPos) {
+			allowPos := dPos*anomaly + contractStateULPs*0x1p-52*oracle.Norm(wx, wy)
+			if d := oracle.AbsErr(pos.X, pos.Y, wx, wy); !(d <= allowPos) {
 				t.Errorf("e = %v, M = %v: position off by %.3g AU, contract %.3g AU", e, m, d, allowPos)
 			}
 
-			allowVel := dVel*anomaly + contractStateULPs*0x1p-52*math.Max(keplerlab.Norm(wvx, wvy), n*a)
-			if d := keplerlab.AbsErr(vel.X, vel.Y, wvx, wvy); !(d <= allowVel) {
+			allowVel := dVel*anomaly + contractStateULPs*0x1p-52*math.Max(oracle.Norm(wvx, wvy), n*a)
+			if d := oracle.AbsErr(vel.X, vel.Y, wvx, wvy); !(d <= allowVel) {
 				t.Errorf("e = %v, M = %v: velocity off by %.3g AU/d, contract %.3g AU/d", e, m, d, allowVel)
 			}
 		}
