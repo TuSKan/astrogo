@@ -34,7 +34,7 @@ func TestLimitingMagnitudeAnchorsOnTheSkyItself(t *testing.T) {
 		background   = 12.3 // e/pixel/s
 	)
 
-	got := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background)
+	got := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
 	want := surface - 2.5*math.Log10(pixelArcsec2)
 
 	if math.Abs(got-want) > 1e-12 {
@@ -64,8 +64,8 @@ func TestLimitingMagnitudeUsesThePogsonRatio(t *testing.T) {
 		background   = 100.0
 	)
 
-	at1 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background)
-	at100 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background/100)
+	at1 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
+	at100 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background/100, 1)
 
 	if diff := at100 - at1; math.Abs(diff-5) > 1e-12 {
 		t.Errorf("a source a hundred times fainter is %.12f mag deeper, want exactly 5", diff)
@@ -79,7 +79,7 @@ func TestLimitingMagnitudeDeepensAsTheThresholdFalls(t *testing.T) {
 	prev := math.Inf(-1)
 
 	for _, signal := range []float64{1000, 100, 10, 1, 0.1} {
-		got := sbplan.LimitingMagnitude(21.5, 4, 50, signal)
+		got := sbplan.LimitingMagnitude(21.5, 4, 50, signal, 1)
 
 		if got <= prev {
 			t.Errorf("a threshold of %g e/s gives %.4f, no deeper than the %.4f of the "+
@@ -87,6 +87,31 @@ func TestLimitingMagnitudeDeepensAsTheThresholdFalls(t *testing.T) {
 		}
 
 		prev = got
+	}
+}
+
+// Air that passes a tenth of the light makes the limit exactly 2.5 magnitudes
+// shallower.
+//
+// The threshold counts electrons at the ground, and the magnitude it is
+// compared against is quoted above the air, so a source must be brighter
+// there by whatever the air takes. Getting the sign wrong would deepen the
+// limit by as much as it should shallow it, and still look plausible (#893).
+func TestLimitingMagnitudeChargesTheAirTowardTheTarget(t *testing.T) {
+	t.Parallel()
+
+	const (
+		surface      = 21.5
+		pixelArcsec2 = 4.0
+		background   = 50.0
+		signal       = 2.0
+	)
+
+	ground := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 1)
+	dimmed := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 0.1)
+
+	if diff := ground - dimmed; math.Abs(diff-2.5) > 1e-12 {
+		t.Errorf("air passing a tenth of the light moves the limit %.12f mag shallower, want exactly 2.5", diff)
 	}
 }
 
