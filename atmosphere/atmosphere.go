@@ -349,6 +349,12 @@ func (b *Builder) Surface(pressureHPa, tempK float64) *Builder {
 // alongside the sky-brightness Atmosphere. Pressure/temperature stay owned
 // by Surface; this only touches the fields Surface doesn't set.
 func (b *Builder) Refraction(model RefractionModel, humidityFrac, wavelengthUM float64) *Builder {
+	// Checked alone, as Surface checks its two: a NaN humidity or wavelength
+	// would otherwise reach SOFA's clamps as a plausible number (#903).
+	if err := (Refraction{Humidity: humidityFrac, Wavelength: wavelengthUM}).Validate(); err != nil {
+		b.errs = append(b.errs, err)
+	}
+
 	b.s.surface.Model = model
 	b.s.surface.Humidity = humidityFrac
 	b.s.surface.Wavelength = wavelengthUM

@@ -102,12 +102,57 @@ func (r Refraction) EffectiveWavelength() float64 {
 	return r.Wavelength
 }
 
+// ErrRefraction is returned for a [Refraction] whose fields cannot describe
+// air.
+var ErrRefraction = errors.New("atmosphere: refraction needs a finite pressure of at least 0 hPa, " +
+	"a temperature above absolute zero, a humidity from 0 to 1 and a wavelength of at least 0 µm")
+
+// Validate reports whether r can describe air: a finite pressure of at least
+// 0 hPa (0 is no refraction), a temperature above absolute zero, a humidity
+// from 0 to 1, and a wavelength of at least 0 µm (0 is the visual default,
+// [Refraction.EffectiveWavelength]). The zero value, no refraction at all,
+// is valid.
+//
+// # Why air that fails it refracts as NaN
+//
+// SOFA's iauRefco clamps each input to its domain with a comparison, and NaN
+// fails every comparison, so a NaN came out as the clamp's bound: a NaN
+// temperature refracted as −150 °C, 2.35 times the real refraction at 20°, a
+// NaN wavelength as 0.1 µm, an infinite pressure as 10,000 hPa. Each was a
+// finite, plausible, wrong number (#903). Refraction's own methods and the
+// models here now return NaN for air that fails Validate, so a bad input
+// cannot pass for a real one; a constructor that can return an error, such as
+// plan.NewSite for its horizon air or [Builder.Build], refuses it instead.
+// Finite values inside these bounds but outside SOFA's domain, such as
+// −200 °C, are still clamped as SOFA documents.
+func (r Refraction) Validate() error {
+	finite := func(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
+
+	switch {
+	case !finite(r.Pressure) || r.Pressure < 0:
+		return fmt.Errorf("%w: pressure %g hPa", ErrRefraction, r.Pressure)
+	case !finite(r.Temperature) || r.Temperature <= -273.15:
+		return fmt.Errorf("%w: temperature %g °C", ErrRefraction, r.Temperature)
+	case !(r.Humidity >= 0 && r.Humidity <= 1):
+		return fmt.Errorf("%w: humidity %g", ErrRefraction, r.Humidity)
+	case !finite(r.Wavelength) || r.Wavelength < 0:
+		return fmt.Errorf("%w: wavelength %g µm", ErrRefraction, r.Wavelength)
+	}
+
+	return nil
+}
+
 // RefractFromTrue is the refraction that carries a true geometric altitude to
 // the observed one, using [Refraction.EffectiveModel].
 //
 // Positive: refraction raises an object, so observed = true + this. Prefer it
 // over reaching into Model directly, which is nil under every constructor.
+// Air that fails [Refraction.Validate] refracts as NaN.
 func (r Refraction) RefractFromTrue(trueAlt angle.Angle) angle.Angle {
+	if r.Validate() != nil {
+		return angle.Rad(math.NaN())
+	}
+
 	return r.EffectiveModel().RefractFromTrue(trueAlt, r)
 }
 
@@ -115,7 +160,12 @@ func (r Refraction) RefractFromTrue(trueAlt angle.Angle) angle.Angle {
 // recover the true geometric one, using [Refraction.EffectiveModel].
 //
 // Positive, like [Refraction.RefractFromTrue], so true = observed − this.
+// Air that fails [Refraction.Validate] refracts as NaN.
 func (r Refraction) RefractFromApparent(obsAlt angle.Angle) angle.Angle {
+	if r.Validate() != nil {
+		return angle.Rad(math.NaN())
+	}
+
 	return r.EffectiveModel().RefractFromApparent(obsAlt, r)
 }
 
@@ -162,11 +212,19 @@ type RefractionBennett struct{}
 // RefractFromTrue is Bennett-NA's refraction at the observed altitude a true
 // altitude refracts to.
 func (RefractionBennett) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
+	if env.Validate() != nil {
+		return angle.Rad(math.NaN())
+	}
+
 	return angle.Rad(refraction.BennettFromTrue(trueAlt.Radians(), env.Pressure, env.Temperature, env.Wavelength))
 }
 
 // RefractFromApparent is Bennett-NA's refraction at the observed altitude.
 func (RefractionBennett) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
+	if env.Validate() != nil {
+		return angle.Rad(math.NaN())
+	}
+
 	return angle.Rad(refraction.Bennett(obsAlt.Radians(), env.Pressure, env.Temperature, env.Wavelength))
 }
 
@@ -203,7 +261,11 @@ type RefractionSOFA struct{}
 // one: iauAtioq's Newton-corrected series wherever the observed altitude is
 // above 10°.
 func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle.Angle {
-	if env.Pressure <= 0 {
+	switch {
+	case env.Validate() != nil:
+		// Refco clamps what it is given, NaN included (#903).
+		return angle.Rad(math.NaN())
+	case env.Pressure == 0:
 		return 0
 	}
 
@@ -218,7 +280,10 @@ func (RefractionSOFA) RefractFromTrue(trueAlt angle.Angle, env Refraction) angle
 // series in its defining form above 10°, where the zenith distance is the
 // observed one, as iauAtoiq removes it.
 func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) angle.Angle {
-	if env.Pressure <= 0 {
+	switch {
+	case env.Validate() != nil:
+		return angle.Rad(math.NaN())
+	case env.Pressure == 0:
 		return 0
 	}
 
