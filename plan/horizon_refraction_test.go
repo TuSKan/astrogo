@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -215,6 +216,23 @@ func TestHorizonRefractionIsPartOfTheSite(t *testing.T) {
 	} {
 		if got, want := s.horizonRefraction(), cold.horizonRefraction(); got != want {
 			t.Errorf("%s dropped the horizon air: %.6f°, want %.6f°", name, got, want)
+		}
+	}
+}
+
+// TestNewSiteRefusesHorizonAirThatIsNot: NewSite checks its horizon air, as it
+// checks its horizon angle (#903). A NaN temperature used to refract as
+// SOFA's clamp of it, −150 °C, and move every rise and set.
+func TestNewSiteRefusesHorizonAirThatIsNot(t *testing.T) {
+	t.Parallel()
+
+	for _, air := range []atmosphere.Refraction{
+		{Pressure: 1010, Temperature: math.NaN()},
+		{Pressure: math.Inf(1), Temperature: 10},
+		{Pressure: 1010, Temperature: 10, Humidity: 2},
+	} {
+		if _, err := NewSiteEarthLocation("bad air", 45, 0, 100, WithHorizonRefraction(air)); !errors.Is(err, atmosphere.ErrRefraction) {
+			t.Errorf("%+v: NewSite = %v, want ErrRefraction", air, err)
 		}
 	}
 }

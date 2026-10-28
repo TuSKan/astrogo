@@ -49,6 +49,11 @@ type Context struct {
 	// which depend on the atmosphere alone.
 	refa, refb float64
 
+	// badAir is atm failing [atmosphere.Refraction.Validate]. Every observed
+	// altitude is then NaN, rather than refracted through SOFA's clamp of it
+	// (#903).
+	badAir bool
+
 	site   *Geodetic
 	atm    atmosphere.Refraction
 	astrom gofaext.ASTROM
@@ -125,6 +130,16 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// The effective wavelength: a zero reached SOFA as 0.1 µm, its clamp, and
 	// doubled the refraction (#904).
 	ctx.refa, ctx.refb = gofaext.Refco(p, atm.Temperature, atm.Humidity, atm.EffectiveWavelength())
+
+	// Refco clamps what it is given, so a NaN temperature came out as −150 °C
+	// and refracted 2.35 times too much (#903). Air that is not air makes the
+	// constants NaN, which SOFA's own astrometry carries into every observed
+	// place, and refract makes the rest NaN.
+	if atm.Validate() != nil {
+		ctx.badAir = true
+		ctx.refa, ctx.refb = math.NaN(), math.NaN()
+	}
+
 	ctx.build(t)
 
 	return ctx
@@ -637,6 +652,8 @@ func (ctx *Context) build(t time.Time) {
 // almanacs give 34′ (#588).
 func (ctx *Context) refract(alt angle.Angle) angle.Angle {
 	switch {
+	case ctx.badAir:
+		return angle.Rad(math.NaN())
 	case ctx.atm.Model != nil:
 		return alt + ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:
@@ -709,6 +726,8 @@ func (ctx *Context) geometric() gofaext.ASTROM {
 // one.
 func (ctx *Context) unrefract(alt angle.Angle) angle.Angle {
 	switch {
+	case ctx.badAir:
+		return angle.Rad(math.NaN())
 	case ctx.atm.Model != nil:
 		return alt - ctx.atm.Model.RefractFromApparent(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:

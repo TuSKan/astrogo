@@ -277,3 +277,51 @@ func TestDisperseStillReportsNoDispersionInAVacuum(t *testing.T) {
 		}
 	}
 }
+
+// TestContextRefusesAirThatIsNot: a Context built from a Refraction that
+// fails Validate gives NaN altitudes rather than SOFA's clamp of its inputs
+// (#903). NewContext takes its refraction constants from its own Refco call,
+// which clamped a NaN temperature to −150 °C and refracted 2.35 times too
+// much, and its stellar path reaches SOFA's Atioq with those constants
+// directly. So both paths are checked, the vector one and the stellar one.
+func TestContextRefusesAirThatIsNot(t *testing.T) {
+	t.Parallel()
+
+	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	site := paranalSite(t)
+
+	good := seaLevelAir()
+	star := coord.NewICRS(angle.Hour(16.5), angle.Deg(-26.4)) // Antares, high over Paranal
+
+	for _, c := range []struct {
+		name  string
+		spoil func(*atmosphere.Refraction)
+	}{
+		{"NaN temperature", func(r *atmosphere.Refraction) { r.Temperature = math.NaN() }},
+		{"NaN pressure", func(r *atmosphere.Refraction) { r.Pressure = math.NaN() }},
+		{"infinite pressure", func(r *atmosphere.Refraction) { r.Pressure = math.Inf(1) }},
+		{"NaN wavelength", func(r *atmosphere.Refraction) { r.Wavelength = math.NaN() }},
+	} {
+		air := good
+		c.spoil(&air)
+
+		ctx := coord.NewContext(when, site, air)
+
+		v := vector.Vec3{X: 0.3, Y: -0.4, Z: 0.866}.MulScalar(1e10)
+		if alt := ctx.GeocentricToObserved(v).Alt(); !math.IsNaN(alt.Radians()) {
+			t.Errorf("%s: the vector path gives an altitude of %.4f°, want NaN", c.name, alt.Degrees())
+		}
+
+		aa, err := ctx.ICRSToAltAz(star)
+		if err == nil && !math.IsNaN(aa.Alt().Radians()) {
+			t.Errorf("%s: the stellar path gives an altitude of %.4f°, want NaN", c.name, aa.Alt().Degrees())
+		}
+	}
+
+	// The same star through good air is a number, so the NaN above is the
+	// air's and not the geometry's.
+	aa, err := coord.NewContext(when, site, good).ICRSToAltAz(star)
+	if err != nil || math.IsNaN(aa.Alt().Radians()) {
+		t.Fatalf("through good air: %v, %v", aa.Alt(), err)
+	}
+}

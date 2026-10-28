@@ -304,6 +304,14 @@ func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error
 		return nil, ErrInvalidHorizon
 	}
 
+	// A NaN temperature in the horizon air moved every rise and set by
+	// refracting as −150 °C, SOFA's clamp of it (#903).
+	if s.horizonAir != nil {
+		if err := s.horizonAir.Validate(); err != nil {
+			return nil, fmt.Errorf("plan: site %q horizon refraction: %w", name, err)
+		}
+	}
+
 	return s, nil
 }
 
