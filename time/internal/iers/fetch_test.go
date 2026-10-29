@@ -101,6 +101,7 @@ func clearCooldown() {
 	lastCacheRead = time.Time{}
 	errLastCache = nil
 	errLastFetch = nil
+
 	settled.Store(nil)
 }
 
@@ -441,6 +442,7 @@ func TestSettledAnswerReopensWithTheThrottle(t *testing.T) {
 	_ = EnsureLoaded(41684)
 
 	forgetCacheRead()
+
 	_ = EnsureLoaded(41684)
 
 	if cached, _ := l.counts(); cached != 2 {
@@ -448,6 +450,7 @@ func TestSettledAnswerReopensWithTheThrottle(t *testing.T) {
 	}
 
 	SetRetryCooldown(0)
+
 	_ = EnsureLoaded(41684)
 
 	if _, fetches := l.counts(); fetches != 2 {

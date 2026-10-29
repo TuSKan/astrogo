@@ -205,6 +205,7 @@ func forgetCacheRead() {
 	defer fetchMu.Unlock()
 
 	lastCacheRead = time.Time{}
+
 	settled.Store(nil)
 }
 
@@ -216,6 +217,7 @@ func SetRetryCooldown(d time.Duration) {
 	defer fetchMu.Unlock()
 
 	retryCooldown = d
+
 	settled.Store(nil)
 }
 
