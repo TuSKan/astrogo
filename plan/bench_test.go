@@ -36,7 +36,9 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		_, _ = VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20))
+		if _, err := VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20)); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -48,7 +50,9 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		_, _ = VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20))
+		if _, err := VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20)); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -64,7 +68,9 @@ func BenchmarkOppositions(b *testing.B) {
 	end := start.Add(unit.Days(365))
 
 	for b.Loop() {
-		_, _ = Oppositions(start, end, mars, sun)
+		if _, err := Oppositions(start, end, mars, sun); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -84,7 +90,9 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 	}
 
 	for b.Loop() {
-		_, _ = solver.Find(spec, start, end)
+		if _, err := solver.Find(spec, start, end); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -99,7 +107,9 @@ func BenchmarkObservableWindows(b *testing.B) {
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
 	for b.Loop() {
-		_, _ = ObservableWindows(obj, start, end, unit.Minutes(5), site, constraints...)
+		if _, err := ObservableWindows(obj, start, end, unit.Minutes(5), site, constraints...); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -144,7 +154,9 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	window := Window{Start: start, End: start.Add(unit.Minutes(float64(n) * 15))}
 
 	for b.Loop() {
-		_, _ = strategy.Schedule(planner, window, blocks, tm)
+		if _, err := strategy.Schedule(planner, window, blocks, tm); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -194,7 +206,9 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	end := start.Add(unit.Days(0.5))
 
 	for b.Loop() {
-		_, _, _ = TransitEstimate(obj, site, start, end)
+		if _, _, err := TransitEstimate(obj, site, start, end); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

@@ -31,11 +31,24 @@ func BenchmarkUTCToTDB(b *testing.B) {
 	}
 }
 
+// BenchmarkUTCToUT1 runs with the zero model chosen, not inherited. Unpinned it
+// times whatever Earth orientation the machine holds: 181 ns and two
+// allocations with no cached bulletin, 65 ns and none with one (#914).
+// BenchmarkUTCToUT1EOP measures the orientation present.
 func BenchmarkUTCToUT1(b *testing.B) {
+	RegisterModel(ZeroModel{})
+	b.Cleanup(ResetEOP)
+
+	if got := EOPSource(); got != "explicit" {
+		b.Fatalf("EOP source = %q after pinning, want explicit: the benchmark would time ambient data", got)
+	}
+
 	t := FromJD(2460000.5, UTC)
 
 	for b.Loop() {
-		_, _ = t.UT1()
+		if _, err := t.UT1(); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
