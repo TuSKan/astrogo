@@ -1,0 +1,77 @@
+name: CodeQL
+
+# Advanced setup rather than default setup, for one reason: default setup
+# skips pull requests from forks, and the main-protection ruleset requires a
+# CodeQL result before any merge, so a contributor's PR could never be merged
+# (#923). This workflow analyzes what default setup did, under the same
+# categories, so existing alerts carry over.
+#
+# A fork's run needs the same approval as its CI, and its results upload
+# despite the read-only token: code scanning accepts an upload from any run
+# the pull_request event triggered.
+
+on:
+  # No path filters: every PR must report the check the ruleset requires.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Tuesday at 07:41 UTC, away from the hourly peak and from Monday's
+    # vulnerability scan.
+    - cron: '41 7 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    # Keep these names: they match default setup's, which the ruleset and
+    # the alert history were built against.
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: go
+            build-mode: autobuild
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          # A minor-version spec rather than go-version-file: go.mod (#109).
+          go-version: '1.27'
+          check-latest: true
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:${{ matrix.language }}
