@@ -164,52 +164,25 @@ func TestScatterKernelMatchesTheReferenceFunctions(t *testing.T) {
 	}
 }
 
-// TestScatterKernelSkipsZeroSourceWithoutChangingTheAnswer covers the one
-// shortcut accumulate takes that is not pure arithmetic: it skips a
-// wavelength whose source radiance is zero.
+// accumulate adds one source direction's contribution to dst: the per-sample
+// form of the hemispheric integral, one multiply-add chain per wavelength with
+// every transcendental already evaluated by pathFactor and phaseAt.
 //
-// That is only sound if the contribution would have been zero anyway, which
-// it is — every remaining factor is finite. Worth a test because the branch
-// exists for speed and a future edit could make it skip something that
-// matters.
-func TestScatterKernelSkipsZeroSourceWithoutChangingTheAnswer(t *testing.T) {
-	t.Parallel()
-
-	scene := kernelScene(t)
-	grid := DefaultOpticalGrid()
-
-	k, err := newScatterKernel(scene, grid)
-	if err != nil {
-		t.Fatalf("newScatterKernel: %v", err)
-	}
-
-	phaseRayleigh, phaseAerosol, err := k.phaseAt(math.Pi / 3)
-	if err != nil {
-		t.Fatalf("phaseAt: %v", err)
-	}
-
-	path := make([]float64, grid.Len())
-	k.pathFactor(path, 1.4, 2.2)
-
-	// Every other wavelength carries no light.
-	sparse := make([]float64, grid.Len())
-	for i := range sparse {
-		if i%2 == 0 {
-			sparse[i] = 3e-9
-		}
-	}
-
-	got := make([]float64, grid.Len())
-	k.accumulate(got, sparse, path, 0.02, phaseRayleigh, phaseAerosol)
-
-	for i := range got {
-		if i%2 == 1 && got[i] != 0 {
-			t.Errorf("wavelength %d had no source but accumulated %g", i, got[i])
+// Production no longer calls it. The integral factors this sum by ring through
+// [sumRingSample] and [scatterKernel.applyRing], and the tests hold that to
+// this, which is kept here for the reason scatterIntoPerSample is: the
+// definition belongs with the checks that use it, and a second implementation
+// in the package would be a second thing to keep right.
+func (k *scatterKernel) accumulate(
+	dst, source, path []float64, dOmega, phaseRayleigh, phaseAerosol float64,
+) {
+	for i, radiance := range source {
+		if radiance == 0 {
+			continue
 		}
 
-		if i%2 == 0 && got[i] == 0 {
-			t.Errorf("wavelength %d had a source and accumulated nothing", i)
-		}
+		phase := k.rayleighWeight[i]*phaseRayleigh + k.aerosolWeight[i]*phaseAerosol
+		dst[i] += radiance * dOmega * phase * path[i]
 	}
 }
 

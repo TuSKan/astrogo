@@ -146,6 +146,35 @@ func TestScatteredInMatchesPerSampleAccumulation(t *testing.T) {
 	}
 }
 
+// A wavelength the incoming field leaves dark stays exactly dark, and a lit one
+// gains light. Nothing may leak between wavelengths: the sums are indexed by
+// wavelength and a slip of one index would put light where the field has none.
+// The per-sample loop used to guarantee this by skipping a dark wavelength; the
+// ring sums reach it by arithmetic, since a zero radiance adds a zero.
+func TestScatteredInLeavesDarkWavelengthsDark(t *testing.T) {
+	t.Parallel()
+
+	grid := DefaultOpticalGrid()
+	dst := NewSpectralRadiance(grid)
+
+	if err := ScatteredIn(t.Context(), dst, patternSky(true), aerosolScene(t),
+		coord.NewAltAz(angle.Deg(45), angle.Deg(10)), grid, 0); err != nil {
+		t.Fatalf("ScatteredIn: %v", err)
+	}
+
+	for i := range dst {
+		dark := i%3 == 0 // patternSky(true) leaves every third wavelength dark
+
+		if dark && dst[i] != 0 {
+			t.Errorf("wavelength %d had no light but gained %g", i, dst[i])
+		}
+
+		if !dark && dst[i] <= 0 {
+			t.Errorf("wavelength %d was lit but gained %g", i, dst[i])
+		}
+	}
+}
+
 // The incoming field is the expensive part of the integral, so it is asked for
 // once per quadrature sample, in order, exactly as before: grouping the sums by
 // ring must not change how often or in what sequence the caller is called.

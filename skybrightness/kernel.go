@@ -161,8 +161,9 @@ func sumRingSample(sumRayleigh, sumAerosol, source []float64, coefRayleigh, coef
 // extinction, applies the ring's path factor, adds the result to dst, and
 // clears the sums ready for the next ring.
 //
-// What [scatterKernel.accumulate] does per sample, done once for all of a
-// ring's samples. Every factor it applies is constant around the ring.
+// What a per-sample accumulation applies to every sample, applied once for all
+// of a ring's samples. Every factor it applies is constant around the ring.
+// The tests hold this and [sumRingSample] to that per-sample form.
 func (k *scatterKernel) applyRing(dst, sumRayleigh, sumAerosol, path []float64) {
 	n := len(dst)
 	sumRayleigh, sumAerosol, path = sumRayleigh[:n], sumAerosol[:n], path[:n]
@@ -174,26 +175,6 @@ func (k *scatterKernel) applyRing(dst, sumRayleigh, sumAerosol, path []float64) 
 
 	clear(sumRayleigh)
 	clear(sumAerosol)
-}
-
-// accumulate adds one source direction's contribution to dst.
-//
-// The per-sample form of the integral: one multiply-add chain per wavelength,
-// with every transcendental already evaluated by pathFactor and phaseAt. The
-// integral itself goes through [sumRingSample] and [scatterKernel.applyRing],
-// which factor this same sum by ring; this is the form they are held to, and
-// the definition a reader checks them against.
-func (k *scatterKernel) accumulate(
-	dst, source, path []float64, dOmega, phaseRayleigh, phaseAerosol float64,
-) {
-	for i, radiance := range source {
-		if radiance == 0 {
-			continue
-		}
-
-		phase := k.rayleighWeight[i]*phaseRayleigh + k.aerosolWeight[i]*phaseAerosol
-		dst[i] += radiance * dOmega * phase * path[i]
-	}
 }
 
 // quadraturePoint is one sample of the hemispheric integral.
