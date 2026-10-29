@@ -1,9 +1,12 @@
 package skybrightness
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -126,4 +129,92 @@ func (b *UncertaintyBudget) Dominant(weights map[ComponentID]unit.Radiance) (Unc
 	}
 
 	return best, bestC
+}
+
+// spectralUncertainty accumulates a component's relative uncertainty over the
+// grid, each sample weighted by the radiance it adds with the trapezoid
+// weights [unit.SpectralGrid.Integrate] uses, so the result is the relative
+// uncertainty of exactly the integrated radiance [UncertaintyBudget.Total]
+// weighs the component by.
+//
+// The samples combine linearly, as a fully correlated error does: the terms
+// that dominate here - a calibration scale, a fitted slope, a scattering
+// coefficient - move a whole spectrum together, not one wavelength at a time.
+type spectralUncertainty struct {
+	weighted, radiance float64
+}
+
+// add records sample i, which added radiance with the given relative
+// uncertainty.
+func (u *spectralUncertainty) add(grid unit.SpectralGrid, i int, radiance, relative float64) {
+	w := radiance
+	if i == 0 || i == grid.Len()-1 {
+		w *= 0.5
+	}
+
+	u.weighted += w * relative
+	u.radiance += w
+}
+
+// contribution reports what was accumulated, with flags. A component that
+// added no radiance has nothing to be uncertain about, so its uncertainty
+// stays unknown, which the budget does not ask of a dark component.
+func (u *spectralUncertainty) contribution(flags Flag, source string) Contribution {
+	if u.radiance <= 0 {
+		return Contribution{Flags: flags}
+	}
+
+	return Contribution{Flags: flags, Relative: u.weighted / u.radiance, Source: source, Known: true}
+}
+
+// ErrUncertaintyValue is returned for a supplied relative uncertainty that is
+// negative or not finite, or for no component to attach it to.
+var ErrUncertaintyValue = errors.New("skybrightness: a supplied uncertainty needs a component and a non-negative, finite relative value")
+
+// WithUncertainty returns c reporting relative, with source, as the 1-sigma
+// relative uncertainty of every radiance it adds, in place of whatever c
+// reports itself.
+//
+// It is how a caller supplies the uncertainty of what the caller supplied:
+// airglow's zenith spectrum, integrated starlight's map and shape, an
+// artificial-light source inventory. Those components report an unknown
+// uncertainty on their own, because it belongs to the caller's data rather than
+// to the model. A caller who knows it says so here, and one who does not leaves
+// [Estimate.TotalUncertainty] reporting [ErrUncertaintyUnknown], naming the
+// component.
+//
+// It also replaces a figure a component does report, for a caller who holds a
+// better one, such as a measurement of the night being modeled.
+func WithUncertainty(c Component, relative float64, source string) (Component, error) {
+	if c == nil || relative < 0 || math.IsNaN(relative) || math.IsInf(relative, 0) {
+		return nil, fmt.Errorf("%w: %g", ErrUncertaintyValue, relative)
+	}
+
+	return &suppliedUncertainty{Component: c, relative: relative, source: source}, nil
+}
+
+// suppliedUncertainty is a component reporting a caller's uncertainty.
+type suppliedUncertainty struct {
+	Component
+
+	relative float64
+	source   string
+}
+
+// AddRadiance implements [Component].
+func (s *suppliedUncertainty) AddRadiance(
+	ctx context.Context,
+	dst SpectralRadiance,
+	grid unit.SpectralGrid,
+	dir coord.AltAz,
+	scene *Scene,
+) (Contribution, error) {
+	contribution, err := s.Component.AddRadiance(ctx, dst, grid, dir, scene)
+	if err != nil {
+		return contribution, fmt.Errorf("skybrightness: %s: %w", s.ID(), err)
+	}
+
+	contribution.Relative, contribution.Source, contribution.Known = s.relative, s.source, true
+
+	return contribution, nil
 }

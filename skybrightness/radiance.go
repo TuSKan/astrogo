@@ -73,18 +73,43 @@ type Component interface {
 	ID() ComponentID
 
 	// AddRadiance accumulates this component's observer-level spectral
-	// radiance for one viewing direction into dst, and reports the quality
-	// flags that apply to what it just computed.
+	// radiance for one viewing direction into dst, and reports what applies
+	// to what it just computed: its quality flags and its uncertainty.
 	//
-	// Flags are returned per call rather than fixed per component because
+	// Both are returned per call rather than fixed per component because
 	// they depend on the scene: the same model is an interpolation in one
-	// geometry and an extrapolation in another, and a caller deciding
-	// whether to trust a number needs to know which case this was.
-	AddRadiance(ctx context.Context, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) (Flag, error)
+	// geometry and an extrapolation in another, and zodiacal light known to
+	// 10 per cent in the bright ecliptic is known to 25 near the pole. The
+	// uncertainty comes from the same call because what it depends on - a
+	// dust column, a zodiacal brightness, an optical depth - exists only
+	// while the radiance is being computed.
+	AddRadiance(ctx context.Context, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) (Contribution, error)
 
 	// Provenance describes the model, its references and its validity
 	// domain, so a result can be traced to the science behind it.
 	Provenance() Provenance
+}
+
+// Contribution is what one [Component.AddRadiance] call reports about the
+// radiance it added.
+//
+// The zero value is no flags and an unknown uncertainty. That default is the
+// point: a component that says nothing about its uncertainty reports an
+// unknown one, never a perfectly certain one, which is what the budget held
+// before #911.
+type Contribution struct {
+	// Flags are the quality flags that apply to what was just computed.
+	Flags Flag
+
+	// Relative is the 1-sigma relative standard uncertainty on the radiance
+	// just added, integrated over the grid. It is meaningful only when Known.
+	Relative float64
+
+	// Source names what dominates Relative, as [Uncertainty.Source] does.
+	Source string
+
+	// Known reports whether the component could establish Relative at all.
+	Known bool
 }
 
 // checkComponents reports duplicate IDs in a component set.

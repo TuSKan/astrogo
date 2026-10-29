@@ -226,12 +226,27 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 
 		buf := NewSpectralRadiance(grid)
 
-		flags, err := c.AddRadiance(ctx, buf, grid, q.Direction, q.Scene)
+		contribution, err := c.AddRadiance(ctx, buf, grid, q.Direction, q.Scene)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %q: %w", ErrComponentFailed, c.ID(), err)
 		}
 
-		est.Quality.Add(flags)
+		est.Quality.Add(contribution.Flags)
+
+		if contribution.Known {
+			// A relative uncertainty that is negative or not finite is a
+			// defect in the component, and the budget would carry it into
+			// every total silently.
+			if r := contribution.Relative; r < 0 || math.IsNaN(r) || math.IsInf(r, 0) {
+				return nil, fmt.Errorf("%w: %q: relative uncertainty %g", ErrComponentFailed, c.ID(), r)
+			}
+
+			est.Uncertainty.Add(Uncertainty{
+				Component: c.ID(),
+				Relative:  contribution.Relative,
+				Source:    contribution.Source,
+			})
+		}
 
 		// Validate per component, not just on the total: a negative term
 		// canceled by a positive one would otherwise pass unnoticed, and

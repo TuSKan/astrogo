@@ -169,10 +169,12 @@ func TestScatteredMoonlightFullMoonSkyBrightness(t *testing.T) {
 	// a real scattering angle rather than a line of sight through the Moon.
 	dir := coord.NewAltAz(angle.Deg(90), angle.Deg(0))
 
-	flags, err := component.AddRadiance(context.Background(), dst, grid, dir, scene)
+	contribution, err := component.AddRadiance(context.Background(), dst, grid, dir, scene)
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
+	flags := contribution.Flags
 
 	if flags&skybrightness.ApproximateMultipleScattering == 0 {
 		t.Error("the component did not flag its multiple-scattering treatment as approximate")

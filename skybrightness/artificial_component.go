@@ -152,23 +152,23 @@ func (a *ArtificialSkyglow) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if err := scene.Validate(); err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	geom, err := a.geometry(scene, grid)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if dir.Alt() <= 0 {
-		return geom.flags, nil
+		return Contribution{Flags: geom.flags}, nil
 	}
 
 	// Gushchin's airmass, not Pickering's: the two-index model is calibrated
@@ -176,7 +176,7 @@ func (a *ArtificialSkyglow) AddRadiance(
 	// the kernel's own limit.
 	viewAirmass, err := atmosphere.GushchinAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: artificial: view airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: artificial: view airmass: %w", err)
 	}
 
 	view := dir.ToUnitVector()
@@ -197,7 +197,7 @@ func (a *ArtificialSkyglow) AddRadiance(
 		scatter := angle.Acos(clamp(src.direction.ToUnitVector().Dot(view), -1, 1))
 
 		if err := src.addTo(total, scatter, src.airmass, viewAirmass); err != nil {
-			return 0, err
+			return Contribution{}, err
 		}
 	}
 
@@ -205,7 +205,7 @@ func (a *ArtificialSkyglow) AddRadiance(
 		dst[i] += total[i]
 	}
 
-	return geom.flags, nil
+	return Contribution{Flags: geom.flags}, nil
 }
 
 // addTo accumulates one source's contribution across the band set.

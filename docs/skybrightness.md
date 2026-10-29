@@ -223,7 +223,7 @@ The fidelity used is recorded in `Reproducibility`.
 ```go
 type Component interface {
     ID() ComponentID
-    AddRadiance(ctx, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) error
+    AddRadiance(ctx, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) (Contribution, error)
     Provenance() Provenance
 }
 ```
@@ -258,12 +258,30 @@ loading, assumed source spectra — are multiplicative. Independence is not assu
 `UncertaintyBudget.Correlated` combines linearly when terms share a systematic.
 
 A component that gives light with no entry in the budget makes the total unknown, not
-zero: `Estimate.TotalUncertainty` returns `ErrUncertaintyUnknown` naming it. **No component
-fills its entry yet** (#911), so every estimate currently reports its uncertainty as unknown.
-Until #911 it reported 0. The entries can come only from figures the components' sources
-quote (`Provenance.ExpectedAccuracy`), and the components fed by a caller's own data, such
-as the airglow spectrum and the star map, carry that data's uncertainty, which only the
-caller knows.
+zero: `Estimate.TotalUncertainty` returns `ErrUncertaintyUnknown` naming it. Until #911 it
+reported 0, a perfectly certain prediction from a budget nothing filled.
+
+Each `AddRadiance` call reports its own entry in its `Contribution`, because what the
+figure depends on - a dust column, a zodiacal brightness, an optical depth - exists only
+while the radiance is computed. Every per-wavelength figure is weighted by the radiance it
+applies to, with `SpectralGrid.Integrate`'s trapezoid weights, and combined linearly, as
+the correlated errors these are behave. The figures come from the components' sources and
+nowhere else:
+
+| component | relative uncertainty | source |
+|---|---|---|
+| extragalactic | 4.0–6.9 % by band | Koushan et al. (2021) Table 3 total error |
+| zodiacal | max(10 %, 15 S10 / brightness), 20 % floor below 300 nm; about 27 % at the ecliptic poles | Leinert et al. (1998) |
+| diffuse galactic | Eq. 7 propagated: slope and quadratic from Table 2, offset 0.8 ± 0.21 MJy sr⁻¹ (Eq. 9); none outside the fitted range or where the starlight cap binds | Kawara et al. (2017), Lagache et al. (2000) |
+| moonlight | ROLO's 10 % absolute scale ⊕ the Noll–Winkler spread of the multiple-scattering coefficient: 16 % in V at Paranal, 18 % at sea level | Stone & Kieffer (2004), Noll et al. (2012), Winkler (2022) |
+| airglow, starlight, artificial | the caller's, through `WithUncertainty` | the caller's data |
+
+Moonlight's figure stays below the 0.2 mag (about 20 %) Jones et al. (2013) found for a
+full radiative-transfer model against 141 spectra, which is the check that its two terms
+are the right size. Velikodsky et al. (2011) find ROLO 13 % faint at 603 nm; that offset
+is recorded in the provenance rather than corrected. The components built from a caller's
+own data report no figure, because their uncertainty is that data's: a natural sky with
+no `WithUncertainty` around them reports `ErrUncertaintyUnknown` naming exactly those.
 
 **Quality** flags record how the prediction was constrained: measured versus
 climatological atmosphere, aerosol, cloud, airglow; measured versus assumed source spectrum
@@ -682,7 +700,8 @@ input because this package ships none and the choice moves the absolute scale.
 component, while there were still zero implementations and the change was free. Flags
 cannot be fixed per component: the same model is an interpolation in one geometry and an
 extrapolation in another, and a caller deciding whether to trust a number needs to know
-which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`.
+which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`. The flags
+now travel in a `Contribution` with the call's uncertainty (#911), for the same reason.
 
 **Atmospheric scattering — Winkler (2022).** The revised simplified scattering model,
 derived from SAAO Sutherland multifilter photometry across a wide range of sky directions,

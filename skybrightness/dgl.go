@@ -120,13 +120,35 @@ const dglQuadraticScale = 1e-5
 // table stops at 648, and the slope is still rising there, so a linear
 // extrapolation would keep climbing with nothing to check it.
 func DGLCoefficientsAt(lambda unit.WavelengthNM) (b, c float64, extrapolated bool) {
+	b, extrapolated = dglAt(lambda, dimensionlessSlope)
+	c, _ = dglAt(lambda, func(row dglCoefficient) float64 { return row.C })
+
+	return b, c * dglQuadraticScale, extrapolated
+}
+
+// dglCoefficientUncertaintiesAt returns the uncertainties of b and c at one
+// wavelength, interpolated as [DGLCoefficientsAt] interpolates the
+// coefficients and in the same units.
+func dglCoefficientUncertaintiesAt(lambda unit.WavelengthNM) (sigmaB, sigmaC float64) {
+	sigmaB, _ = dglAt(lambda, func(row dglCoefficient) float64 {
+		return row.SigmaNuB * float64(row.Lambda) / 1000 / 3000
+	})
+	sigmaC, _ = dglAt(lambda, func(row dglCoefficient) float64 { return row.SigmaC })
+
+	return sigmaB, sigmaC * dglQuadraticScale
+}
+
+// dglAt interpolates one quantity of the table's rows linearly at lambda,
+// holding the nearest endpoint outside the tabulated 225 to 648 nm and
+// reporting that it did.
+func dglAt(lambda unit.WavelengthNM, of func(dglCoefficient) float64) (value float64, extrapolated bool) {
 	first, last := dglCoefficients[0], dglCoefficients[len(dglCoefficients)-1]
 
 	switch {
 	case lambda <= first.Lambda:
-		return dimensionlessSlope(first), first.C * dglQuadraticScale, lambda < first.Lambda
+		return of(first), lambda < first.Lambda
 	case lambda >= last.Lambda:
-		return dimensionlessSlope(last), last.C * dglQuadraticScale, lambda > last.Lambda
+		return of(last), lambda > last.Lambda
 	}
 
 	for i := 1; i < len(dglCoefficients); i++ {
@@ -138,14 +160,53 @@ func DGLCoefficientsAt(lambda unit.WavelengthNM) (b, c float64, extrapolated boo
 		lo := dglCoefficients[i-1]
 		f := float64(lambda-lo.Lambda) / float64(hi.Lambda-lo.Lambda)
 
-		bLo, bHi := dimensionlessSlope(lo), dimensionlessSlope(hi)
-
-		return bLo + f*(bHi-bLo),
-			(lo.C + f*(hi.C-lo.C)) * dglQuadraticScale,
-			false
+		return of(lo) + f*(of(hi)-of(lo)), false
 	}
 
-	return dimensionlessSlope(last), last.C * dglQuadraticScale, false
+	return of(last), false
+}
+
+// dglOffsetUncertaintyMJy is the uncertainty of the non-ISM offset subtracted
+// from the 100 micron intensity, [DustEmissionOffsetMJy]: 0.78 +/- 0.21
+// MJy sr^-1 by Lagache et al. (2000), as Kawara et al. (2017) cite it.
+const dglOffsetUncertaintyMJy = 0.21
+
+// dglRelativeUncertainty is the relative uncertainty of the diffuse galactic
+// light at one wavelength, along a sightline whose SFD 100 micron intensity is
+// sfdIntensity, and whether one can be given at all.
+//
+// It propagates Eq. 7, D = b*I - c*I^2 with I = I_SFD - 0.8, to first order:
+//
+//	sigma_D^2 = I^2 sigma_b^2 + I^4 sigma_c^2 + (b - 2cI)^2 sigma_I^2
+//
+// The last term is Kawara et al.'s own Eq. 9, with sigma_I the offset's
+// uncertainty; the first two are Table 2's, treated as independent because the
+// paper gives no covariance. The SFD map's own error is not included: it is a
+// property of the caller's dust map, not of this model.
+//
+// There is no figure outside the regime the correlation was fitted over: a
+// sightline at or below the offset, above [MaxDustIntensityMJy], or past the
+// quadratic's turnover.
+func dglRelativeUncertainty(lambda unit.WavelengthNM, sfdIntensity float64) (float64, bool) {
+	i100 := sfdIntensity - DustEmissionOffsetMJy
+	if i100 <= 0 || i100 > MaxDustIntensityMJy {
+		return 0, false
+	}
+
+	b, c, _ := DGLCoefficientsAt(lambda)
+	if c > 0 && i100 >= b/(2*c) {
+		return 0, false
+	}
+
+	sigmaB, sigmaC := dglCoefficientUncertaintiesAt(lambda)
+	slope := b - 2*c*i100
+	value := b*i100 - c*i100*i100
+
+	variance := i100*i100*sigmaB*sigmaB +
+		i100*i100*i100*i100*sigmaC*sigmaC +
+		slope*slope*dglOffsetUncertaintyMJy*dglOffsetUncertaintyMJy
+
+	return math.Sqrt(variance) / value, true
 }
 
 // dimensionlessSlope converts the tabulated nu*b_i into Eq. 7's b_i.

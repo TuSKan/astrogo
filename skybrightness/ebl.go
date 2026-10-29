@@ -87,6 +87,10 @@ type ExtragalacticBackground struct {
 	// spectral holds I_lambda in W m^-2 sr^-1 nm^-1 at each tabulated pivot
 	// wavelength, precomputed so evaluation is interpolation only.
 	spectral []float64
+
+	// relative holds Table 3's total error at each pivot wavelength, as a
+	// fraction of the integrated galaxy light there.
+	relative []float64
 }
 
 // NewExtragalacticBackground returns the component over the published table.
@@ -96,13 +100,15 @@ type ExtragalacticBackground struct {
 // no site, epoch or geometry dependence.
 func NewExtragalacticBackground() *ExtragalacticBackground {
 	spectral := make([]float64, len(koushanIGL))
+	relative := make([]float64, len(koushanIGL))
 
 	for i, p := range koushanIGL {
 		// nu*I_nu [nW m^-2 sr^-1] -> I_lambda [W m^-2 sr^-1 nm^-1].
 		spectral[i] = p.NuInu * 1e-9 / p.PivotNM
+		relative[i] = p.TotalErrorPercent / 100
 	}
 
-	return &ExtragalacticBackground{spectral: spectral}
+	return &ExtragalacticBackground{spectral: spectral, relative: relative}
 }
 
 // ID implements [Component].
@@ -117,24 +123,24 @@ func (e *ExtragalacticBackground) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: extragalactic: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: extragalactic: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: extragalactic: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: extragalactic: ozone airmass: %w", err)
 	}
 
 	pressure, _ := scene.Atmosphere.Surface()
@@ -144,17 +150,19 @@ func (e *ExtragalacticBackground) AddRadiance(
 
 	flags := Flag(0)
 
+	var uncertainty spectralUncertainty
+
 	for i := range dst {
 		lambda := grid.At(i)
 
-		value, extrapolated := e.at(float64(lambda))
+		value, extrapolated := interpolatePivots(e.spectral, float64(lambda))
 		if extrapolated {
 			flags |= ExtrapolatedModel
 		}
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: extragalactic: %w", err)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -165,18 +173,25 @@ func (e *ExtragalacticBackground) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
 		}
 
 		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: extragalactic: %w", err)
 		}
 
-		dst[i] += value * float64(atmosphere.Transmission(slant)) * ozone
+		added := value * float64(atmosphere.Transmission(slant)) * ozone
+		dst[i] += added
+
+		relative, _ := interpolatePivots(e.relative, float64(lambda))
+		uncertainty.add(grid, i, added, relative)
 	}
 
-	return flags, nil
+	// Koushan et al.'s total error is a measurement error on what they
+	// counted. That the count is a floor is a different matter, and their
+	// gamma-ray comparison bounds the room above it as small.
+	return uncertainty.contribution(flags, "Koushan et al. (2021) Table 3 total error"), nil
 }
 
 // Provenance implements [Component].
@@ -209,8 +224,9 @@ func (e *ExtragalacticBackground) Provenance() Provenance {
 	}
 }
 
-// at interpolates the tabulated spectral radiance, reporting whether the
-// wavelength fell outside the measured range.
+// interpolatePivots interpolates a table given at Koushan et al.'s pivot
+// wavelengths - the spectral radiance, or its relative error - reporting
+// whether the wavelength fell outside the measured range.
 //
 // Outside the table the endpoint value is held rather than extrapolated. Nine
 // points spanning 357.7 to 2154.9 nm do not constrain a slope beyond their
@@ -223,15 +239,15 @@ func (e *ExtragalacticBackground) Provenance() Provenance {
 // turns over by Ks, so a straight line between neighboring pivots is within a
 // few per cent of any smoother curve through the same points — comfortably
 // inside the 4 to 7 per cent the measurements themselves carry.
-func (e *ExtragalacticBackground) at(lambdaNM float64) (value float64, extrapolated bool) {
+func interpolatePivots(table []float64, lambdaNM float64) (value float64, extrapolated bool) {
 	n := len(koushanIGL)
 
 	if lambdaNM <= koushanIGL[0].PivotNM {
-		return e.spectral[0], lambdaNM < koushanIGL[0].PivotNM
+		return table[0], lambdaNM < koushanIGL[0].PivotNM
 	}
 
 	if lambdaNM >= koushanIGL[n-1].PivotNM {
-		return e.spectral[n-1], lambdaNM > koushanIGL[n-1].PivotNM
+		return table[n-1], lambdaNM > koushanIGL[n-1].PivotNM
 	}
 
 	i := sort.Search(n, func(k int) bool { return koushanIGL[k].PivotNM >= lambdaNM })
@@ -239,5 +255,5 @@ func (e *ExtragalacticBackground) at(lambdaNM float64) (value float64, extrapola
 	lo, hi := koushanIGL[i-1].PivotNM, koushanIGL[i].PivotNM
 	t := (lambdaNM - lo) / (hi - lo)
 
-	return e.spectral[i-1] + t*(e.spectral[i]-e.spectral[i-1]), false
+	return table[i-1] + t*(table[i]-table[i-1]), false
 }

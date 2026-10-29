@@ -226,20 +226,20 @@ func (c *CloudySkyglow) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	// Below the horizon there is no sky to look at.
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	deck, err := c.deck(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	var flags Flag
@@ -248,18 +248,18 @@ func (c *CloudySkyglow) AddRadiance(
 
 	for _, e := range c.emitters {
 		if err := ctx.Err(); err != nil {
-			return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
 		}
 
 		f, err := c.addEmitter(dst, buf, grid, dir, scene, e, deck)
 		if err != nil {
-			return 0, err
+			return Contribution{}, err
 		}
 
 		flags |= f
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // deck resolves the cloud layer into an integration ceiling and a
