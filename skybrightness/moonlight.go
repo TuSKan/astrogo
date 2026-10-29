@@ -293,12 +293,12 @@ const (
 func moonlightRelativeUncertainty(lambda unit.WavelengthNM, pressureHPa float64) (float64, error) {
 	rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, pressureHPa)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("uncertainty: %w", err)
 	}
 
 	winkler, err := atmosphere.MultipleScatteringFactor(rayleigh)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("uncertainty: %w", err)
 	}
 
 	noll := 1 + nollMultipleScattering*float64(rayleigh)

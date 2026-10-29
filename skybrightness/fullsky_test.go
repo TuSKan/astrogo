@@ -2,7 +2,9 @@ package skybrightness_test
 
 import (
 	"context"
+	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -433,4 +435,48 @@ func BenchmarkFullSkyEstimate(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// TestFullSkyUncertainty: on the assembled sky, the components with sourced
+// uncertainties report them, and the three built from the caller's own data -
+// the airglow spectrum, the star map, the city - do not, so the total names
+// exactly what the caller still has to supply (#911).
+func TestFullSkyUncertainty(t *testing.T) {
+	t.Parallel()
+
+	when, _ := nearFullMoonUp(t)
+	model, scene, grid := assembleSky(t, when)
+
+	est, err := model.Estimate(context.Background(), skybrightness.Query{
+		Scene:     scene,
+		Direction: coord.NewAltAz(angle.Deg(40), angle.Deg(10)),
+		Grid:      grid,
+	})
+	if err != nil {
+		t.Fatalf("Estimate: %v", err)
+	}
+
+	known := map[skybrightness.ComponentID]float64{}
+	for _, u := range est.Uncertainty.Components {
+		known[u.Component] = u.Relative
+	}
+
+	for _, id := range []skybrightness.ComponentID{skybrightness.Moonlight, skybrightness.Zodiacal} {
+		if _, ok := known[id]; !ok {
+			t.Errorf("%s reports no uncertainty; its sources give one", id)
+		}
+	}
+
+	_, err = est.TotalUncertainty()
+	if !errors.Is(err, skybrightness.ErrUncertaintyUnknown) {
+		t.Fatalf("TotalUncertainty error = %v, want ErrUncertaintyUnknown", err)
+	}
+
+	for _, id := range []string{"airglow-continuum", "artificial", "starlight"} {
+		if !strings.Contains(err.Error(), id) {
+			t.Errorf("the total does not name %s, whose uncertainty only the caller can supply: %v", id, err)
+		}
+	}
+
+	t.Logf("budget: %+v", est.Uncertainty.Components)
 }

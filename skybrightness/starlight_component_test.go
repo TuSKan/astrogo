@@ -108,6 +108,7 @@ func starlightAt(
 	if err != nil {
 		t.Fatalf("AddRadiance at %g degrees: %v", alt, err)
 	}
+
 	flags = contribution.Flags
 
 	mean, err = magnitude.MeanFluxDensity(dst, grid, testBand(), 0.99)
@@ -289,6 +290,7 @@ func TestIntegratedStarlightFlagsMissingCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
 	flags := contribution.Flags
 
 	if flags&skybrightness.UnknownCloud == 0 {
@@ -468,6 +470,7 @@ func TestDiffuseGalacticLightIsCappedAgainstStarlight(t *testing.T) {
 		if err != nil {
 			t.Fatalf("AddRadiance: %v", err)
 		}
+
 		flags := contribution.Flags
 
 		mean, err := magnitude.MeanFluxDensity(dst, grid, testBand(), 0)
@@ -560,6 +563,7 @@ func TestDiffuseGalacticLightWithoutAMapSaysItIsUnbounded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
 	flags := contribution.Flags
 
 	if flags&skybrightness.ExtrapolatedModel == 0 {
@@ -587,6 +591,7 @@ func TestDiffuseGalacticLightUncoveredSightlineIsNotCappedToZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
 	flags := contribution.Flags
 
 	var total float64

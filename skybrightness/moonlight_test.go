@@ -173,6 +173,7 @@ func TestScatteredMoonlightFullMoonSkyBrightness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
 	flags := contribution.Flags
 
 	if flags&skybrightness.ApproximateMultipleScattering == 0 {

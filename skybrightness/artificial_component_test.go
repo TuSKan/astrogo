@@ -310,6 +310,7 @@ func TestArtificialSkyglowPropagatesEmitterFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+
 	flags := contribution.Flags
 
 	if flags&skybrightness.AssumedSourceSpectrum == 0 {

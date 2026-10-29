@@ -352,6 +352,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 		relative, ok := dglRelativeUncertainty(lambda, intensity)
 		known = known && ok
+
 		uncertainty.add(grid, i, added, relative)
 	}
 
@@ -608,8 +609,11 @@ func (z *ZodiacalLight) Provenance() Provenance {
 			"Only the directly attenuated term is applied; light scattered out of " +
 				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
-		ExpectedAccuracy: "Leinert et al. describe the table as good to roughly 10 per " +
-			"cent away from the solar vicinity.",
+		ExpectedAccuracy: "Leinert et al. give the visual zodiacal light as known to " +
+			"10% at best, with the table's brightnesses uncertain by 10-15 S10 " +
+			"where faint and 5-10% where bright, and hardly better than 20% below " +
+			"300 nm. The uncertainty budget carries max(10%, 15 S10 / brightness), " +
+			"about 27% toward the ecliptic poles.",
 	}
 }
 
