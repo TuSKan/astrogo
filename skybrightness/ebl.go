@@ -221,6 +221,12 @@ func (e *ExtragalacticBackground) Provenance() Provenance {
 			"Only the directly attenuated term is applied; light scattered out of " +
 				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
+		ExpectedAccuracy: "Koushan et al. Table 3 gives the integrated galaxy light to " +
+			"4.0-6.9% from u to Ks, its four error terms added in quadrature, and the " +
+			"uncertainty budget carries it. That is the error of a lower limit: " +
+			"undetected galaxies and diffuse light are absent by construction, and " +
+			"only their gamma-ray comparison bounds how far above it the true " +
+			"background lies.",
 	}
 }
 

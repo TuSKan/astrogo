@@ -2,7 +2,9 @@ package skybrightness
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -276,6 +278,26 @@ func TestExtragalacticProvenanceRecordsTheLowerLimit(t *testing.T) {
 
 	if !saysLimit {
 		t.Errorf("provenance does not record that the IGL is a lower limit: %v", p.KnownApproximations)
+	}
+}
+
+// TestExtragalacticAccuracyMatchesTheTable holds the range the provenance
+// quotes to the table's total errors, rounded as the text rounds them, so the
+// two cannot drift apart (#936).
+func TestExtragalacticAccuracyMatchesTheTable(t *testing.T) {
+	t.Parallel()
+
+	lo, hi := math.Inf(1), math.Inf(-1)
+
+	for _, p := range koushanIGL {
+		lo, hi = min(lo, p.TotalErrorPercent), max(hi, p.TotalErrorPercent)
+	}
+
+	figure := fmt.Sprintf("%.1f-%.1f%% from u to Ks", lo, hi)
+
+	text := NewExtragalacticBackground().Provenance().ExpectedAccuracy
+	if !strings.Contains(text, figure) {
+		t.Errorf("the provenance does not quote the table's %q: %q", figure, text)
 	}
 }
 
