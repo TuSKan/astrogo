@@ -63,3 +63,23 @@ func TestFinalsTextEmpty(t *testing.T) {
 		t.Errorf("zero days gave %q, want nothing", got)
 	}
 }
+
+// TestPutFieldRefusesAValueOfTheWrongWidth: a value too wide for its column
+// would shift every column after it, so the generator panics and does not write
+// a row the parser would read wrongly. FinalsText cannot reach it with any date
+// it is asked for, so the guard is tested where it is.
+func TestPutFieldRefusesAValueOfTheWrongWidth(t *testing.T) {
+	row := []byte("..........")
+
+	defer func() {
+		if recover() == nil {
+			t.Error("putField accepted a value wider than its column")
+		}
+
+		if string(row) != ".........." {
+			t.Errorf("putField wrote %q before refusing", row)
+		}
+	}()
+
+	putField(row, 0, 3, "1234")
+}
