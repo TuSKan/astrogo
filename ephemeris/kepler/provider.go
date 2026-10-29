@@ -2,7 +2,6 @@ package kepler
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
@@ -187,12 +186,16 @@ var plutoElements = func() Elements {
 // It lives here rather than in the ephemeris root package, which would
 // cycle: ephemeris imports kepler to re-export Elements and NewFromElements.
 type sofaBase struct {
-	// last is the last Epv00 evaluation: the Sun and the Earth at one epoch
-	// are two Locate calls and one series, the costliest SOFA evaluates
-	// here. Held by value under mu, so keeping it allocates nothing; the
-	// series itself is evaluated outside the lock.
-	mu   sync.Mutex
-	last epv00At
+	// memo holds the recent Epv00 evaluations, the costliest SOFA evaluates
+	// here: the Sun and the Earth at one epoch are two Locate calls and one
+	// series, and a search returns to the dates of an earlier pass. Nil means
+	// the memo every sofaBase shares (see [epv00Memo]); a test gives its own, so
+	// that what it counts is its own. The series is evaluated outside the lock.
+	memo *epv00Memo
+
+	// eval is the Epv00 evaluation; nil means gofaext.Epv00. A test sets it to
+	// count the evaluations, or to fail one.
+	eval func(d1, d2 float64) (pvh, pvb [2][3]float64, status int)
 }
 
 // epv00At is one Epv00 evaluation: the Earth's heliocentric and barycentric
@@ -298,27 +301,29 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 
 func (s *sofaBase) Close() error { return nil }
 
-// epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
-// same date.
+// epv00 is Epv00 at d1 + d2, from the memo when it holds that date.
 func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
-	s.mu.Lock()
-	e := s.last
-	s.mu.Unlock()
+	memo := s.memo
+	if memo == nil {
+		memo = &sharedEpv00
+	}
 
-	if e.set && e.d1 == d1 && e.d2 == d2 {
+	if e, ok := memo.get(d1, d2); ok {
 		return e, nil
 	}
 
-	pvh, pvb, status := gofaext.Epv00(d1, d2)
+	eval := s.eval
+	if eval == nil {
+		eval = gofaext.Epv00
+	}
+
+	pvh, pvb, status := eval(d1, d2)
 	if status < 0 {
 		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
 	}
 
-	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
-
-	s.mu.Lock()
-	s.last = e
-	s.mu.Unlock()
+	e := epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+	memo.put(e)
 
 	return e, nil
 }
