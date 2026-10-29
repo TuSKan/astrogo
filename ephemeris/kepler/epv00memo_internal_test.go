@@ -142,10 +142,10 @@ func (m *epv00Memo) allocated() int {
 // requests that hit, miss, evict and grow the table, every answer is the one a
 // direct Epv00 gives.
 func TestEpv00MemoIsBitIdentical(t *testing.T) {
-	s := &sofaBase{memo: &epv00Memo{}}
+	m := &epv00Memo{}
 
 	for _, req := range epv00Requests(30000) {
-		got, err := s.epv00(req[0], req[1])
+		got, err := m.epv00(req[0], req[1], gofaext.Epv00)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -161,12 +161,12 @@ func TestEpv00MemoComputesAnInstantOnce(t *testing.T) {
 	// others whatever they hash to.
 	var c countingEval
 
-	s := &sofaBase{memo: &epv00Memo{}, eval: c.eval}
+	m := &epv00Memo{}
 	keys := [][2]float64{{2461000, 0.1}, {2461000, 0.2}, {2461001, 0.3}, {2461002, 0.4}}
 
 	for range 10 {
 		for _, k := range keys {
-			if _, err := s.epv00(k[0], k[1]); err != nil {
+			if _, err := m.epv00(k[0], k[1], c.eval); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -183,7 +183,7 @@ func TestEpv00MemoComputesAnInstantOnce(t *testing.T) {
 func TestEpv00MemoHoldsAWorkingSet(t *testing.T) {
 	var c countingEval
 
-	s := &sofaBase{memo: &epv00Memo{}, eval: c.eval}
+	m := &epv00Memo{}
 	r := rand.New(rand.NewPCG(3, 5))
 
 	const distinct = 300
@@ -197,7 +197,7 @@ func TestEpv00MemoHoldsAWorkingSet(t *testing.T) {
 
 	for range passes {
 		for _, k := range keys {
-			if _, err := s.epv00(k[0], k[1]); err != nil {
+			if _, err := m.epv00(k[0], k[1], c.eval); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -214,14 +214,13 @@ func TestEpv00MemoHoldsAWorkingSet(t *testing.T) {
 // more than its cap.
 func TestEpv00MemoIsBounded(t *testing.T) {
 	m := &epv00Memo{}
-	s := &sofaBase{memo: m}
 	r := rand.New(rand.NewPCG(13, 17))
 
 	const limit = epv00Shards * epv00ShardSets * epv00Ways
 
 	for range 3 * limit {
 		d1, d2 := epv00Key(r)
-		if _, err := s.epv00(d1, d2); err != nil {
+		if _, err := m.epv00(d1, d2, gofaext.Epv00); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -235,13 +234,12 @@ func TestEpv00MemoIsBounded(t *testing.T) {
 // not pay for the whole table, only for the shard the instant falls in.
 func TestEpv00MemoAllocatesOnDemand(t *testing.T) {
 	m := &epv00Memo{}
-	s := &sofaBase{memo: m}
 
 	if got := m.allocated(); got != 0 {
 		t.Fatalf("a new memo has %d shards allocated before any request", got)
 	}
 
-	if _, err := s.epv00(2461000, 0.5); err != nil {
+	if _, err := m.epv00(2461000, 0.5, gofaext.Epv00); err != nil {
 		t.Fatal(err)
 	}
 
@@ -251,33 +249,34 @@ func TestEpv00MemoAllocatesOnDemand(t *testing.T) {
 }
 
 // TestEpv00MemoIsSharedAcrossProviders is why the memo is process-wide. A
-// provider is built per call in places (eph.Default() in a constraint check),
-// so a memo each held would start empty every time; the date a first provider
-// evaluated is the date a second finds.
+// provider is built per call in places (eph.Default() in a constraint check), so
+// a memo each held would start empty every time; what a first provider
+// evaluated is held in the shared memo for the second.
 func TestEpv00MemoIsSharedAcrossProviders(t *testing.T) {
-	var c countingEval
-
 	// A date nothing else in this package asks for, since the memo is shared
-	// with every test that leaves its sofaBase on the default.
+	// with every other test that uses a sofaBase.
 	const d1, d2 = 2400000.5, 0.123456789
 
-	first := &sofaBase{eval: c.eval}
-	second := &sofaBase{eval: c.eval}
+	if _, held := sharedEpv00.get(d1, d2); held {
+		t.Fatal("the shared memo already holds the date this test uses")
+	}
 
-	a, err := first.epv00(d1, d2)
+	a, err := (&sofaBase{}).epv00(d1, d2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	b, err := second.epv00(d1, d2)
+	held, ok := sharedEpv00.get(d1, d2)
+	if !ok {
+		t.Fatal("what one provider evaluated is not in the shared memo")
+	}
+
+	b, err := (&sofaBase{}).epv00(d1, d2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if got := c.n.Load(); got != 1 {
-		t.Errorf("%d evaluations for one date asked by two providers, want 1", got)
-	}
-
+	sameBits(t, held, a)
 	sameBits(t, b, a)
 	sameBits(t, a, epv00Direct(t, d1, d2))
 }
@@ -289,14 +288,14 @@ func TestEpv00MemoDoesNotKeepFailures(t *testing.T) {
 
 	m := &epv00Memo{}
 
-	s := &sofaBase{memo: m, eval: func(_, _ float64) (pvh, pvb [2][3]float64, status int) {
+	failing := func(_, _ float64) (pvh, pvb [2][3]float64, status int) {
 		calls.Add(1)
 
 		return pvh, pvb, -1
-	}}
+	}
 
 	for range 2 {
-		if _, err := s.epv00(2461000, 0.5); !errors.Is(err, ErrSofaFailure) {
+		if _, err := m.epv00(2461000, 0.5, failing); !errors.Is(err, ErrSofaFailure) {
 			t.Fatalf("err = %v, want ErrSofaFailure", err)
 		}
 	}
@@ -305,7 +304,7 @@ func TestEpv00MemoDoesNotKeepFailures(t *testing.T) {
 		t.Errorf("%d evaluations for 2 failing requests, want 2", got)
 	}
 
-	if got := s.memo.entries(); got != 0 {
+	if got := m.entries(); got != 0 {
 		t.Errorf("memo holds %d entries after failures only", got)
 	}
 }
@@ -326,7 +325,7 @@ func TestEpv00MemoConcurrentIsBitIdentical(t *testing.T) {
 		want[i] = epv00Direct(t, keys[i][0], keys[i][1])
 	}
 
-	s := &sofaBase{memo: &epv00Memo{}}
+	m := &epv00Memo{}
 
 	var wg sync.WaitGroup
 
@@ -337,7 +336,7 @@ func TestEpv00MemoConcurrentIsBitIdentical(t *testing.T) {
 			for range 4000 {
 				i := rg.IntN(pool)
 
-				got, err := s.epv00(keys[i][0], keys[i][1])
+				got, err := m.epv00(keys[i][0], keys[i][1], gofaext.Epv00)
 				if err != nil {
 					t.Error(err)
 

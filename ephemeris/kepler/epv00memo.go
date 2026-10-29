@@ -1,6 +1,7 @@
 package kepler
 
 import (
+	"fmt"
 	"math"
 	"math/bits"
 	"sync"
@@ -68,7 +69,7 @@ type epv00Memo struct {
 	shards [epv00Shards]epv00Shard
 }
 
-// sharedEpv00 is the memo every sofaBase uses unless it is given its own.
+// sharedEpv00 is the memo every sofaBase uses.
 var sharedEpv00 epv00Memo
 
 // at reports whether e holds the evaluation at d1 + d2.
@@ -150,4 +151,32 @@ func (m *epv00Memo) put(e epv00At) {
 
 	set.ways[set.next%epv00Ways] = e
 	set.next++
+}
+
+// epv00 is Epv00 at d1 + d2: the held evaluation when there is one, and
+// otherwise eval's, which it then holds. The series is evaluated outside the
+// lock, so two goroutines asking for the same new date may both evaluate it; the
+// second store finds the first and does nothing. A failed evaluation is returned
+// and never held.
+//
+// eval is a parameter, not a field of [sofaBase], so that a test can count the
+// evaluations or fail one without a field that only tests use. sofaBase passes
+// gofaext.Epv00.
+func (m *epv00Memo) epv00(
+	d1, d2 float64,
+	eval func(d1, d2 float64) (pvh, pvb [2][3]float64, status int),
+) (epv00At, error) {
+	if e, ok := m.get(d1, d2); ok {
+		return e, nil
+	}
+
+	pvh, pvb, status := eval(d1, d2)
+	if status < 0 {
+		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	}
+
+	e := epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+	m.put(e)
+
+	return e, nil
 }
