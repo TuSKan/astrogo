@@ -203,13 +203,13 @@ func TestExtragalacticAddRadiance(t *testing.T) {
 	eval := func(alt, az float64) (SpectralRadiance, Flag) {
 		dst := NewSpectralRadiance(grid)
 
-		flags, err := e.AddRadiance(context.Background(), dst, grid,
+		contribution, err := e.AddRadiance(context.Background(), dst, grid,
 			coord.NewAltAz(angle.Deg(alt), angle.Deg(az)), scene)
 		if err != nil {
 			t.Fatalf("AddRadiance(%v): %v", alt, err)
 		}
 
-		return dst, flags
+		return dst, contribution.Flags
 	}
 
 	below, _ := eval(-10, 0)

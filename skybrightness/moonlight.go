@@ -140,19 +140,19 @@ func (m *ScatteredMoonlight) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if err := scene.Validate(); err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	geom, err := m.geometry(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	flags := ApproximateMultipleScattering
@@ -163,12 +163,12 @@ func (m *ScatteredMoonlight) AddRadiance(
 	// Below the horizon the Moon illuminates nothing the observer can see,
 	// and above the horizon a line of sight below it is looking at ground.
 	if !geom.aboveHorizon || dir.Alt() <= 0 {
-		return flags, nil
+		return Contribution{Flags: flags}, nil
 	}
 
 	viewAirmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: moonlight: view airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: moonlight: view airmass: %w", err)
 	}
 
 	// The scattering angle is the angle between the direction the light was
@@ -200,7 +200,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
@@ -208,7 +208,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		phase, err := atmosphere.CombinedPhaseFunction(scatter.Radians(),
 			rayleigh, aer, float64(aerosol.Asymmetry), atmosphere.RayleighDepolarization)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		// Aerosol removes light by absorption as well as scattering; the
@@ -220,7 +220,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		l, err := atmosphere.SingleScatteredRadiance(geom.irradiance[i], phase,
 			scattering, extinction, geom.airmass, viewAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		// Photons scattered twice or more still reach the observer, and
@@ -229,7 +229,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		// molecular optical depth.
 		multiple, err := atmosphere.MultipleScatteringFactor(rayleigh)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		scattered[i] = l * multiple
@@ -239,7 +239,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 	// Doing it here rather than per band keeps the physics on the grid the
 	// coefficients were fitted for.
 	if err := grid.Resample(resampled, bands, scattered, 0); err != nil {
-		return 0, fmt.Errorf("skybrightness: moonlight: resample: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: moonlight: resample: %w", err)
 	}
 
 	// The Moon's beam crosses the ozone layer before it scatters, and the
@@ -250,13 +250,13 @@ func (m *ScatteredMoonlight) AddRadiance(
 	for i := range dst {
 		ozone, err := ozoneTransmission(scene.Atmosphere, grid.At(i), geom.ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		dst[i] += resampled[i] * ozone
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // Provenance implements [Component].

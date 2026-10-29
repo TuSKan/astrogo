@@ -305,11 +305,12 @@ func TestArtificialSkyglowPropagatesEmitterFlags(t *testing.T) {
 	grid := skybrightness.DefaultOpticalGrid()
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := component.AddRadiance(context.Background(), dst, grid,
+	contribution, err := component.AddRadiance(context.Background(), dst, grid,
 		coord.NewAltAz(angle.Deg(30), angle.Deg(0)), scene)
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+	flags := contribution.Flags
 
 	if flags&skybrightness.AssumedSourceSpectrum == 0 {
 		t.Error("the emitter's AssumedSourceSpectrum flag did not reach the caller")

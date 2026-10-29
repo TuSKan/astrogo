@@ -117,24 +117,24 @@ func (e *ExtragalacticBackground) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: extragalactic: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: extragalactic: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: extragalactic: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: extragalactic: ozone airmass: %w", err)
 	}
 
 	pressure, _ := scene.Atmosphere.Surface()
@@ -154,7 +154,7 @@ func (e *ExtragalacticBackground) AddRadiance(
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: extragalactic: %w", err)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -165,18 +165,18 @@ func (e *ExtragalacticBackground) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "extragalactic", slantErr)
 		}
 
 		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: extragalactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: extragalactic: %w", err)
 		}
 
 		dst[i] += value * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // Provenance implements [Component].

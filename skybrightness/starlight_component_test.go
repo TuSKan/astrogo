@@ -104,10 +104,11 @@ func starlightAt(
 
 	var err error
 
-	flags, err = isl.AddRadiance(context.Background(), dst, grid, dir, scene)
+	contribution, err := isl.AddRadiance(context.Background(), dst, grid, dir, scene)
 	if err != nil {
 		t.Fatalf("AddRadiance at %g degrees: %v", alt, err)
 	}
+	flags = contribution.Flags
 
 	mean, err = magnitude.MeanFluxDensity(dst, grid, testBand(), 0.99)
 	if err != nil {
@@ -284,10 +285,11 @@ func TestIntegratedStarlightFlagsMissingCoverage(t *testing.T) {
 
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := isl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
+	contribution, err := isl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+	flags := contribution.Flags
 
 	if flags&skybrightness.UnknownCloud == 0 {
 		t.Errorf("flags = %v, want UnknownCloud for an uncovered direction", flags)
@@ -462,10 +464,11 @@ func TestDiffuseGalacticLightIsCappedAgainstStarlight(t *testing.T) {
 
 		dst := skybrightness.NewSpectralRadiance(grid)
 
-		flags, err := dgl.AddRadiance(context.Background(), dst, grid, dir, scene)
+		contribution, err := dgl.AddRadiance(context.Background(), dst, grid, dir, scene)
 		if err != nil {
 			t.Fatalf("AddRadiance: %v", err)
 		}
+		flags := contribution.Flags
 
 		mean, err := magnitude.MeanFluxDensity(dst, grid, testBand(), 0)
 		if err != nil {
@@ -552,11 +555,12 @@ func TestDiffuseGalacticLightWithoutAMapSaysItIsUnbounded(t *testing.T) {
 
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := dgl.AddRadiance(context.Background(), dst, grid,
+	contribution, err := dgl.AddRadiance(context.Background(), dst, grid,
 		coord.NewAltAz(angle.Deg(60), angle.Deg(0)), starlightScene(t))
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+	flags := contribution.Flags
 
 	if flags&skybrightness.ExtrapolatedModel == 0 {
 		t.Error("an uncapped result must carry ExtrapolatedModel")
@@ -578,11 +582,12 @@ func TestDiffuseGalacticLightUncoveredSightlineIsNotCappedToZero(t *testing.T) {
 
 	dst := skybrightness.NewSpectralRadiance(grid)
 
-	flags, err := dgl.AddRadiance(context.Background(), dst, grid,
+	contribution, err := dgl.AddRadiance(context.Background(), dst, grid,
 		coord.NewAltAz(angle.Deg(60), angle.Deg(0)), starlightScene(t))
 	if err != nil {
 		t.Fatalf("AddRadiance: %v", err)
 	}
+	flags := contribution.Flags
 
 	var total float64
 	for _, v := range dst {
@@ -663,7 +668,8 @@ func TestIntegratedStarlightSeparatesFailureFromMissingCoverage(t *testing.T) {
 
 			dst := skybrightness.NewSpectralRadiance(grid)
 
-			flags, err := isl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
+			contribution, err := isl.AddRadiance(context.Background(), dst, grid, dir, starlightScene(t))
+			flags := contribution.Flags
 
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
