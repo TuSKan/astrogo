@@ -127,3 +127,39 @@ func (b *UncertaintyBudget) Dominant(weights map[ComponentID]unit.Radiance) (Unc
 
 	return best, bestC
 }
+
+// spectralUncertainty accumulates a component's relative uncertainty over the
+// grid, each sample weighted by the radiance it adds with the trapezoid
+// weights [unit.SpectralGrid.Integrate] uses, so the result is the relative
+// uncertainty of exactly the integrated radiance [UncertaintyBudget.Total]
+// weighs the component by.
+//
+// The samples combine linearly, as a fully correlated error does: the terms
+// that dominate here - a calibration scale, a fitted slope, a scattering
+// coefficient - move a whole spectrum together, not one wavelength at a time.
+type spectralUncertainty struct {
+	weighted, radiance float64
+}
+
+// add records sample i, which added radiance with the given relative
+// uncertainty.
+func (u *spectralUncertainty) add(grid unit.SpectralGrid, i int, radiance, relative float64) {
+	w := radiance
+	if i == 0 || i == grid.Len()-1 {
+		w *= 0.5
+	}
+
+	u.weighted += w * relative
+	u.radiance += w
+}
+
+// contribution reports what was accumulated, with flags. A component that
+// added no radiance has nothing to be uncertain about, so its uncertainty
+// stays unknown, which the budget does not ask of a dark component.
+func (u *spectralUncertainty) contribution(flags Flag, source string) Contribution {
+	if u.radiance <= 0 {
+		return Contribution{Flags: flags}
+	}
+
+	return Contribution{Flags: flags, Relative: u.weighted / u.radiance, Source: source, Known: true}
+}

@@ -315,6 +315,14 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
+	// The uncertainty holds where the fit does: inside the 100 micron range it
+	// was fitted over, before its turnover, and where the starlight cap leaves
+	// the correlation's own value standing. The cap's 0.35 has no stated
+	// uncertainty, so a capped value has no figure.
+	var uncertainty spectralUncertainty
+
+	known := scale >= 1
+
 	for i := range dst {
 		lambda := grid.At(i)
 
@@ -339,10 +347,19 @@ func (d *DiffuseGalacticLight) AddRadiance(
 			return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
 		}
 
-		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant)) * ozone
+		added := scratch[i] * scale * float64(atmosphere.Transmission(slant)) * ozone
+		dst[i] += added
+
+		relative, ok := dglRelativeUncertainty(lambda, intensity)
+		known = known && ok
+		uncertainty.add(grid, i, added, relative)
 	}
 
-	return Contribution{Flags: flags}, nil
+	if !known {
+		return Contribution{Flags: flags}, nil
+	}
+
+	return uncertainty.contribution(flags, "Kawara et al. (2017) Table 2 and Eq. 9"), nil
 }
 
 // Provenance implements [Component].
@@ -499,7 +516,7 @@ func (z *ZodiacalLight) AddRadiance(
 	clear(scratch)
 	defer z.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
 
-	flags, err := ZodiacalRadiance(scratch, grid, geom)
+	reference, flags, err := zodiacalRadiance(scratch, grid, geom)
 	if errors.Is(err, ErrZodiacalGeometry) {
 		// Inside the solar vicinity the table does not reach. That is a real
 		// gap in the model, not a failure of the evaluation, and a caller
@@ -533,6 +550,8 @@ func (z *ZodiacalLight) AddRadiance(
 	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
+	var uncertainty spectralUncertainty
+
 	for i := range dst {
 		lambda := grid.At(i)
 
@@ -557,10 +576,13 @@ func (z *ZodiacalLight) AddRadiance(
 			return Contribution{}, fmt.Errorf("skybrightness: zodiacal: %w", err)
 		}
 
-		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
+		added := scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
+		dst[i] += added
+
+		uncertainty.add(grid, i, added, zodiacalRelativeUncertainty(reference/zodiacalTableUnit, lambda))
 	}
 
-	return Contribution{Flags: flags}, nil
+	return uncertainty.contribution(flags, "Leinert et al. (1998) map accuracy"), nil
 }
 
 // Provenance implements [Component].
