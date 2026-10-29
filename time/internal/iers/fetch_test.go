@@ -101,6 +101,7 @@ func clearCooldown() {
 	lastCacheRead = time.Time{}
 	errLastCache = nil
 	errLastFetch = nil
+	settled.Store(nil)
 }
 
 // errUpstream stands in for whatever the loader's own layer failed with.
@@ -396,3 +397,60 @@ func TestEnsureLoadedConcurrent(t *testing.T) {
 type nonTableModel struct{}
 
 func (nonTableModel) EOP(float64) (EOP, error) { return EOP{}, ErrNoRecords }
+
+// TestEnsureLoadedSettledAnswerAllocatesNothing is the allocation contract of
+// #931. With no data and no consent, every lookup lands inside the cooldown and
+// gets the same answer; it used to take fetchMu and allocate a fresh
+// errors.Join each time, 2 allocations and 40 bytes per UT1.
+func TestEnsureLoadedSettledAnswerAllocatesNothing(t *testing.T) {
+	l := noCache(Data{}, errUpstream)
+	installLoader(t, l)
+
+	SetRetryCooldown(time.Hour)
+	t.Cleanup(func() { SetRetryCooldown(5 * time.Minute) })
+
+	if err := EnsureLoaded(41684); !errors.Is(err, errUpstream) {
+		t.Fatalf("first attempt: err = %v, want the fetch's error", err)
+	}
+
+	var err error
+
+	if allocs := testing.AllocsPerRun(100, func() { err = EnsureLoaded(41685) }); allocs != 0 {
+		t.Errorf("a settled lookup allocates %v times, want 0", allocs)
+	}
+
+	if !errors.Is(err, errUpstream) {
+		t.Errorf("settled answer = %v, want the fetch's error, the same as the first attempt", err)
+	}
+
+	if cached, fetches := l.counts(); cached != 1 || fetches != 1 {
+		t.Errorf("loader asked %d cached reads and %d fetches inside the cooldown, want 1 and 1", cached, fetches)
+	}
+}
+
+// TestSettledAnswerReopensWithTheThrottle: the fast path must not outlive what
+// it stands for. Turning throttling off, or forgetting the cached read as
+// Reset does, reopens the attempts at once.
+func TestSettledAnswerReopensWithTheThrottle(t *testing.T) {
+	l := noCache(Data{}, errUpstream)
+	installLoader(t, l)
+
+	SetRetryCooldown(time.Hour)
+	t.Cleanup(func() { SetRetryCooldown(5 * time.Minute) })
+
+	_ = EnsureLoaded(41684)
+
+	forgetCacheRead()
+	_ = EnsureLoaded(41684)
+
+	if cached, _ := l.counts(); cached != 2 {
+		t.Errorf("after the cached read was forgotten: %d cached reads, want 2", cached)
+	}
+
+	SetRetryCooldown(0)
+	_ = EnsureLoaded(41684)
+
+	if _, fetches := l.counts(); fetches != 2 {
+		t.Errorf("after throttling was turned off: %d fetches, want 2", fetches)
+	}
+}
