@@ -191,7 +191,7 @@ func TestCrescentVisibilityMoonSetBeforeTheSun(t *testing.T) {
 	}
 
 	if lag := r.MABIMS2021.Params.LT; !r.Moonset.Before(r.Sunset) || lag >= 0 {
-		t.Fatalf("moonset %v, sunset %v, lag %.1f min: want the Moon set first", r.Moonset, r.Sunset, lag)
+		t.Fatalf("moonset %v, sunset %v, lag %.1f min: want the Moon set first", r.Moonset, r.Sunset, lag.Minutes())
 	}
 
 	if !r.BestTime.Equal(r.Sunset) || !r.QureshiBestTime.Equal(r.Sunset) {

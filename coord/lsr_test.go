@@ -88,7 +88,7 @@ func TestLSRApexMatchesTheLiterature(t *testing.T) {
 	gal := coord.ICRSToGalactic(apex)
 
 	t.Logf("Delhaye apex: galactic l %.4f b %.4f, speed %.4f km/s",
-		gal.L().Degrees(), gal.B().Degrees(), speed)
+		gal.L().Degrees(), gal.B().Degrees(), speed.KmPerSec())
 
 	// The published figures are given to the degree, so the tolerance is the
 	// rounding and not a measurement.

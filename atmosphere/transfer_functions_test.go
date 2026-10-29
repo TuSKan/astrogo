@@ -28,7 +28,7 @@ func TestMolecularScaleHeightIsTheFamiliar8400m(t *testing.T) {
 	}
 
 	if math.Abs((got - 8435).Meters()) > 5 {
-		t.Errorf("at 288.15 K the scale height is %.1f m, want about 8435", got)
+		t.Errorf("at 288.15 K the scale height is %.1f m, want about 8435", got.Meters())
 	}
 
 	// Linear in temperature, which is the whole reason it is derived: colder
@@ -40,7 +40,7 @@ func TestMolecularScaleHeightIsTheFamiliar8400m(t *testing.T) {
 
 	if rel := math.Abs((cold/got - 0.5).Meters()); rel > 1e-12 {
 		t.Errorf("half the temperature gives %.4f× the scale height, want exactly half",
-			cold/got)
+			cold.Meters()/got.Meters())
 	}
 }
 

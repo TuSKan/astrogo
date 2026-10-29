@@ -49,7 +49,7 @@ func TestLeapTableReadsMidnightAsTheDayItStarts(t *testing.T) {
 			}
 
 			if got[0].DeltaAT != 10 {
-				t.Errorf("DeltaAT = %g, want 10", got[0].DeltaAT)
+				t.Errorf("DeltaAT = %g s, want 10", got[0].DeltaAT.Seconds())
 			}
 		})
 	}
