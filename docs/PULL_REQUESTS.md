@@ -111,10 +111,14 @@ which pull request is running — and its absence was not hypothetical: #80 and
 #81 both merged without a fragment while this very section asked for one, and
 would have been missing from the release they belong to.
 
-If a change genuinely warrants no entry — pure test coverage for behavior
-already shipped, or a CI change no user can observe — label the pull request
-`no-changelog`. The label is deliberate and shows up in review; silence did
-not.
+**Every change gets one, tests and benchmarks included.** A new test changes
+what the project can claim is verified, measured or guarded, and the changelog
+is where a user learns it. "Tests only" was once a reason to skip the entry,
+and stopped being one with #390. The `no-changelog` label is kept for the few
+pull requests a reader of the release could not act on: dependency-bot bumps
+and pure spelling passes. A release pull request needs neither; the check
+recognizes one by what it changes. The label is deliberate and shows up in
+review; silence did not.
 
 Applying it re-runs the check on its own. That is why the job lives in
 `changelog.yml` rather than in `ci.yml`: a label change is not a `synchronize`,
@@ -151,10 +155,15 @@ is an index, not the record.**
 ```bash
 gofmt -l . && go build ./... && go vet ./... && go mod tidy
 go test ./...
+go test -tags="integration,network,validation" -count=1 ./...
 go test -race -short -count=1 ./...
 golangci-lint run
 golangci-lint run --build-tags="integration,network,validation"
+(cd examples && go mod tidy && go build ./... && go vet ./... && golangci-lint run --config ../.golangci.yml)
 ```
+
+This is the gate every change meets, a maintainer's or a contributor's, and the
+pull request body says which of it ran.
 
 **Run the linter twice, and understand why.** CI runs `golangci-lint` with **no
 build tags**. A helper used only from a `network`-tagged file is, to that run, a
@@ -163,12 +172,18 @@ passes with tags and fails without them is the single most common way a green
 local run turns red in CI. A declaration shared by two differently-tagged files
 needs a constraint covering both, e.g. `//go:build validation || network`.
 
-For a change touching external services, also run the relevant tagged suite:
+**Run the tagged tests for every change, not only one touching a service.** CI
+runs the untagged and `integration` suites on each pull request, but `network`
+only nightly and `validation` only weekly (`pre-release.yml`). A change that
+breaks either is otherwise found after it merged, by somebody else. Network
+tests skip an endpoint that is down rather than fail, so the run is safe on a
+slow or offline machine. A test that still fails is telling you something;
+check whether it fails on `main` too, and say so either way.
 
-```bash
-go test -tags=network -count=1 ./ephemeris/...
-go test -tags=validation -count=1 ./...
-```
+**And the examples module.** `examples/` is a separate module, so nothing
+above compiles it. A dependency change needs `go mod tidy` there as well, and
+an edit there needs its own lint run, which is how a clean local gate once
+went red in CI (#844).
 
 ---
 
