@@ -2,6 +2,7 @@ package skybrightness
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
@@ -111,6 +112,15 @@ func (e *Estimate) ElectronRate(inst optics.Instrument) (unit.ElectronsPerPixelP
 
 // TotalUncertainty combines the per-component budget, weighting each
 // component by its share of the integrated radiance.
+//
+// Every component contributing light must have an entry in the budget, or
+// the error wraps [ErrUncertaintyUnknown] and names the ones without. A
+// component that contributes nothing, such as moonlight with the Moon below
+// the horizon, needs none: its share is zero whatever its uncertainty.
+//
+// Until #911 a missing entry counted as no uncertainty at all. No component
+// fills the budget yet, so every estimate reported 0, which reads as a
+// perfectly certain prediction rather than an unknown one.
 func (e *Estimate) TotalUncertainty() (float64, error) {
 	weights := make(map[ComponentID]unit.Radiance, len(e.components))
 
@@ -121,6 +131,25 @@ func (e *Estimate) TotalUncertainty() (float64, error) {
 		}
 
 		weights[id] = r
+	}
+
+	covered := make(map[ComponentID]bool, len(e.Uncertainty.Components))
+	for _, u := range e.Uncertainty.Components {
+		covered[u.Component] = true
+	}
+
+	var missing []ComponentID
+
+	for id, r := range weights {
+		if r != 0 && !covered[id] {
+			missing = append(missing, id)
+		}
+	}
+
+	if len(missing) > 0 {
+		slices.Sort(missing)
+
+		return 0, fmt.Errorf("%w: no budget entry for %v", ErrUncertaintyUnknown, missing)
 	}
 
 	return e.Uncertainty.Total(weights), nil

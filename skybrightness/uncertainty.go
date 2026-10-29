@@ -1,10 +1,16 @@
 package skybrightness
 
 import (
+	"errors"
 	"math"
 
 	"github.com/TuSKan/astrogo/unit"
 )
+
+// ErrUncertaintyUnknown is returned for a total uncertainty that cannot be
+// computed, because a component contributing light has no entry in the
+// budget. Its uncertainty is unknown, which is not zero.
+var ErrUncertaintyUnknown = errors.New("skybrightness: uncertainty unknown")
 
 // Uncertainty is the uncertainty of one contribution, expressed as a
 // relative standard uncertainty on its radiance.

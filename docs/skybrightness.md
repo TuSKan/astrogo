@@ -257,6 +257,14 @@ Uncertainties are relative because the dominant terms — airglow variability, a
 loading, assumed source spectra — are multiplicative. Independence is not assumed;
 `UncertaintyBudget.Correlated` combines linearly when terms share a systematic.
 
+A component that gives light with no entry in the budget makes the total unknown, not
+zero: `Estimate.TotalUncertainty` returns `ErrUncertaintyUnknown` naming it. **No component
+fills its entry yet** (#911), so every estimate currently reports its uncertainty as unknown.
+Until #911 it reported 0. The entries can come only from figures the components' sources
+quote (`Provenance.ExpectedAccuracy`), and the components fed by a caller's own data, such
+as the airglow spectrum and the star map, carry that data's uncertainty, which only the
+caller knows.
+
 **Quality** flags record how the prediction was constrained: measured versus
 climatological atmosphere, aerosol, cloud, airglow; measured versus assumed source spectrum
 and emission function; precomputed RT; extrapolation beyond a validity domain. A caller
