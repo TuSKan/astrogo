@@ -46,6 +46,11 @@ type hemisphereField struct {
 
 	// components names what each sample's radiance slice holds, in order.
 	components []ComponentID
+
+	// longest is the length of the longest run of samples sharing a ring, which
+	// sizes the working storage of scatterInto. It is a property of samples and
+	// is set where they are: anything that changes them must set it again.
+	longest int
 }
 
 // hemisphereSample is one quadrature point of the incoming field.
@@ -147,6 +152,8 @@ func (m *Model) sampleHemisphere(
 		field.samples = append(field.samples, sample)
 	}
 
+	field.longest = longestRing(field.samples)
+
 	return field, nil
 }
 
@@ -184,7 +191,7 @@ func (f *hemisphereField) scatterInto(
 		return fmt.Errorf("%w: view airmass: %w", ErrScattering, err)
 	}
 
-	scratch := newRingScratch(f.grid.Len(), longestRing(f.samples))
+	scratch := newRingScratch(f.grid.Len(), f.longest)
 
 	for rest := f.samples; len(rest) > 0; {
 		ring := leadingRing(rest)

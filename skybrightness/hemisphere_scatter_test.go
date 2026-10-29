@@ -109,6 +109,8 @@ func syntheticField(
 		f.samples = append(f.samples, sample)
 	}
 
+	f.longest = longestRing(f.samples)
+
 	return f
 }
 
@@ -301,6 +303,7 @@ func TestScatterIntoDoesNotDependOnSampleOrder(t *testing.T) {
 
 	r := rand.New(rand.NewPCG(3, 5))
 	r.Shuffle(len(f.samples), func(i, j int) { f.samples[i], f.samples[j] = f.samples[j], f.samples[i] })
+	f.longest = longestRing(f.samples)
 
 	assertScatterIntoMatches(t, f, kernel, coord.NewAltAz(angle.Deg(40), angle.Deg(75)), scatterIDs)
 }
@@ -364,9 +367,6 @@ func TestScatterIntoReportsAFailingPhaseFunction(t *testing.T) {
 	}
 }
 
-// BenchmarkScatterInto is the hemispheric sum for one view direction over a
-// default-resolution field, which is the unit a sky map repeats once per
-// direction. Unlike the preset sky-map benchmark it is serial and free of
 // scatterInto allocates once per call, however many rings, components and
 // samples the field holds, because its working storage is a single slab. A sky
 // map calls it for every direction, so a slice per ring or per component would
@@ -392,6 +392,9 @@ func TestScatterIntoAllocatesOnce(t *testing.T) {
 	}
 }
 
+// BenchmarkScatterInto is the hemispheric sum for one view direction over a
+// default-resolution field, which is the unit a sky map repeats once per
+// direction. Unlike the preset sky-map benchmark it is serial and free of
 // scheduler and GC noise, so a change to this function shows up here alone.
 func BenchmarkScatterInto(b *testing.B) {
 	grid := DefaultOpticalGrid()
