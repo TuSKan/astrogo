@@ -41,9 +41,10 @@ jobs:
   # and names a real section. It cannot know which pull request is running, so
   # the existence check has to live here, where the number is.
   #
-  # Label a pull request `no-changelog` when it genuinely warrants no entry —
-  # pure test coverage for shipped behavior, or a change to CI that no user
-  # can observe. The label is deliberate and reviewable; silence was not.
+  # Every change gets a fragment, tests and benchmarks included (#925). Label a
+  # pull request `no-changelog` only when a release reader could not act on
+  # it: a dependency-bot bump or a pure spelling pass. The label is deliberate
+  # and reviewable; silence was not.
   #
   # The job name is unchanged from when this lived in ci.yml, so the required
   # check keeps matching.
@@ -104,6 +105,7 @@ jobs:
 
           echo "::error::No changelog fragment for pull request #${PR_NUMBER}."
           echo "Add docs/changelog.d/${PR_NUMBER}-<short-slug>.md — see docs/changelog.d/README.md"
-          echo "and docs/PULL_REQUESTS.md section 4. If this change warrants no entry,"
-          echo "label the pull request 'no-changelog' — which now re-runs this check by itself."
+          echo "and docs/PULL_REQUESTS.md section 4. Tests and benchmarks need one too. Only a"
+          echo "dependency bump or a pure spelling pass takes the 'no-changelog' label instead,"
+          echo "which re-runs this check by itself."
           exit 1
