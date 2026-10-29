@@ -66,8 +66,16 @@ type dglCoefficient struct {
 	// is recovered as b = NuB * lambda(um) / 3000.
 	NuB float64
 
+	// SigmaNuB is the table's uncertainty on NuB, in the same units. Kawara
+	// et al. quote twice what simple propagation over their four samples
+	// gives, because the samples are not independent.
+	SigmaNuB float64
+
 	// C is the quadratic coefficient in units of 1e-5 (MJy sr^-1)^-1.
 	C float64
+
+	// SigmaC is the table's uncertainty on C, in the same units.
+	SigmaC float64
 }
 
 // dglCoefficients is Kawara et al. (2017) Table 2, the eight FOS bands.
@@ -87,14 +95,14 @@ type dglCoefficient struct {
 // turn. TestDGLTurnoverMatchesTheFittedRange asserts this for every band, so
 // the evidence for the reading is executable rather than a comment.
 var dglCoefficients = [8]dglCoefficient{
-	{225.0, 3.0, 0.1},
-	{274.0, 3.9, 0.3},
-	{319.0, 6.1, 0.7},
-	{369.0, 8.5, 1.1},
-	{418.0, 13.6, 2.4},
-	{472.0, 17.5, 3.3},
-	{550.0, 20.1, 4.4},
-	{648.0, 21.0, 4.5},
+	{225.0, 3.0, 1.4, 0.1, 0.4},
+	{274.0, 3.9, 0.3, 0.3, 0.1},
+	{319.0, 6.1, 0.4, 0.7, 0.1},
+	{369.0, 8.5, 0.5, 1.1, 0.2},
+	{418.0, 13.6, 0.5, 2.4, 0.3},
+	{472.0, 17.5, 0.6, 3.3, 0.3},
+	{550.0, 20.1, 0.6, 4.4, 0.4},
+	{648.0, 21.0, 0.9, 4.5, 0.7},
 }
 
 // dglQuadraticScale is the 1e-5 discussed above.

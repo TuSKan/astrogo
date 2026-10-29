@@ -1815,7 +1815,8 @@ scattering-integral presets and irrelevant here.
 **On the precision that is available here.** A 10⁻¹² agreement is what §13's tiling check
 reaches, because that compares the same sum in two orders. It is not available against
 GAMBONS at any effort: Koushan's extragalactic values carry 4–7 per cent, Kawara's DGL slope
-10–50 per cent, the two models aggregate different Gaia releases, and one solves the
+3–8 per cent (47 at 225 nm) before the dust map's own uncertainty, the two models aggregate
+different Gaia releases, and one solves the
 transport where the other attenuates directly. Inputs known to five per cent cannot produce
 agreement at twelve digits, and an implementation tuned until they did would only be
 agreeing with itself.
