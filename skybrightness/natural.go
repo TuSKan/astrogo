@@ -364,8 +364,12 @@ func (d *DiffuseGalacticLight) Provenance() Provenance {
 			"Only the directly attenuated term is applied; light scattered out of " +
 				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
-		ExpectedAccuracy: "The correlation's own scatter is large; Kawara et al. quote " +
-			"uncertainties of 10 to 50 per cent on the slope depending on band.",
+		ExpectedAccuracy: "Kawara et al. Table 2 gives the slope to 3-8 per cent from " +
+			"274 to 648 nm and 47 per cent at 225 nm. A prediction also carries " +
+			"the uncertainty of the 100 micron intensity it is evaluated at " +
+			"(their Eq. 9), which at high galactic latitude is dominated by the " +
+			"0.8 MJy/sr offset subtracted from it, 0.78 +/- 0.21 MJy/sr as " +
+			"Kawara et al. cite it from Lagache et al. (2000).",
 	}
 }
 
