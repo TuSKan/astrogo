@@ -95,6 +95,12 @@ const DefaultScatteringRings = 12
 // Pass rings <= 0 for [DefaultScatteringRings].
 //
 // dst is accumulated into, not overwritten, matching [Component.AddRadiance].
+//
+// The samples of a ring are summed before the ring's weights and path factor
+// are applied, once per ring rather than once per sample, as
+// [hemisphereField.scatterInto] does. The field is still evaluated once per
+// sample, in order, and dst is written one ring at a time: a field that fails
+// partway leaves it holding the rings completed before the one in hand.
 func ScatteredIn(
 	ctx context.Context,
 	dst SpectralRadiance,
@@ -136,11 +142,15 @@ func ScatteredIn(
 	}
 
 	source := NewSpectralRadiance(grid)
-	path := make([]float64, grid.Len())
+	s := newRingScratch(grid.Len(), 0)
 	ring := -1
 
 	for _, p := range hemisphereQuadrature(rings) {
 		if p.ring != ring {
+			if ring >= 0 {
+				kernel.applyRing(dst, s.sumRayleigh, s.sumAerosol, s.path)
+			}
+
 			sourceAirmass, err := atmosphere.Airmass(p.alt)
 			if err != nil {
 				return fmt.Errorf("%w: source airmass at %v: %w", ErrScattering, p.alt, err)
@@ -150,7 +160,7 @@ func ScatteredIn(
 			// on the source airmass, which is a function of altitude alone, so
 			// every azimuth around a ring shares it — and a ring near the
 			// horizon carries dozens of them.
-			kernel.pathFactor(path, sourceAirmass, viewAirmass)
+			kernel.pathFactor(s.path, sourceAirmass, viewAirmass)
 
 			ring = p.ring
 		}
@@ -171,8 +181,11 @@ func ScatteredIn(
 			return err
 		}
 
-		kernel.accumulate(dst, source, path, p.dOmega, phaseRayleigh, phaseAerosol)
+		sumRingSample(s.sumRayleigh, s.sumAerosol, source,
+			p.dOmega*phaseRayleigh, p.dOmega*phaseAerosol)
 	}
+
+	kernel.applyRing(dst, s.sumRayleigh, s.sumAerosol, s.path)
 
 	return nil
 }
