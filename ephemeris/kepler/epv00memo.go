@@ -37,8 +37,11 @@ type epv00Set struct {
 // epv00Shard is one independently locked part of the memo. Its table is
 // allocated by the first store, so a program that evaluates Epv00 a few times
 // pays for a shard or two and not for the whole memo.
+//
+// A hit writes nothing: eviction is first-in, first-out and keeps no recency. So
+// lookups share the lock, and only a store takes it exclusively.
 type epv00Shard struct {
-	mu   sync.Mutex
+	mu   sync.RWMutex
 	sets []epv00Set
 }
 
@@ -101,8 +104,8 @@ func (m *epv00Memo) get(d1, d2 float64) (epv00At, bool) {
 	h := epv00Hash(d1, d2)
 	sh := m.shard(h)
 
-	sh.mu.Lock()
-	defer sh.mu.Unlock()
+	sh.mu.RLock()
+	defer sh.mu.RUnlock()
 
 	if sh.sets == nil {
 		return epv00At{}, false
