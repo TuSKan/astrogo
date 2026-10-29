@@ -170,6 +170,8 @@ func BenchmarkGreedyStrategy_10Slew(b *testing.B) {
 	window := Window{Start: start, End: start.Add(unit.Minutes(150))}
 
 	for b.Loop() {
-		_, _ = (&GreedyStrategy{}).Schedule(planner, window, blocks, tm)
+		if _, err := (&GreedyStrategy{}).Schedule(planner, window, blocks, tm); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
