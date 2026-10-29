@@ -14,7 +14,7 @@ import (
 // once that it is using zero DUT1 and polar motion. A real planning session has
 // the data, and pays for reading it at every Context it builds. These run a
 // scheduler, the workload that builds the most Contexts, with the orientation
-// absent and present; the ranking's twin is in observable_bench_test.go.
+// absent and present.
 
 // benchEOPStart and benchEOPDays place a synthetic table over the benchmark
 // epochs: MJD 59900 for 1500 days, to mid-2027.
