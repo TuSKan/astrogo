@@ -162,8 +162,7 @@ golangci-lint run --build-tags="integration,network,validation"
 (cd examples && go mod tidy && go build ./... && go vet ./... && golangci-lint run --config ../.golangci.yml)
 ```
 
-This is the gate every change meets, a maintainer's or a contributor's, and the
-pull request body says which of it ran.
+Every pull request runs this gate, and its body says which of it ran.
 
 **Run the linter twice, and understand why.** CI runs `golangci-lint` with **no
 build tags**. A helper used only from a `network`-tagged file is, to that run, a
