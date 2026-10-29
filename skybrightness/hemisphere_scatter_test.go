@@ -187,11 +187,25 @@ func intoBuffers(ids []ComponentID, width int) map[ComponentID][]float64 {
 	return into
 }
 
-// scatterIntoTolerance is the bound the kernel's own equivalence test uses: a
-// few ulp of headroom over the operations reordered, and many orders below any
-// physical effect. A wrong weight, a missed ring or a stale sum is not
-// rounding and would pass straight through it.
-const scatterIntoTolerance = 1e-12
+// scatterIntoTolerance bounds how far the ring-summed forms may sit from the
+// per-sample forms: 1e-13 relative.
+//
+// Both forms add the same terms, all positive on these fields, in a different
+// order, so the standard bound for a recursive sum of positive terms applies: n
+// additions give a relative error of at most n*u, where u = 2^-53 = 1.1e-16. At
+// the default 12 rings there are 367 samples. The per-sample form adds them one
+// after another into a destination that already holds a value: at most
+// 367u = 4.1e-14. The ring form adds at most 47 samples within the longest ring
+// (48) and then 12 ring totals into the destination: at most 59u = 6.5e-15,
+// plus a handful of roundings in the weights and the path factor. The two can
+// differ by at most the sum of the bounds, about 4.8e-14, so 1e-13 leaves a
+// factor of two. The largest difference measured is 6.1e-15.
+//
+// That is why it is derived here and not borrowed from the older kernel test's
+// 1e-12: the tests are held to "only the order of summation changed". A dropped
+// sample is a 48th of a ring, and a wrong weight or a stale sum is a percent or
+// more, all far above it.
+const scatterIntoTolerance = 1e-13
 
 // assertScatterIntoMatches runs both forms from identical starting buffers and
 // requires every component to agree. The omitted component is deliberately
@@ -353,6 +367,31 @@ func TestScatterIntoReportsAFailingPhaseFunction(t *testing.T) {
 // BenchmarkScatterInto is the hemispheric sum for one view direction over a
 // default-resolution field, which is the unit a sky map repeats once per
 // direction. Unlike the preset sky-map benchmark it is serial and free of
+// scatterInto allocates once per call, however many rings, components and
+// samples the field holds, because its working storage is a single slab. A sky
+// map calls it for every direction, so a slice per ring or per component would
+// multiply the allocation by tens across a map of twenty thousand directions.
+//
+// No t.Parallel: testing.AllocsPerRun measures the whole process, so a sibling
+// test allocating concurrently would be counted here.
+func TestScatterIntoAllocatesOnce(t *testing.T) {
+	grid := DefaultOpticalGrid()
+	kernel := aerosolKernel(t)
+	f := syntheticField(t, grid, DefaultScatteringRings, scatterIDs, 0)
+	into := intoBuffers(scatterIDs[:len(scatterIDs)-1], grid.Len())
+	view := coord.NewAltAz(angle.Deg(45), angle.Deg(120))
+
+	got := testing.AllocsPerRun(50, func() {
+		if err := f.scatterInto(nil, kernel, view, into); err != nil {
+			t.Fatalf("scatterInto: %v", err)
+		}
+	})
+
+	if got > 1 {
+		t.Errorf("scatterInto allocated %v times per call, want at most 1", got)
+	}
+}
+
 // scheduler and GC noise, so a change to this function shows up here alone.
 func BenchmarkScatterInto(b *testing.B) {
 	grid := DefaultOpticalGrid()
