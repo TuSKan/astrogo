@@ -362,12 +362,12 @@ func TestTheGalacticBasisIsOrthonormal(t *testing.T) {
 	// is what makes the frame right-handed rather than mirrored.
 	towardRotation := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(90), 0))
 
-	g := f.FromICRS(towardRotation, 1000)
+	g := f.FromICRS(towardRotation, unit.Pc(1000))
 	sun := f.SunPosition()
 
-	if g.Y()-sun.Y() < 990 {
+	if along := g.Y() - sun.Y(); along < unit.Pc(990) {
 		t.Errorf("a target toward Galactic l = 90 is only %.1f pc along +Y from the Sun, "+
-			"want about 1000 — the frame is mirrored", g.Y()-sun.Y())
+			"want about 1000 — the frame is mirrored", along.Pc())
 	}
 }
 
@@ -411,7 +411,7 @@ func TestToICRSDeclinesAVelocityItCannotSplit(t *testing.T) {
 		back, distance := f.ToICRS(fast)
 
 		if distance <= 0 {
-			t.Fatalf("expected a real distance, got %g", distance)
+			t.Fatalf("expected a real distance, got %v", distance)
 		}
 
 		if back.PmRA() != 0 || back.PmDec() != 0 || back.Parallax() != 0 || back.RV() != 0 {

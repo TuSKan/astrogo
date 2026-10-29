@@ -622,8 +622,8 @@ func (c Ecliptic) String() string {
 }
 
 func (c ObserversLocation) String() string {
-	return fmt.Sprintf("ObserversLocation Lon=%s Lat=%s Height=%f",
-		c.lon.Wrap360().DMSString(2), c.lat.DMSString(2), c.height)
+	return fmt.Sprintf("ObserversLocation Lon=%s Lat=%s Height=%f m",
+		c.lon.Wrap360().DMSString(2), c.lat.DMSString(2), c.height.Meters())
 }
 
 // ── Geometry Math ────────────────────────────────────────────────────────────
