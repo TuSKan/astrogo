@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/TuSKan/astrogo/logging"
@@ -18,7 +19,20 @@ var (
 	errLastCache  error             // why the last cached copy was unusable, if not merely absent
 	errLastFetch  error             // non-nil if the most recent attempt failed
 	retryCooldown = 5 * time.Minute // minimum interval between fetch attempts
+
+	// settled is EnsureLoaded's answer while both the cached read and the
+	// fetch are inside their cooldown, and the time the first of the two
+	// windows reopens. Until then no attempt can change anything, so a lookup
+	// returns it without taking fetchMu or joining the errors again (#931).
+	// Every writer of the state above clears it.
+	settled atomic.Pointer[settledAnswer]
 )
+
+// settledAnswer is what EnsureLoaded returns, unchanged, until until.
+type settledAnswer struct {
+	until time.Time
+	err   error
+}
 
 // EnsureLoaded makes a best-effort, at-most-one-attempt-per-cooldown-window
 // attempt to populate the global EOP model before a lookup for mjd —
@@ -58,6 +72,13 @@ func EnsureLoaded(mjd float64) error {
 
 	if covered(mjd) {
 		return nil
+	}
+
+	// Without data and without consent this is every lookup, on every
+	// goroutine. It used to queue on fetchMu and allocate a fresh
+	// errors.Join each time, for the same answer (#931).
+	if a := settled.Load(); a != nil && time.Now().Before(a.until) {
+		return a.err
 	}
 
 	fetchMu.Lock()
@@ -127,7 +148,7 @@ func EnsureLoaded(mjd float64) error {
 
 	// Throttle retries so transient errors don't cause a request storm.
 	if !lastAttempt.IsZero() && time.Since(lastAttempt) < retryCooldown {
-		return errors.Join(errLastCache, errLastFetch) // nil if neither failed
+		return settle()
 	}
 
 	lastAttempt = time.Now()
@@ -139,7 +160,29 @@ func EnsureLoaded(mjd float64) error {
 		errLastCache = nil
 	}
 
-	return errors.Join(errLastCache, errLastFetch)
+	return settle()
+}
+
+// settle returns the joined errors of the last cached read and fetch, nil if
+// neither failed, and records it as the answer until the first of the two
+// cooldown windows reopens. Called with fetchMu held.
+func settle() error {
+	err := errors.Join(errLastCache, errLastFetch)
+
+	if retryCooldown <= 0 || lastCacheRead.IsZero() || lastAttempt.IsZero() {
+		settled.Store(nil)
+
+		return err
+	}
+
+	first := lastCacheRead
+	if lastAttempt.Before(first) {
+		first = lastAttempt
+	}
+
+	settled.Store(&settledAnswer{until: first.Add(retryCooldown), err: err})
+
+	return err
 }
 
 // forgetCacheRead lets the next EnsureLoaded read the cached bulletin
@@ -162,6 +205,8 @@ func forgetCacheRead() {
 	defer fetchMu.Unlock()
 
 	lastCacheRead = time.Time{}
+
+	settled.Store(nil)
 }
 
 // SetRetryCooldown sets the minimum interval EnsureLoaded waits between
@@ -172,6 +217,8 @@ func SetRetryCooldown(d time.Duration) {
 	defer fetchMu.Unlock()
 
 	retryCooldown = d
+
+	settled.Store(nil)
 }
 
 // covered reports whether the current global model covers the given MJD.
