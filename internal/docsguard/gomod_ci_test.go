@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// workflows are the CI definitions that pin a Go toolchain, relative to the
-// repository root.
-var workflows = []string{
-	filepath.Join(".github", "workflows", "ci.yml"),
-	filepath.Join(".github", "workflows", "pre-release.yml"),
-}
+// workflowGlob matches every CI definition, relative to the repository root.
+//
+// The guard reads all of them rather than a list. A list covers only the
+// workflows someone remembered to add to it: govulncheck.yml, release.yml and
+// codeql.yml each pinned Go unchecked that way until #929.
+var workflowGlob = filepath.Join(".github", "workflows", "*.yml")
 
 var (
 	// goDirective matches go.mod's own version line: "go 1.25.8".
@@ -23,8 +23,8 @@ var (
 	workflowGoVersion = regexp.MustCompile(`(?m)^\s*go-version:\s*'?"?(\d+)\.(\d+)`)
 )
 
-// TestWorkflowGoVersionTracksTheModuleDirective keeps the six hand-written
-// toolchain pins in the workflows on the same minor version as go.mod.
+// TestWorkflowGoVersionTracksTheModuleDirective keeps every hand-written
+// toolchain pin in the workflows on the same minor version as go.mod.
 //
 // # Why these are hand-written at all
 //
@@ -44,7 +44,7 @@ var (
 // Decoupling the two is safe in the direction that matters — Go refuses to
 // build below go.mod's directive and fetches the toolchain it needs, so a
 // mismatch degrades to a download rather than to a wrong result. What it is
-// not is *visible*: the day go.mod moves to 1.26.x, all six pins silently
+// not is *visible*: the day go.mod moves to 1.26.x, every pin silently
 // reintroduce the exact download #109 exists to remove, and CI stays green
 // while doing it. Nothing about a slow job says which line to change.
 //
@@ -69,8 +69,20 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 
 	found := 0
 
-	for _, wf := range workflows {
-		path := filepath.Join(root, wf)
+	workflows, err := filepath.Glob(filepath.Join(root, workflowGlob))
+	if err != nil {
+		t.Fatalf("glob %s: %v", workflowGlob, err)
+	}
+
+	if len(workflows) == 0 {
+		t.Fatalf("no workflow matches %s; the guard is looking in the wrong place", workflowGlob)
+	}
+
+	for _, path := range workflows {
+		wf, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			wf = path
+		}
 
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -99,8 +111,10 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	}
 
 	// A pin that stops matching is worse than a mismatched one: the guard
-	// keeps passing while guarding nothing. Nine is the count today, and the
-	// tenth should arrive with this number updated. The ninth was the
+	// keeps passing while guarding nothing. Twelve is the count today, and the
+	// thirteenth should arrive with this number updated. The tenth to twelfth
+	// are govulncheck.yml's, release.yml's and codeql.yml's, which were there
+	// all along and uncounted until the guard read the whole directory (#929). The ninth was the
 	// benchmarks job's own setup for benchstat, when the benchmarks themselves
 	// moved to a matrix of shards (#863): the matrix is one step, run four
 	// times.
@@ -116,7 +130,7 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	// eight pins were asserted as seven, and gone on passing while guarding one
 	// fewer than it claimed. Counting is what made two independently correct
 	// edits visibly incompatible.
-	const wantPins = 9
+	const wantPins = 12
 
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
