@@ -28,13 +28,16 @@ func cloudyCity(tb testing.TB, bearingDeg, distanceKM float64) *skybrightness.Un
 	return e
 }
 
-// cloudyScene builds an atmosphere with or without an overcast deck, at the
-// aerosol of Kocifaj (2007) §3: a reference AOD of 0.4 at 500 nm, Angstrom
-// 1.3, single-scattering albedo 0.85 and asymmetry 0.65.
+// cloudyScene builds an atmosphere with or without an overcast deck, with a
+// moderate aerosol: a reference AOD of 0.4 at 500 nm, Angstrom 1.3,
+// single-scattering albedo 0.85 and asymmetry 0.65, at a scale height of
+// 1538 m.
 //
-// The aerosol scale height is 1538 m, which is 1/beta for the paper's
-// beta = 0.65 km^-1 — the same profile written the way this package
-// parameterizes it.
+// It is not the paper's configuration, though until #934 this comment said
+// so: Kocifaj (2007) runs an aerosol of optical depth 0.5, Angstrom 1 and
+// asymmetry 0.90, which kocifaj2008Scene builds. The tests here check signs,
+// orderings and limits that hold for any reasonable aerosol, and their figures
+// are this scene's, not the paper's.
 func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
 	tb.Helper()
 
@@ -175,11 +178,9 @@ func TestCloudTermScalesWithReflectanceAndHeight(t *testing.T) {
 
 // Radiance falls steeply with angular distance from the source.
 //
-// Kocifaj (2007) §3.1 states it for the cloudless case: "reduction of the
-// intensity may reach two orders of magnitude" across the sky. This checks
-// the direction and the rough scale, not a digitized curve — the figures are
-// in relative units on a logarithmic scale and reading numbers off them would
-// be inventing precision.
+// This checks the direction and a factor of three, in cloudyScene's air. The
+// shape Kocifaj (2008) describes for the same model, in that paper's own
+// configuration, is TestCloudlessSkyHasKocifaj2008sShape's.
 func TestCloudlessRadianceFallsAwayFromTheSource(t *testing.T) {
 	t.Parallel()
 

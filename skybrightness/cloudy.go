@@ -213,9 +213,14 @@ func (c *CloudySkyglow) Provenance() Provenance {
 			"Source spectra and upward emission functions are whatever the emitters " +
 				"supply, and each emitter reports whether those were measured or assumed.",
 		},
-		ExpectedAccuracy: "Not established against measurement here. The paper reports " +
-			"cloudless radiance falling about two orders of magnitude with angular " +
-			"distance from the source, which this reproduces.",
+		ExpectedAccuracy: "Not established against measurement here. In the configuration " +
+			"of Kocifaj (2008) Sec. 3, which restates Kocifaj (2007)'s, the cloudless sky has " +
+			"the shape that paper describes: luminance falling with angular distance from " +
+			"the source, a minimum opposite it at a zenith angle of 35 degrees that does not " +
+			"move between 2 and 10 km, and a slight rise toward the opposite horizon. Its " +
+			"range across the sky depends on how near the horizon it is sampled toward the " +
+			"source: 19x out to 60 degrees and 148x to 75, the paper's one to two orders " +
+			"of magnitude, but 2500x to 85.",
 	}
 }
 
