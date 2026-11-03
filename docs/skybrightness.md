@@ -1269,11 +1269,15 @@ filesystem — `remote` addresses everything as a bucket plus key.
 
 **No hidden network dependency.** `Model.Estimate` is deterministic for a given scene and
 dataset version and performs no acquisition. This is enforced behaviorally:
-`TestEstimateWorksOffline` runs an evaluation under `remote.SetOffline(true)` and requires
-byte-identical output. A structural direct-import check complements it
-(`TestCoreDoesNotImportIOPackages`); a *transitive* ban would be wrong rather than
-stricter, because the specification requires reusing `coord`, `ephemeris` and `time`, which
-legitimately reach `remote` for Earth-orientation data and JPL kernels, both consent-gated.
+`TestEstimateWorksOffline` runs the six real components of `fullsky_test.go` under
+`remote.SetOffline(true)`, then online, and requires byte-identical output. A structural
+check complements it: `TestCoreDoesNotImportIOPackages` bans `remote`, `net`, `net/http`,
+`fits`, `plan` and HDF5 from the core's whole import closure, and `os` as a direct import,
+since `fmt` brings it in (#973). The specification requires reusing `coord`, `ephemeris`
+and `time`, and none of them imports `remote`: `time` takes Earth-orientation data through a
+loader that `remote/eop` registers, and JPL kernels live in `ephemeris/jpl`. At runtime the
+core reaches outside only through what its caller hands it, the scene's ephemeris provider
+and a registered EOP loader, both consent-gated.
 
 ---
 
