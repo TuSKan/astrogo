@@ -4,6 +4,8 @@ package mpcorb_test
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"math"
 	"path/filepath"
 	"testing"
@@ -205,9 +207,12 @@ func TestEveryParsedObjectPropagates(t *testing.T) {
 //
 // The endpoint declares SizeVaries, so the grant's own byte budget is what
 // decides; a grant too small for the file must be refused as clearly as no
-// grant at all, which is the second half of this test.
+// grant at all, which is the second step of this test. Until #969 the doc
+// comment said so and the test did not check it.
 func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
+
+	ctx := context.Background()
 
 	// Captured rather than Reset: Reset leaves the data directory alone, so
 	// the temporary one below would stay configured after it is deleted, and
@@ -217,15 +222,34 @@ func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 
 	remote.SetDataDir("file:///" + tempBucket(t) + "?create_dir=true")
 
-	if _, err := mpcorb.Open(context.Background(), "Distant.txt"); err == nil {
-		t.Fatal("Open succeeded with no EnableDownloads grant")
+	if _, err := mpcorb.Open(ctx, "Distant.txt"); !errors.Is(err, remote.ErrDownloadDenied) {
+		t.Fatalf("Open with no EnableDownloads grant = %v, want ErrDownloadDenied", err)
+	}
+
+	// A budget far below Distant.txt's ~1.7 MB. SizeVaries lets any grant past
+	// the check made before the request, so only the size the source reports
+	// can refuse this one.
+	remote.EnableDownloads(1<<10, remote.MPCORB)
+
+	if _, err := mpcorb.Open(ctx, "Distant.txt"); !errors.Is(err, remote.ErrDownloadDenied) {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("Open under a 1 KiB grant = %v, want ErrDownloadDenied", err)
+	}
+
+	cache, prefix, err := remote.CacheDir(ctx, remote.MPCORB)
+	if err != nil {
+		t.Fatalf("CacheDir: %v", err)
+	}
+
+	if _, err := fs.Stat(cache, prefix+"Distant.txt"); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("the cache holds Distant.txt after a refused Open (stat: %v)", err)
 	}
 
 	// And the same empty cache directory must work once consent is granted,
-	// or the refusal above proves only that the fixture is broken.
+	// or the refusals above prove only that the fixture is broken.
 	remote.EnableDownloads(64<<20, remote.MPCORB)
 
-	seq, err := mpcorb.Open(context.Background(), "Distant.txt")
+	seq, err := mpcorb.Open(ctx, "Distant.txt")
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("Open after consent: %v; the temporary cache directory is what "+
