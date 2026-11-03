@@ -91,10 +91,15 @@
 // [GetFile] is the one entry point for file content. It resolves the
 // source and the cache through the same opener, reuses a cached copy (on
 // existence alone for immutable content, after an ETag check for
-// [Endpoint.Mutable] content), and on a miss downloads under a
-// cross-process lock, staging the bytes and validating them before
-// anything appears at the cache key. An interrupted transfer resumes from
-// the partial rather than restarting.
+// [Endpoint.Mutable] content when the caller may download), and on a
+// miss downloads under a cross-process lock, staging the bytes and
+// validating them before anything appears at the cache key. An
+// interrupted transfer resumes from the partial rather than restarting.
+//
+// Consent is checked before any request. A caller without it is served
+// what is cached, mutable or not, as offline mode serves it, and refused
+// only when nothing is: it could not download a newer copy, so asking
+// the source whether there is one would only cost it (#964).
 //
 // # Offline and air-gapped deployments
 //
