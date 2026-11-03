@@ -31,6 +31,8 @@ func TestOpenNamesTheConsentItNeeds(t *testing.T) {
 	// consent at all, because an immutable object is reused on existence
 	// alone — correct, and enough to make the first version of this test pass
 	// on a cold machine and fail on the one that had just run the example.
+	// Captured first, so the tests after this one do not inherit it (#971).
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	_, err := dataset.Open(context.Background(), dataset.Spec{
