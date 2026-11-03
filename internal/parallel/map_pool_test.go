@@ -12,6 +12,11 @@ import (
 // goroutine per item (#955). These tests hold what that must not change: every
 // item runs, the bound is the bound, and the dispatch is dynamic.
 
+var (
+	errTooFewAtOnce = errors.New("fewer than limit calls ran at once")
+	errHeldBack     = errors.New("the other items waited behind a blocked one")
+)
+
 // TestMap_EveryItemRunsAfterAnError: an error is returned once every call has
 // finished, and no item is skipped because an earlier one failed, as with
 // errgroup.Group without a context. Callers such as VisibleTonight record each
@@ -67,7 +72,11 @@ func TestMap_RunsLimitCallsAtOnce(t *testing.T) {
 		now := active.Add(1)
 		defer active.Add(-1)
 
-		for p := peak.Load(); now > p && !peak.CompareAndSwap(p, now); p = peak.Load() {
+		for {
+			p := peak.Load()
+			if now <= p || peak.CompareAndSwap(p, now) {
+				break
+			}
 		}
 
 		if i < limit {
@@ -76,7 +85,7 @@ func TestMap_RunsLimitCallsAtOnce(t *testing.T) {
 			select {
 			case <-release:
 			case <-time.After(10 * time.Second):
-				return 0, errors.New("fewer than limit calls ran at once")
+				return 0, errTooFewAtOnce
 			}
 		}
 
@@ -122,7 +131,7 @@ func TestMap_ABlockedItemDoesNotHoldBackTheRest(t *testing.T) {
 		case <-done:
 			return 0, nil
 		case <-time.After(10 * time.Second):
-			return 0, errors.New("the other items waited behind a blocked one")
+			return 0, errHeldBack
 		}
 	})
 	if err != nil {
@@ -156,7 +165,7 @@ func BenchmarkMapDeepStack(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		if _, err := Map(in, 0, func(i int, _ int) (int, error) { return deepStack(64), nil }); err != nil {
+		if _, err := Map(in, 0, func(_ int, _ int) (int, error) { return deepStack(64), nil }); err != nil {
 			b.Fatal(err)
 		}
 	}
