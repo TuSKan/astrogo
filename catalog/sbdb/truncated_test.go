@@ -15,14 +15,21 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 )
 
+// kindCounts is how many requests arrived for each kind of body.
+type kindCounts struct{ asteroids, comets atomic.Int32 }
+
 // manyBodies serves the SBDB Query API with more asteroids than the default
 // limit and a few comets, honoring the request's limit as SBDB does, and
-// records the last limit asked for and how many requests arrived.
-func manyBodies(t *testing.T, asteroids, comets int, lastLimit *atomic.Int64, requests *atomic.Int32) {
+// records the last limit asked for and how many requests arrived per kind.
+func manyBodies(t *testing.T, asteroids, comets int, lastLimit *atomic.Int64, requests *kindCounts) {
 	t.Helper()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
+		if r.URL.Query().Get("sb-kind") == "c" {
+			requests.comets.Add(1)
+		} else {
+			requests.asteroids.Add(1)
+		}
 
 		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
 		if err != nil {
@@ -58,10 +65,16 @@ func manyBodies(t *testing.T, asteroids, comets int, lastLimit *atomic.Int64, re
 // with more candidates than the default of 50 gives its 50 brightest and then
 // an error wrapping resolve.ErrTruncated, and the cut list is not cached
 // (#776). It used to stop at 50 silently, a list that looked complete.
+//
+// "Not cached" is held per call: each one must reach the server for both
+// kinds. It used to require exactly 4 requests over the two calls, and a
+// request that outlasted the endpoint's timeout under load was retried and
+// counted twice (#975). A retry only adds requests, so it cannot hide a call
+// served from the cache, which makes none.
 func TestSearchBrightSaysWhenItIsCut(t *testing.T) {
 	var (
 		lastLimit atomic.Int64
-		requests  atomic.Int32
+		requests  kindCounts
 	)
 
 	manyBodies(t, 120, 3, &lastLimit, &requests)
@@ -73,6 +86,8 @@ func TestSearchBrightSaysWhenItIsCut(t *testing.T) {
 			got    []resolve.Target
 			errSaw error
 		)
+
+		asteroidsBefore, cometsBefore := requests.asteroids.Load(), requests.comets.Load()
 
 		prov.SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 9})(func(tgt resolve.Target, err error) bool {
 			if err != nil {
@@ -93,14 +108,16 @@ func TestSearchBrightSaysWhenItIsCut(t *testing.T) {
 		if !errors.Is(errSaw, resolve.ErrTruncated) {
 			t.Errorf("pass %d: error %v, want ErrTruncated after a list cut at the default", pass, errSaw)
 		}
+
+		if requests.asteroids.Load() == asteroidsBefore || requests.comets.Load() == cometsBefore {
+			t.Errorf("pass %d asked the server for %d asteroid and %d comet lists, want at least one of each: "+
+				"a cut list must not be served from the cache", pass,
+				requests.asteroids.Load()-asteroidsBefore, requests.comets.Load()-cometsBefore)
+		}
 	}
 
 	if lastLimit.Load() != 51 {
 		t.Errorf("asked for %d rows per kind, want one past the default of 50", lastLimit.Load())
-	}
-
-	if n := requests.Load(); n != 4 {
-		t.Errorf("%d requests over two calls, want 4: a cut list must not be served from the cache", n)
 	}
 }
 
@@ -109,7 +126,7 @@ func TestSearchBrightSaysWhenItIsCut(t *testing.T) {
 func TestSearchBrightKeepsTheCallersLimit(t *testing.T) {
 	var (
 		lastLimit atomic.Int64
-		requests  atomic.Int32
+		requests  kindCounts
 	)
 
 	manyBodies(t, 120, 3, &lastLimit, &requests)
