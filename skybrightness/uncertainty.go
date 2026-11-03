@@ -176,12 +176,17 @@ var ErrUncertaintyValue = errors.New("skybrightness: a supplied uncertainty need
 // reports itself.
 //
 // It is how a caller supplies the uncertainty of what the caller supplied:
-// airglow's zenith spectrum, integrated starlight's map and shape, an
-// artificial-light source inventory. Those components report an unknown
-// uncertainty on their own, because it belongs to the caller's data rather than
-// to the model. A caller who knows it says so here, and one who does not leaves
-// [Estimate.TotalUncertainty] reporting [ErrUncertaintyUnknown], naming the
-// component.
+// airglow's zenith spectrum, and integrated starlight's map and shape. Those
+// components report an unknown uncertainty on their own, because it belongs to
+// the caller's data rather than to the model. A caller who knows it says so
+// here, and one who does not leaves [Estimate.TotalUncertainty] reporting
+// [ErrUncertaintyUnknown], naming the component.
+//
+// An artificial-light inventory is the exception. Its uncertainty belongs to
+// each source, through [GroundEmitter.SourceUncertainty], because
+// [ArtificialSkyglow] weights it by each source's share of the radiance and
+// combines it with the model's own published error (#933). Wrapping that
+// component here replaces both.
 //
 // It also replaces a figure a component does report, for a caller who holds a
 // better one, such as a measurement of the night being modeled.

@@ -44,6 +44,18 @@ type GroundEmitter interface {
 	// Quality reports whether the spectrum and emission function are
 	// measured or assumed, so the assumption travels with the result.
 	Quality() Flag
+
+	// SourceUncertainty reports the 1-sigma relative uncertainty of the
+	// radiance SourceRadiance writes, and whether the source states one.
+	//
+	// It is the inventory's part of an error budget: the flux, spectrum
+	// and emission function the caller supplied. Only the caller can know
+	// it, and a VIIRS cell is not known as well as a surveyed luminaire,
+	// so it belongs to each source rather than to a component.
+	// [ArtificialSkyglow] combines it with its model's own departure from
+	// an exact solution, and a lit source that states none leaves that
+	// component's uncertainty unknown (#933).
+	SourceUncertainty() (relative float64, known bool)
 }
 
 // UniformEmitter is a source with a fixed spectral power distribution and
@@ -72,6 +84,12 @@ type UniformEmitter struct {
 	// Flags records whether the spectrum and emission function are
 	// measured or assumed.
 	Flags Flag
+
+	// RelativeUncertainty is the 1-sigma relative uncertainty of Radiance,
+	// as a fraction: 0.2 for 20%. Zero means not stated, which leaves
+	// [ArtificialSkyglow]'s uncertainty unknown. No real source is known
+	// exactly, so zero is not a figure to state.
+	RelativeUncertainty float64
 }
 
 // EmissionShape is how much light a source sends at a given angle above its
@@ -245,6 +263,11 @@ func (u *UniformEmitter) Location() *coord.Geodetic { return u.At }
 
 // Quality implements GroundEmitter.
 func (u *UniformEmitter) Quality() Flag { return u.Flags }
+
+// SourceUncertainty implements GroundEmitter.
+func (u *UniformEmitter) SourceUncertainty() (relative float64, known bool) {
+	return u.RelativeUncertainty, u.RelativeUncertainty != 0
+}
 
 // SourceRadiance implements GroundEmitter. The bearing toward the observer
 // is unused here because a UniformEmitter is azimuthally symmetric, which
