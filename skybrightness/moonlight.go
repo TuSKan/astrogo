@@ -98,6 +98,13 @@ type moonGeometry struct {
 
 	// aboveHorizon is false when the Moon contributes nothing.
 	aboveHorizon bool
+
+	// refraction and ephemeris complete the cache key. The direction, both
+	// airmasses and aboveHorizon went through the one, and every position
+	// came from the other, so a scene that changes either must rebuild
+	// this (#945).
+	refraction atmosphere.Refraction
+	ephemeris  eph.Provider
 }
 
 // NewScatteredMoonlight builds the moonlight component from the solar
@@ -375,7 +382,9 @@ func (m *ScatteredMoonlight) geometry(scene *Scene) (*moonGeometry, error) {
 
 // matches reports whether this geometry was computed for the given scene.
 func (g *moonGeometry) matches(scene *Scene) bool {
-	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer
+	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer &&
+		sameRefraction(g.refraction, scene.Atmosphere.Refraction()) &&
+		sameProvider(g.ephemeris, scene.Ephemeris)
 }
 
 // computeGeometry resolves the Moon's position, phase and irradiance.
@@ -416,6 +425,8 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	geom := &moonGeometry{
 		observer:     scene.Observer,
 		at:           scene.Time,
+		refraction:   scene.Atmosphere.Refraction(),
+		ephemeris:    scene.Ephemeris,
 		direction:    altaz,
 		aboveHorizon: altaz.Alt() > 0,
 		irradiance:   make([]float64, len(magnitude.ROLOBands())),
