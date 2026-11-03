@@ -2,6 +2,12 @@ version: 2
 
 # One scheduled PR combines both Go modules and GitHub Actions.
 # Security updates remain independent of this version-update schedule.
+#
+# The PR must be mergeable as Dependabot opens it, with no maintainer commit or
+# label added afterwards. A commit on a bot's pull request leaves it waiting on
+# a second approver this repository does not have, and a label added after the
+# bot's push races that push's changelog run (#942). #768, #851 and #939 each
+# needed one or the other (#943).
 multi-ecosystem-groups:
   weekly-dependencies:
     schedule:
@@ -12,12 +18,24 @@ multi-ecosystem-groups:
       include: scope
     labels:
       - dependencies
+      # docs/PULL_REQUESTS.md exempts a dependency-bot bump from a changelog
+      # fragment. Applied here, the label is in the event that opens the pull
+      # request, so the fragment check never sees it unlabeled.
+      - no-changelog
 
 updates:
   - package-ecosystem: gomod
     directories:
       - "/"
       - "/examples"
+    # The examples module reaches most of astrogo's dependencies only through
+    # its replace directive, as indirect requirements. Dependabot updates
+    # direct ones by default, so a root bump left examples/go.mod behind:
+    # TestExamplesModuleIsVerifiedAgainstTheWorkingTree and govulncheck's
+    # examples scan both refused #939. For gomod, "all" also covers the
+    # dependencies of direct dependencies.
+    allow:
+      - dependency-type: all
     patterns:
       - "*"
     multi-ecosystem-group: weekly-dependencies

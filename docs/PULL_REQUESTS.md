@@ -115,8 +115,9 @@ would have been missing from the release they belong to.
 what the project can claim is verified, measured or guarded, and the changelog
 is where a user learns it. "Tests only" was once a reason to skip the entry,
 and stopped being one with #390. The `no-changelog` label is kept for the few
-pull requests a reader of the release could not act on: dependency-bot bumps
-and pure spelling passes. A release pull request needs neither; the check
+pull requests a reader of the release could not act on: dependency-bot bumps,
+which `.github/dependabot.yml` labels as it opens them (#943), and pure
+spelling passes. A release pull request needs neither; the check
 recognizes one by what it changes. The label is deliberate and shows up in
 review; silence did not.
 
