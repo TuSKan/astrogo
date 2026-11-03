@@ -16,11 +16,13 @@ import (
 // ranges. TestKocifajFiguresMatchTheProvenance holds the code to it.
 const kocifajModel = 0.25
 
-// statingCity is cityAt with a stated source uncertainty.
-func statingCity(t *testing.T, bearingDeg, distanceKM, radiance, relative float64) *skybrightness.UniformEmitter {
+// statingCity is cityAt with a stated source uncertainty, 20 km away: well
+// inside the distances the paper validated, so no case here is flagged for
+// its distance.
+func statingCity(t *testing.T, bearingDeg, radiance, relative float64) *skybrightness.UniformEmitter {
 	t.Helper()
 
-	e := cityAt(t, bearingDeg, distanceKM, radiance)
+	e := cityAt(t, bearingDeg, 20, radiance)
 	e.RelativeUncertainty = relative
 
 	return e
@@ -65,7 +67,7 @@ func TestArtificialSkyglowRejectsAnInvalidSourceUncertainty(t *testing.T) {
 	t.Parallel()
 
 	for _, bad := range []float64{-0.1, math.NaN(), math.Inf(1)} {
-		_, err := skybrightness.NewArtificialSkyglow([]skybrightness.GroundEmitter{statingCity(t, 0, 20, 1e-3, bad)})
+		_, err := skybrightness.NewArtificialSkyglow([]skybrightness.GroundEmitter{statingCity(t, 0, 1e-3, bad)})
 		if !errors.Is(err, skybrightness.ErrUncertaintyValue) {
 			t.Errorf("a source stating %v: err = %v, want ErrUncertaintyValue", bad, err)
 		}
@@ -94,22 +96,22 @@ func TestArtificialSkyglowUncertaintyCombinesModelAndInventory(t *testing.T) {
 	}{
 		{
 			"one source at 10%",
-			[]skybrightness.GroundEmitter{statingCity(t, 90, 20, 1e-3, 0.10)},
+			[]skybrightness.GroundEmitter{statingCity(t, 90, 1e-3, 0.10)},
 			math.Hypot(kocifajModel, 0.10),
 		},
 		{
 			"two equal sources at 10% and 30%",
 			[]skybrightness.GroundEmitter{
-				statingCity(t, 90, 20, 1e-3, 0.10),
-				statingCity(t, 270, 20, 1e-3, 0.30),
+				statingCity(t, 90, 1e-3, 0.10),
+				statingCity(t, 270, 1e-3, 0.30),
 			},
 			math.Hypot(kocifajModel, 0.5*0.10+0.5*0.30),
 		},
 		{
 			"a source nine times brighter at 10%, beside one at 30%",
 			[]skybrightness.GroundEmitter{
-				statingCity(t, 90, 20, 9e-3, 0.10),
-				statingCity(t, 270, 20, 1e-3, 0.30),
+				statingCity(t, 90, 9e-3, 0.10),
+				statingCity(t, 270, 1e-3, 0.30),
 			},
 			math.Hypot(kocifajModel, 0.9*0.10+0.1*0.30),
 		},
@@ -141,7 +143,7 @@ func TestArtificialSkyglowUncertaintyIsUnknownWhileASourceStatesNone(t *testing.
 	}{
 		{"no source states one", []skybrightness.GroundEmitter{cityAt(t, 0, 20, 1e-3)}},
 		{"one of two states none", []skybrightness.GroundEmitter{
-			statingCity(t, 90, 20, 1e-3, 0.10),
+			statingCity(t, 90, 1e-3, 0.10),
 			cityAt(t, 270, 20, 1e-3),
 		}},
 	} {
@@ -156,7 +158,7 @@ func TestArtificialSkyglowUncertaintyIsUnknownWhileASourceStatesNone(t *testing.
 func TestArtificialSkyglowUncertaintyReachesTheBudget(t *testing.T) {
 	t.Parallel()
 
-	c, err := skybrightness.NewArtificialSkyglow([]skybrightness.GroundEmitter{statingCity(t, 0, 20, 1e-3, 0.10)})
+	c, err := skybrightness.NewArtificialSkyglow([]skybrightness.GroundEmitter{statingCity(t, 0, 1e-3, 0.10)})
 	if err != nil {
 		t.Fatalf("NewArtificialSkyglow: %v", err)
 	}
