@@ -343,7 +343,10 @@ func (m *ScatteredMoonlight) Provenance() Provenance {
 			"which the uncertainty budget carries. Velikodsky et al. (2011) find " +
 			"ROLO 13% faint at 603 nm, a correction Jones et al. (2013) apply and " +
 			"this component does not. The solar spectrum the caller supplies " +
-			"carries its own uncertainty, which is not included.",
+			"carries its own uncertainty, which is not included. Measured against " +
+			"Krisciunas & Schaefer (1991) Table 1, ten moonlit-sky V measurements " +
+			"at Mauna Kea, the component reads 0.30 mag faint on average with the " +
+			"CALSPEC solar spectrum, outside that budget (#938).",
 	}
 }
 

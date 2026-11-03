@@ -276,9 +276,12 @@ nowhere else:
 | moonlight | ROLO's 10 % absolute scale ⊕ the Noll–Winkler spread of the multiple-scattering coefficient: 16 % in V at Paranal, 18 % at sea level | Stone & Kieffer (2004), Noll et al. (2012), Winkler (2022) |
 | airglow, starlight, artificial | the caller's, through `WithUncertainty` | the caller's data |
 
-Moonlight's figure stays below the 0.2 mag (about 20 %) Jones et al. (2013) found for a
-full radiative-transfer model against 141 spectra, which is the check that its two terms
-are the right size. Velikodsky et al. (2011) find ROLO 13 % faint at 603 nm; that offset
+Moonlight's figure is below the 0.2 mag (about 20 %) Jones et al. (2013) found for a full
+radiative-transfer model against 141 spectra, and measurement does not bear it out. Against
+the twelve moonlit-sky measurements of Krisciunas & Schaefer (1991) Table 1, the component
+reads 0.30 mag faint on average, with a scatter of 0.35 in the log of the ratio
+(`TestScatteredMoonlightAgainstKS91WithCALSPEC`). #938 is finding why; the budget is asserted
+once it is fixed. Velikodsky et al. (2011) find ROLO 13 % faint at 603 nm; that offset
 is recorded in the provenance rather than corrected. The components built from a caller's
 own data report no figure, because their uncertainty is that data's: a natural sky with
 no `WithUncertainty` around them reports `ErrUncertaintyUnknown` naming exactly those.
@@ -679,7 +682,7 @@ once and allocates nothing per direction (4.6 µs, 0 allocs).
 
 | Step | Go function | Validation test |
 | :--- | :--- | :--- |
-| Reflectance → irradiance → scattering → radiance | `ScatteredMoonlight.AddRadiance` | `TestScatteredMoonlightFullMoonSkyBrightness` |
+| Reflectance → irradiance → scattering → radiance | `ScatteredMoonlight.AddRadiance` | `TestScatteredMoonlightAgainstKS91`, `TestScatteredMoonlightAgainstKS91WithCALSPEC` |
 | Directional falloff away from the Moon | — | `TestScatteredMoonlightDarkensAwayFromTheMoon` |
 | Per-scene geometry cache | — | `TestScatteredMoonlightCacheRespectsScene`, `…Concurrent` |
 
@@ -1551,7 +1554,7 @@ allocations.
 | 0 | Architecture and spectral foundation | **Done** |
 | 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. Ozone's cross section ships only as `atmosphere`'s 10 nm average of the 223 K file that `dataset/crosssection` fetches (§11.5, §16), and every component that crosses the ozone layer applies it (#632) |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
-| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.6 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
+| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor. Against Krisciunas & Schaefer (1991)'s measured moonlit sky it reads 0.30 mag faint on average, outside its uncertainty budget (#938). The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitized comparison remains |
 | 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitized because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
