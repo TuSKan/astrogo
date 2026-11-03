@@ -239,6 +239,12 @@ func logEOPUnavailable(mjd float64, cause error) {
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
+	// A model that answers mjd with nothing to load is answered from one
+	// read of it: no lock, one interpolation (#953).
+	if eop, ok := iers.Lookup(mjd); ok {
+		return eop, nil, nil
+	}
+
 	loadErr := iers.EnsureLoaded(mjd)
 
 	eop, err = iers.GetModel().EOP(mjd)

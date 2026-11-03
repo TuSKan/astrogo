@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -49,26 +49,29 @@ type Loader interface {
 	Fetch(ctx context.Context) (Data, error)
 }
 
-var (
-	loaderMu sync.RWMutex
-	loader   Loader
-)
+// loader is the registered Loader, nil for none. It is read without a lock,
+// since a program that registers none asks on every lookup (#953).
+var loader atomic.Pointer[Loader]
 
 // RegisterLoader sets the process-wide EOP loader. Passing nil unregisters,
 // which is how a test restores the pristine state.
 func RegisterLoader(l Loader) {
-	loaderMu.Lock()
-	defer loaderMu.Unlock()
+	if l == nil {
+		loader.Store(nil)
 
-	loader = l
+		return
+	}
+
+	loader.Store(&l)
 }
 
 // GetLoader returns the registered loader, or nil.
 func GetLoader() Loader {
-	loaderMu.RLock()
-	defer loaderMu.RUnlock()
+	if l := loader.Load(); l != nil {
+		return *l
+	}
 
-	return loader
+	return nil
 }
 
 // FSLoader is a [Loader] reading one finals2000A object from a filesystem,
