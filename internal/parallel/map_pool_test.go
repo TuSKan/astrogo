@@ -5,7 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
+
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Map runs on a pool of workers that each take the next index, not on a

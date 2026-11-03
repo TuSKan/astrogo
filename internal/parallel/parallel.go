@@ -34,7 +34,7 @@ import (
 //
 // If any call returns a non-nil error, Map returns the first one returned
 // (the others' results are discarded) once every call has finished. Nothing
-// is cancelled: every item is still called, as errgroup.Group without a
+// is canceled: every item is still called, as errgroup.Group without a
 // context did.
 //
 // The calls run on min(limit, len(in)) goroutines, each taking the next
