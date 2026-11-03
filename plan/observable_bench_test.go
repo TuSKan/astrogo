@@ -93,6 +93,13 @@ func nightChain() []Constraint {
 // BenchmarkRankObservables ranks a list of targets at one instant, the call
 // behind "what should I observe now". The work is per target, so the sizes show
 // how it scales; the mixed list shows what a moving body adds.
+//
+// stars-10000 is there for many cores. A ranking of a thousand takes about 2 ms
+// on sixteen, and on a power-managed CPU that is shorter than the clock takes
+// to ramp, so between rankings it measures the clock as much as the work. On an
+// 8-core laptop, with a worker pool in place of a goroutine per target, the
+// busy cores ran 1000 stars at half their base clock and 10000 at all of it
+// (#955).
 func BenchmarkRankObservables(b *testing.B) {
 	site := benchSite(b)
 	t := benchEpoch()
@@ -105,6 +112,7 @@ func BenchmarkRankObservables(b *testing.B) {
 	}{
 		{"stars-100", benchStars(100)},
 		{"stars-1000", benchStars(1000)},
+		{"stars-10000", benchStars(10000)},
 		{"mixed-100", mixed},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
