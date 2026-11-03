@@ -59,8 +59,9 @@ type settledAnswer struct {
 // Both steps go through the registered [Loader] rather than reaching for
 // a cache directory or an HTTP client directly. That is what lets this
 // package, and astrogo/time above it, link neither — see [Loader]. With
-// no loader registered the result is [ErrNoLoader], and the caller
-// degrades to zero EOP exactly as it does when consent is absent.
+// no loader registered the result is [ErrNoLoader], given without taking
+// fetchMu, and the caller degrades to zero EOP exactly as it does when
+// consent is absent.
 //
 // Safe for concurrent use: a mutex serializes attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
@@ -79,6 +80,15 @@ func EnsureLoaded(mjd float64) error {
 	// errors.Join each time, for the same answer (#931).
 	if a := settled.Load(); a != nil && time.Now().Before(a.until) {
 		return a.err
+	}
+
+	// No loader is an answer only RegisterLoader changes. Given under
+	// fetchMu, it queued every lookup of a program that links none behind
+	// every other, so sixteen goroutines together looked up fewer epochs a
+	// second than one alone (#953). The check inside the lock stays for a
+	// loader removed meanwhile.
+	if GetLoader() == nil {
+		return ErrNoLoader
 	}
 
 	fetchMu.Lock()
@@ -198,8 +208,8 @@ func settle() error {
 // the read was throttled.
 //
 // Takes fetchMu on its own rather than being called with modelMu held:
-// EnsureLoaded holds fetchMu and then reads the model through covered, so
-// acquiring them the other way round would invert the order.
+// EnsureLoaded holds fetchMu and then registers what it loaded under
+// modelMu, so acquiring them the other way round would invert the order.
 func forgetCacheRead() {
 	fetchMu.Lock()
 	defer fetchMu.Unlock()

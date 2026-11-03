@@ -58,8 +58,9 @@
 // # Concurrency
 //
 // The scale conversions are pure functions on a value type and are safe to
-// call from any goroutine. Earth-orientation data is process-wide state
-// behind a sync.RWMutex: [RegisterModel] and the lazy load that [Time.EOP],
+// call from any goroutine. Earth-orientation data is process-wide state, read
+// without a lock and written under one, as the leap-second table is:
+// [RegisterModel] and the lazy load that [Time.EOP],
 // [Time.UTC] and [Time.UT1] trigger are safe to race, and a caller that wants
 // determinism registers a model up front rather than relying on whatever the
 // first lookup happens to load.

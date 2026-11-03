@@ -26,7 +26,12 @@ const (
 	benchEOPDays  = 1500
 )
 
-var benchEOPModes = []string{"zero", "table"}
+// benchEOPModes are three states of Earth orientation. "untouched" is the
+// library as a program that registers no loader has it, as this package's
+// tests do: every lookup goes through the lazy load and finds nothing to load.
+// It is not "zero", which RegisterModel makes skip the lazy load altogether,
+// and until #953 the two differed by a global mutex on every lookup.
+var benchEOPModes = []string{"untouched", "zero", "table"}
 
 // pinEOP is the process-wide Earth orientation for the benchmark, restored to
 // the library default when it ends. RegisterModel makes the choice
@@ -34,7 +39,13 @@ var benchEOPModes = []string{"zero", "table"}
 func pinEOP(b *testing.B, mode string) {
 	b.Helper()
 
+	want := "explicit"
+
 	switch mode {
+	case "untouched":
+		time.ResetEOP()
+
+		want = "zero"
 	case "zero":
 		time.RegisterModel(time.ZeroModel{})
 	case "table":
@@ -50,8 +61,12 @@ func pinEOP(b *testing.B, mode string) {
 
 	b.Cleanup(time.ResetEOP)
 
-	if got := time.EOPSource(); got != "explicit" {
-		b.Fatalf("EOP source = %q after pinning %q, want explicit: the benchmark would time ambient data", got, mode)
+	// After a lookup: one that found a bulletin to load would leave the source
+	// "cache", and "untouched" would time a table.
+	_ = time.FromJD(2461056.25, time.UTC).EOP()
+
+	if got := time.EOPSource(); got != want {
+		b.Fatalf("EOP source = %q after pinning %q, want %s: the benchmark would time ambient data", got, mode, want)
 	}
 }
 
@@ -115,5 +130,46 @@ func BenchmarkSetTimeEOP(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+// BenchmarkSetTimeEOPParallel is a night's walk on every core at once, each
+// goroutine moving its own copy of one Context, as a ranking's targets do with
+// their urgency probes. The Context holds its bracket first, as RankObservables
+// builds it, so each move interpolates and looks Earth orientation up. Per-op
+// time is wall time across GOMAXPROCS goroutines, and falls as cores are added
+// unless the moves contend; before #953 every lookup took shared locks.
+func BenchmarkSetTimeEOPParallel(b *testing.B) {
+	loc, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	start := time.FromJD(2461056.25, time.UTC)
+
+	steps := make([]time.Time, 96)
+	for i := range steps {
+		steps[i] = start.Add(unit.Minutes(5 * float64(i+1)))
+	}
+
+	for _, mode := range benchEOPModes {
+		b.Run(mode, func(b *testing.B) {
+			pinEOP(b, mode)
+
+			ctx := coord.NewContext(start, loc, atmosphere.StandardRefraction())
+			ctx.SetTime(steps[len(steps)-1])
+			ctx.SetTime(start)
+
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					c := *ctx
+
+					for _, t := range steps {
+						c.SetTime(t)
+					}
+				}
+			})
+		})
 	}
 }
