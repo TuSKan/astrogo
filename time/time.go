@@ -894,6 +894,13 @@ func DateJulianCal(year, month, day, hour, minute, second int) Time {
 func (t Time) DecimalYear() float64 {
 	y, m, d, f := t.Calendar()
 
+	// A Julian Date that is not finite has no calendar date, and month 0
+	// indexed daysBeforeMonth at −1: a panic in Time.TT (#961). Its fractional
+	// year is its own non-finite value, which the Julian epoch year carries.
+	if m == 0 {
+		return t.JulianEpochYear()
+	}
+
 	leap := y%4 == 0 && (y%100 != 0 || y%400 == 0)
 
 	days, doy := 365.0, daysBeforeMonth[m-1]+d
