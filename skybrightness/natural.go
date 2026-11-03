@@ -36,6 +36,10 @@ type sceneFrame struct {
 	// refraction is part of the cache key, because ctx was built with it.
 	refraction atmosphere.Refraction
 
+	// ephemeris is part of it too when the frame holds the Sun, which was
+	// read from it (#945). Nil when the component needs no Sun.
+	ephemeris eph.Provider
+
 	ctx *coord.Context
 
 	// sunEcliptic is the Sun's apparent ecliptic position; sunDistanceAU is
@@ -62,7 +66,11 @@ func (f *sceneFrame) matches(scene *Scene) bool {
 	// one, which is also why the stale frame only appears when a caller reuses
 	// a site across scenes. That is the ordinary way to model one observatory
 	// under changing weather.
-	return sameRefraction(f.refraction, scene.Atmosphere.Refraction())
+	if !sameRefraction(f.refraction, scene.Atmosphere.Refraction()) {
+		return false
+	}
+
+	return f.ephemeris == nil || sameProvider(f.ephemeris, scene.Ephemeris)
 }
 
 // sameRefraction reports whether two refraction settings would build the same
@@ -83,6 +91,25 @@ func sameRefraction(a, b atmosphere.Refraction) bool {
 	}
 
 	return reflect.TypeOf(a.Model) == reflect.TypeOf(b.Model)
+}
+
+// sameProvider reports whether two ephemerides are the same one.
+//
+// Identity, as the observer is compared: two providers can agree to the
+// last bit and still be different data, and only the caller knows which it
+// meant. A provider whose dynamic type is not comparable would panic under
+// ==, so it never matches; the cache then rebuilds, which is correct and
+// only slower.
+func sameProvider(a, b eph.Provider) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	if ta := reflect.TypeOf(a); ta != reflect.TypeOf(b) || !ta.Comparable() {
+		return false
+	}
+
+	return a == b
 }
 
 // newSceneFrame resolves a scene's transform context and Sun position.
@@ -123,6 +150,7 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 
 	frame.sunEcliptic = coord.ICRSToEcliptic(icrs, at)
 	frame.sunDistanceAU = sun.Pos.Norm()
+	frame.ephemeris = scene.Ephemeris
 
 	return frame, nil
 }

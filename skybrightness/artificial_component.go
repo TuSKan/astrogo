@@ -94,6 +94,13 @@ type artificialGeometry struct {
 	at       time.GoTime
 	grid     unit.SpectralGrid
 
+	// atmosphere is part of the cache key, because every per-band optical
+	// depth, asymmetry and t below was computed from it. A pointer, as the
+	// observer is: Builder.Build returns a fresh copy that has only getters
+	// afterwards. Without it a site reused under new weather kept the first
+	// weather's sky, 94x too bright at an AOD of 0.4 after 0.02 (#945).
+	atmosphere *atmosphere.Atmosphere
+
 	sources []artificialSource
 	flags   Flag
 }
@@ -309,7 +316,8 @@ func (a *ArtificialSkyglow) geometry(scene *Scene, grid unit.SpectralGrid) (*art
 
 // matches reports whether this geometry was computed for the given scene.
 func (g *artificialGeometry) matches(scene *Scene, grid unit.SpectralGrid) bool {
-	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer && g.grid.Equal(grid)
+	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer &&
+		g.atmosphere == scene.Atmosphere && g.grid.Equal(grid)
 }
 
 // computeGeometry resolves every source against the scene.
@@ -329,10 +337,11 @@ func (a *ArtificialSkyglow) computeGeometry(scene *Scene, grid unit.SpectralGrid
 	}
 
 	geom := &artificialGeometry{
-		observer: scene.Observer,
-		at:       scene.Time,
-		grid:     grid,
-		sources:  make([]artificialSource, 0, len(a.emitters)),
+		observer:   scene.Observer,
+		at:         scene.Time,
+		grid:       grid,
+		atmosphere: scene.Atmosphere,
+		sources:    make([]artificialSource, 0, len(a.emitters)),
 	}
 
 	for _, emitter := range a.emitters {
