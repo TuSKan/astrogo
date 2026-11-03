@@ -63,8 +63,8 @@ func TestScatteredMoonlightAgainstKS91WithCALSPEC(t *testing.T) {
 	defer cancel()
 
 	// The file is a few megabytes; consent is still required.
+	t.Cleanup(remote.Capture(remote.CALSPEC).Restore)
 	remote.EnableDownloads(64<<20, remote.CALSPEC)
-	defer remote.EnableDownloads(0)
 
 	m, err := solar.NewScatteredMoonlight(ctx)
 	if err != nil {

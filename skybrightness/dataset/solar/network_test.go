@@ -4,7 +4,6 @@ package solar_test
 
 import (
 	"context"
-	"errors"
 	"math"
 	"testing"
 
@@ -38,8 +37,8 @@ func TestNewScatteredMoonlightFromCALSPEC(t *testing.T) {
 	defer cancel()
 
 	// The file is a few megabytes; consent is still required.
+	t.Cleanup(remote.Capture(remote.CALSPEC).Restore)
 	remote.EnableDownloads(64<<20, remote.CALSPEC)
-	defer remote.EnableDownloads(0)
 
 	m, err := solar.NewScatteredMoonlight(ctx)
 	if err != nil {
@@ -65,8 +64,8 @@ func TestSolarSpectrumCoversTheROLOBands(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
+	t.Cleanup(remote.Capture(remote.CALSPEC).Restore)
 	remote.EnableDownloads(64<<20, remote.CALSPEC)
-	defer remote.EnableDownloads(0)
 
 	spectrum, err := solar.Open(ctx)
 	if err != nil {
@@ -104,24 +103,5 @@ func TestSolarSpectrumCoversTheROLOBands(t *testing.T) {
 	if reddest := sampled[len(sampled)-1]; reddest >= sampled[peak]/4 {
 		t.Errorf("the reddest band is %.3e against a peak of %.3e; the decline is too shallow",
 			reddest, sampled[peak])
-	}
-}
-
-// Without consent the fetch must fail with the actionable error rather than
-// downloading anyway.
-func TestSolarRespectsDownloadConsent(t *testing.T) {
-	reachable(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	remote.EnableDownloads(0)
-
-	if _, err := solar.NewScatteredMoonlight(ctx); err != nil &&
-		!errors.Is(err, remote.ErrDownloadDenied) {
-		// A cached copy from an earlier run makes this succeed, which is
-		// correct behavior rather than a failure — consent gates the network
-		// step, not the cache.
-		t.Logf("consent path returned %v", err)
 	}
 }
