@@ -466,28 +466,6 @@ func TestTwilight_HighLat(t *testing.T) {
 	}
 }
 
-// ── Benchmarks ─────────────────────────────────────────────────────────────
-
-func BenchmarkEventSolver(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
-	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-	start := time.FromJD(2451545.0, time.UTC)
-	end := start.Add(unit.Hours(24))
-	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(1))
-	spec := EventSpec{
-		Family:    EventFamilyVisibility,
-		Kind:      EventAnyVisibility,
-		Target:    obj,
-		Observer:  site,
-		Threshold: angle.Deg(20),
-	}
-
-	for b.Loop() {
-		_, _ = solver.Find(spec, start, end)
-	}
-}
-
 // ── Geometry Tests ─────────────────────────────────────────────────────────
 
 // mockLinearTarget sweeps across Right Ascension linearly.
