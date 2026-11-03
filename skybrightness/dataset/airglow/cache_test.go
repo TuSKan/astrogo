@@ -31,7 +31,9 @@ import (
 func TestFetchServesACachedSkytableOffline(t *testing.T) {
 	// Not parallel: SetDataDir and SetOffline are both process-global, and a
 	// sibling running beside this one would be pointed at its cache or cut
-	// off from a network it needed.
+	// off from a network it needed. Captured first, so the tests after this
+	// one do not inherit its deleted cache directory (#971).
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	spec := airglow.Spec{
@@ -94,6 +96,7 @@ func TestFetchServesACachedSkytableOffline(t *testing.T) {
 // another would be worse than not caching: a solar flux of 100 and one of 250
 // are different skies, and nothing downstream could tell which it had.
 func TestCacheKeyDistinguishesRequests(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	base := airglow.Spec{Observatory: airglow.Paranal, SolarFluxSFU: 100, MinNM: 400, MaxNM: 900}
@@ -153,6 +156,7 @@ func TestCacheKeyDistinguishesRequests(t *testing.T) {
 // would miss, and offline a miss cannot recover.
 func TestScaleMultipliesAndIsNotInTheCacheKey(t *testing.T) {
 	// Not parallel: SetDataDir and SetOffline are process-global.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	base := airglow.Spec{Observatory: airglow.Paranal, SolarFluxSFU: 100, MinNM: 499, MaxNM: 504}

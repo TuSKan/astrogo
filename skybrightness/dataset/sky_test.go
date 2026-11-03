@@ -32,6 +32,9 @@ func skySite(tb testing.TB) *coord.Geodetic {
 func TestOpenRefusesABadSpec(t *testing.T) {
 	// Not parallel: SetDataDir is process-global, and a sibling running
 	// beside it would be pointed at this test's cache or this one at theirs.
+	// Captured first, so the tests after this one do not inherit its deleted
+	// cache directory (#971).
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	for _, c := range []struct {
