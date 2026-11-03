@@ -370,6 +370,16 @@ func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 	return vec, nil
 }
 
+// urgencyProbes are the offsets from the scoring instant at which
+// estimateHoursUntilSet evaluates a target's altitude, nearest first.
+var urgencyProbes = [...]time.Duration{
+	30 * time.Minute,
+	1 * time.Hour,
+	2 * time.Hour,
+	4 * time.Hour,
+	8 * time.Hour,
+}
+
 // estimateHoursUntilSet computes a lightweight estimate of how many hours
 // remain before the target sets below minAlt. It evaluates altitude at a
 // small set of future offsets to avoid the cost of a full EventSolver call.
@@ -387,21 +397,12 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 		return 0
 	}
 
-	// Probe at +30m, +1h, +2h, +4h, +8h — 5 evaluations total.
-	probeOffsets := [5]time.Duration{
-		30 * time.Minute,
-		1 * time.Hour,
-		2 * time.Hour,
-		4 * time.Hour,
-		8 * time.Hour,
-	}
-
 	// The last instant known to be above the horizon, starting from now.
 	prevHours, prevAlt := 0.0, currentAlt
 
 	probe := *ctx
 
-	for _, offset := range probeOffsets {
+	for _, offset := range urgencyProbes {
 		ft := t.Add(time.FromGoDuration(offset))
 
 		pos, err := obj.Position(ft)
@@ -559,9 +560,10 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 // Objects are evaluated concurrently.
 //
 // They share one [coord.Context], built for the instant: the ~100 µs Apco13
-// solve is the same for every target, and was paid once for each (#916). A
-// [ConstraintCtx] is handed it from every goroutine at once, so it must only
-// read it; see that interface.
+// solve is the same for every target, and was paid once for each (#916). So is
+// the bracket a target's urgency is estimated across, which each target built
+// again (#951). A [ConstraintCtx] is handed it from every goroutine at once, so
+// it must only read it; see that interface.
 func RankObservables(
 	objs []Observable,
 	t time.Time,
@@ -574,6 +576,14 @@ func RankObservables(
 	}
 
 	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+
+	// Each target's urgency moves a copy of ctx as far as the farthest probe.
+	// A new Context holds the series at t alone, so every copy evaluated them
+	// again for the instant a day on, the same one for every target: 90% of a
+	// ranking (#951). Moved there and back, ctx is at t exactly as NewContext
+	// placed it and keeps what the move evaluated, so the copies interpolate.
+	ctx.SetTime(t.Add(time.FromGoDuration(urgencyProbes[len(urgencyProbes)-1])))
+	ctx.SetTime(t)
 
 	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
 		return Scorer{Site: site, Context: ctx, Constraints: constraints}.Score(obj, t)
