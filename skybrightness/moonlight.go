@@ -290,6 +290,15 @@ const (
 	nollMultipleScattering = 2.2
 )
 
+// roloVelikodskyScale corrects ROLO's absolute scale. Velikodsky et al.
+// (2011), Icarus 214, 30, find ROLO's albedo 13 per cent too faint at
+// 603 nm. Jones et al. (2013), A&A 560, A91, the moonlight model in ESO's
+// sky model, divide the albedo at every wavelength by 0.87, "since there is
+// no information about the wavelength dependence for this correction", and
+// so does this (#938). Against Krisciunas & Schaefer (1991)'s measured
+// moonlit sky it is worth 0.15 mag, half of what the component read faint.
+const roloVelikodskyScale = 0.87
+
 // moonlightRelativeUncertainty combines the two terms in quadrature at one
 // wavelength, under a surface pressure in hPa.
 //
@@ -348,12 +357,13 @@ func (m *ScatteredMoonlight) Provenance() Provenance {
 			"2004), and the multiple-scattering coefficient by the factor of two " +
 			"between Noll et al. (2012) and Winkler (2022); together 16-18% in V, " +
 			"which the uncertainty budget carries. Velikodsky et al. (2011) find " +
-			"ROLO 13% faint at 603 nm, a correction Jones et al. (2013) apply and " +
-			"this component does not. The solar spectrum the caller supplies " +
-			"carries its own uncertainty, which is not included. Measured against " +
-			"Krisciunas & Schaefer (1991) Table 1, ten moonlit-sky V measurements " +
-			"at Mauna Kea, the component reads 0.30 mag faint on average with the " +
-			"CALSPEC solar spectrum, outside that budget (#938).",
+			"ROLO 13% faint at 603 nm, and the albedo is divided by 0.87 at every " +
+			"wavelength, as Jones et al. (2013) do. The solar spectrum the caller " +
+			"supplies carries its own uncertainty, which is not included. Measured " +
+			"against Krisciunas & Schaefer (1991) Table 1, ten moonlit-sky V " +
+			"measurements at Mauna Kea, the component reads 0.13 mag faint on " +
+			"average in V with the CALSPEC solar spectrum, within that budget " +
+			"(#938).",
 	}
 }
 
@@ -463,6 +473,10 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	}
 
 	geom.extrapolated = err != nil
+
+	for i := range reflectance {
+		reflectance[i] /= roloVelikodskyScale
+	}
 
 	// Distances: the Sun-Moon leg in AU, the Moon-observer leg in km.
 	//

@@ -334,11 +334,11 @@ func TestKS91GeometryMatchesTheEphemeris(t *testing.T) {
 // as two and a half magnitudes. That test compared one geometry against an
 // uncited "roughly 18" (#935). This one compares ten against measurements.
 //
-// The component's uncertainty budget says 16-18%, which this does not assert.
-// With the CALSPEC solar spectrum, TestScatteredMoonlightAgainstKS91WithCALSPEC
-// measures the component 0.30 mag faint on average, and #938 is finding why.
-// The budget's assertion comes with that fix. The blackbody spectrum here
-// keeps the check offline, for every CI run, at the cost of about 20%.
+// The component's uncertainty budget says 16-18%.
+// TestScatteredMoonlightAgainstKS91WithCALSPEC asserts it, on the CALSPEC solar
+// spectrum through the V band, where the component reads 0.13 mag faint on
+// average (#938). The blackbody spectrum here keeps this check offline, for
+// every CI run, at the cost of about 20%, so it holds only the two magnitudes.
 //
 // The two rows at a phase angle of 119 degrees are outside ROLO, and the
 // component must say so.
