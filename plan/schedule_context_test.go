@@ -86,7 +86,7 @@ func TestScheduleThroughTheContextCache(t *testing.T) {
 			return (&GreedyStrategy{}).schedule(planner, window, blocks, transition, ctxAt)
 		}},
 		{"swap", func(ctxAt func(time.Time) *coord.Context) (*Schedule, error) {
-			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window, blocks, transition, ctxAt)
+			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window, blocks, transition, ctxAt, nil)
 		}},
 	} {
 		got, err := run.schedule(plannerContexts(planner))

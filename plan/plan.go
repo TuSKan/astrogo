@@ -467,6 +467,37 @@ type Scorer struct {
 	// Constraints are the requirements a target must satisfy to score above
 	// zero.
 	Constraints []Constraint
+
+	// moon, when set, holds the Moon's place at each instant one scheduling
+	// run scores; nil uses the process-wide cache. See moonPlaces.
+	moon moonPlaces
+}
+
+// moonPlaces is the Moon's apparent geocentric vector at each instant one
+// scheduling run has scored, held for the whole run and dropped with it.
+//
+// A run's instants are its placements' midpoints, and its swap pass returns to
+// every one of them on every pass. The process-wide cache keeps the last
+// moonPosCacheSize, so once a schedule has more placements than that each
+// return was a miss: a 100-block schedule needed the Moon at 100 instants and
+// computed it 2,100 times (#959). The run knows its own instants, so it keeps
+// them; a failure is returned and never kept.
+type moonPlaces map[time.Time]vector.Vec3
+
+// at is the Moon's vector at t, computed once per run.
+func (m moonPlaces) at(t time.Time) (vector.Vec3, error) {
+	if v, ok := m[t]; ok {
+		return v, nil
+	}
+
+	v, err := getMoonGeocentricVec(t)
+	if err != nil {
+		return vector.Vec3{}, err
+	}
+
+	m[t] = v
+
+	return v, nil
 }
 
 // Score calculates a composite desirability score for a target at a given time.
@@ -522,7 +553,7 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	if wMoon > 0 {
 		// Both as the site sees them: the Moon's parallax moves it up to
 		// 0.95° from where the Earth's center has it (#634).
-		moonVec, err := getMoonGeocentricVec(t)
+		moonVec, err := s.moonAt(t)
 		if err == nil {
 			pos, posErr := topocentricPosition(obj, t, ctx)
 			if posErr != nil {
@@ -553,6 +584,16 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	}
 
 	return score, nil
+}
+
+// moonAt is the Moon's vector at t: from the scheduling run's own record when
+// the Scorer carries one, from the process-wide cache otherwise.
+func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
+	if s.moon != nil {
+		return s.moon.at(t)
+	}
+
+	return getMoonGeocentricVec(t)
 }
 
 // RankObservables evaluates and ranks a list of targets based on their

@@ -196,6 +196,15 @@ func BenchmarkSwapOptimized_100(b *testing.B) {
 	benchScheduler(b, 100, &SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3})
 }
 
+// BenchmarkSwapOptimizedDefault_100 is the strategy as its zero value configures
+// it, twenty passes over a Priority seed: what a caller writing
+// &SwapOptimizedStrategy{} runs. Each pass returns to every placement, which
+// is where the Moon's place was computed again for instants the run already
+// had (#959).
+func BenchmarkSwapOptimizedDefault_100(b *testing.B) {
+	benchScheduler(b, 100, &SwapOptimizedStrategy{})
+}
+
 // ── Transit Estimate ────────────────────────────────────────────────────────
 
 func BenchmarkTransitEstimate(b *testing.B) {
