@@ -557,14 +557,26 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 // RankObservables evaluates and ranks a list of targets based on their
 // composite observability score at a specific time and site.
 // Objects are evaluated concurrently.
+//
+// They share one [coord.Context], built for the instant: the ~100 µs Apco13
+// solve is the same for every target, and was paid once for each (#916). A
+// [ConstraintCtx] is handed it from every goroutine at once, so it must only
+// read it; see that interface.
 func RankObservables(
 	objs []Observable,
 	t time.Time,
 	site *Site,
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
+	// Nothing to score needs no Context, and no site.
+	if len(objs) == 0 {
+		return nil, nil
+	}
+
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+
 	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
-		return Scorer{Site: site, Constraints: constraints}.Score(obj, t)
+		return Scorer{Site: site, Context: ctx, Constraints: constraints}.Score(obj, t)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: score: %w", err)

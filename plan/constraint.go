@@ -49,6 +49,13 @@ type Constraint interface {
 type ConstraintCtx interface {
 	Constraint
 	// CheckCtx is like Check but uses a pre-built coord.Context.
+	//
+	// ctx is shared: with the constraints checked after this one, with the
+	// scoring that follows them, and, in [RankObservables], with every other
+	// target being ranked on another goroutine. CheckCtx must only read it. A
+	// constraint that needs another instant takes a copy (c := *ctx) and moves
+	// that; calling ctx.SetTime on the one it was given corrupts what everything
+	// else sees, and is a data race under RankObservables.
 	CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error)
 }
 
