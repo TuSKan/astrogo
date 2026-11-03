@@ -271,6 +271,33 @@ func TestEmittersFlagAssumptions(t *testing.T) {
 	}
 }
 
+// Every emitter carries the region's stated uncertainty, and none when the
+// region states none, so skybrightness.ArtificialSkyglow can weight it by
+// each sector's share of the light (#933).
+func TestEmittersCarryTheRegionsUncertainty(t *testing.T) {
+	t.Parallel()
+
+	for _, stated := range []float64{0, 0.3} {
+		emitters, err := viirs.FromGrid(uniformGrid(5), 2024).Emitters(viirs.Region{
+			Site: paranal(t), Sectors: 2, RadialSamples: 4, Spectrum: topHatSpectrum(),
+			RelativeUncertainty: stated,
+		})
+		if err != nil {
+			t.Fatalf("Emitters: %v", err)
+		}
+
+		if len(emitters) == 0 {
+			t.Fatal("no emitters, so this tests nothing")
+		}
+
+		for i, e := range emitters {
+			if r, known := e.SourceUncertainty(); r != stated || known != (stated != 0) {
+				t.Errorf("region stating %v: emitter %d reports (%v, %v)", stated, i, r, known)
+			}
+		}
+	}
+}
+
 // Missing data is not measured darkness. A bin that resolves to no-data must
 // be dropped, not turned into a zero-radiance source, or an unmapped region
 // would read as pristine sky.

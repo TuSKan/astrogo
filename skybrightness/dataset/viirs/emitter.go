@@ -107,6 +107,13 @@ type Region struct {
 	// The VIIRS noise floor is around 0.5 in dark areas, so a small
 	// positive value avoids turning sensor noise into light sources.
 	MinRadiance float64
+
+	// RelativeUncertainty is the 1-sigma relative uncertainty of every
+	// emitter's radiance: the conversion from DNB radiance through the
+	// assumed spectrum and emission function, which only the caller can
+	// judge. Zero means not stated, as on skybrightness.UniformEmitter, and
+	// skybrightness.ArtificialSkyglow then reports no uncertainty (#933).
+	RelativeUncertainty float64
 }
 
 // defaults for a Region left partly unset.
@@ -241,6 +248,7 @@ func emitterFor(at *coord.Geodetic, radiance float64, scale []float64, region Re
 		Emission: region.Emission,
 		Flags: skybrightness.AssumedSourceSpectrum |
 			skybrightness.AssumedEmissionFunction,
+		RelativeUncertainty: region.RelativeUncertainty,
 	}
 }
 

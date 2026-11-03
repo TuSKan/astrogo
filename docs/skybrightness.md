@@ -274,7 +274,8 @@ nowhere else:
 | zodiacal | max(10 %, 15 S10 / brightness), 20 % floor below 300 nm; about 27 % at the ecliptic poles | Leinert et al. (1998) |
 | diffuse galactic | Eq. 7 propagated: slope and quadratic from Table 2, offset 0.8 ± 0.21 MJy sr⁻¹ (Eq. 9); none outside the fitted range or where the starlight cap binds | Kawara et al. (2017), Lagache et al. (2000) |
 | moonlight | ROLO's 10 % absolute scale ⊕ the Noll–Winkler spread of the multiple-scattering coefficient: 16 % in V at Paranal, 18 % at sea level | Stone & Kieffer (2004), Noll et al. (2012), Winkler (2022) |
-| airglow, starlight, artificial | the caller's, through `WithUncertainty` | the caller's data |
+| artificial | 25 %, the top of the model's published discrepancy from an exact multiple-scattering solution, ⊕ each emitter's stated uncertainty weighted by its share of the radiance; unknown while a lit emitter states none | Kocifaj, Barà & Falchi (2022) §3; the caller's inventory, through `GroundEmitter.SourceUncertainty` |
+| airglow, starlight | the caller's, through `WithUncertainty` | the caller's data |
 
 Moonlight's figure is below the 0.2 mag (about 20 %) Jones et al. (2013) found for a full
 radiative-transfer model against 141 spectra, and measurement does not bear it out. Against
