@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -201,10 +202,12 @@ func TestVizierConeSearch_UnknownTable(t *testing.T) {
 // cone queried against two different tables must not collide on one cache
 // entry (the cache key previously covered only ra/dec/rad/limit).
 func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
-	var calls int
+	// Written from the server's goroutines, and a retried request can overlap
+	// the one it retries, so atomic.
+	var calls atomic.Int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("parse form: %v", err)
@@ -233,18 +236,38 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 		defaultTargets, hipTargets []resolve.Target
 	)
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius})(func(tar resolve.Target, _ error) bool {
+	// Each cone is given at its own table's epoch, so propagation leaves the
+	// center as it is and the two cache keys can differ only in the table
+	// name. Given no epoch, the center was carried from J2000 to Hipparcos's
+	// J1991.25, which moves even a motionless declination in its last digit
+	// (41.269 to 41.269000000000005): the keys never matched, and this test
+	// passed with the table name taken out of the key (#981).
+	defaultEpoch := tableSchemas[defaultTable].Epoch
+	hipEpoch := tableSchemas["I/239/hip_main"].Epoch
+
+	// Each search must reach the service, or the second was answered from the
+	// first's cache entry. Counted per call rather than as a total of 2: a
+	// request retried after a timeout is counted twice (#981).
+	before := calls.Load()
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, _ error) bool {
 		defaultTargets = append(defaultTargets, tar)
 		return true
 	})
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius})(func(tar resolve.Target, _ error) bool {
+	if calls.Load() == before {
+		t.Fatal("the default-table cone search sent no request")
+	}
+
+	before = calls.Load()
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, _ error) bool {
 		hipTargets = append(hipTargets, tar)
 		return true
 	})
 
-	if calls != 2 {
-		t.Fatalf("expected 2 live requests (no cache collision), got %d", calls)
+	if calls.Load() == before {
+		t.Fatal("the HIP cone search sent no request: it collided with the default table's cache entry")
 	}
 
 	if len(defaultTargets) != 1 || defaultTargets[0].Designation != "2" {
