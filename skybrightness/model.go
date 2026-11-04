@@ -23,6 +23,10 @@ var (
 	// asked to evaluate under a transfer that is not the one the preset
 	// names.
 	ErrPresetMismatch = errors.New("skybrightness: query does not match the preset")
+
+	// ErrDirection is returned for a direction whose altitude or azimuth is
+	// a NaN or an infinity.
+	ErrDirection = errors.New("skybrightness: direction must be finite")
 )
 
 // Fidelity selects how much computation a caller is willing to spend. All
@@ -189,6 +193,14 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 		return nil, err
 	}
 
+	// The direction is the caller's input, so a non-finite one is refused
+	// here, once, by name. Left to the components, it surfaced as one of them
+	// failing: CloudySkyglow returned NaN radiance, and the others an airmass
+	// or optical-depth error that never mentioned the direction (#1000).
+	if err := checkDirection(q.Direction); err != nil {
+		return nil, err
+	}
+
 	if err := m.checkPreset(q); err != nil {
 		return nil, err
 	}
@@ -288,6 +300,17 @@ func (m *Model) Estimate(ctx context.Context, q Query) (*Estimate, error) {
 	}
 
 	return est, nil
+}
+
+// checkDirection returns ErrDirection for a direction whose altitude or
+// azimuth is not finite.
+func checkDirection(dir coord.AltAz) error {
+	alt, az := dir.Alt().Degrees(), dir.Az().Degrees()
+	if math.IsNaN(alt) || math.IsInf(alt, 0) || math.IsNaN(az) || math.IsInf(az, 0) {
+		return fmt.Errorf("%w: altitude %v deg, azimuth %v deg", ErrDirection, alt, az)
+	}
+
+	return nil
 }
 
 // selected returns the component filter, or nil for "everything".
