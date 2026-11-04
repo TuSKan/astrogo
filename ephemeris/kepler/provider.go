@@ -111,6 +111,14 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
 func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
+	// SOFA's theories compute a NaN position from a NaN date, and Moon98 has
+	// no status to say so, so ephemeris.Default answered the Sun and the Moon
+	// at a NaN or infinite time with NaN and no error (#1002). Checked before
+	// the elements lookup, so registered elements and any base are covered.
+	if jd := t.JD(); !finite(jd) {
+		return core.State{}, fmt.Errorf("%w: JD %v", ErrNonFiniteTime, jd)
+	}
+
 	el, ok := p.elements[id]
 	if !ok {
 		st, err := p.base.Locate(id, t)
