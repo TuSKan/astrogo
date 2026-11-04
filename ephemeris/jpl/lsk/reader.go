@@ -49,8 +49,15 @@ type Reader struct {
 // remote.EnableDownloads(0, remote.NAIFLSK) (naif0012.tls is only ~5 KB) or
 // pre-seed the file to stay fully offline.
 //
-// It provides an auto-healing mechanism for CI environments by automatically
-// removing corrupt or truncated files.
+// A kernel that does not parse is never left in the cache: Cache removes it
+// when it reports the failure, whether it was just downloaded (a truncated
+// file, an error page) or cached long before. The next call then fetches a
+// fresh one where downloads are consented to, or says plainly that nothing is
+// cached.
+//
+// The doc promised this "auto-healing" before any of it existed: a corrupt
+// cached kernel failed every call until it was deleted by hand, and the file
+// opened for it was not closed (#1010).
 func Cache(ctx context.Context, kernel string) (*Reader, error) {
 	fsys, key, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
 	if err != nil {
@@ -62,7 +69,15 @@ func Cache(ctx context.Context, kernel string) (*Reader, error) {
 		return nil, fmt.Errorf("jpl: failed to load LSK %s: %w", key, err)
 	}
 
-	return NewReader(ls)
+	l, err := NewReader(ls)
+	if err != nil {
+		// NewReader keeps the file only when it parses, so it is closed here,
+		// and then removed: it is astrogo's cache entry, and kept it would
+		// fail every later call the same way.
+		return nil, errors.Join(fmt.Errorf("jpl: LSK %s: %w", key, err), ls.Close(), remote.RemoveFile(ctx, fsys, key))
+	}
+
+	return l, nil
 }
 
 // NewReader parses an LSK kernel from the given reader.
