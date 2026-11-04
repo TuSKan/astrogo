@@ -17,6 +17,7 @@ func TestInterpolatePivotsRefusesNonFiniteWavelength(t *testing.T) {
 		if !extrapolated {
 			t.Errorf("λ=%v not from the table must be flagged", lambda)
 		}
+
 		if !math.IsNaN(value) {
 			t.Errorf("λ=%v = %v, want NaN", lambda, value)
 		}
