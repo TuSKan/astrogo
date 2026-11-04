@@ -27,4 +27,7 @@ var (
 	// ErrUnsupportedBody indicates a body ID the default SOFA base
 	// provider (sofaBase) has no data for.
 	ErrUnsupportedBody = errors.New("kepler: unsupported body for the default SOFA base provider")
+	// ErrNonFiniteTime indicates a time whose Julian Date is a NaN or an
+	// infinity, at which no body has a position.
+	ErrNonFiniteTime = errors.New("kepler: time is not finite")
 )
