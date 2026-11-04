@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -491,7 +493,10 @@ func TestTwoMASSRowsCarryTheNightTheyWereObserved(t *testing.T) {
 // TestOnlyTwoMASSIsAskedForRowEpochs: the cone query asks for a row epoch
 // column exactly where the table has one.
 func TestOnlyTwoMASSIsAskedForRowEpochs(t *testing.T) {
-	var queries []string
+	var (
+		mu      sync.Mutex
+		queries []string
+	)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -499,7 +504,11 @@ func TestOnlyTwoMASSIsAskedForRowEpochs(t *testing.T) {
 			return
 		}
 
+		mu.Lock()
+
 		queries = append(queries, r.PostFormValue("QUERY"))
+
+		mu.Unlock()
 
 		w.Header().Set("Content-Type", "text/csv")
 		_, _ = fmt.Fprint(w, "designation,ra,dec,epoch_jd\n")
@@ -514,6 +523,14 @@ func TestOnlyTwoMASSIsAskedForRowEpochs(t *testing.T) {
 		req := resolve.ConeRequest{Table: table, Center: coord.NewICRS(angle.Deg(10), angle.Deg(40)), Radius: angle.Arcsec(5)}
 		prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
 	}
+
+	// A query repeated back to back is one query retried after a timeout, and
+	// counting it twice both broke the length and shifted the indexes below
+	// (#981). The three tables' queries differ, so collapsing repeats cannot
+	// merge two of them.
+	mu.Lock()
+	queries = slices.Compact(queries)
+	mu.Unlock()
 
 	if len(queries) != 3 {
 		t.Fatalf("%d queries, want 3", len(queries))
