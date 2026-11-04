@@ -40,11 +40,18 @@ const (
 	Friday Weekday = 5
 	// Saturday is the seventh day of the week.
 	Saturday Weekday = 6
+
+	// NoWeekday is the weekday of a time that has none, one whose Julian Date
+	// is NaN or infinite. Its String is "".
+	NoWeekday Weekday = -1
 )
 
-// String returns the English name of the day ("Sunday", "Monday", ...).
+// String returns the English name of the day ("Sunday", "Monday", ...), or ""
+// for NoWeekday.
 func (w Weekday) String() string {
 	switch w {
+	case NoWeekday:
+		return ""
 	case Sunday:
 		return "Sunday"
 	case Monday:
@@ -677,12 +684,19 @@ func (t Time) FormatJulian(format string) string {
 // Weekday returns the day of the week for time t.
 // 0=Sunday, 1=Monday, ..., 6=Saturday.
 // This is computed directly from the Julian Date and works for all epochs.
+// A time whose Julian Date is NaN or infinite has no day and gets NoWeekday.
 func (t Time) Weekday() Weekday {
 	// The Julian Date at noon on Monday 1 Jan 4713 BC is 0.0.
 	// JD 0.0 was a Monday. So JD mod 7 gives:
 	//   0 = Monday, 1 = Tuesday, ..., 6 = Sunday
 	// We want 0=Sunday, so we shift by +1.
 	jd := t.JD()
+
+	// Converting a non-finite JD to an int gives MinInt64 on amd64 and 0 on
+	// arm64, so it used to land on Sunday on one and Monday on the other (#982).
+	if math.IsNaN(jd) || math.IsInf(jd, 0) {
+		return NoWeekday
+	}
 	// Floor to get the nearest noon JD (integer), then shift
 	// The day of the week = (floor(JD + 0.5) + 1) mod 7
 	d := int(math.Floor(jd+0.5)) + 1
