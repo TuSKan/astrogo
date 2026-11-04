@@ -3,6 +3,8 @@ package passband_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -19,19 +21,30 @@ import (
 // cache that is written, and the cache that is read back instead of a second
 // request.
 
-// serveProfile stands up a fake SVO, points the endpoint at it, and returns the
-// number of requests it has answered.
-func serveProfile(t *testing.T, body string) (hits *int, gotID *string) {
+// serveProfile stands up a fake SVO, points the endpoint at it, and returns a
+// count of the requests it has answered and the last filter ID it was asked
+// for. The handler writes both from the server's own goroutines, and a request
+// retried after a timeout can arrive while the first is still being answered,
+// so both are synchronized.
+//
+// The count is for per-call assertions, "this call reached the service" or
+// "this call sent nothing", never an exact total: remote retries a request
+// that outlasts its timeout, and the service then counts it twice (#981).
+func serveProfile(t *testing.T, body string) (hits *atomic.Int32, gotID func() string) {
 	t.Helper()
 
 	var (
-		count int
+		count atomic.Int32
+		mu    sync.Mutex
 		id    string
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		count++
+		count.Add(1)
+
+		mu.Lock()
 		id = r.URL.Query().Get("ID")
+		mu.Unlock()
 
 		_, _ = w.Write([]byte(body))
 	}))
@@ -49,7 +62,12 @@ func serveProfile(t *testing.T, body string) (hits *int, gotID *string) {
 	// answer the first request and make the fetch look like it never happened.
 	remote.SetDataDir(tempBucketURL(t))
 
-	return &count, &id
+	return &count, func() string {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return id
+	}
 }
 
 func TestFetchRequestsTheFilterAndCachesIt(t *testing.T) {
@@ -64,15 +82,17 @@ func TestFetchRequestsTheFilterAndCachesIt(t *testing.T) {
 		t.Errorf("%d samples, want %d", len(band.WavelengthNM), len(goodRows()))
 	}
 
-	if *gotID != "Generic/Bessell.V" {
-		t.Errorf("service saw ID=%q, want the filter that was asked for", *gotID)
+	if id := gotID(); id != "Generic/Bessell.V" {
+		t.Errorf("service saw ID=%q, want the filter that was asked for", id)
 	}
 
-	if *hits != 1 {
-		t.Fatalf("service saw %d requests for the first fetch, want 1", *hits)
+	if hits.Load() == 0 {
+		t.Fatal("the first fetch sent no request")
 	}
 
 	// The second call is the point of the cache: same answer, no request.
+	before := hits.Load()
+
 	again, err := passband.Fetch(t.Context(), "Generic/Bessell.V")
 	if err != nil {
 		t.Fatalf("second Fetch: %v", err)
@@ -82,8 +102,8 @@ func TestFetchRequestsTheFilterAndCachesIt(t *testing.T) {
 		t.Errorf("cached profile has %d samples, want %d", len(again.WavelengthNM), len(band.WavelengthNM))
 	}
 
-	if *hits != 1 {
-		t.Errorf("service saw %d requests in total, want 1 — the second call did not read the cache", *hits)
+	if n := hits.Load() - before; n != 0 {
+		t.Errorf("the second call sent %d requests, want none — it did not read the cache", n)
 	}
 }
 
@@ -92,16 +112,16 @@ func TestFetchRequestsTheFilterAndCachesIt(t *testing.T) {
 func TestFetchDoesNotCacheAnUnusableAnswer(t *testing.T) {
 	hits, _ := serveProfile(t, `<VOTABLE><RESOURCE>`)
 
-	if _, err := passband.Fetch(t.Context(), "Generic/Bessell.V"); err == nil {
-		t.Fatal("a truncated profile was accepted")
-	}
+	for call := 1; call <= 2; call++ {
+		before := hits.Load()
 
-	if _, err := passband.Fetch(t.Context(), "Generic/Bessell.V"); err == nil {
-		t.Fatal("a truncated profile was accepted on the second call")
-	}
+		if _, err := passband.Fetch(t.Context(), "Generic/Bessell.V"); err == nil {
+			t.Fatalf("call %d: a truncated profile was accepted", call)
+		}
 
-	if *hits != 2 {
-		t.Errorf("service saw %d requests, want 2 — an unparseable answer was cached", *hits)
+		if hits.Load() == before {
+			t.Errorf("call %d sent no request — an unparseable answer was cached", call)
+		}
 	}
 }
 
@@ -134,11 +154,13 @@ func TestFetchStillWorksWhenTheCacheCannotBeOpened(t *testing.T) {
 	}
 
 	// Nothing was cached, so the second call asks again rather than failing.
+	before := hits.Load()
+
 	if _, err := passband.Fetch(t.Context(), "Generic/Bessell.V"); err != nil {
 		t.Fatalf("second Fetch with an unopenable cache: %v", err)
 	}
 
-	if *hits != 2 {
-		t.Errorf("service saw %d requests, want 2 — without a cache every call is a request", *hits)
+	if hits.Load() == before {
+		t.Error("the second call sent no request — without a cache every call is a request")
 	}
 }

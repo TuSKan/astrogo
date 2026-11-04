@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -156,16 +157,18 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 }
 
 // serveSSOFT points remote.FINK at a local server returning body, and reports
-// how many times it was asked.
-func serveSSOFT(t *testing.T, status int, body []byte) *int {
+// how many times it was asked. The count is written from the server's
+// goroutines, so it is atomic, and it is for per-call assertions: a request
+// retried after a timeout, or after a 5xx, is counted twice (#981).
+func serveSSOFT(t *testing.T, status int, body []byte) *atomic.Int32 {
 	t.Helper()
 
 	t.Cleanup(remote.Reset)
 
-	calls := 0
+	var calls atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		calls++
+		calls.Add(1)
 
 		if status != 0 && status != http.StatusOK {
 			w.WriteHeader(status)
@@ -282,14 +285,26 @@ func TestEnsureLoadedDownloadsOnce(t *testing.T) {
 
 	p := New()
 
-	for range 3 {
+	if err := p.ensureLoaded(context.Background()); err != nil {
+		t.Fatalf("ensureLoaded: %v", err)
+	}
+
+	if calls.Load() == 0 {
+		t.Fatal("the first load did not fetch the bulk table")
+	}
+
+	// Per call rather than a total of 1: the first download can be retried
+	// and counted twice, but a later load must send nothing.
+	before := calls.Load()
+
+	for range 2 {
 		if err := p.ensureLoaded(context.Background()); err != nil {
 			t.Fatalf("ensureLoaded: %v", err)
 		}
 	}
 
-	if *calls != 1 {
-		t.Errorf("the bulk table was fetched %d times, want 1", *calls)
+	if n := calls.Load() - before; n != 0 {
+		t.Errorf("two later loads fetched the bulk table %d times, want none", n)
 	}
 }
 
@@ -372,16 +387,15 @@ func TestFailedLoadIsNotRetried(t *testing.T) {
 
 	// The transport retries the 500 within the first load (#845), so what
 	// the provider decides is only what the second load asks.
-	asked := *calls
+	asked := calls.Load()
 
 	second := p.ensureLoaded(context.Background())
 	if second == nil {
 		t.Fatal("the second ensureLoaded returned no error")
 	}
 
-	if *calls != asked {
-		t.Errorf("the second load asked the server %d more times; the recorded failure was expected to be replayed",
-			*calls-asked)
+	if n := calls.Load() - asked; n != 0 {
+		t.Errorf("the second load asked the server %d more times; the recorded failure was expected to be replayed", n)
 	}
 
 	if first.Error() != second.Error() {

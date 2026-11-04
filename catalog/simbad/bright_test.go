@@ -109,9 +109,13 @@ func TestSearchBrightReturnsEveryObjectBelowTheCap(t *testing.T) {
 		t.Errorf("MAXREC = %v, want %d", got, brightRowCap+1)
 	}
 
-	if again, _ := drainBright(p, resolve.BrightRequest{MaxVMag: 6}); len(again) != 3 || hits.Load() != 1 {
-		t.Errorf("a second call returned %d targets after %d requests; a complete list is cached",
-			len(again), hits.Load())
+	// Counted per call, not as a total: a request retried after a timeout is
+	// counted twice, and only a call served from the cache sends none (#981).
+	before := hits.Load()
+
+	if again, _ := drainBright(p, resolve.BrightRequest{MaxVMag: 6}); len(again) != 3 || hits.Load() != before {
+		t.Errorf("a second call returned %d targets after %d more requests; a complete list is cached",
+			len(again), hits.Load()-before)
 	}
 }
 
@@ -132,9 +136,12 @@ func TestSearchBrightReportsACutList(t *testing.T) {
 		t.Fatalf("errors = %v, want one wrapping resolve.ErrTruncated", errs)
 	}
 
-	if _, errs := drainBright(p, resolve.BrightRequest{MaxVMag: 9}); len(errs) != 1 || hits.Load() != 2 {
-		t.Errorf("a second call made %d requests in all and yielded %v; a cut list must not be cached",
-			hits.Load(), errs)
+	// Per call, as above: the second call must reach the service at least once.
+	before := hits.Load()
+
+	if _, errs := drainBright(p, resolve.BrightRequest{MaxVMag: 9}); len(errs) != 1 || hits.Load() == before {
+		t.Errorf("a second call sent %d requests and yielded %v; a cut list must not be cached",
+			hits.Load()-before, errs)
 	}
 }
 
