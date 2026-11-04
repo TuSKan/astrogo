@@ -101,12 +101,25 @@ func TestMapCacheWriteRead(t *testing.T) {
 
 	seq2, _ := cache.Get(key)
 
-	var o []resolve.Target
+	var (
+		o      []resolve.Target
+		getErr error
+	)
 
-	seq2(func(tar resolve.Target, _ error) bool {
+	// The sequence yields a zero target with its error; dropped, a failed
+	// read counted as the one overwritten entry (#1008).
+	seq2(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			getErr = err
+
+			return false
+		}
+
 		o = append(o, tar)
+
 		return true
 	})
+	testutil.AssertNoError(t, getErr)
 	testutil.AssertEqual(t, "Overwrite Length", len(o), 1)
 	testutil.AssertEqual(t, "Overwritten ID", o[0].ID, "OVERWRITTEN")
 }

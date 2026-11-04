@@ -152,11 +152,26 @@ func TestSearchBright_RespectsLimit(t *testing.T) {
 
 	var got []resolve.Target
 
+	// The iterator yields a zero target with its error; dropped, a failed
+	// search read as a target with no ID (#1008).
+	var searchErr error
+
 	iter := p.SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 5, Limit: 1})
-	iter(func(t resolve.Target, _ error) bool {
-		got = append(got, t)
+	iter(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			searchErr = err
+
+			return false
+		}
+
+		got = append(got, tar)
+
 		return true
 	})
+
+	if searchErr != nil {
+		t.Fatalf("SearchBright: %v", searchErr)
+	}
 
 	if len(got) != 1 {
 		t.Fatalf("expected Limit=1 to cap results at 1, got %d", len(got))
