@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -26,12 +28,22 @@ type sbdbAnswer struct {
 }
 
 // serveSBDB points SBDB at a server answering by the request's key=value
-// ("sstr=Vega", "des=73P"), and returns the keys it was asked, in order.
-func serveSBDB(t *testing.T, answers map[string]sbdbAnswer) *[]string {
+// ("sstr=Vega", "des=73P"), and returns a function reporting the keys it was
+// asked, in order.
+//
+// A request repeated back to back is reported once. remote retries a request
+// that outlasts its timeout, and the server then sees it twice: under load
+// this test failed with "got sstr=73P, des=73P, des=73P" (#981). The cost is
+// that a bug sending one request twice in a row would pass too. The keys are
+// written from the server's goroutines, so they are guarded.
+func serveSBDB(t *testing.T, answers map[string]sbdbAnswer) (asked func() []string) {
 	t.Helper()
 	t.Cleanup(remote.Reset)
 
-	var asked []string
+	var (
+		mu   sync.Mutex
+		keys []string
+	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -41,7 +53,11 @@ func serveSBDB(t *testing.T, answers map[string]sbdbAnswer) *[]string {
 			key = "des=" + q.Get("des")
 		}
 
-		asked = append(asked, key)
+		mu.Lock()
+
+		keys = append(keys, key)
+
+		mu.Unlock()
 
 		a, ok := answers[key]
 		if !ok {
@@ -66,7 +82,12 @@ func serveSBDB(t *testing.T, answers map[string]sbdbAnswer) *[]string {
 		t.Fatal(err)
 	}
 
-	return &asked
+	return func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return slices.Compact(slices.Clone(keys))
+	}
 }
 
 // TestUnknownNameIsNotFound: SBDB's "specified object was not found" is an
@@ -112,7 +133,7 @@ func TestDesignationAmongMatchesIsSelected(t *testing.T) {
 
 	testutil.AssertEqual(t, "SPKID", got.SPKID, "1000394")
 	testutil.AssertEqual(t, "Name", got.Name, "73P/Schwassmann-Wachmann 3")
-	testutil.AssertEqual(t, "requests", strings.Join(*asked, ", "), "sstr=73P, des=73P")
+	testutil.AssertEqual(t, "requests", strings.Join(asked(), ", "), "sstr=73P, des=73P")
 
 	if !got.HasElements {
 		t.Error("HasElements = false: the des= answer carries the full orbit")
