@@ -103,3 +103,47 @@ func TestADateOutsideASofaSpanWarnsOncePerTheory(t *testing.T) {
 		t.Errorf("after Mars and Jupiter in 3500: %d Plan94 warnings, want 1; log %q", got, buf.String())
 	}
 }
+
+// The warning for a date outside Epv00's span is a property of the request, not
+// of whether the series had to be evaluated for it. A date the memo already
+// holds, asked for again after the warning was re-armed, warns again; were the
+// warning given only where the series is evaluated, whether a caller was told
+// would depend on who had asked for that date before.
+//
+// Not parallel, for the reason above.
+func TestAHeldDateOutsideTheSpanStillWarns(t *testing.T) {
+	var buf bytes.Buffer
+
+	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
+	rearm := func() { *epv00Span.once = sync.Once{} }
+	rearm()
+
+	t.Cleanup(func() {
+		logging.Set(nil)
+		rearm()
+	})
+
+	p := New()
+	// A date no other test asks for, outside 1900-2100.
+	at := time.FromJD(2451545.0+(1750-2000)*365.25+0.123456789, time.TT)
+
+	if _, err := p.Locate(core.Sun, at); err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+
+	if got := strings.Count(buf.String(), "theory=Epv00"); got != 1 {
+		t.Fatalf("after the first request: %d Epv00 warnings, want 1; log %q", got, buf.String())
+	}
+
+	// The date is held now. Re-arm, and ask again.
+	rearm()
+
+	if _, err := p.Locate(core.Sun, at); err != nil {
+		t.Fatalf("second request: %v", err)
+	}
+
+	if got := strings.Count(buf.String(), "theory=Epv00"); got != 2 {
+		t.Errorf("after asking for the held date again: %d Epv00 warnings, want 2; log %q", got, buf.String())
+	}
+}

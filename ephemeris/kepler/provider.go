@@ -2,7 +2,6 @@ package kepler
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
@@ -194,19 +193,15 @@ var plutoElements = func() Elements {
 //
 // It lives here rather than in the ephemeris root package, which would
 // cycle: ephemeris imports kepler to re-export Elements and NewFromElements.
-type sofaBase struct {
-	// last is the last Epv00 evaluation: the Sun and the Earth at one epoch
-	// are two Locate calls and one series, the costliest SOFA evaluates
-	// here. Held by value under mu, so keeping it allocates nothing; the
-	// series itself is evaluated outside the lock.
-	mu   sync.Mutex
-	last epv00At
-}
+type sofaBase struct{}
 
 // epv00At is one Epv00 evaluation: the Earth's heliocentric and barycentric
 // position and velocity at the TDB two-part date d1 + d2.
 type epv00At struct {
-	set      bool
+	set bool
+	// outside is Epv00's status +1: the date is outside its fitted span, and
+	// the result is a worse position, not a failure.
+	outside  bool
 	d1, d2   float64
 	pvh, pvb [2][3]float64
 }
@@ -314,31 +309,22 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 
 func (s *sofaBase) Close() error { return nil }
 
-// epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
-// same date.
-func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
-	s.mu.Lock()
-	e := s.last
-	s.mu.Unlock()
-
-	if e.set && e.d1 == d1 && e.d2 == d2 {
-		return e, nil
+// epv00 is Epv00 at d1 + d2, from the memo every sofaBase shares when it holds
+// that date (see [epv00Memo]).
+//
+// The warning for a date outside Epv00's fitted span is given here, from the
+// status the held evaluation carries, and not where the series is evaluated: a
+// date the memo already holds must warn as the first request for it did, or
+// whether a caller was told would depend on who asked first.
+func (*sofaBase) epv00(d1, d2 float64) (epv00At, error) {
+	e, err := sharedEpv00.epv00(d1, d2, gofaext.Epv00)
+	if err != nil {
+		return epv00At{}, err
 	}
 
-	pvh, pvb, status := gofaext.Epv00(d1, d2)
-	if status < 0 {
-		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
-	}
-
-	if status == 1 {
+	if e.outside {
 		warnOutsideSpan(epv00Span, d1+d2)
 	}
-
-	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
-
-	s.mu.Lock()
-	s.last = e
-	s.mu.Unlock()
 
 	return e, nil
 }
