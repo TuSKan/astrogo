@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/time"
@@ -19,13 +20,15 @@ import (
 // response it turns into an Almanac.
 
 // serveAlmanac stands up a fake SkyCalc and points the endpoint at it.
-func serveAlmanac(t *testing.T, status int, body string) (gotPath *string) {
+func serveAlmanac(t *testing.T, status int, body string) (gotPath *testutil.Recorded[string]) {
 	t.Helper()
 
-	var path string
+	// Recorded, not a plain string: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	var path testutil.Recorded[string]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path = r.URL.Path
+		path.Set(r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
@@ -57,8 +60,8 @@ func TestAlmanacAtPostsToSkyCalcAndDecodes(t *testing.T) {
 		t.Fatalf("AlmanacAt: %v", err)
 	}
 
-	if *gotPath != "/api/skycalc_almanac" {
-		t.Errorf("service saw %q, want the almanac path", *gotPath)
+	if gotPath.Get() != "/api/skycalc_almanac" {
+		t.Errorf("service saw %q, want the almanac path", gotPath.Get())
 	}
 
 	if alm.SolarFluxSFU != 129.5 {

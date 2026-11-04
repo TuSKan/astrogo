@@ -9,7 +9,9 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -223,11 +225,23 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 	fsys := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
-	var commands []string
+	// Guarded: a retried request can overlap the one it retries, and the late
+	// handler would append while the test reads (#1012).
+	var (
+		mu       sync.Mutex
+		recorded []string
+	)
+
+	record := func(cmd string) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		recorded = append(recorded, cmd)
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cmd := r.URL.Query().Get("COMMAND")
-		commands = append(commands, cmd)
+		record(cmd)
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -268,6 +282,10 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 		t.Fatalf("expected 1 reader from the DES=-escalated request, got %d", len(readers))
 	}
 
+	mu.Lock()
+	commands := slices.Clone(recorded)
+	mu.Unlock()
+
 	if len(commands) != 1 {
 		t.Fatalf("expected exactly 1 request (DES= directly, bare form skipped), got %d: %v", len(commands), commands)
 	}
@@ -294,11 +312,23 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 	fsys := tempBucket(t)
 	spkB64 := base64.StdEncoding.EncodeToString(testDAFHeader())
 
-	var commands []string
+	// Guarded: a retried request can overlap the one it retries, and the late
+	// handler would append while the test reads (#1012).
+	var (
+		mu       sync.Mutex
+		recorded []string
+	)
+
+	record := func(cmd string) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		recorded = append(recorded, cmd)
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cmd := r.URL.Query().Get("COMMAND")
-		commands = append(commands, cmd)
+		record(cmd)
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -334,6 +364,10 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 	if len(readers) != 1 {
 		t.Fatalf("expected 1 reader from the CAP-retried request, got %d", len(readers))
 	}
+
+	mu.Lock()
+	commands := slices.Clone(recorded)
+	mu.Unlock()
 
 	if len(commands) != 2 {
 		t.Fatalf("expected 2 requests (plain DES=, then DES=...;CAP retry — bare form skipped), got %d: %v", len(commands), commands)

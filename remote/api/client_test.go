@@ -9,8 +9,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -85,16 +87,15 @@ func TestGetJSONDecodes(t *testing.T) {
 }
 
 func TestPostFormAndPostJSON(t *testing.T) {
-	var (
-		gotContentType string
-		gotBody        string
-	)
+	// One recorded value, not two plain strings: a retried request can leave an
+	// earlier attempt's handler writing after the test reads (#1012).
+	type sent struct{ contentType, body string }
+
+	var seen testutil.Recorded[sent]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotContentType = r.Header.Get("Content-Type")
-
 		raw, _ := io.ReadAll(r.Body)
-		gotBody = string(raw)
+		seen.Set(sent{contentType: r.Header.Get("Content-Type"), body: string(raw)})
 
 		fmt.Fprint(w, "ok") //nolint:errcheck // failure surfaces in the assertions below
 	}))
@@ -111,12 +112,14 @@ func TestPostFormAndPostJSON(t *testing.T) {
 
 	_ = form.Close()
 
-	if !strings.HasPrefix(gotContentType, "application/x-www-form-urlencoded") {
-		t.Errorf("PostForm Content-Type = %q", gotContentType)
+	got := seen.Get()
+
+	if !strings.HasPrefix(got.contentType, "application/x-www-form-urlencoded") {
+		t.Errorf("PostForm Content-Type = %q", got.contentType)
 	}
 
-	if gotBody != "QUERY=SELECT+1" {
-		t.Errorf("PostForm body = %q", gotBody)
+	if got.body != "QUERY=SELECT+1" {
+		t.Errorf("PostForm body = %q", got.body)
 	}
 
 	jsonResp, err := client.PostJSON(context.Background(), base, "", map[string]string{"k": "v"})
@@ -126,12 +129,14 @@ func TestPostFormAndPostJSON(t *testing.T) {
 
 	_ = jsonResp.Close()
 
-	if !strings.HasPrefix(gotContentType, "application/json") {
-		t.Errorf("PostJSON Content-Type = %q", gotContentType)
+	got = seen.Get()
+
+	if !strings.HasPrefix(got.contentType, "application/json") {
+		t.Errorf("PostJSON Content-Type = %q", got.contentType)
 	}
 
-	if gotBody != `{"k":"v"}` {
-		t.Errorf("PostJSON body = %q", gotBody)
+	if got.body != `{"k":"v"}` {
+		t.Errorf("PostJSON body = %q", got.body)
 	}
 }
 
@@ -162,11 +167,11 @@ func TestNon2xxBecomesHTTPError(t *testing.T) {
 }
 
 func TestRetriesServerErrorThenSucceeds(t *testing.T) {
-	var attempts int
+	// Atomic: a retried request can overlap the attempt it retries (#1012).
+	var attempts atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
-		if attempts < 3 {
+		if attempts.Add(1) < 3 {
 			w.WriteHeader(http.StatusServiceUnavailable)
 
 			return
@@ -185,18 +190,19 @@ func TestRetriesServerErrorThenSucceeds(t *testing.T) {
 
 	defer func() { _ = body.Close() }()
 
-	if attempts != 3 {
-		t.Errorf("attempts = %d, want 3 (two 503s then success)", attempts)
+	if n := attempts.Load(); n != 3 {
+		t.Errorf("attempts = %d, want 3 (two 503s then success)", n)
 	}
 }
 
 // A 4xx is the caller's own request; re-sending it just wastes the
 // service's budget.
 func TestDoesNotRetryClientError(t *testing.T) {
-	var attempts int
+	// Atomic: a request timed out and retried can overlap the first (#1012).
+	var attempts atomic.Int32
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
+		attempts.Add(1)
 
 		http.Error(w, "bad query", http.StatusBadRequest)
 	}))
@@ -208,8 +214,8 @@ func TestDoesNotRetryClientError(t *testing.T) {
 		t.Fatal("expected an error for a 400")
 	}
 
-	if attempts != 1 {
-		t.Errorf("attempts = %d, want 1 — a 400 must not be retried", attempts)
+	if n := attempts.Load(); n != 1 {
+		t.Errorf("attempts = %d, want 1 — a 400 must not be retried", n)
 	}
 }
 
@@ -233,11 +239,14 @@ func TestWithTimeoutOverridesTheConstructorsTimeout(t *testing.T) {
 // appended — string concatenation would splice the path in after the query
 // and silently address the wrong thing.
 func TestRequestURLPreservesExistingQuery(t *testing.T) {
-	var gotPath, gotToken string
+	// Recorded, not plain strings: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	type sent struct{ path, token string }
+
+	var seen testutil.Recorded[sent]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotToken = r.URL.Query().Get("token")
+		seen.Set(sent{path: r.URL.Path, token: r.URL.Query().Get("token")})
 
 		fmt.Fprint(w, "ok") //nolint:errcheck // failure surfaces in the assertions below
 	}))
@@ -251,6 +260,9 @@ func TestRequestURLPreservesExistingQuery(t *testing.T) {
 	}
 
 	_ = body.Close()
+
+	got := seen.Get()
+	gotPath, gotToken := got.path, got.token
 
 	if gotPath != "/base/sync" {
 		t.Errorf("path = %q, want /base/sync", gotPath)
@@ -387,14 +399,14 @@ func TestUnparseableBaseURLIsRefused(t *testing.T) {
 func TestAuthTokenTravelsInAHeader(t *testing.T) {
 	t.Parallel()
 
-	var (
-		gotAuth string
-		gotURL  string
-	)
+	// Recorded, not plain strings: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	type sent struct{ auth, url string }
+
+	var seen testutil.Recorded[sent]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
-		gotURL = r.URL.String()
+		seen.Set(sent{auth: r.Header.Get("Authorization"), url: r.URL.String()})
 
 		_, _ = w.Write([]byte("ok"))
 	}))
@@ -407,6 +419,9 @@ func TestAuthTokenTravelsInAHeader(t *testing.T) {
 	}
 
 	_ = body.Close()
+
+	got := seen.Get()
+	gotAuth, gotURL := got.auth, got.url
 
 	if gotAuth != "Token s3cret" {
 		t.Errorf("Authorization = %q, want the scheme and token as given", gotAuth)

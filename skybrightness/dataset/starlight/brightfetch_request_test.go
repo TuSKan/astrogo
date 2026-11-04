@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -19,11 +20,13 @@ import (
 // TAP form.
 
 func TestFetchHipparcosPostsTheQueryAndParsesTheAnswer(t *testing.T) {
-	var gotQuery string
+	// Recorded, not a plain string: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	var seenQuery testutil.Recorded[string]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
-		gotQuery = r.PostForm.Get("QUERY")
+		seenQuery.Set(r.PostForm.Get("QUERY"))
 
 		_, _ = w.Write([]byte("HIP,RAICRS,DEICRS,Vmag,B-V,V-I,pmRA,pmDE,RAhms,DEdms\n" +
 			"3,0.00500795,38.85928608,6.61,0.51,0.60,5.24,-2.91,00 00 01.20,+38 51 33.4\n"))
@@ -48,6 +51,8 @@ func TestFetchHipparcosPostsTheQueryAndParsesTheAnswer(t *testing.T) {
 
 	// The magnitude cut is the caller's argument, and getting it wrong would
 	// silently change how much of the sky the map covers.
+	gotQuery := seenQuery.Get()
+
 	if !strings.Contains(gotQuery, "Vmag < 6.5") {
 		t.Errorf("query = %q, want the caller's magnitude cut", gotQuery)
 	}
@@ -89,11 +94,13 @@ func TestFetchHipparcosReportsAServiceFailure(t *testing.T) {
 // this package sends, for the same reason as the first: the ADQL is the part no
 // parser test can check.
 func TestAddCousinsRQueriesTheBrightStarCatalog(t *testing.T) {
-	var gotQuery string
+	// Recorded, not a plain string: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	var seenQuery testutil.Recorded[string]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
-		gotQuery = r.PostForm.Get("QUERY")
+		seenQuery.Set(r.PostForm.Get("QUERY"))
 
 		// One catalog row at the same position as the star below, so the
 		// positional match succeeds and R is filled in.
@@ -124,6 +131,8 @@ func TestAddCousinsRQueriesTheBrightStarCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddCousinsR: %v", err)
 	}
+
+	gotQuery := seenQuery.Get()
 
 	if !strings.Contains(gotQuery, "V/50/catalog") {
 		t.Errorf("query = %q, want the Bright Star Catalogue table", gotQuery)

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -173,10 +174,12 @@ func TestAPIClientReachesTheResolvedURL(t *testing.T) {
 
 	client := Default()
 
-	var gotPath string
+	// Recorded, not a plain string: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	var seenPath testutil.Recorded[string]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
+		seenPath.Set(r.URL.Path)
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"name":"Ceres"}`))
@@ -199,7 +202,7 @@ func TestAPIClientReachesTheResolvedURL(t *testing.T) {
 		t.Errorf("decoded name = %q, want Ceres", out.Name)
 	}
 
-	if gotPath != "/api/lookup" {
+	if gotPath := seenPath.Get(); gotPath != "/api/lookup" {
 		t.Errorf("server saw path %q, want /api/lookup — the override's own path must survive the join", gotPath)
 	}
 }

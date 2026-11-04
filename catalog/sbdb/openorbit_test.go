@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -53,14 +55,26 @@ func TestParseFloatReadsAnExponent(t *testing.T) {
 }
 
 // serveJSON points endpoint at a server answering every request with body,
-// and returns the query strings it saw.
-func serveJSON(t *testing.T, endpoint remote.EndpointID, body func(q map[string][]string) string) *[]map[string][]string {
+// and returns a function giving the query strings it saw.
+func serveJSON(t *testing.T, endpoint remote.EndpointID, body func(q map[string][]string) string) func() []map[string][]string {
 	t.Helper()
 
-	var seen []map[string][]string
+	// Guarded: a retried request can overlap the one it retries, and the late
+	// handler would append while the test reads (#1012).
+	var (
+		mu   sync.Mutex
+		seen []map[string][]string
+	)
+
+	record := func(q map[string][]string) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		seen = append(seen, q)
+	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = append(seen, r.URL.Query())
+		record(r.URL.Query())
 
 		w.Header().Set("Content-Type", "application/json")
 
@@ -75,7 +89,12 @@ func serveJSON(t *testing.T, endpoint remote.EndpointID, body func(q map[string]
 		t.Fatal(err)
 	}
 
-	return &seen
+	return func() []map[string][]string {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return slices.Clone(seen)
+	}
 }
 
 // TestSBDBResolverDecodesAnOpenOrbit reads C/2023 A3 as SBDB's identify
@@ -208,7 +227,7 @@ func TestSearchBrightDecodesBothFormsAtFullPrecision(t *testing.T) {
 		t.Fatalf("got %d comets, want 2", len(comets))
 	}
 
-	for _, q := range *seen {
+	for _, q := range seen() {
 		if q["full-prec"] == nil || q["full-prec"][0] != "true" {
 			t.Errorf("a bulk query went out without full-prec=true: %v", q)
 		}
