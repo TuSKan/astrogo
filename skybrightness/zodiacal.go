@@ -10,8 +10,15 @@ import (
 )
 
 // ErrZodiacalGeometry is returned for a direction the tabulated map does not
-// cover, or for a non-physical heliocentric distance.
+// cover, a direction that is not finite, or a non-physical heliocentric
+// distance.
 var ErrZodiacalGeometry = errors.New("skybrightness: zodiacal geometry outside the tabulated map")
+
+// errZodiacalSolarVicinity marks, beside ErrZodiacalGeometry, the one case of it
+// that is a gap in the model rather than a bad input: a direction inside the
+// solar vicinity the table leaves blank. ZodiacalLight reports that as no
+// contribution, and must not report anything else that way (#998).
+var errZodiacalSolarVicinity = errors.New("inside the solar vicinity the table leaves blank")
 
 // Zodiacal light — sunlight scattered by interplanetary dust.
 //
@@ -135,6 +142,16 @@ type ZodiacalGeometry struct {
 // magnitude, and a night-sky model has no business reporting a number a few
 // degrees from the Sun.
 func ZodiacalBrightnessAt(geom ZodiacalGeometry) (float64, error) {
+	// A NaN or infinite coordinate fails every comparison in the bracketing
+	// below, which then lands on the table's first cell, 0 degrees from the
+	// Sun, with a NaN weight: an error at low latitude, and a NaN brightness
+	// with no error elsewhere (#998).
+	if l, b := geom.DifferentialLongitude.Degrees(), geom.EclipticLatitude.Degrees(); math.IsNaN(l) || math.IsInf(l, 0) ||
+		math.IsNaN(b) || math.IsInf(b, 0) {
+		return 0, fmt.Errorf("%w: direction %g deg from the Sun in longitude, %g deg ecliptic latitude is not finite",
+			ErrZodiacalGeometry, l, b)
+	}
+
 	lon := foldDifferentialLongitude(geom.DifferentialLongitude)
 
 	lat := foldEclipticLatitude(geom.EclipticLatitude)
@@ -212,8 +229,8 @@ func interpolateZodiacal(lon, lat float64) (float64, error) {
 		}
 
 		if math.IsNaN(c.value) {
-			return 0, fmt.Errorf("%w: %.1f deg from the Sun in longitude, %.1f deg ecliptic latitude",
-				ErrZodiacalGeometry, lon, lat)
+			return 0, fmt.Errorf("%w: %w: %.1f deg from the Sun in longitude, %.1f deg ecliptic latitude",
+				ErrZodiacalGeometry, errZodiacalSolarVicinity, lon, lat)
 		}
 
 		total += c.value * c.weight
