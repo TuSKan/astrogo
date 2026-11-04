@@ -546,11 +546,16 @@ func (z *ZodiacalLight) AddRadiance(
 	defer z.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
 
 	reference, flags, err := zodiacalRadiance(scratch, grid, geom)
-	if errors.Is(err, ErrZodiacalGeometry) {
+	if errors.Is(err, errZodiacalSolarVicinity) {
 		// Inside the solar vicinity the table does not reach. That is a real
 		// gap in the model, not a failure of the evaluation, and a caller
 		// looking that close to the Sun has bigger problems than zodiacal
 		// light.
+		//
+		// Only that case. Matching ErrZodiacalGeometry here instead also gave
+		// a NaN or infinite direction, and a non-physical Sun distance, zero
+		// radiance and no error, so an estimate quietly lost its brightest
+		// natural term (#998).
 		return Contribution{Flags: ExtrapolatedModel}, nil
 	}
 

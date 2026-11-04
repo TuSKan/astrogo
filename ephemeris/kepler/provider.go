@@ -111,6 +111,14 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
 func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
+	// SOFA's theories compute a NaN position from a NaN date, and Moon98 has
+	// no status to say so, so ephemeris.Default answered the Sun and the Moon
+	// at a NaN or infinite time with NaN and no error (#1002). Checked before
+	// the elements lookup, so registered elements and any base are covered.
+	if jd := t.JD(); !finite(jd) {
+		return core.State{}, fmt.Errorf("%w: JD %v", ErrNonFiniteTime, jd)
+	}
+
 	el, ok := p.elements[id]
 	if !ok {
 		st, err := p.base.Locate(id, t)
@@ -266,9 +274,17 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 			np = int(id / 100)
 		}
 
+		// SOFA returns the most serious of three conditions: -1, an illegal
+		// planet number; +2, a failure to converge; +1, a year outside
+		// 1000-3000. Only +1 is a warning. A +2 position is not a solution
+		// of Kepler's equation, and was returned as one until #1003.
 		pv, status := gofaext.Plan94(d1, d2, np)
-		if status < 0 {
+		if status < 0 || status == 2 {
 			return core.State{}, fmt.Errorf("%w: gofaext.Plan94 status %d", ErrSofaFailure, status)
+		}
+
+		if status == 1 {
+			warnOutsideSpan(plan94Span, d1+d2)
 		}
 
 		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]), vector.V3(pv[1][0], pv[1][1], pv[1][2]), core.Sun)
@@ -312,6 +328,10 @@ func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
 	pvh, pvb, status := gofaext.Epv00(d1, d2)
 	if status < 0 {
 		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	}
+
+	if status == 1 {
+		warnOutsideSpan(epv00Span, d1+d2)
 	}
 
 	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
