@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/file"
 )
 
@@ -34,13 +35,15 @@ import (
 
 // serveRecording stands up a server answering everything with body, recording
 // the last path it was asked for.
-func serveRecording(t *testing.T, body string) (baseURL string, lastPath *string) {
+func serveRecording(t *testing.T, body string) (baseURL string, lastPath *testutil.Recorded[string]) {
 	t.Helper()
 
-	var seen string
+	// Recorded, not a plain string: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	var seen testutil.Recorded[string]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = r.URL.Path
+		seen.Set(r.URL.Path)
 
 		http.ServeContent(w, r, "object.dat", time.Unix(1_700_000_000, 0), strings.NewReader(body))
 	}))
@@ -80,8 +83,8 @@ func TestKeyParamServesOneObjectUnderAnyName(t *testing.T) {
 		t.Fatalf("ReadAll: %v", err)
 	}
 
-	if *servedPath != "/archive/2026-08/dump.dat" {
-		t.Errorf("server saw %q, want the single key the URL named", *servedPath)
+	if servedPath.Get() != "/archive/2026-08/dump.dat" {
+		t.Errorf("server saw %q, want the single key the URL named", servedPath.Get())
 	}
 
 	if !bytes.Equal(got, []byte(body)) {
@@ -143,7 +146,7 @@ func TestPrefixParamScopesTheBucket(t *testing.T) {
 		t.Fatalf("ReadAll: %v", err)
 	}
 
-	if *servedPath != "/mirror/openngc/NGC.csv" {
-		t.Errorf("server saw %q, want the prefixed path", *servedPath)
+	if servedPath.Get() != "/mirror/openngc/NGC.csv" {
+		t.Errorf("server saw %q, want the prefixed path", servedPath.Get())
 	}
 }

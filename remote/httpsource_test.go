@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -186,13 +187,14 @@ func TestValidateSeesFullStagedContent(t *testing.T) {
 func TestMutableSourceRevalidatesByETag(t *testing.T) {
 	cleanRemoteState(t)
 
-	var hits int
+	// Atomic: a retried request can overlap the attempt it retries (#1012).
+	var hits atomic.Int32
 
 	body := []byte("v1 rows")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			hits++
+			hits.Add(1)
 		}
 
 		http.ServeContent(w, r, "NGC.csv", time.Unix(1_700_000_000, 0), bytes.NewReader(body))
@@ -211,8 +213,8 @@ func TestMutableSourceRevalidatesByETag(t *testing.T) {
 		}
 	}
 
-	if hits != 1 {
-		t.Errorf("source body fetched %d times, want 1 — the ETag check must skip the transfer", hits)
+	if n := hits.Load(); n != 1 {
+		t.Errorf("source body fetched %d times, want 1 — the ETag check must skip the transfer", n)
 	}
 }
 

@@ -302,18 +302,15 @@ func TestDefaultAPITimeoutIsTheSameValue(t *testing.T) {
 // offline test above only ever reaches their refusal branch, which leaves the
 // forwarding itself — the body, the content type, the resolved URL — unchecked.
 func TestPostVerbsReachTheServerThroughTheFrontDoor(t *testing.T) {
-	var (
-		gotContentType string
-		gotBody        string
-		gotPath        string
-	)
+	// Recorded, not plain strings: a retried request can leave an earlier
+	// attempt's handler writing after the test reads (#1012).
+	type sent struct{ contentType, body, path string }
+
+	var seen testutil.Recorded[sent]
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotContentType = r.Header.Get("Content-Type")
-		gotPath = r.URL.Path
-
 		raw, _ := io.ReadAll(r.Body)
-		gotBody = string(raw)
+		seen.Set(sent{contentType: r.Header.Get("Content-Type"), body: string(raw), path: r.URL.Path})
 
 		_, _ = w.Write([]byte("ok"))
 	}))
@@ -335,6 +332,9 @@ func TestPostVerbsReachTheServerThroughTheFrontDoor(t *testing.T) {
 
 	_ = form.Close()
 
+	got := seen.Get()
+	gotContentType, gotBody, gotPath := got.contentType, got.body, got.path
+
 	if !strings.HasPrefix(gotContentType, "application/x-www-form-urlencoded") {
 		t.Errorf("PostForm Content-Type = %q", gotContentType)
 	}
@@ -353,6 +353,9 @@ func TestPostVerbsReachTheServerThroughTheFrontDoor(t *testing.T) {
 	}
 
 	_ = resp.Close()
+
+	got = seen.Get()
+	gotContentType, gotBody = got.contentType, got.body
 
 	if !strings.HasPrefix(gotContentType, "application/json") {
 		t.Errorf("PostJSON Content-Type = %q", gotContentType)
