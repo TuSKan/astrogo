@@ -237,6 +237,13 @@ func (c *CloudySkyglow) AddRadiance(
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
+	// Checked before the horizon test, which a NaN altitude passes. Nothing
+	// after it looks at the direction, so a NaN or infinite one came out as
+	// NaN in every bin, with no error (#1000).
+	if err := checkDirection(dir); err != nil {
+		return Contribution{}, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
+	}
+
 	// Below the horizon there is no sky to look at.
 	if dir.Alt() <= 0 {
 		return Contribution{}, nil
