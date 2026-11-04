@@ -31,8 +31,10 @@ go mod tidy && gofmt -l . && golangci-lint run
 Tests are partitioned by build tag — the default `go test ./...` runs only fast, deterministic, offline tests. Anything touching a network or a heavy reference corpus is gated:
 
 - `network` — live calls to SIMBAD, MAST, Gaia, VizieR, JPL, SBDB, NORAD, FINK. These tests do a TCP pre-check and `t.Skipf` when the endpoint is unreachable (never fail CI for external downtime). Keep `t.Fatal` only for wrong data from a reachable endpoint. A service that, when degraded, rejects every request as malformed (VizieR answers "400 1 unresolved identifiers") goes through `testutil.SkipOnDegradedService` with a control request that cannot be wrong (`testutil.TAPControl`), so its outage skips while a genuinely bad query still fails (#492).
-- `validation` — numerical comparisons against JPL Horizons and SOFA fixtures, mostly under [ephemeris/jpl/validation/](ephemeris/jpl/validation/) and `plan/{usno,nasa_eclipse,astropixels}_test.go`.
-- `integration` — cross-provider tests with offline caches.
+- `validation` — numerical comparisons against published references: JPL Horizons and SOFA fixtures under [ephemeris/jpl/validation/](ephemeris/jpl/validation/), and the sky-brightness components against their papers' measurements in `skybrightness/` (the `gambons_*` files and `cloudy_validation_test.go`).
+- `integration` — cross-provider tests over offline caches, and `plan`'s comparisons against live USNO, NASA eclipse-catalog and AstroPixels data in `plan/{usno,nasa_eclipse,astropixels}_test.go` (`go test -tags integration -run TestUSNO ./plan/`).
+
+A pull request vets all three tags and runs `integration` in a non-blocking job. Beyond that, the Validation workflow (`pre-release.yml`) runs `network` nightly and `validation` and `integration` weekly.
 
 ## Fuzzing
 
