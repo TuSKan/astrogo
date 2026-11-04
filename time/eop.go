@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
@@ -239,6 +240,16 @@ func logEOPUnavailable(mjd float64, cause error) {
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
+	// A non-finite MJD is a broken epoch, not an uncovered one: every range
+	// comparison on the paths below is false for a NaN, so one used to slip
+	// past them into the past-bulletin hold and come back with the
+	// bulletin's last DUT1 and no leap seconds — a finite DUT1 for a time
+	// that has none (#963). The answer carries a NaN DUT1 with the error, so
+	// a caller that ignores the error reads no finite value either.
+	if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+		return EOP{DUT1: math.NaN()}, nil, fmt.Errorf("%w: MJD %v is not finite", ErrOutOfRange, mjd)
+	}
+
 	// A model that answers mjd with nothing to load is answered from one
 	// read of it: no lock, one interpolation (#953).
 	if eop, ok := iers.Lookup(mjd); ok {

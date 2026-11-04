@@ -15,6 +15,7 @@ func TestTableEOPRefusesNonFiniteMJD(t *testing.T) {
 		if !errors.Is(err, ErrOutOfRange) {
 			t.Errorf("EOP(%v) returned err = %v, want ErrOutOfRange", mjd, err)
 		}
+
 		if eop != (EOP{}) {
 			t.Errorf("EOP(%v) returned a value with an error", mjd)
 		}
