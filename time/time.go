@@ -501,7 +501,9 @@ func (t Time) Scale() Scale {
 // If a display location is set, the civil time in that timezone is shown;
 // otherwise the raw JD and scale are returned.
 func (t Time) String() string {
-	if t.loc != nil && t.loc != time.UTC {
+	// A non-finite time has no civil time to show in any zone, so it keeps
+	// the JD form, which prints its NaN honestly (#986).
+	if t.loc != nil && t.loc != time.UTC && !t.nonFinite() {
 		return t.ToGo().Format("2006-01-02 15:04:05 MST")
 	}
 
@@ -541,6 +543,14 @@ func (t Time) String() string {
 // data at all. Printing the right instant is worth the one scale that has to
 // ask.
 func (t Time) ToGo() time.Time {
+	// A non-finite time has no instant on the UTC timeline, and the standard
+	// library's own "no time" is the zero Time, which IsZero reports. It used to
+	// come out as the year 292277019622 on amd64, where its NaN converts to
+	// MinInt64 (#986). Checked first, so a non-finite UT1 time asks no EOP.
+	if t.nonFinite() {
+		return time.Time{}
+	}
+
 	utc := t.UTC()
 
 	// A standard-library time is a count of uniform seconds, so a leap-second
@@ -622,6 +632,13 @@ func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
 // are taken from each part as integers and only the fractions are added,
 // where a float64 resolves picoseconds.
 func julianCalendar(jd1, jd2 float64) (year, month, day int, dayFrac float64) {
+	// A non-finite date has no calendar: zeros, as Calendar answers through
+	// gofaext.JdToDate. Converted to int unchecked, it came out as a definite
+	// -4712-01-01 on amd64 (#986).
+	if dj := jd1 + jd2; math.IsNaN(dj) || math.IsInf(dj, 0) {
+		return 0, 0, 0, 0
+	}
+
 	w1, w2 := math.Floor(jd1), math.Floor(jd2)
 
 	// Fractional day from midnight, which is noon plus a half: under 2.5.
@@ -983,6 +1000,14 @@ func (t Time) In(loc *time.Location) Time {
 // apart (#766); MST there reads "UTC". The display location applies only
 // within the standard library's years.
 func (t Time) Format(format string) string {
+	// A non-finite time has no date or clock to lay out. Its calendar year
+	// reads as 0, inside the range handed to ToGo below, so it used to format a
+	// year of 292277019622, and would format 0001-01-01 from ToGo's zero Time.
+	// It formats as String does instead (#986).
+	if t.nonFinite() {
+		return t.String()
+	}
+
 	jd1, jd2 := t.clockParts()
 
 	y, _, _, _, _ := gofaext.JdToDate(jd1, jd2)
@@ -1672,6 +1697,16 @@ func (t Time) subDays(other Time) float64 {
 	}
 
 	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
+}
+
+// nonFinite reports whether t's Julian Date is NaN or infinite: a Time with no
+// instant, which FromJD(math.NaN(), …) builds and an infinite JD becomes when
+// it is split. Its calendar, clock and day of the year have no value, and
+// converting its parts to int gives MinInt64 on amd64 and 0 on arm64 (#986).
+func (t Time) nonFinite() bool {
+	j := t.jd1 + t.jd2
+
+	return math.IsNaN(j) || math.IsInf(j, 0)
 }
 
 // halfSecondDays is half a second in days: added to an instant before it is

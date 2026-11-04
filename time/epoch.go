@@ -1,6 +1,8 @@
 package time
 
 import (
+	"math"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 )
@@ -59,7 +61,15 @@ func (t Time) JulianEpochYear() float64 {
 // came out 0.917, and 23:00 UTC on 31 December shown in Tokyo 366.33 in a
 // 365-day year (#760). A caller pairing Year with DayOfYear, as a TLE epoch
 // does, needs both from one date.
+//
+// A non-finite time has no day of the year and gets NaN, as DecimalYear does.
+// Calendar answers it with zeros, which used to come out as -1721059 here
+// (#986).
 func (t Time) DayOfYear() float64 {
+	if t.nonFinite() {
+		return math.NaN()
+	}
+
 	y, m, d, frac := t.Calendar()
 
 	return float64(mjdOf(y, m, d)-mjdOf(y, 1, 1)) + 1 + frac
