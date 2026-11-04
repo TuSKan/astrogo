@@ -26,21 +26,25 @@ reviewer can act on. Delete any that genuinely do not apply.
 
 ## Verification
 
-<!-- Which gates ran. At minimum:
+<!-- Which gates ran. The full gate, docs/PULL_REQUESTS.md §5:
 
-     gofmt -l . && go build ./... && go vet ./...
+     gofmt -l . && go build ./... && go vet ./... && go mod tidy
      go test ./...
+     go test -tags="integration,network,validation" -count=1 ./...
+     go test -race -short -count=1 ./...
      golangci-lint run
      golangci-lint run --build-tags="integration,network,validation"
+     the examples/ module: go mod tidy, build, vet and lint
 
      Both linter runs, please — CI lints untagged, and a helper used only from
-     a tagged file reads as unused there. See docs/PULL_REQUESTS.md §5.
+     a tagged file reads as unused there. The tagged tests too: CI runs the
+     network and validation suites only on a schedule.
 
      If you reproduced a pre-existing failure on main, say so, so nobody
      assumes this change caused it. -->
 
 ---
 
-- [ ] A changelog fragment in `docs/changelog.d/` (or: this change is not user-visible)
+- [ ] A changelog fragment in `docs/changelog.d/`, tests and benchmarks included (see docs/PULL_REQUESTS.md §4)
 - [ ] New exported symbols have tests in this change
 - [ ] `Closes #NN.` on its own line above, if this fixes a filed issue

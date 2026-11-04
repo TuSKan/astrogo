@@ -213,5 +213,5 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 // String returns a DMS representation of the geodetic coordinate.
 func (g *Geodetic) String() string {
 	return fmt.Sprintf("Lon=%s, Lat=%s, H=%.1fm",
-		g.Lon().DMSString(0), g.Lat().DMSString(0), g.Height())
+		g.Lon().DMSString(0), g.Lat().DMSString(0), g.Height().Meters())
 }

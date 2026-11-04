@@ -223,7 +223,7 @@ The fidelity used is recorded in `Reproducibility`.
 ```go
 type Component interface {
     ID() ComponentID
-    AddRadiance(ctx, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) error
+    AddRadiance(ctx, dst SpectralRadiance, grid unit.SpectralGrid, dir coord.AltAz, scene *Scene) (Contribution, error)
     Provenance() Provenance
 }
 ```
@@ -256,6 +256,37 @@ dominates" by taking a measurement, but cannot act on a single opaque percentage
 Uncertainties are relative because the dominant terms — airglow variability, aerosol
 loading, assumed source spectra — are multiplicative. Independence is not assumed;
 `UncertaintyBudget.Correlated` combines linearly when terms share a systematic.
+
+A component that gives light with no entry in the budget makes the total unknown, not
+zero: `Estimate.TotalUncertainty` returns `ErrUncertaintyUnknown` naming it. Until #911 it
+reported 0, a perfectly certain prediction from a budget nothing filled.
+
+Each `AddRadiance` call reports its own entry in its `Contribution`, because what the
+figure depends on - a dust column, a zodiacal brightness, an optical depth - exists only
+while the radiance is computed. Every per-wavelength figure is weighted by the radiance it
+applies to, with `SpectralGrid.Integrate`'s trapezoid weights, and combined linearly, as
+the correlated errors these are behave. The figures come from the components' sources and
+nowhere else:
+
+| component | relative uncertainty | source |
+|---|---|---|
+| extragalactic | 4.0–6.9 % by band | Koushan et al. (2021) Table 3 total error |
+| zodiacal | max(10 %, 15 S10 / brightness), 20 % floor below 300 nm; about 27 % at the ecliptic poles | Leinert et al. (1998) |
+| diffuse galactic | Eq. 7 propagated: slope and quadratic from Table 2, offset 0.8 ± 0.21 MJy sr⁻¹ (Eq. 9); none outside the fitted range or where the starlight cap binds | Kawara et al. (2017), Lagache et al. (2000) |
+| moonlight | ROLO's 10 % absolute scale ⊕ the Noll–Winkler spread of the multiple-scattering coefficient: 16 % in V at Paranal, 18 % at sea level | Stone & Kieffer (2004), Noll et al. (2012), Winkler (2022) |
+| artificial | 25 %, the top of the model's published discrepancy from an exact multiple-scattering solution, ⊕ each emitter's stated uncertainty weighted by its share of the radiance; unknown while a lit emitter states none | Kocifaj, Barà & Falchi (2022) §3; the caller's inventory, through `GroundEmitter.SourceUncertainty` |
+| airglow, starlight | the caller's, through `WithUncertainty` | the caller's data |
+
+Moonlight's figure is below the 0.2 mag (about 20 %) Jones et al. (2013) found for a full
+radiative-transfer model against 141 spectra, and measurement bears it out. Against the
+twelve moonlit-sky measurements of Krisciunas & Schaefer (1991) Table 1, the component reads
+0.13 mag faint in V on average, inside the bound `TestScatteredMoonlightAgainstKS91WithCALSPEC`
+derives from this budget and the data's scatter. Velikodsky et al. (2011) find ROLO 13 %
+faint at 603 nm, and the albedo is divided by 0.87 at every wavelength, as Jones et al. do;
+before #938 that offset was recorded rather than corrected, and the component read 0.30 mag
+faint. The components built from a caller's
+own data report no figure, because their uncertainty is that data's: a natural sky with
+no `WithUncertainty` around them reports `ErrUncertaintyUnknown` naming exactly those.
 
 **Quality** flags record how the prediction was constrained: measured versus
 climatological atmosphere, aerosol, cloud, airglow; measured versus assumed source spectrum
@@ -456,13 +487,18 @@ governing equations to its refs. 14, 20, 36 and 37. Of those four only Kocifaj (
 | `L₂`, `CF`, `ο(z,A)` | *not in 2007* | The 2025 paper's own extension: one reflecting layer becomes a fractional 3D cloud field. This is the part that has to be built from the PNAS structure rather than transcribed |
 
 **Validation setup from Kocifaj (2007) §3**, which is the first thing to reproduce because
-it is a closed numerical example rather than a field comparison: `h₀` = 8 km, `β` = 0.65 km⁻¹,
-`g` = 0.90, aerosol single-scattering albedo 0.85, molecular 1.0, `Q` = `q` = 0.15, band
-0.45–0.75 µm, `τ_M` ≈ 4.09 and `τ_A` ≈ 1 at a 500 nm reference AOD of 0.4, `ρ` ∈ {0.4, 0.7},
-cloud altitude `H` ∈ {1, 3} km, one source at 5 km and azimuth 20°, optionally a second at
-120° and 1–5 km. Its Figs. 2–6 are the shapes to match; the paper's own statement that
-cloudless radiance falls two orders of magnitude with angular distance from the source is
-the cheapest first check.
+it is a closed numerical example rather than a field comparison. Kocifaj (2008), Appl. Opt.
+47, 792, §3 restates its conditions "in accordance with" it, and that is the text these were
+checked against: `h₀` = 8 km, `γ` = 0.65 km⁻¹ (the aerosol decay rate, a 1538 m scale
+height), `g` = 0.90, aerosol single-scattering albedo 0.85, molecular 1.0, `Q` = `q` = 0.15,
+the band 0.45–0.75 µm weighted by photopic efficiency, optical depths falling as
+`τ_M ∝ λ^-4.09` and `τ_A ∝ λ^-1` with a 500 nm reference AOD of **0.5**, and a cloud
+reflectance of 0.46 at `H` = 1 km. Until #934 this paragraph read the two exponents as optical
+depths, "`τ_M` ≈ 4.09 and `τ_A` ≈ 1", and gave the AOD as 0.4. The 2008 runs place one source
+2 km away at azimuth 250°, or three at 2, 4 and 8 km. The 2007 geometry recorded here before,
+one source at 5 km and azimuth 20° with optionally a second at 120° and 1–5 km, `ρ` ∈
+{0.4, 0.7} and `H` ∈ {1, 3} km, has not been checked against the 2007 text, which is not in
+hand. `TestCloudlessSkyHasKocifaj2008sShape` runs the 2008 Fig. 1 case.
 
 **This is not a small addition to §11.1 either.** `ArtificialSkyglow` implements Kocifaj,
 Bará & Falchi (2022), which is the *analytic* formulation — an all-sky radiance (Eq. 2)
@@ -513,12 +549,22 @@ that reaches a distant cloud, so a better-shielded town screens sooner. The test
 asserts the signs and the ordering and *records* the crossover rather than requiring one;
 tightening it needs their source inventory, not more code.
 
-**The 2007 figures are not digitized, and cannot be from what is in hand.** Figs. 2-6 are
-contour plots in relative units on a logarithmic scale, and the copy available here is a
-text extraction with no image tooling to recover the panels. Reading numbers off them would
-be inventing precision. What the paper states in prose — cloudless radiance falling about
-two orders of magnitude with angular distance from the source — is checked instead, in
-`TestCloudlessRadianceFallsAwayFromTheSource`.
+**The figures are not digitized.** The 2007 paper is not in hand, and the 2008 figures for a
+point source are contour plots in relative units. Reading numbers off them would be inventing
+precision. What the 2008 paper states in prose about the cloudless sky is checked instead, in
+`TestCloudlessSkyHasKocifaj2008sShape`, in that paper's configuration:
+
+- luminance falls with angular distance from the source, along every almucantar;
+- its minimum lies opposite the source, at a zenith angle of 35°, and does not move as the
+  source goes from 2 to 10 km;
+- past the minimum it rises 1.7× toward the opposite horizon.
+
+The same paragraph's range, "one to two orders of magnitude", is not something the sky has
+without a zenith limit. Brightest over darkest is 19× out to 60°, 148× to 75°, 2500× to 85°
+and 34 000× to 89°, because a line of sight that low toward the source passes a few hundred
+meters over it. The paper's figure is the range out to 60–75°, so the test requires only the
+one order and states the rest. This file used to say the component reproduces two orders of
+magnitude, on a test that asked for 3× and measured 21× in a different configuration (#934).
 Regimes to test: pristine clear, urban clear, thin cloud, broken cloud, cloud over the
 observer, cloud over the source city, cloud between city and observer, overcast.
 
@@ -653,7 +699,7 @@ once and allocates nothing per direction (4.6 µs, 0 allocs).
 
 | Step | Go function | Validation test |
 | :--- | :--- | :--- |
-| Reflectance → irradiance → scattering → radiance | `ScatteredMoonlight.AddRadiance` | `TestScatteredMoonlightFullMoonSkyBrightness` |
+| Reflectance → irradiance → scattering → radiance | `ScatteredMoonlight.AddRadiance` | `TestScatteredMoonlightAgainstKS91`, `TestScatteredMoonlightAgainstKS91WithCALSPEC` |
 | Directional falloff away from the Moon | — | `TestScatteredMoonlightDarkensAwayFromTheMoon` |
 | Per-scene geometry cache | — | `TestScatteredMoonlightCacheRespectsScene`, `…Concurrent` |
 
@@ -674,7 +720,8 @@ input because this package ships none and the choice moves the absolute scale.
 component, while there were still zero implementations and the change was free. Flags
 cannot be fixed per component: the same model is an interpolation in one geometry and an
 extrapolation in another, and a caller deciding whether to trust a number needs to know
-which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`.
+which case it got. `Model.Estimate` ORs them into the `Estimate`'s `Quality`. The flags
+now travel in a `Contribution` with the call's uncertainty (#911), for the same reason.
 
 **Atmospheric scattering — Winkler (2022).** The revised simplified scattering model,
 derived from SAAO Sutherland multifilter photometry across a wide range of sky directions,
@@ -1222,11 +1269,15 @@ filesystem — `remote` addresses everything as a bucket plus key.
 
 **No hidden network dependency.** `Model.Estimate` is deterministic for a given scene and
 dataset version and performs no acquisition. This is enforced behaviorally:
-`TestEstimateWorksOffline` runs an evaluation under `remote.SetOffline(true)` and requires
-byte-identical output. A structural direct-import check complements it
-(`TestCoreDoesNotImportIOPackages`); a *transitive* ban would be wrong rather than
-stricter, because the specification requires reusing `coord`, `ephemeris` and `time`, which
-legitimately reach `remote` for Earth-orientation data and JPL kernels, both consent-gated.
+`TestEstimateWorksOffline` runs the six real components of `fullsky_test.go` under
+`remote.SetOffline(true)`, then online, and requires byte-identical output. A structural
+check complements it: `TestCoreDoesNotImportIOPackages` bans `remote`, `net`, `net/http`,
+`fits`, `plan` and HDF5 from the core's whole import closure, and `os` as a direct import,
+since `fmt` brings it in (#973). The specification requires reusing `coord`, `ephemeris`
+and `time`, and none of them imports `remote`: `time` takes Earth-orientation data through a
+loader that `remote/eop` registers, and JPL kernels live in `ephemeris/jpl`. At runtime the
+core reaches outside only through what its caller hands it, the scene's ephemeris provider
+and a registered EOP loader, both consent-gated.
 
 ---
 
@@ -1524,9 +1575,9 @@ allocations.
 | 0 | Architecture and spectral foundation | **Done** |
 | 1 | Atmospheric foundation, into `atmosphere` | **Done.** Scattering, transfer, scale heights and van Rhijn; absorption reads through `dataset/crosssection`. Ozone's cross section ships only as `atmosphere`'s 10 nm average of the 223 K file that `dataset/crosssection` fetches (§11.5, §16), and every component that crosses the ozone layer applies it (#632) |
 | 2 | Natural moonless sky (GAMBONS, Gaia DR3) | **Largely built.** DGL, zodiacal light and airglow are implemented and validated; `dataset/starlight` holds the map type, its loader and a Gaia TAP builder. What remains is reference data, not code: an ISL map (requested, or buildable), Kawara's `c` decade (resolved), and band transformations |
-| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor, validated at 18.6 mag/arcsec². The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
+| 3 | Modern Moon (Jones 2013, ROLO, Winkler 2022) | **`ScatteredMoonlight` shipped** — ROLO reflectance + single-scattering transfer with Winkler's multiple-scattering factor. Against Krisciunas & Schaefer (1991)'s measured moonlit sky it reads 0.13 mag faint in V on average, within its uncertainty budget, once ROLO's absolute scale carries Velikodsky et al. (2011)'s correction as Jones et al. (2013) apply it (#938). The solar spectrum is now supplied by `dataset/solar` from CALSPEC. Remaining: Winkler's own model is empirical at one site, so the multiple-scattering factor is a correction rather than a transfer solution |
 | 4 | Artificial clear sky (Kocifaj 2022, VIIRS as source) | **`ArtificialSkyglow` + `dataset/viirs` shipped.** Absolute scale is uncalibrated, but not for the reason an earlier revision of this row gave: Eq. 2 is not missing an area term, and §17 records why that reading was wrong. The real blocker is narrower and is a literature gap rather than a transcription one — Kocifaj & Bará say `L_i` can be inferred from satellite radiance data and cite Elvidge et al. (2017), which is an instrument and product description carrying no DNB-pixel-to-line-of-sight-radiance conversion. A recipe for **part** of it does exist and was missed when this row was written: Aubé et al. (2020) §2.4, Eqs. 4 and 8–11, correct the DNB signal for atmospheric extinction and for the subgrid obstacles that block the low-angle light the satellite would otherwise see, giving `Ra_corrected = Ra·F_T·F_o` with `F_o = (1 − cos70°)/[1 − f_o·cos θ_lim + (f_o−1)·cos70°]` and `θ_lim = arctan(d_o/h_o)`. It transplants mechanically — this component is homogeneous in source strength to 2e-16, so such a factor applies per emitter rather than to a result, which is better than that paper's own single-obstacle-set correction to model output and avoids the 10 per cent residual they attribute to it. **It does not lift the blocker**, for two reasons: `F_o` integrates over the 0–70° cone VIIRS samples, so it anchors magnitude and says nothing about the upward emission function, and near-horizontal emission is what carries skyglow far; and Illumina takes spectral power distribution and angular emission from its own inventory regardless. It also needs per-region obstacle height, spacing and filling factor, which is a further dataset. So `dataset/viirs` still uses a stated substitute; directional structure is meaningful, absolute scale is not. Fig. 1 is checked against the properties the paper states about it (`TestKocifaj2022Fig1Curves`); a digitized comparison remains |
-| 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **122×** over the town against their "more than fifteenfold", raises horizontal illuminance **57.8×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The 2007 contour figures are not digitized because the copy in hand is text-only, so its prose claim is checked instead. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
+| 5 | Clouds (Kocifaj 2007 + 2025) | **Done and validated as far as the papers allow.** `skybrightness.CloudySkyglow` implements Kocifaj (2007) Eq. 27 and the 2025 extension to a fractional deck. Against the paper's own Žilina configuration it amplifies the zenith **123×** over the town against their "more than fifteenfold", raises horizontal illuminance **58.0×** against their "more than fourfold", and **screens beyond about 45 km** — both signs, monotonic between them. The crossover sits further out than their 18.5 km and cannot be reconciled without the cloud albedo and shielding split they do not state; §11.2 records the sweep. The contour figures are not digitized, so the 2008 paper's description of the cloudless sky is checked instead, in its own configuration. Two departures are in the component's provenance: Beer-Lambert opacity in place of their stochastic 3D cloud field, and a CF weight on `L_infinity` that their printed Eq. 3 lacks |
 | 6 | External high-fidelity RT (Illumina-v2, precomputed) | Planned |
 | 7 | Operational observatory calibration | Planned |
 | 8 | Performance: LUTs, surrogates, caching, loop optimization | **Partly done, and now with the number it was waiting for.** Caching was built in rather than deferred: `coord.Context` is reused per epoch, every natural component holds a `frameCache`, and `ScatteredMoonlight` caches its per-scene geometry — correctness-shaped decisions that were never Phase 8 work. The row previously said no optimization should start before a measurement justified it. `CloudySkyglow` produced one: **9.35 ms per direction** against the analytic solution's 9.9 µs, a factor of 942, because its cost is a height integral per wavelength. Loop optimization alone took it to **0.72 ms, 13× faster**, by hoisting out of the spectral loop everything that does not vary across it — the airmass of each leg, both phase functions, and the exponential profile shapes, which factor into a wavelength-independent decay times a per-wavelength column. Verified exact: 32 sampled radiances moved by at most 1.9 ulps, which is reassociation rather than a change in the model. What remains is LUTs and surrogates, and the measurement to justify *those* has not been taken |
@@ -1807,7 +1858,8 @@ scattering-integral presets and irrelevant here.
 **On the precision that is available here.** A 10⁻¹² agreement is what §13's tiling check
 reaches, because that compares the same sum in two orders. It is not available against
 GAMBONS at any effort: Koushan's extragalactic values carry 4–7 per cent, Kawara's DGL slope
-10–50 per cent, the two models aggregate different Gaia releases, and one solves the
+3–8 per cent (47 at 225 nm) before the dust map's own uncertainty, the two models aggregate
+different Gaia releases, and one solves the
 transport where the other attenuates directly. Inputs known to five per cent cannot produce
 agreement at twelve digits, and an implementation tuned until they did would only be
 agreeing with itself.

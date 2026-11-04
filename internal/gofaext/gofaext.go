@@ -1,6 +1,10 @@
 package gofaext
 
-import "github.com/hebl/gofa"
+import (
+	"math"
+
+	"github.com/hebl/gofa"
+)
 
 // Dtf2d converts a calendar date and time expressed in the given scale
 // ("UTC", "TAI", "TT", etc.) into a two-part Julian date (d1, d2).
@@ -20,10 +24,57 @@ func Dtf2d(scale string, year, month, day, hour, minute int, second float64) (d1
 // JdToDate converts a Julian date (supplied as two-part jd1+jd2) to a
 // Gregorian calendar date. Returns year, month, day (integer) and the
 // fractional day.
+//
+// The date is the proleptic Gregorian calendar's for every finite Julian
+// Date. SOFA's iauJd2cal gives it only from JD −68569.5 (−4900 March 1) to
+// JD 1e9, and outside that returns −1 and zeros, which twenty-one callers
+// read as year 0, month 0, day 0, and one indexed a table with, panicking
+// in Time.TT (#961). The calendar repeats every 400 years to the day, so a
+// date outside the range is carried into it by whole cycles, converted
+// there by SOFA, and its year carried back: the same calendar, exactly, and
+// SOFA's own answer to the bit wherever SOFA gives one.
+//
+// status is −1 only for a Julian Date that is not finite, which has no date.
+// That is refused before SOFA sees it, since iauJd2cal's range check is two
+// comparisons a NaN passes, and it answered NaN with status 0 and day
+// −9223372036854775784.
 func JdToDate(jd1, jd2 float64) (year, month, day int, frac float64, status int) {
+	dj := jd1 + jd2
+	if math.IsNaN(dj) || math.IsInf(dj, 0) {
+		return 0, 0, 0, 0, -1
+	}
+
 	status = gofa.Jd2cal(jd1, jd2, &year, &month, &day, &frac)
-	return year, month, day, frac, status
+	if status == 0 {
+		return year, month, day, frac, status
+	}
+
+	var cycles float64
+
+	if dj < jd2calMin {
+		cycles = math.Ceil((jd2calMin - dj) / gregorianCycleDays)
+	} else {
+		cycles = -math.Ceil((dj - jd2calMax) / gregorianCycleDays)
+	}
+
+	status = gofa.Jd2cal(jd1+cycles*gregorianCycleDays, jd2, &year, &month, &day, &frac)
+	if status != 0 {
+		return 0, 0, 0, 0, status
+	}
+
+	return year - 400*int(cycles), month, day, frac, 0
 }
+
+// gregorianCycleDays is the proleptic Gregorian calendar's period: 400 years
+// of 97 leap days, after which every date falls on the same day number again.
+const gregorianCycleDays = 146097
+
+// jd2calMin and jd2calMax are the range of Julian Dates SOFA's iauJd2cal
+// converts, its DJMIN and DJMAX.
+const (
+	jd2calMin = -68569.5
+	jd2calMax = 1e9
+)
 
 // Seps returns the angular separation (in radians) between two directions
 // given as (ra1,dec1) and (ra2,dec2), both in radians.

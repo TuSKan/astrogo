@@ -199,7 +199,7 @@ func TestSpaceVelocityRefusesWhatItCannotAnswer(t *testing.T) {
 		}
 
 		if speed, ok := coord.SpaceSpeed(tc.star); ok {
-			t.Errorf("%s: SpaceSpeed reported %g km/s, want none", tc.name, speed)
+			t.Errorf("%s: SpaceSpeed reported %g km/s, want none", tc.name, speed.KmPerSec())
 		}
 	}
 

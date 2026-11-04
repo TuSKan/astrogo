@@ -451,7 +451,11 @@ func (s *GreedyStrategy) schedule(
 			}
 
 			if ok {
-				score := scoreBlockPlacement(b, startTime, endTime, planner, ctxAt)
+				// A greedy run scores each placement once and never returns to
+				// it, so it keeps no record of the Moon: one would hold only
+				// what is not asked for again, measured at 14% more bytes and
+				// no time saved (#959).
+				score := scoreBlockPlacement(b, startTime, endTime, planner, ctxAt, nil)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,
 					Window:    Window{Start: startTime, End: endTime},

@@ -160,7 +160,8 @@ func (m *epv00Memo) put(e epv00At) {
 // otherwise eval's, which it then holds. The series is evaluated outside the
 // lock, so two goroutines asking for the same new date may both evaluate it; the
 // second store finds the first and does nothing. A failed evaluation is returned
-// and never held.
+// and never held. A status of +1, a date outside the series' span, is held with
+// the evaluation, as [epv00At].outside, so that a caller can warn on a hit too.
 //
 // eval is a parameter, not a field of [sofaBase], so that a test can count the
 // evaluations or fail one without a field that only tests use. sofaBase passes
@@ -178,7 +179,7 @@ func (m *epv00Memo) epv00(
 		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
 	}
 
-	e := epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+	e := epv00At{set: true, outside: status == 1, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
 	m.put(e)
 
 	return e, nil

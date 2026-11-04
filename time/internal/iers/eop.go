@@ -1,6 +1,9 @@
 package iers
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // EOP holds Earth Orientation Parameters for a single epoch.
 // All fields follow IERS conventions.
@@ -40,16 +43,40 @@ const (
 )
 
 var (
-	modelMu     sync.RWMutex
-	globalModel Model = ZeroModel{}
-	// explicitModel is true once a caller has called RegisterModel
-	// directly — see RegisterModel and EnsureLoaded (fetch.go) for what
-	// this gates.
-	explicitModel bool
-	// modelSource records provenance for EOPSource — purely observational,
-	// never consulted by any decision logic in this package.
-	modelSource = SourceZero
+	// modelMu orders the writers of current. Readers take no lock: every
+	// Earth orientation lookup in a process reads the model, from every core,
+	// and the read locks a lookup took were each an atomic add on one shared
+	// counter, so sixteen goroutines looked up less than one did (#953).
+	modelMu sync.Mutex
+
+	// current is the registered model state, nil until the first
+	// registration and after Reset: see state.
+	current atomic.Pointer[modelState]
+
+	// pristine is the state before any registration.
+	pristine = modelState{model: ZeroModel{}, source: SourceZero}
 )
+
+// modelState is what a lookup reads, as one value, so that the model, its
+// source and whether a caller chose it all come from one registration.
+type modelState struct {
+	model Model
+	// source records provenance for EOPSource — purely observational,
+	// never consulted by any decision logic in this package.
+	source string
+	// explicit is true once a caller has called RegisterModel directly —
+	// see RegisterModel and EnsureLoaded (fetch.go) for what this gates.
+	explicit bool
+}
+
+// state is the current model state, without a lock.
+func state() *modelState {
+	if s := current.Load(); s != nil {
+		return s
+	}
+
+	return &pristine
+}
 
 // RegisterModel sets the globally used Earth orientation parameter model,
 // and marks the choice authoritative: EnsureLoaded's lazy loader (an
@@ -65,15 +92,13 @@ var (
 // the caller's own choice. See EOPSource to observe which case is active.
 //
 // Use registerModelInternal for the lazy loader's own opportunistic
-// registration — it must NOT set explicitModel, or a caller's later
+// registration — it must NOT mark the model explicit, or a caller's later
 // RegisterModel call would have nothing left to override.
 func RegisterModel(m Model) {
 	modelMu.Lock()
 	defer modelMu.Unlock()
 
-	globalModel = m
-	explicitModel = true
-	modelSource = SourceExplicit
+	current.Store(&modelState{model: m, source: SourceExplicit, explicit: true})
 }
 
 // registerModelInternal installs m without marking the choice explicit —
@@ -85,12 +110,11 @@ func registerModelInternal(m Model, source string) {
 	modelMu.Lock()
 	defer modelMu.Unlock()
 
-	if explicitModel {
+	if state().explicit {
 		return
 	}
 
-	globalModel = m
-	modelSource = source
+	current.Store(&modelState{model: m, source: source})
 }
 
 // Reset restores the model to its pristine default state — ZeroModel, not
@@ -110,19 +134,14 @@ func Reset() {
 	modelMu.Lock()
 	defer modelMu.Unlock()
 
-	globalModel = ZeroModel{}
-	explicitModel = false
-	modelSource = SourceZero
+	current.Store(nil)
 }
 
 // modelIsExplicit reports whether RegisterModel has been called directly,
 // as opposed to internally by the lazy loader — see EnsureLoaded, which
 // skips its own disk-probe/network-fetch dance entirely once this is true.
 func modelIsExplicit() bool {
-	modelMu.RLock()
-	defer modelMu.RUnlock()
-
-	return explicitModel
+	return state().explicit
 }
 
 // EOPSource reports where the currently active model came from: SourceZero
@@ -133,20 +152,36 @@ func modelIsExplicit() bool {
 // can assert "this ran with real EOP" instead of inferring it indirectly
 // from a lookup's numeric result.
 func EOPSource() string {
-	modelMu.RLock()
-	defer modelMu.RUnlock()
-
-	return modelSource
+	return state().source
 }
 
 // GetModel retrieves the globally used Earth orientation parameter model.
 // Defaults to ZeroModel until RegisterModel populates it directly, or a
 // lazy load triggered by EnsureLoaded succeeds.
 func GetModel() Model {
-	modelMu.RLock()
-	defer modelMu.RUnlock()
+	return state().model
+}
 
-	return globalModel
+// Lookup is the current model's EOP at mjd when nothing need be loaded to give
+// it, which is EnsureLoaded's own first answer: a model a caller registered is
+// authoritative, and a loaded table that covers mjd needs no other. It reads
+// the model state once and interpolates once, where a lazily loaded table's
+// covered epoch was interpolated twice, once by EnsureLoaded to learn it was
+// covered and once for the answer (#953). ok is false otherwise,
+// including when the model does not answer mjd, and the caller then goes
+// through EnsureLoaded as before.
+func Lookup(mjd float64) (eop EOP, ok bool) {
+	s := state()
+
+	if !s.explicit {
+		if _, table := s.model.(*Table); !table || s.source == SourceZero {
+			return EOP{}, false
+		}
+	}
+
+	eop, err := s.model.EOP(mjd)
+
+	return eop, err == nil
 }
 
 // coverer is implemented by Model values that know their own valid MJD

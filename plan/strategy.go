@@ -55,17 +55,21 @@ func (s *SwapOptimizedStrategy) Schedule(
 	blocks []*Block,
 	transition TransitionModel,
 ) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition, movingContext(planner.Site.Location(), planner.Site.Refraction()))
+	return s.schedule(planner, window, blocks, transition,
+		movingContext(planner.Site.Location(), planner.Site.Refraction()), moonPlaces{})
 }
 
 // schedule is Schedule with the Context for each instant of the swap and
-// insert passes supplied by ctxAt; the base strategy builds its own.
+// insert passes supplied by ctxAt, and the Moon's place at each instant they
+// score held in moon for the whole run (nil: the process-wide cache); the base
+// strategy builds its own.
 func (s *SwapOptimizedStrategy) schedule(
 	planner *Planner,
 	window Window,
 	blocks []*Block,
 	transition TransitionModel,
 	ctxAt func(time.Time) *coord.Context,
+	moon moonPlaces,
 ) (*Schedule, error) {
 	base := s.Base
 	if base == nil {
@@ -95,12 +99,12 @@ func (s *SwapOptimizedStrategy) schedule(
 	idlePasses := 0
 
 	for pass := range maxPasses {
-		swapped, err := s.swapPass(sched, planner, transition, step, ctxAt, tabu, pass)
+		swapped, err := s.swapPass(sched, planner, transition, step, ctxAt, moon, tabu, pass)
 		if err != nil {
 			return nil, err
 		}
 
-		inserted, err := s.insertPass(sched, planner, window, transition, step, ctxAt)
+		inserted, err := s.insertPass(sched, planner, window, transition, step, ctxAt, moon)
 		if err != nil {
 			return nil, err
 		}
@@ -130,6 +134,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 	transition TransitionModel,
 	step time.Duration,
 	ctxAt func(time.Time) *coord.Context,
+	moon moonPlaces,
 	tabu *tabuList,
 	passNum int,
 ) (bool, error) {
@@ -228,8 +233,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 		// Plateau moves (>=) allow escape from local maxima; oscillation is bounded
 		// by the convergence check in Schedule() which stops after two idle passes.
 		oldScore := bi.Score + bj.Score
-		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner, ctxAt)
-		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner, ctxAt)
+		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner, ctxAt, moon)
+		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner, ctxAt, moon)
 		newScore := newJScore + newIScore
 
 		if newScore >= oldScore {
@@ -279,6 +284,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 	transition TransitionModel,
 	step time.Duration,
 	ctxAt func(time.Time) *coord.Context,
+	moon moonPlaces,
 ) (bool, error) {
 	if len(sched.Unscheduled) == 0 {
 		return false, nil
@@ -355,7 +361,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					sched.Blocks[gap.next].SetupTime = setupNext
 				}
 
-				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, ctxAt)
+				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, ctxAt, moon)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
 					Window:    Window{Start: startTime, End: endTime},
@@ -411,14 +417,21 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // 1-minute step that is 30 s away, up to 7.5′ of altitude, and the swap pass
 // compares these scores to decide (#481).
 //
+// The Moon's place there comes from moon, the run's own record of the
+// instants it has scored, so a swap pass returning to a placement does not
+// compute it again (#959); nil uses the process-wide cache.
+//
 // Falls back to static block priority if scoring fails.
-func scoreBlockPlacement(block *Block, start, end time.Time, planner *Planner, ctxAt func(time.Time) *coord.Context) float64 {
+func scoreBlockPlacement(
+	block *Block, start, end time.Time, planner *Planner, ctxAt func(time.Time) *coord.Context, moon moonPlaces,
+) float64 {
 	mid := start.Add(end.Sub(start) / 2)
 
 	score, err := Scorer{
 		Site:        planner.Site,
 		Context:     ctxAt(mid),
 		Constraints: planner.Constraints,
+		moon:        moon,
 	}.Score(block.Target, mid)
 	if err != nil {
 		return block.Priority

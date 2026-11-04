@@ -354,7 +354,7 @@ func TestStrings(t *testing.T) {
 	testutil.AssertEqual(t, "Ecliptic string", ecl.String(), "Ecliptic Lon=+15°00'00.00\" Lat=+30°00'00.00\"")
 
 	obs := coord.NewObserversLocation(angle.Deg(15), angle.Deg(30), 100)
-	testutil.AssertEqual(t, "ObserversLocation string", obs.String(), "ObserversLocation Lon=+15°00'00.00\" Lat=+30°00'00.00\" Height=100.000000")
+	testutil.AssertEqual(t, "ObserversLocation string", obs.String(), "ObserversLocation Lon=+15°00'00.00\" Lat=+30°00'00.00\" Height=100.000000 m")
 }
 
 func TestSeparationAndPositionAngle(t *testing.T) {

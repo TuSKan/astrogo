@@ -133,36 +133,39 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		return nil, "", gateErr
 	}
 
-	srcFS, err := OpenFS(ctx, ep.URL)
-	if err != nil {
-		// A caller who never granted consent gets ErrDownloadDenied rather
-		// than this source error even when the source is genuinely
-		// unreachable: consent is the actionable blocker from their side,
-		// and reporting it consistently matches the documented contract.
-		// Routed through CheckDownload so a custom Policy still decides.
-		// A caller who did grant consent sees the real error.
-		if cerr := c.CheckDownload(id, name, ep.ApproxSize); cerr != nil {
-			return nil, "", cerr
+	// Consent first, before any request, routed through CheckDownload so a
+	// custom Policy still decides.
+	//
+	// A caller who may not download can only be given what is already here.
+	// Asking a mutable source whether its cached copy is current gives such
+	// a caller nothing it could act on: a request it never agreed to and,
+	// against a source that does not answer, the whole of the endpoint's
+	// timeout. The lazy EOP load sat out 17 s of it with every uncovered
+	// lookup in the process queued behind it, to be handed the bulletin its
+	// own cached read had just found (#964). So it is served what is cached,
+	// as offline mode serves it, and refused only when nothing is.
+	//
+	// Refused before the source is even opened, so the error is consent's
+	// whether or not the source is reachable, the actionable blocker from
+	// the caller's side. And before the lock, which another process can hold
+	// for as long as its download takes, or a crashed one until the lock goes
+	// stale after half an hour, all of it to be refused at the end (#424).
+	// fetchInto checks again, on the size the source reports.
+	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
+		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
+			return cacheFS, cacheKey, nil
 		}
 
+		return nil, "", err
+	}
+
+	srcFS, err := OpenFS(ctx, ep.URL)
+	if err != nil {
 		return nil, "", fmt.Errorf("remote: open source %s: %w", ep.URL, err)
 	}
 
 	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
 		return cacheFS, cacheKey, nil
-	}
-
-	// Nothing current is cached, so this call can only end in a download, and
-	// a caller who may not download has nothing to wait for. Checked before
-	// the lock, because the lock can be held by another process for as long
-	// as its download takes, or by a crashed one until the lock goes stale
-	// after half an hour: the lazy EOP load, which takes it on every process's
-	// first lookup, sat out the whole of that holding its own mutex, with
-	// every lookup in the process queued behind it, only to be refused
-	// consent at the end (#424). fetchInto checks again, on the size the
-	// source reports.
-	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
-		return nil, "", err
 	}
 
 	// The lock spans the "still missing? then download" decision, not just

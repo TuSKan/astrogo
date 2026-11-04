@@ -52,6 +52,12 @@ func fakeIERSSourceForGateway(t *testing.T, content string) {
 func TestEOPSourceGateway(t *testing.T) {
 	t.Cleanup(time.ResetEOP)
 
+	// The pristine default is whatever ResetEOP returns to, so start there.
+	// Assumed instead, it held only when this test ran first: shuffled after a
+	// test whose GAST lazily loaded this machine's cached bulletin, the source
+	// was "cache" (#990).
+	time.ResetEOP()
+
 	if got := time.EOPSource(); got != "zero" {
 		t.Errorf(`EOPSource() = %q before any RegisterModel call, want "zero"`, got)
 	}
@@ -91,6 +97,12 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 		time.ResetEOP()
 		remote.Reset()
 	})
+
+	// A lazy load happens only with no model loaded, so start from none. A test
+	// before this one may have loaded this machine's real bulletin, which
+	// covers MJD 41684 too, and then the seeded file below was never read
+	// (#990).
+	time.ResetEOP()
 
 	// No source is configured at all (remote.SetURL is never called, so
 	// the endpoint keeps its default https:// URL, which has no
@@ -137,6 +149,9 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 		time.SetRetryCooldown(5 * time.Minute)
 	})
 
+	// From no model, as the test above explains (#990).
+	time.ResetEOP()
+
 	// Another test in this binary may have made a recent lazy-load attempt
 	// (success or failure); disable the cooldown so this test's own
 	// attempt isn't throttled by that unrelated prior attempt.
@@ -169,6 +184,10 @@ func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
 		time.ResetEOP()
 		remote.Reset()
 	})
+
+	// From no model, as TestEOPLazyLoadFindsPreSeededCacheWithoutConsent
+	// explains (#990).
+	time.ResetEOP()
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })

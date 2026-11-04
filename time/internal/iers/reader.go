@@ -184,6 +184,14 @@ func (t *Table) EOP(mjd float64) (EOP, error) {
 		return EOP{}, ErrNoRecords
 	}
 
+	// A NaN passes the range check below on both sides and would then index
+	// one past the last record; a Julian Date of +/-inf arrives here as a NaN
+	// MJD too, so a non-finite query is refused outright (#963).
+	if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+		return EOP{}, fmt.Errorf("%w: MJD %.1f not in [%.1f, %.1f]",
+			ErrOutOfRange, mjd, t.records[0].MJD, t.records[len(t.records)-1].MJD)
+	}
+
 	// Reject queries outside the data coverage window.
 	if mjd < t.records[0].MJD || mjd > t.records[len(t.records)-1].MJD {
 		return EOP{}, fmt.Errorf("%w: MJD %.1f not in [%.1f, %.1f]",

@@ -155,7 +155,7 @@ func TestDeltaTUncertaintyGrowsFromTheBulletinsEnd(t *testing.T) {
 
 	for _, mjd := range []float64{39000, 60000, 60400} {
 		if s := time.DeltaTUncertainty(atMJD(mjd)); s != 0 {
-			t.Errorf("MJD %.0f, inside the measured record: σ = %g s, want 0", mjd, s)
+			t.Errorf("MJD %.0f, inside the measured record: σ = %g s, want 0", mjd, s.Seconds())
 		}
 	}
 
@@ -176,7 +176,7 @@ func TestDeltaTUncertaintyGrowsFromTheBulletinsEnd(t *testing.T) {
 	}
 
 	if s := time.DeltaTUncertainty(time.Date(1750, time.June, 15, 0, 0, 0, 0, time.LocationUTC)); s != 2 {
-		t.Errorf("1750: σ = %g s, want the historical model's 2 s", s)
+		t.Errorf("1750: σ = %g s, want the historical model's 2 s", s.Seconds())
 	}
 }
 

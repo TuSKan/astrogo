@@ -273,7 +273,15 @@ var compassPoints = [16]string{
 // CompassDirection returns az as a 16-point compass label (N, NNE, NE,
 // ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW) — the everyday
 // "which way do I look" complement to the numeric azimuth degrees.
+//
+// A non-finite azimuth names no direction, so it gets "". It used to get
+// "N": converting NaN to an int gives MinInt64 on amd64 and 0 on arm64, and
+// both land on the first label (#979).
 func CompassDirection(az angle.Angle) string {
+	if r := az.Radians(); math.IsNaN(r) || math.IsInf(r, 0) {
+		return ""
+	}
+
 	deg := az.Wrap360().Degrees()
 	idx := int(math.Round(deg/22.5)) % 16
 
@@ -284,8 +292,8 @@ func CompassDirection(az angle.Angle) string {
 	return compassPoints[idx]
 }
 
-// Compass returns c's azimuth as a 16-point compass label — see
-// CompassDirection.
+// Compass returns c's azimuth as a 16-point compass label, or "" for a
+// non-finite azimuth — see CompassDirection.
 func (c AltAz) Compass() string { return CompassDirection(c.az) }
 
 // SetAlt sets the altitude of the AltAz coordinate.
@@ -622,8 +630,8 @@ func (c Ecliptic) String() string {
 }
 
 func (c ObserversLocation) String() string {
-	return fmt.Sprintf("ObserversLocation Lon=%s Lat=%s Height=%f",
-		c.lon.Wrap360().DMSString(2), c.lat.DMSString(2), c.height)
+	return fmt.Sprintf("ObserversLocation Lon=%s Lat=%s Height=%f m",
+		c.lon.Wrap360().DMSString(2), c.lat.DMSString(2), c.height.Meters())
 }
 
 // ── Geometry Math ────────────────────────────────────────────────────────────

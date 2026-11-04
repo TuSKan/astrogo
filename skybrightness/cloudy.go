@@ -213,9 +213,14 @@ func (c *CloudySkyglow) Provenance() Provenance {
 			"Source spectra and upward emission functions are whatever the emitters " +
 				"supply, and each emitter reports whether those were measured or assumed.",
 		},
-		ExpectedAccuracy: "Not established against measurement here. The paper reports " +
-			"cloudless radiance falling about two orders of magnitude with angular " +
-			"distance from the source, which this reproduces.",
+		ExpectedAccuracy: "Not established against measurement here. In the configuration " +
+			"of Kocifaj (2008) Sec. 3, which restates Kocifaj (2007)'s, the cloudless sky has " +
+			"the shape that paper describes: luminance falling with angular distance from " +
+			"the source, a minimum opposite it at a zenith angle of 35 degrees that does not " +
+			"move between 2 and 10 km, and a slight rise toward the opposite horizon. Its " +
+			"range across the sky depends on how near the horizon it is sampled toward the " +
+			"source: 19x out to 60 degrees and 148x to 75, the paper's one to two orders " +
+			"of magnitude, but 2500x to 85.",
 	}
 }
 
@@ -226,20 +231,20 @@ func (c *CloudySkyglow) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	// Below the horizon there is no sky to look at.
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	deck, err := c.deck(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	var flags Flag
@@ -248,18 +253,18 @@ func (c *CloudySkyglow) AddRadiance(
 
 	for _, e := range c.emitters {
 		if err := ctx.Err(); err != nil {
-			return 0, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: cloudy skyglow: %w", err)
 		}
 
 		f, err := c.addEmitter(dst, buf, grid, dir, scene, e, deck)
 		if err != nil {
-			return 0, err
+			return Contribution{}, err
 		}
 
 		flags |= f
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // deck resolves the cloud layer into an integration ceiling and a

@@ -120,7 +120,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 		swap := &Schedule{Window: window, Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)}}
 
 		_, err := strategy.swapPass(swap, planner, &failingTransition{failAt: tc.failAt}, time.Minute,
-			plannerContexts(planner), newTabuList(2), 0)
+			plannerContexts(planner), nil, newTabuList(2), 0)
 		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
 			t.Errorf("swapPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",
 				tc.failAt, err, tc.names)
@@ -144,7 +144,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 		}
 
 		_, err := strategy.insertPass(insert, planner, window, &failingTransition{failAt: tc.failAt}, time.Minute,
-			plannerContexts(planner))
+			plannerContexts(planner), nil)
 		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
 			t.Errorf("insertPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",
 				tc.failAt, err, tc.names)

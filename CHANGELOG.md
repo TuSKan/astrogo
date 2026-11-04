@@ -7,6 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-11-03
+
+### Added
+- **`kepler.FromState`, the two-body orbit through an ICRF state vector**, any
+conic, about the central body it is given. Held to a 256-bit oracle within 8
+times the error the input's own rounding causes; measured at 4.69. (#867)
+- **`atmosphere/dataset/cams` is fuzzed**, now that scigolib/hdf5 v0.14.2 bounds
+the allocations a malformed file used to end the process with, and `ReadPlane`
+bounds a plane by its declared bytes, not only its values. A sweep of corrupted
+files guards that no variant ends the process or allocates more than its file
+could hold. (#871)
+- **Benchmarks for what an observing planner runs:** `RankObservables` at 100 and 1000 targets, `Scorer.Score`, and `ObservableWindows` for
+one and twenty targets under the altitude check and under the Sun, Moon separation and Moon illumination constraints. (#918)
+
+### Changed — BREAKING
+- **`kepler.FromPerihelion` and `eph.ElementsFromPerihelion` take the osculation
+epoch before the perihelion time.** `Epoch` reports it and `MeanAnomaly` is the
+mean anomaly there; positions are unchanged. Pass the perihelion time for both
+to keep the old behavior. (#868)
+- **`skybrightness.Component.AddRadiance` returns `(Contribution, error)`**, carrying the flags and, where the component's sources give one, the relative uncertainty of the radiance it added; `Model.Estimate` fills the uncertainty budget from it. Extragalactic light, zodiacal light, diffuse galactic light and moonlight now report sourced figures; airglow, starlight and artificial light take the caller's through the new `WithUncertainty`, and until then `TotalUncertainty` names them as unknown. (#928)
+- **`GroundEmitter` has a new method, `SourceUncertainty`, and `ArtificialSkyglow` now reports its model's own error.** That error is the 25% by which Kocifaj, Barà & Falchi (2022) find the model departs from an exact multiple-scattering solution. The component combines it with each emitter's stated uncertainty, weighted by that emitter's share of the radiance. `UniformEmitter.RelativeUncertainty` and `viirs.Region.RelativeUncertainty` supply the emitter's figure. A source outside the paper's validated 1.3–81.3 km, or aerosol optical depth above 0.57, is flagged `ExtrapolatedModel`. (#947)
+
+### Changed
+- The `examples` module requires v0.22.0, so it resolves against the current release for anyone who fetches it directly. (#860)
+- The Benchmarks CI job runs on four runners at once, in shards that
+`.github/scripts/bench-shards.sh` defines: about 17 minutes down to 5.5, with
+the same samples and the same delta. CI can also be run by hand. (#864)
+- **An apparent place on `ephemeris.Default()` evaluates the analytical series
+once instead of twice.** The light-time solve carries the Earth or the Sun back
+from its state at t while that stays within 1 µas, and evaluates it beyond. (#865)
+- **`kepler.Provider.Register` fits a far orbit about the barycenter** when that leaves less perturbation
+at its epoch than the Sun, and `Locate` reports which: against Horizons, a Centaur or a trans-Neptunian
+object is now 0.03 to 30 km off at 30 days, not 815 to 950. (#872)
+- **`internal/keplerlab` is now `internal/oracle`**, keeping only the 256-bit oracles the Kepler contract
+tests compare against; the experiments behind `docs/kepler.md` stay reproducible at commit ec5be0d5. (#876)
+- **Leap seconds end on 2027-05-20** (CGPM 2026 Resolution 5), not by 2035: the zero-EOP warning states up to
+0.9 s of UT1 before that date and whatever |UT1−UTC| has drifted to after it, within the new 3600 s limit,
+and the `time` docs and README say the same. (#883)
+- **The Race Detection job runs on two runners and says where its time goes**: `plan` on one, every other
+package but `internal/docsguard` on the other, with each shard's slowest tests in its summary; `kepler`'s
+oracle sweep is thinner under `-short`. About 4 minutes, from 7. (#889)
+- **The empty root `internal` package and `internal/workload`'s finished design experiments are gone**; the
+workload benchmarks stay, and `docs/ephemeris.md` points at commit 3b1d36ca to rerun the experiments. (#892)
+- **`skybrightness`'s hemispheric scattering sum applies each ring's weights and path factor once per ring, not once per sample**, in both the sky-map path and `ScatteredIn`. Reference sky maps run about 17% faster; results differ from before by at most about 6e-15 relative, so they are not bit-identical. (#910)
+- **The benchmarks no longer time whatever Earth orientation the machine holds.** `BenchmarkUTCToUT1` now measures a pinned zero model, so the
+CI benchmark history steps once. Pinned zero and table variants of UT1, `Time.EOP`, `NewContext`, `SetTime` and a scheduler are added,
+and the 13 discarded errors in benchmarks now fail them. (#917)
+- **`plan.RankObservables` builds one `coord.Context` for the instant instead of one per target**: 54–62% faster and 86% fewer bytes, with
+every score unchanged to the last bit. `ConstraintCtx.CheckCtx` now documents that it must only read the Context it is given, since the
+goroutines ranking the other targets read the same one. (#920)
+- **The pull request guide asks for a changelog fragment on every change, tests and benchmarks included, and puts the tagged test suites and the `examples/` module in the gate.** `docs/PULL_REQUESTS.md`, the pull request template and the changelog check's message had allowed less. (#926)
+- **Dependabot's weekly pull request can now merge as opened.** It updates the examples module's indirect requirements along with the root's, and carries the `no-changelog` label from the start. Until now each one needed a maintainer's commit or label, and #939 became unmergeable after one. (#944)
+- **`plan.RankObservables` builds once the interpolation bracket every target's urgency estimate needs, instead of once per target.** It is 82–90% faster on one core and 55–80% on sixteen, and every score is unchanged to the last bit. (#952)
+- **`Time.EOP` reads Earth orientation without a lock.** A covered lookup is 66–89% faster on one core. It now scales across cores, where sixteen goroutines used to look up fewer epochs a second than one. A program with no EOP loader no longer serializes every lookup on a global mutex. Results are bit-identical. (#954)
+- **`plan.RankObservables`, `FilterObservable`, `RankObservable` and `VisibleTonight` run their per-target work on a pool of workers instead of a goroutine per target.** Growing each new goroutine's stack was a fifth of a ranking. A ranking of 10,000 stars is 23% faster on one core and 36–37% faster on four to sixteen, with half the bytes and allocations. (#956)
+
+### Fixed
+- **`docs/USNO.md` gave the seasons as 2–4 minutes from USNO, from before the
+nutation fix.** It now lists the 20 events `TestUSNO_Seasons` compares,
+2020–2035, measured live: 0.74 min at worst. (#862)
+- **A fault on JPL Horizons' own server is recognized on every path to it.** The
+name lookup in `catalog/jpl` wraps the same sentinel as kernel generation, and
+the live tests skip on that outage instead of failing. (#866)
+- **Ten live-service tests sent requests with no deadline**, so a hung service
+killed the whole package at `go test`'s timeout. Each now has its endpoint's
+own, and `internal/docsguard` refuses an unbounded live request. (#869)
+- **The docs compile check never type-checked a call through `eph.`, `plan.` or
+`jpl.`, and checked only the README.** It now honors shown imports, knows `eph`,
+and compiles every document, which found four broken samples in
+`docs/PLANET_PARADE.md`. (#870)
+- **`docs/USNO.md` dates its seasons table to the run that measured it**, 2026-10-27; #862's change of
+date was never committed. (#873)
+- **`coord.SunBarycentric` says whose barycenter it is**: SOFA's, 107 to 122 km from DE440's over 1972-2100,
+so a position from a JPL kernel is better moved to the Sun with that kernel's own Sun. A validation test
+holds the figure. (#878)
+- **`ephemeris.Default()`'s Pluto is back to 0.14 AU from DE440 at worst over 1800-2050**, from the 1.96 AU
+#872 made it by refitting Standish's fitted elements about the barycenter; `kepler.Provider.Register` now
+keeps them about the Sun, and the Pluto validation suite measures `Default()` itself. (#881)
+- **Comments, failure messages and the satellite example name `Locate`, `LocateCtx` and `Instant.Astrometric`**,
+the names #803 gave `State`, `StateCtx` and `AstrometricState`. (#884)
+- **Examples 22 and 23 print their figures in the units they label**: the radial-velocity example showed Sirius's
+correction in m/s under "km/s" (−22513.928 for −22.514) and composed the corrected RV in the wrong unit, and
+the Kepler example showed Ceres's semi-major axis in meters under "AU". (#887)
+- **The README gives topocentric accuracy against Horizons as measured**, p50 0.32″ and max 2.21″ from
+`coord.topocentric.corpus`; its max had been the p99, 2.1″. (#890)
+- **`skybrightness/plan.Imaging`'s limiting magnitude is quoted above the atmosphere**, the scale `plan.LimitingMagnitudeConstraint`
+compares it against. The target is now dimmed by the air toward it, so the depth is no longer too deep by its extinction: 0.11 mag at
+the zenith and 0.57 at ten degrees through a V filter at Paranal. (#895)
+- **Perihelion and aphelion are now held to USNO's minute, as `docs/VALIDATION.md` states**, over 2024–2028 rather than one year at
+two hours. All ten are within 39 s. (#898)
+- **`plan.SatellitePasses` finds a pass that clears `minElevation` for less than its 30 s step**. Every sampled maximum below the
+threshold is refined to its true peak. Before, such a pass was found or missed depending on when the window started: 19 of 30 starts
+missed one on the ISS test fixture. (#899)
+- **`plan.SatellitePasses` reports a pass the search window cuts off**, at the window's edge and marked by the new `SatellitePass`
+fields `RiseCutOff` and `SetCutOff`. Before, a pass in progress when the window opened or closed was dropped, so asking during an
+overhead pass returned none. (#901)
+- **A tabulated wavelength must be positive and finite, not only increasing.** The new `unit.ValidateWavelengths` is the one check
+behind `Resample`, `magnitude.Passband`, `optics.Throughput`, `atmosphere.CrossSection` and VIIRS source spectra. Before, a NaN,
+infinite or negative wavelength validated: a passband at −600 to −500 nm had a 546.6 nm pivot. (#902)
+- **A refraction with wavelength 0 refracts at the visual default, 0.55 µm, under SOFA's model**, through the new
+`atmosphere.Refraction.EffectiveWavelength`. SOFA used to clamp a zero to 0.1 µm, twice the refraction from 10° to the zenith. Every
+`Builder`-made atmosphere carried that zero, and with it the Sun and Moon that `skybrightness` places. (#905)
+- **`skybrightness/dataset.Sky.Scene`'s default air carries ozone**, the new `atmosphere.SubtropicalOzoneDU` (258 DU) that
+`plan.VisibleTonight`'s default air also uses. Without it the default sky at Paranal was 0.024 mag too bright at the zenith and 0.127
+at 10°. (#907)
+- **A refraction whose fields are not air is refused, not clamped by SOFA into a plausible number.** The new `Refraction.Validate`
+backs `plan.NewSite` and `Builder.Build`. Paths with no error to return, `coord.Context` among them, now give NaN. A NaN temperature
+used to refract as −150 °C, 2.35 times too much. (#908)
+- **`skybrightness.Estimate.TotalUncertainty` reports an unknown uncertainty as unknown, not 0.** No component fills the uncertainty
+budget yet, so every estimate used to report an uncertainty of 0, a perfectly certain prediction. It now returns the new
+`ErrUncertaintyUnknown`, naming each component that gives light without an entry. (#912)
+- **`coord.ObserversLocation.String` names its height's unit, and a float verb can no longer print a raw unit or angle value.** The height printed in meters with no unit; it now ends in " m". A new docsguard test type-checks every package and fails on `%f`, `%g` or `%e` applied to a `unit` or `angle` value that has a float view of itself, which is how six test messages came to print m/s as km/s, radians as degrees, seconds as minutes and meters as parsecs. (#921)
+- **A pull request from a fork can now be merged.** The branch ruleset requires a CodeQL result, and CodeQL ran as GitHub's default setup, which skips pull requests from forks, so no contributor's PR could ever satisfy it. CodeQL now runs from a workflow in the repository, on every pull request, analyzing the same languages as before. (#924)
+- **`DiffuseGalacticLight` quotes Kawara et al.'s slope uncertainty as their Table 2 gives it**: 3–8 per cent from 274 to 648 nm and 47 at 225 nm, not the "10 to 50 per cent" the provenance claimed. The coefficient table now carries both uncertainty columns, checked row by row against the paper. (#927)
+- **The docsguard check that keeps CI's Go pins in step with go.mod reads every workflow.** It read two of the five files that pin Go, so `govulncheck.yml`, `release.yml` and `codeql.yml` could fall behind go.mod unnoticed. (#930)
+- **With no Earth orientation loaded, a UT1, UTC or EOP lookup no longer takes a lock or allocates.** Every such call waited on one mutex and built a fresh error for an answer that cannot change until the retry cooldown ends; it now reads a stored answer, about half the time per call and none of the 2 allocations. (#932)
+- **`ExtragalacticBackground`'s provenance states its accuracy.** It quotes Koushan et al. (2021) Table 3: 4.0–6.9% from u to Ks, which is the error of a lower limit. The field was empty, and no test noticed, because the provenance check covered only the components one scene assembled. A new test finds every component in the package source and requires each one's provenance fields. (#937)
+- **Scattered moonlight is measured against a published reference.** The reference is the twelve moonlit-sky measurements of Krisciunas & Schaefer (1991) Table 1, which take the place of an uncited "~18 mag/arcsec²" that a test accepted anywhere from 16.5 to 20.5. On the CALSPEC solar spectrum the component reads 0.30 mag faint on average, which is outside its uncertainty budget. The documents now say so, and the cause is tracked separately. (#940)
+- **`CloudySkyglow` is checked against the cloudless sky Kocifaj (2008) describes, in that paper's stated configuration.** The shape matches: the minimum opposite the source at a 35° zenith angle, with a slight rise toward the opposite horizon. Its provenance no longer says it reproduces "two orders of magnitude", a range that depends on how near the horizon the sky is sampled. The design document's optical-depth exponents, the test scene's aerosol attribution, and the validation row's test file and Žilina figures are corrected. (#941)
+- **A site reused under new weather no longer gets the old sky.** `ArtificialSkyglow` and `ScatteredMoonlight` cached scene geometry keyed only on the observer and the time. A hazy sky evaluated after a clean one at the same site and instant came out 94× too bright for artificial light. Their caches, and the natural components' frame, now key on the atmosphere, the refraction and the ephemeris they were computed from. (#946)
+- **A `no-changelog` label added just after a push no longer leaves the Changelog Fragment check stuck red.** The check now reads the pull request's labels when it runs, not the labels recorded in the event that started it. Each new run also cancels the one in progress, so a re-run, or the newest run, sees the labels as they are. (#949)
+- **Scattered moonlight now reads within its uncertainty budget.** Measured against Krisciunas & Schaefer (1991)'s twelve moonlit-sky measurements, it read 0.30 mag faint. `ScatteredMoonlight` now applies the 13% absolute-scale correction Velikodsky et al. (2011) found for ROLO, dividing the albedo by 0.87 as Jones et al. (2013) do. It reads 0.13 mag faint in V, and a test now holds it to that budget. Moonlight is 14.9% brighter everywhere. (#950)
+
 ## [0.22.0] — 2026-10-27
 
 ### Added
@@ -3172,7 +3295,8 @@ First observatory-grade release. Validated against USNO, JPL Horizons, and NASA 
 - `VisibleIntervals` creates independent Contexts per grid step (correct; each step is a different epoch)
 - IERS EOP data fetched via `go:generate`, not at runtime
 
-[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/TuSKan/astrogo/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/TuSKan/astrogo/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/TuSKan/astrogo/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/TuSKan/astrogo/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/TuSKan/astrogo/compare/v0.19.0...v0.20.0

@@ -26,13 +26,13 @@ func epv00Direct(tb testing.TB, d1, d2 float64) epv00At {
 		tb.Fatalf("Epv00(%v, %v) status %d", d1, d2, status)
 	}
 
-	return epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
+	return epv00At{set: true, outside: status == 1, d1: d1, d2: d2, pvh: pvh, pvb: pvb}
 }
 
 // bitsEqual is whether a and b are the same to the last bit in every field. It
 // is not ==, which calls -0 and +0 equal and a NaN unequal to itself.
 func bitsEqual(a, b epv00At) bool {
-	if a.set != b.set ||
+	if a.set != b.set || a.outside != b.outside ||
 		math.Float64bits(a.d1) != math.Float64bits(b.d1) ||
 		math.Float64bits(a.d2) != math.Float64bits(b.d2) {
 		return false

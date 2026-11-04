@@ -333,12 +333,19 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
 
-// Default returns the standard offline ephemeris provider for every
-// named body core.ID defines: the Sun, Moon, Mercury through Neptune,
-// and the Solar System Barycenter via SOFA analytical models (no kernel
-// or network access), plus Pluto — which SOFA has no analytical model
-// for — via two-body Keplerian propagation from plutoElements. No named
-// core.ID this library defines returns ErrUnsupportedBody from here.
+// Default returns the standard offline ephemeris provider: SOFA's analytical
+// models (no kernel or network access) for the Sun, the Moon, the Earth,
+// Mercury and Venus, the Solar System Barycenter and the system barycenters
+// of Mercury through Neptune, plus Pluto's barycenter — which SOFA has no
+// analytical model for — by two-body Keplerian propagation from
+// plutoElements.
+//
+// The planet centers of Mars through Pluto (Mars, Jupiter, Saturn, Uranus,
+// Neptune and Pluto, NAIF 499 to 999) are ErrUnsupportedBody. An ID is a
+// NAIF code, and SOFA's theory places each system's barycenter, not its
+// planet: ask for MarsBarycenter through PlutoBarycenter instead. Mercury and
+// Venus have no moons, so their centers are their barycenters and are
+// answered.
 //
 // Pluto's accuracy is the same documented limitation as any other
 // Kepler-backed body (see Elements' doc comment): two-body propagation
@@ -354,6 +361,20 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // the same [kepler.PlutoElements], that registration is now belt and braces
 // rather than the only thing closing the gap — it keeps Default's contract
 // visible at the call site instead of resting on a lower layer's behavior.
+//
+// SOFA fits each theory to a span of dates. Epv00 (the Sun and the Earth) is
+// fitted to 1900-2100 AD: SOFA's notes give its position errors as about
+// double that span's by 1800 and 2200, 10 times by 1500 and 2500, and 60
+// times by 1000 and 3000. Plan94 (the planets' barycenters) is fitted to
+// 1000-3000 AD, and no worse there than 1.5 times its 1800-2050 accuracy.
+// Moon98 states no span; SOFA compared it with ELP/MPP02 over 1950-2100.
+// astrogo's own metrology covers 1900-2100 (docs/VALIDATION.md). A date
+// outside Epv00's or Plan94's span is still answered, since 1800 and 2200 are
+// ordinary dates to plan for, but the first such date in a process writes a
+// warning through the logging package naming the theory and the span. A
+// Plan94 solution that SOFA reports failed to converge is an error,
+// kepler.ErrSofaFailure. For dates well outside these spans, use an SPK
+// kernel: NewProvider with Planets.
 func Default() Provider {
 	p := kepler.New()
 	if err := p.Register(PlutoBarycenter, kepler.PlutoElements()); err != nil {

@@ -16,8 +16,6 @@ import (
 var wallClockAllowed = map[string]string{
 	"atmosphere/builder_roundtrip_test.go": "asserts Age(now) is zero for a value just built; " +
 		"the present is the input under test",
-	"ephemeris/ephemeris_bench_test.go": "a benchmark, which measures a rate rather than " +
-		"asserting an astronomical result",
 	"ephemeris/jpl/validation/corpus_settled_test.go": "a corpus entry is 'settled' relative to " +
 		"the present by definition",
 	"ephemeris/jpl/validation/gen_corpus_test.go": "stamps the generation time into the corpus " +

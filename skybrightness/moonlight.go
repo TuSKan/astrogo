@@ -98,6 +98,13 @@ type moonGeometry struct {
 
 	// aboveHorizon is false when the Moon contributes nothing.
 	aboveHorizon bool
+
+	// refraction and ephemeris complete the cache key. The direction, both
+	// airmasses and aboveHorizon went through the one, and every position
+	// came from the other, so a scene that changes either must rebuild
+	// this (#945).
+	refraction atmosphere.Refraction
+	ephemeris  eph.Provider
 }
 
 // NewScatteredMoonlight builds the moonlight component from the solar
@@ -140,19 +147,19 @@ func (m *ScatteredMoonlight) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if err := scene.Validate(); err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	geom, err := m.geometry(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	flags := ApproximateMultipleScattering
@@ -163,12 +170,12 @@ func (m *ScatteredMoonlight) AddRadiance(
 	// Below the horizon the Moon illuminates nothing the observer can see,
 	// and above the horizon a line of sight below it is looking at ground.
 	if !geom.aboveHorizon || dir.Alt() <= 0 {
-		return flags, nil
+		return Contribution{Flags: flags}, nil
 	}
 
 	viewAirmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: moonlight: view airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: moonlight: view airmass: %w", err)
 	}
 
 	// The scattering angle is the angle between the direction the light was
@@ -200,7 +207,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
@@ -208,7 +215,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		phase, err := atmosphere.CombinedPhaseFunction(scatter.Radians(),
 			rayleigh, aer, float64(aerosol.Asymmetry), atmosphere.RayleighDepolarization)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		// Aerosol removes light by absorption as well as scattering; the
@@ -220,7 +227,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		l, err := atmosphere.SingleScatteredRadiance(geom.irradiance[i], phase,
 			scattering, extinction, geom.airmass, viewAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		// Photons scattered twice or more still reach the observer, and
@@ -229,7 +236,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 		// molecular optical depth.
 		multiple, err := atmosphere.MultipleScatteringFactor(rayleigh)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
 		scattered[i] = l * multiple
@@ -239,7 +246,7 @@ func (m *ScatteredMoonlight) AddRadiance(
 	// Doing it here rather than per band keeps the physics on the grid the
 	// coefficients were fitted for.
 	if err := grid.Resample(resampled, bands, scattered, 0); err != nil {
-		return 0, fmt.Errorf("skybrightness: moonlight: resample: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: moonlight: resample: %w", err)
 	}
 
 	// The Moon's beam crosses the ozone layer before it scatters, and the
@@ -247,16 +254,72 @@ func (m *ScatteredMoonlight) AddRadiance(
 	// beam along the Moon's own path and not the line of sight. Applied on the
 	// caller's grid rather than ROLO's bands, which run past 1000 nm where the
 	// cross section is not tabulated.
+	var uncertainty spectralUncertainty
+
 	for i := range dst {
-		ozone, err := ozoneTransmission(scene.Atmosphere, grid.At(i), geom.ozoneAirmass)
+		lambda := grid.At(i)
+
+		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, geom.ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: moonlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
 		}
 
-		dst[i] += resampled[i] * ozone
+		added := resampled[i] * ozone
+		dst[i] += added
+
+		relative, err := moonlightRelativeUncertainty(lambda, float64(pressure))
+		if err != nil {
+			return Contribution{}, fmt.Errorf("skybrightness: moonlight: %w", err)
+		}
+
+		uncertainty.add(grid, i, added, relative)
 	}
 
-	return flags, nil
+	return uncertainty.contribution(flags, "ROLO absolute scale and the multiple-scattering coefficient"), nil
+}
+
+// The two terms of the moonlight's uncertainty that its sources quantify.
+//
+// ROLO's absolute scale is uncertain by 5 to 10 per cent (Stone & Kieffer
+// 2004), and the upper end is taken. The multiple-scattering factor
+// 1 + 4.5*tau_R is Winkler's (2022) revision of Noll et al.'s (2012)
+// 1 + 2.2*tau_R. Neither paper states an uncertainty for its coefficient, so
+// the difference between the two is taken as the factor's.
+const (
+	roloAbsoluteScale      = 0.10
+	nollMultipleScattering = 2.2
+)
+
+// roloVelikodskyScale corrects ROLO's absolute scale. Velikodsky et al.
+// (2011), Icarus 214, 30, find ROLO's albedo 13 per cent too faint at
+// 603 nm. Jones et al. (2013), A&A 560, A91, the moonlight model in ESO's
+// sky model, divide the albedo at every wavelength by 0.87, "since there is
+// no information about the wavelength dependence for this correction", and
+// so does this (#938). Against Krisciunas & Schaefer (1991)'s measured
+// moonlit sky it is worth 0.15 mag, half of what the component read faint.
+const roloVelikodskyScale = 0.87
+
+// moonlightRelativeUncertainty combines the two terms in quadrature at one
+// wavelength, under a surface pressure in hPa.
+//
+// In V that comes to 16 per cent at Paranal's pressure and 18 at sea level,
+// below the 0.2 mag, about 20 per cent, Jones et al. (2013) found for a full
+// radiative-transfer moonlight model against 141 spectra: the cross-check that
+// the two terms are the right size.
+func moonlightRelativeUncertainty(lambda unit.WavelengthNM, pressureHPa float64) (float64, error) {
+	rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, pressureHPa)
+	if err != nil {
+		return 0, fmt.Errorf("uncertainty: %w", err)
+	}
+
+	winkler, err := atmosphere.MultipleScatteringFactor(rayleigh)
+	if err != nil {
+		return 0, fmt.Errorf("uncertainty: %w", err)
+	}
+
+	noll := 1 + nollMultipleScattering*float64(rayleigh)
+
+	return math.Hypot(roloAbsoluteScale, (winkler-noll)/winkler), nil
 }
 
 // Provenance implements [Component].
@@ -290,9 +353,17 @@ func (m *ScatteredMoonlight) Provenance() Provenance {
 			"A homogeneous, plane-parallel atmosphere with airmass in place of " +
 				"sec(z); no cloud, no ground reflection.",
 		},
-		ExpectedAccuracy: "ROLO's own absolute scale is 5-10%, and the solar spectrum " +
-			"the caller supplies carries its own. The single-scattering omission " +
-			"dominates both near a bright Moon.",
+		ExpectedAccuracy: "ROLO's absolute scale is uncertain by 5-10% (Stone & Kieffer " +
+			"2004), and the multiple-scattering coefficient by the factor of two " +
+			"between Noll et al. (2012) and Winkler (2022); together 16-18% in V, " +
+			"which the uncertainty budget carries. Velikodsky et al. (2011) find " +
+			"ROLO 13% faint at 603 nm, and the albedo is divided by 0.87 at every " +
+			"wavelength, as Jones et al. (2013) do. The solar spectrum the caller " +
+			"supplies carries its own uncertainty, which is not included. Measured " +
+			"against Krisciunas & Schaefer (1991) Table 1, ten moonlit-sky V " +
+			"measurements at Mauna Kea, the component reads 0.13 mag faint on " +
+			"average in V with the CALSPEC solar spectrum, within that budget " +
+			"(#938).",
 	}
 }
 
@@ -321,7 +392,9 @@ func (m *ScatteredMoonlight) geometry(scene *Scene) (*moonGeometry, error) {
 
 // matches reports whether this geometry was computed for the given scene.
 func (g *moonGeometry) matches(scene *Scene) bool {
-	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer
+	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer &&
+		sameRefraction(g.refraction, scene.Atmosphere.Refraction()) &&
+		sameProvider(g.ephemeris, scene.Ephemeris)
 }
 
 // computeGeometry resolves the Moon's position, phase and irradiance.
@@ -362,6 +435,8 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	geom := &moonGeometry{
 		observer:     scene.Observer,
 		at:           scene.Time,
+		refraction:   scene.Atmosphere.Refraction(),
+		ephemeris:    scene.Ephemeris,
 		direction:    altaz,
 		aboveHorizon: altaz.Alt() > 0,
 		irradiance:   make([]float64, len(magnitude.ROLOBands())),
@@ -398,6 +473,10 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	}
 
 	geom.extrapolated = err != nil
+
+	for i := range reflectance {
+		reflectance[i] /= roloVelikodskyScale
+	}
 
 	// Distances: the Sun-Moon leg in AU, the Moon-observer leg in km.
 	//

@@ -36,6 +36,10 @@ type sceneFrame struct {
 	// refraction is part of the cache key, because ctx was built with it.
 	refraction atmosphere.Refraction
 
+	// ephemeris is part of it too when the frame holds the Sun, which was
+	// read from it (#945). Nil when the component needs no Sun.
+	ephemeris eph.Provider
+
 	ctx *coord.Context
 
 	// sunEcliptic is the Sun's apparent ecliptic position; sunDistanceAU is
@@ -62,7 +66,11 @@ func (f *sceneFrame) matches(scene *Scene) bool {
 	// one, which is also why the stale frame only appears when a caller reuses
 	// a site across scenes. That is the ordinary way to model one observatory
 	// under changing weather.
-	return sameRefraction(f.refraction, scene.Atmosphere.Refraction())
+	if !sameRefraction(f.refraction, scene.Atmosphere.Refraction()) {
+		return false
+	}
+
+	return f.ephemeris == nil || sameProvider(f.ephemeris, scene.Ephemeris)
 }
 
 // sameRefraction reports whether two refraction settings would build the same
@@ -83,6 +91,25 @@ func sameRefraction(a, b atmosphere.Refraction) bool {
 	}
 
 	return reflect.TypeOf(a.Model) == reflect.TypeOf(b.Model)
+}
+
+// sameProvider reports whether two ephemerides are the same one.
+//
+// Identity, as the observer is compared: two providers can agree to the
+// last bit and still be different data, and only the caller knows which it
+// meant. A provider whose dynamic type is not comparable would panic under
+// ==, so it never matches; the cache then rebuilds, which is correct and
+// only slower.
+func sameProvider(a, b eph.Provider) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	if ta := reflect.TypeOf(a); ta != reflect.TypeOf(b) || !ta.Comparable() {
+		return false
+	}
+
+	return a == b
 }
 
 // newSceneFrame resolves a scene's transform context and Sun position.
@@ -123,6 +150,7 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 
 	frame.sunEcliptic = coord.ICRSToEcliptic(icrs, at)
 	frame.sunDistanceAU = sun.Pos.Norm()
+	frame.ephemeris = scene.Ephemeris
 
 	return frame, nil
 }
@@ -234,24 +262,24 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	frame, err := d.frame.get(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	icrs, err := frame.ctx.AltAzToICRS(dir)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: diffuse galactic: direction: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: direction: %w", err)
 	}
 
 	galactic := coord.ICRSToGalactic(icrs)
@@ -260,7 +288,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	if err != nil {
 		// A direction the map does not cover is missing data, not a dark
 		// sightline, so it contributes nothing and says so.
-		return UnknownCloud, nil
+		return Contribution{Flags: UnknownCloud}, nil
 	}
 
 	// The spectrum is always built aside, because both the cap and the
@@ -275,7 +303,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 	flags, err := DiffuseGalacticRadiance(scratch, grid, intensity)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	scale := 1.0
@@ -287,7 +315,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	} else {
 		capScale, capFlags, err := d.capFactor(scratch, grid, icrs, galactic)
 		if err != nil {
-			return flags, err
+			return Contribution{Flags: flags}, err
 		}
 
 		scale, flags = capScale, flags|capFlags
@@ -302,12 +330,12 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	// then dimmed by it.
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: diffuse galactic: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: diffuse galactic: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: ozone airmass: %w", err)
 	}
 
 	pressure, _ := scene.Atmosphere.Surface()
@@ -315,12 +343,20 @@ func (d *DiffuseGalacticLight) AddRadiance(
 	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
+	// The uncertainty holds where the fit does: inside the 100 micron range it
+	// was fitted over, before its turnover, and where the starlight cap leaves
+	// the correlation's own value standing. The cap's 0.35 has no stated
+	// uncertainty, so a capped value has no figure.
+	var uncertainty spectralUncertainty
+
+	known := scale >= 1
+
 	for i := range dst {
 		lambda := grid.At(i)
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -331,18 +367,28 @@ func (d *DiffuseGalacticLight) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "diffuse galactic", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "diffuse galactic", slantErr)
 		}
 
 		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: diffuse galactic: %w", err)
 		}
 
-		dst[i] += scratch[i] * scale * float64(atmosphere.Transmission(slant)) * ozone
+		added := scratch[i] * scale * float64(atmosphere.Transmission(slant)) * ozone
+		dst[i] += added
+
+		relative, ok := dglRelativeUncertainty(lambda, intensity)
+		known = known && ok
+
+		uncertainty.add(grid, i, added, relative)
 	}
 
-	return flags, nil
+	if !known {
+		return Contribution{Flags: flags}, nil
+	}
+
+	return uncertainty.contribution(flags, "Kawara et al. (2017) Table 2 and Eq. 9"), nil
 }
 
 // Provenance implements [Component].
@@ -364,8 +410,12 @@ func (d *DiffuseGalacticLight) Provenance() Provenance {
 			"Only the directly attenuated term is applied; light scattered out of " +
 				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
-		ExpectedAccuracy: "The correlation's own scatter is large; Kawara et al. quote " +
-			"uncertainties of 10 to 50 per cent on the slope depending on band.",
+		ExpectedAccuracy: "Kawara et al. Table 2 gives the slope to 3-8 per cent from " +
+			"274 to 648 nm and 47 per cent at 225 nm. A prediction also carries " +
+			"the uncertainty of the 100 micron intensity it is evaluated at " +
+			"(their Eq. 9), which at high galactic latitude is dominated by the " +
+			"0.8 MJy/sr offset subtracted from it, 0.78 +/- 0.21 MJy/sr as " +
+			"Kawara et al. cite it from Lagache et al. (2000).",
 	}
 }
 
@@ -456,24 +506,24 @@ func (z *ZodiacalLight) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	frame, err := z.frame.get(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	icrs, err := frame.ctx.AltAzToICRS(dir)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: zodiacal: direction: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: zodiacal: direction: %w", err)
 	}
 
 	ecliptic := coord.ICRSToEcliptic(icrs, time.FromGo(scene.Time))
@@ -495,17 +545,22 @@ func (z *ZodiacalLight) AddRadiance(
 	clear(scratch)
 	defer z.scratch.Put(scratch) //nolint:staticcheck // a slice header, deliberately pooled
 
-	flags, err := ZodiacalRadiance(scratch, grid, geom)
-	if errors.Is(err, ErrZodiacalGeometry) {
+	reference, flags, err := zodiacalRadiance(scratch, grid, geom)
+	if errors.Is(err, errZodiacalSolarVicinity) {
 		// Inside the solar vicinity the table does not reach. That is a real
 		// gap in the model, not a failure of the evaluation, and a caller
 		// looking that close to the Sun has bigger problems than zodiacal
 		// light.
-		return ExtrapolatedModel, nil
+		//
+		// Only that case. Matching ErrZodiacalGeometry here instead also gave
+		// a NaN or infinite direction, and a non-physical Sun distance, zero
+		// radiance and no error, so an estimate quietly lost its brightest
+		// natural term (#998).
+		return Contribution{Flags: ExtrapolatedModel}, nil
 	}
 
 	if err != nil {
-		return flags, err
+		return Contribution{Flags: flags}, err
 	}
 
 	// Zodiacal light is sunlight scattered by interplanetary dust, so it
@@ -516,12 +571,12 @@ func (z *ZodiacalLight) AddRadiance(
 	// times the size.
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: zodiacal: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: zodiacal: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: zodiacal: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: zodiacal: ozone airmass: %w", err)
 	}
 
 	pressure, _ := scene.Atmosphere.Surface()
@@ -529,12 +584,14 @@ func (z *ZodiacalLight) AddRadiance(
 	height := scene.Observer.Height()
 	kappa := scene.Atmosphere.DiffuseKappa()
 
+	var uncertainty spectralUncertainty
+
 	for i := range dst {
 		lambda := grid.At(i)
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: zodiacal: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: zodiacal: %w", err)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -545,18 +602,21 @@ func (z *ZodiacalLight) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "zodiacal", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "zodiacal", slantErr)
 		}
 
 		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: zodiacal: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: zodiacal: %w", err)
 		}
 
-		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
+		added := scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
+		dst[i] += added
+
+		uncertainty.add(grid, i, added, zodiacalRelativeUncertainty(reference/zodiacalTableUnit, lambda))
 	}
 
-	return flags, nil
+	return uncertainty.contribution(flags, "Leinert et al. (1998) map accuracy"), nil
 }
 
 // Provenance implements [Component].
@@ -582,8 +642,11 @@ func (z *ZodiacalLight) Provenance() Provenance {
 			"Only the directly attenuated term is applied; light scattered out of " +
 				"the beam is not returned to it, matching IntegratedStarlight.",
 		},
-		ExpectedAccuracy: "Leinert et al. describe the table as good to roughly 10 per " +
-			"cent away from the solar vicinity.",
+		ExpectedAccuracy: "Leinert et al. give the visual zodiacal light as known to " +
+			"10% at best, with the table's brightnesses uncertain by 10-15 S10 " +
+			"where faint and 5-10% where bright, and hardly better than 20% below " +
+			"300 nm. The uncertainty budget carries max(10%, 15 S10 / brightness), " +
+			"about 27% toward the ecliptic poles.",
 	}
 }
 
@@ -642,16 +705,16 @@ func (a *Airglow) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if !a.grid.Equal(grid) {
-		return 0, fmt.Errorf("%w: component holds %v, asked for %v", ErrAirglowSpectrum, a.grid, grid)
+		return Contribution{}, fmt.Errorf("%w: component holds %v, asked for %v", ErrAirglowSpectrum, a.grid, grid)
 	}
 
 	// AirglowRadiance checks this for whatever slice it is handed, and it used
 	// to be handed dst. Now that it fills a scratch buffer instead, dst is
 	// only ever indexed here and has to be checked here.
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
@@ -665,7 +728,7 @@ func (a *Airglow) AddRadiance(
 
 	flags, err := AirglowRadiance(scratch, grid, a.zenith, angle.Deg(90)-dir.Alt(), a.layerHeight)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if a.measured {
@@ -694,17 +757,17 @@ func (a *Airglow) AddRadiance(
 	// explicitly rather than inferred from Airmass refusing, so a future
 	// failure there is reported instead of read as a direction off the sky.
 	if dir.Alt().Degrees() <= 0 {
-		return flags, nil
+		return Contribution{Flags: flags}, nil
 	}
 
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: airglow: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: airglow: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: airglow: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: airglow: ozone airmass: %w", err)
 	}
 
 	pressure, _ := scene.Atmosphere.Surface()
@@ -717,7 +780,7 @@ func (a *Airglow) AddRadiance(
 
 		rayleigh, rErr := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if rErr != nil {
-			return 0, fmt.Errorf("skybrightness: airglow: %w", rErr)
+			return Contribution{}, fmt.Errorf("skybrightness: airglow: %w", rErr)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -728,18 +791,18 @@ func (a *Airglow) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "airglow", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "airglow", slantErr)
 		}
 
 		ozone, oErr := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if oErr != nil {
-			return 0, fmt.Errorf("skybrightness: airglow: %w", oErr)
+			return Contribution{}, fmt.Errorf("skybrightness: airglow: %w", oErr)
 		}
 
 		dst[i] += scratch[i] * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // Provenance implements [Component].
@@ -923,29 +986,29 @@ func (s *IntegratedStarlight) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if dir.Alt() <= 0 {
-		return 0, nil
+		return Contribution{}, nil
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	if !s.grid.Equal(grid) {
-		return 0, fmt.Errorf("%w: component holds %v, asked for %v",
+		return Contribution{}, fmt.Errorf("%w: component holds %v, asked for %v",
 			ErrNoStarMap, s.grid, grid)
 	}
 
 	frame, err := s.frame.get(scene)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	icrs, err := frame.ctx.AltAzToICRS(dir)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: starlight: direction: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: starlight: direction: %w", err)
 	}
 
 	lon, lat := icrs.RA(), icrs.Dec()
@@ -959,22 +1022,22 @@ func (s *IntegratedStarlight) AddRadiance(
 	switch {
 	case errors.Is(err, ErrNoCoverage):
 		// The map answered: it has nothing here. Flagged, not failed.
-		return UnknownCloud, nil
+		return Contribution{Flags: UnknownCloud}, nil
 	case err != nil:
-		return 0, fmt.Errorf("skybrightness: starlight: radiance: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: starlight: radiance: %w", err)
 	case value <= 0:
 		// Covered, but no measurable starlight in this direction.
-		return UnknownCloud, nil
+		return Contribution{Flags: UnknownCloud}, nil
 	}
 
 	airmass, err := atmosphere.Airmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: starlight: airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: starlight: airmass: %w", err)
 	}
 
 	ozoneAirmass, err := atmosphere.OzoneAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: starlight: ozone airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: starlight: ozone airmass: %w", err)
 	}
 
 	flags := Flag(0)
@@ -996,7 +1059,7 @@ func (s *IntegratedStarlight) AddRadiance(
 
 		rayleigh, err := atmosphere.RayleighOpticalDepth(lambda, float64(pressure))
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: starlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: starlight: %w", err)
 		}
 
 		// Masana et al. (2021) Eq. 29: the molecular and aerosol columns carry
@@ -1007,18 +1070,18 @@ func (s *IntegratedStarlight) AddRadiance(
 			rayleigh, unit.OpticalDepth(aerosol.TauAt(lambda)),
 			airmass, airmass, height, kappa)
 		if slantErr != nil {
-			return 0, fmt.Errorf("skybrightness: %s: %w", "starlight", slantErr)
+			return Contribution{}, fmt.Errorf("skybrightness: %s: %w", "starlight", slantErr)
 		}
 
 		ozone, err := ozoneTransmission(scene.Atmosphere, lambda, ozoneAirmass)
 		if err != nil {
-			return 0, fmt.Errorf("skybrightness: starlight: %w", err)
+			return Contribution{}, fmt.Errorf("skybrightness: starlight: %w", err)
 		}
 
 		dst[i] += value * s.shape[i] * float64(atmosphere.Transmission(slant)) * ozone
 	}
 
-	return flags, nil
+	return Contribution{Flags: flags}, nil
 }
 
 // Provenance implements [Component].

@@ -78,6 +78,15 @@ func (eopLoader) Cached(ctx context.Context) (time.EOPData, error) {
 
 // Fetch downloads finals2000A.all, subject to download consent.
 func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
+	// The network step, and consent gates it before anything else does.
+	// Without consent remote.GetFile serves a cached bulletin as offline mode
+	// does (#964), which is the one Cached has just read and found wanting,
+	// and the lazy load would record it as fetched from the network.
+	ep, _ := remote.Lookup(remote.IERSFinals2000A)
+	if err := remote.CheckDownload(remote.IERSFinals2000A, "finals2000A.all", ep.ApproxSize); err != nil {
+		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
+	}
+
 	// remote.GetFile reuses the cache untouched when the source's current ETag
 	// shows the IERS bulletin has not changed since it was last
 	// downloaded — a content check rather than a wall-clock expiry, since

@@ -32,12 +32,12 @@ func (c constantComponent) AddRadiance(
 	_ unit.SpectralGrid,
 	_ coord.AltAz,
 	_ *skybrightness.Scene,
-) (skybrightness.Flag, error) {
+) (skybrightness.Contribution, error) {
 	for i := range dst {
 		dst[i] += c.value
 	}
 
-	return 0, nil
+	return skybrightness.Contribution{}, nil
 }
 
 func (c constantComponent) Provenance() skybrightness.Provenance {
@@ -61,10 +61,10 @@ func (b badComponent) AddRadiance(
 	_ unit.SpectralGrid,
 	_ coord.AltAz,
 	_ *skybrightness.Scene,
-) (skybrightness.Flag, error) {
+) (skybrightness.Contribution, error) {
 	dst[0] = b.value
 
-	return 0, nil
+	return skybrightness.Contribution{}, nil
 }
 
 func (b badComponent) Provenance() skybrightness.Provenance { return skybrightness.Provenance{} }

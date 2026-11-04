@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/TuSKan/astrogo/internal/gofaext"
@@ -144,7 +145,16 @@ var (
 // An epoch past the bulletin's end is a different notice with a Once of its
 // own: there DUT1 is not zero but held, and with one Once between them
 // whichever case came first would silence the other for the process.
+//
+// A non-finite mjd gets no notice at all. It is a time with no instant, not
+// degraded accuracy, and its answer already carries a NaN DUT1 (#963). Warned
+// about, it would say no EOP data could be found when none was missing, and
+// spend the Once, silencing the real notice for the rest of the process (#988).
 func warnEOPUnavailable(mjd float64, cause error) {
+	if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+		return
+	}
+
 	if held, ok := errors.AsType[*deltaTHeldError](cause); ok {
 		warnDeltaTHeldOnce.Do(func() { logDeltaTHeld(mjd, held) })
 
@@ -239,6 +249,22 @@ func logEOPUnavailable(mjd float64, cause error) {
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
+	// A non-finite MJD is a broken epoch, not an uncovered one: every range
+	// comparison on the paths below is false for a NaN, so one used to slip
+	// past them into the past-bulletin hold and come back with the
+	// bulletin's last DUT1 and no leap seconds — a finite DUT1 for a time
+	// that has none (#963). The answer carries a NaN DUT1 with the error, so
+	// a caller that ignores the error reads no finite value either.
+	if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+		return EOP{DUT1: math.NaN()}, nil, fmt.Errorf("%w: MJD %v is not finite", ErrOutOfRange, mjd)
+	}
+
+	// A model that answers mjd with nothing to load is answered from one
+	// read of it: no lock, one interpolation (#953).
+	if eop, ok := iers.Lookup(mjd); ok {
+		return eop, nil, nil
+	}
+
 	loadErr := iers.EnsureLoaded(mjd)
 
 	eop, err = iers.GetModel().EOP(mjd)

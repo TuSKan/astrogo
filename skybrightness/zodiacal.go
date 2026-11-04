@@ -10,8 +10,15 @@ import (
 )
 
 // ErrZodiacalGeometry is returned for a direction the tabulated map does not
-// cover, or for a non-physical heliocentric distance.
+// cover, a direction that is not finite, or a non-physical heliocentric
+// distance.
 var ErrZodiacalGeometry = errors.New("skybrightness: zodiacal geometry outside the tabulated map")
+
+// errZodiacalSolarVicinity marks, beside ErrZodiacalGeometry, the one case of it
+// that is a gap in the model rather than a bad input: a direction inside the
+// solar vicinity the table leaves blank. ZodiacalLight reports that as no
+// contribution, and must not report anything else that way (#998).
+var errZodiacalSolarVicinity = errors.New("inside the solar vicinity the table leaves blank")
 
 // Zodiacal light — sunlight scattered by interplanetary dust.
 //
@@ -135,6 +142,16 @@ type ZodiacalGeometry struct {
 // magnitude, and a night-sky model has no business reporting a number a few
 // degrees from the Sun.
 func ZodiacalBrightnessAt(geom ZodiacalGeometry) (float64, error) {
+	// A NaN or infinite coordinate fails every comparison in the bracketing
+	// below, which then lands on the table's first cell, 0 degrees from the
+	// Sun, with a NaN weight: an error at low latitude, and a NaN brightness
+	// with no error elsewhere (#998).
+	if l, b := geom.DifferentialLongitude.Degrees(), geom.EclipticLatitude.Degrees(); math.IsNaN(l) || math.IsInf(l, 0) ||
+		math.IsNaN(b) || math.IsInf(b, 0) {
+		return 0, fmt.Errorf("%w: direction %g deg from the Sun in longitude, %g deg ecliptic latitude is not finite",
+			ErrZodiacalGeometry, l, b)
+	}
+
 	lon := foldDifferentialLongitude(geom.DifferentialLongitude)
 
 	lat := foldEclipticLatitude(geom.EclipticLatitude)
@@ -212,8 +229,8 @@ func interpolateZodiacal(lon, lat float64) (float64, error) {
 		}
 
 		if math.IsNaN(c.value) {
-			return 0, fmt.Errorf("%w: %.1f deg from the Sun in longitude, %.1f deg ecliptic latitude",
-				ErrZodiacalGeometry, lon, lat)
+			return 0, fmt.Errorf("%w: %w: %.1f deg from the Sun in longitude, %.1f deg ecliptic latitude",
+				ErrZodiacalGeometry, errZodiacalSolarVicinity, lon, lat)
 		}
 
 		total += c.value * c.weight
@@ -359,25 +376,31 @@ func ZodiacalColorCorrection(lambda unit.WavelengthNM, elongation angle.Angle) f
 // Directions the table excludes return [ErrZodiacalGeometry] rather than a
 // number.
 func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom ZodiacalGeometry) (Flag, error) {
+	_, flags, err := zodiacalRadiance(dst, grid, geom)
+
+	return flags, err
+}
+
+// zodiacalRadiance is [ZodiacalRadiance], also returning the tabulated
+// brightness at the geometry, which the uncertainty is a function of.
+func zodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom ZodiacalGeometry) (reference float64, flags Flag, err error) {
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return 0, 0, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	if geom.SunDistance <= 0 || math.IsNaN(float64(geom.SunDistance)) {
-		return 0, fmt.Errorf("%w: heliocentric distance %g AU",
+		return 0, 0, fmt.Errorf("%w: heliocentric distance %g AU",
 			ErrZodiacalGeometry, geom.SunDistance.AU())
 	}
 
-	reference, err := ZodiacalBrightnessAt(geom)
+	reference, err = ZodiacalBrightnessAt(geom)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	scale := math.Pow(geom.SunDistance.AU(), zodiacalHeliocentricExponent) * zodiacalSeasonalFactor(geom)
 	elongation := ZodiacalElongation(geom)
-
-	var flags Flag
 
 	for i := range dst {
 		lambda := grid.At(i)
@@ -396,7 +419,36 @@ func ZodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 		dst[i] += v
 	}
 
-	return flags, nil
+	return reference, flags, nil
+}
+
+// The accuracy Leinert et al. (1998) give the zodiacal light. In the visual it
+// "is known to an accuracy of 10% at best", and the tabulated map carries
+// "10 - 15 S10 for low values and 5% - 10% for the higher brightnesses". In
+// the ultraviolet, below 300 nm, the visual distribution stands in at "hardly
+// better than about 20%". The absolute term is taken at the upper end of its
+// range: 15 S10 is 19.2 in Table 17's units, which are Table 16's S10 times
+// 1.28.
+const (
+	zodiacalVisualAccuracy      = 0.10
+	zodiacalUltravioletAccuracy = 0.20
+	zodiacalUltravioletNM       = 300.0
+	zodiacalAbsoluteError       = 15 * 1.28
+)
+
+// zodiacalRelativeUncertainty is the relative uncertainty of the zodiacal
+// light at wavelength lambda, where the map reads table in Table 17's units.
+//
+// The absolute term is what dominates toward the ecliptic poles: the faintest
+// cells, near 72 in those units, carry 19.2, about 27 per cent. Over the
+// brighter ecliptic the floor takes over.
+func zodiacalRelativeUncertainty(table float64, lambda unit.WavelengthNM) float64 {
+	floor := zodiacalVisualAccuracy
+	if lambda < zodiacalUltravioletNM {
+		floor = zodiacalUltravioletAccuracy
+	}
+
+	return max(floor, zodiacalAbsoluteError/table)
 }
 
 // ZodiacalElongation is the angular distance from the Sun implied by a

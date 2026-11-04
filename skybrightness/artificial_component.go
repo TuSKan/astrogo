@@ -94,6 +94,13 @@ type artificialGeometry struct {
 	at       time.GoTime
 	grid     unit.SpectralGrid
 
+	// atmosphere is part of the cache key, because every per-band optical
+	// depth, asymmetry and t below was computed from it. A pointer, as the
+	// observer is: Builder.Build returns a fresh copy that has only getters
+	// afterwards. Without it a site reused under new weather kept the first
+	// weather's sky, 94x too bright at an AOD of 0.4 after 0.02 (#945).
+	atmosphere *atmosphere.Atmosphere
+
 	sources []artificialSource
 	flags   Flag
 }
@@ -112,11 +119,20 @@ type artificialSource struct {
 	asymmetry []float64
 	optical   []float64 // the parameter t of Eq. 3
 	arriving  []float64 // L_S after transmission over the separation
+
+	// relative and known are the emitter's stated uncertainty.
+	relative float64
+	known    bool
 }
 
 // artificialScratch is one direction's working space.
 type artificialScratch struct {
 	radiance []float64
+
+	// weighted is each band's radiance times its source's stated
+	// uncertainty, summed over sources: the inventory's part of the
+	// budget, before it is divided by the band's total.
+	weighted []float64
 }
 
 // NewArtificialSkyglow builds the artificial-skyglow component over a set of
@@ -129,6 +145,10 @@ func NewArtificialSkyglow(emitters []GroundEmitter, opts ...ArtificialOption) (*
 	for i, e := range emitters {
 		if e == nil || e.Location() == nil {
 			return nil, fmt.Errorf("%w: emitter %d has no location", ErrNoEmitterLocation, i)
+		}
+
+		if r, known := e.SourceUncertainty(); known && (r < 0 || math.IsNaN(r) || math.IsInf(r, 0)) {
+			return nil, fmt.Errorf("%w: emitter %d states %g", ErrUncertaintyValue, i, r)
 		}
 	}
 
@@ -152,23 +172,23 @@ func (a *ArtificialSkyglow) AddRadiance(
 	grid unit.SpectralGrid,
 	dir coord.AltAz,
 	scene *Scene,
-) (Flag, error) {
+) (Contribution, error) {
 	if err := scene.Validate(); err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if len(dst) != grid.Len() {
-		return 0, fmt.Errorf("%w: %d destination slots, grid has %d",
+		return Contribution{}, fmt.Errorf("%w: %d destination slots, grid has %d",
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
 	geom, err := a.geometry(scene, grid)
 	if err != nil {
-		return 0, err
+		return Contribution{}, err
 	}
 
 	if dir.Alt() <= 0 {
-		return geom.flags, nil
+		return Contribution{Flags: geom.flags}, nil
 	}
 
 	// Gushchin's airmass, not Pickering's: the two-index model is calibrated
@@ -176,7 +196,7 @@ func (a *ArtificialSkyglow) AddRadiance(
 	// the kernel's own limit.
 	viewAirmass, err := atmosphere.GushchinAirmass(dir.Alt())
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness: artificial: view airmass: %w", err)
+		return Contribution{}, fmt.Errorf("skybrightness: artificial: view airmass: %w", err)
 	}
 
 	view := dir.ToUnitVector()
@@ -186,18 +206,31 @@ func (a *ArtificialSkyglow) AddRadiance(
 
 	if cap(scratch.radiance) < grid.Len() {
 		scratch.radiance = make([]float64, grid.Len())
+		scratch.weighted = make([]float64, grid.Len())
 	}
 
 	total := scratch.radiance[:grid.Len()]
 	clear(total)
+
+	weighted := scratch.weighted[:grid.Len()]
+	clear(weighted)
+
+	known := true
 
 	for i := range geom.sources {
 		src := &geom.sources[i]
 
 		scatter := angle.Acos(clamp(src.direction.ToUnitVector().Dot(view), -1, 1))
 
-		if err := src.addTo(total, scatter, src.airmass, viewAirmass); err != nil {
-			return 0, err
+		lit, err := src.addTo(total, weighted, scatter, src.airmass, viewAirmass)
+		if err != nil {
+			return Contribution{}, err
+		}
+
+		// A dark source has nothing to be uncertain about; a lit one that
+		// states nothing leaves the whole budget unknown.
+		if lit && !src.known {
+			known = false
 		}
 	}
 
@@ -205,7 +238,27 @@ func (a *ArtificialSkyglow) AddRadiance(
 		dst[i] += total[i]
 	}
 
-	return geom.flags, nil
+	if !known {
+		return Contribution{Flags: geom.flags}, nil
+	}
+
+	// Per band, the inventory's part is each source's stated uncertainty
+	// weighted by its share of the radiance, summed linearly: the sources
+	// are treated as fully correlated, the conservative choice, as #911
+	// treats wavelengths. The model's own departure from an exact solution
+	// is independent of the inventory, so the two add in quadrature.
+	var uncertainty spectralUncertainty
+
+	for i, l := range total {
+		if l <= 0 {
+			continue
+		}
+
+		uncertainty.add(grid, i, l, math.Hypot(kocifajModelDiscrepancy, weighted[i]/l))
+	}
+
+	return uncertainty.contribution(geom.flags,
+		"Kocifaj, Bara & Falchi (2022) Sec. 3 model discrepancy, with the emitters' stated uncertainty"), nil
 }
 
 // addTo accumulates one source's contribution across the band set.
@@ -215,7 +268,9 @@ func (a *ArtificialSkyglow) AddRadiance(
 // atmosphere.CombinedPhaseFunction. The weighting that follows is that
 // function's own Eq. 12 combination, kept identical to it — this is a hoist,
 // not a second implementation.
-func (s *artificialSource) addTo(dst []float64, scatter angle.Angle, airmassSource, airmassView float64) error {
+func (s *artificialSource) addTo(
+	dst, weighted []float64, scatter angle.Angle, airmassSource, airmassView float64,
+) (lit bool, err error) {
 	theta := scatter.Radians()
 	molecular := atmosphere.RayleighPhaseFunction(theta, atmosphere.RayleighDepolarization)
 
@@ -226,7 +281,7 @@ func (s *artificialSource) addTo(dst []float64, scatter angle.Angle, airmassSour
 
 		aerosolPhase, err := atmosphere.HenyeyGreensteinPhaseFunction(theta, s.asymmetry[i])
 		if err != nil {
-			return fmt.Errorf("skybrightness: artificial: %w", err)
+			return false, fmt.Errorf("skybrightness: artificial: %w", err)
 		}
 
 		total := float64(s.rayleigh[i] + s.aerosol[i])
@@ -239,13 +294,15 @@ func (s *artificialSource) addTo(dst []float64, scatter angle.Angle, airmassSour
 		l, err := AllSkyRadiance(s.arriving[i], phase, s.asymmetry[i],
 			airmassSource, airmassView, s.optical[i])
 		if err != nil {
-			return fmt.Errorf("skybrightness: artificial: %w", err)
+			return false, fmt.Errorf("skybrightness: artificial: %w", err)
 		}
 
 		dst[i] += l
+		weighted[i] += l * s.relative
+		lit = lit || l > 0
 	}
 
-	return nil
+	return lit, nil
 }
 
 // Provenance implements [Component].
@@ -262,10 +319,12 @@ func (a *ArtificialSkyglow) Provenance() Provenance {
 		},
 		Equations: "Eq. 1 as atmosphere.CombinedPhaseFunction; Eq. 2 as AllSkyRadiance; " +
 			"Eq. 3 as OpticalParameterT; Eq. 4/5 as AsymmetryParameter",
-		ValidityDomain: "Clear sky. The asymmetry parameterization was solved at 450 and " +
-			"550 nm and represents a band roughly 20-30 nm wide, so this component is " +
-			"less spectrally resolved than the grid it writes onto. Ground sources " +
-			"beyond a few kilometers, where the horizon-source geometry holds.",
+		ValidityDomain: "Clear sky. The paper validated sources 1.3 to 81.3 km from the " +
+			"observer and aerosol optical depths up to 0.57, and a source or band " +
+			"outside those is flagged ExtrapolatedModel. The asymmetry " +
+			"parameterization was solved at 450 and 550 nm and represents a band " +
+			"roughly 20-30 nm wide, so this component is less spectrally resolved " +
+			"than the grid it writes onto.",
 		KnownApproximations: []string{
 			"M_S is taken as the horizon airmass in Gushchin's formula, and the " +
 				"emission function is evaluated at zero elevation; the paper " +
@@ -278,9 +337,14 @@ func (a *ArtificialSkyglow) Provenance() Provenance {
 			"Source spectra and upward emission functions are whatever the emitters " +
 				"supply, and each emitter reports whether those were measured or assumed.",
 		},
-		ExpectedAccuracy: "The paper validates against a multiple-scattering code to fifth " +
-			"order; the dominant uncertainty in practice is the source inventory, not " +
-			"the propagation.",
+		ExpectedAccuracy: "Kocifaj, Bara & Falchi (2022) Sec. 3 compare the model with " +
+			"MSOS1, a multiple-scattering code run to the fifth order: a mean " +
+			"discrepancy over the sky of 20% aerosol-free at 450 nm, 20-25% at " +
+			"aerosol optical depths of 0.23 and 0.57, and 15-25% across the 550 nm " +
+			"set. The uncertainty budget carries 25%, the top of those ranges, " +
+			"combined with each emitter's stated uncertainty weighted by its share " +
+			"of the radiance. While a lit emitter states none, the uncertainty is " +
+			"unknown.",
 	}
 }
 
@@ -309,7 +373,8 @@ func (a *ArtificialSkyglow) geometry(scene *Scene, grid unit.SpectralGrid) (*art
 
 // matches reports whether this geometry was computed for the given scene.
 func (g *artificialGeometry) matches(scene *Scene, grid unit.SpectralGrid) bool {
-	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer && g.grid.Equal(grid)
+	return g != nil && g.at.Equal(scene.Time) && g.observer == scene.Observer &&
+		g.atmosphere == scene.Atmosphere && g.grid.Equal(grid)
 }
 
 // computeGeometry resolves every source against the scene.
@@ -329,10 +394,11 @@ func (a *ArtificialSkyglow) computeGeometry(scene *Scene, grid unit.SpectralGrid
 	}
 
 	geom := &artificialGeometry{
-		observer: scene.Observer,
-		at:       scene.Time,
-		grid:     grid,
-		sources:  make([]artificialSource, 0, len(a.emitters)),
+		observer:   scene.Observer,
+		at:         scene.Time,
+		grid:       grid,
+		atmosphere: scene.Atmosphere,
+		sources:    make([]artificialSource, 0, len(a.emitters)),
 	}
 
 	for _, emitter := range a.emitters {
@@ -391,6 +457,12 @@ func (a *ArtificialSkyglow) resolveSource(
 
 	flags := emitter.Quality()
 
+	src.relative, src.known = emitter.SourceUncertainty()
+
+	if km := separation.Km(); km < kocifajNearestKM || km > kocifajFarthestKM {
+		flags |= ExtrapolatedModel
+	}
+
 	pressure, _ := scene.Atmosphere.Surface()
 	aerosol := scene.Atmosphere.Aerosol()
 
@@ -409,6 +481,9 @@ func (a *ArtificialSkyglow) resolveSource(
 		}
 
 		aer := unit.OpticalDepth(aerosol.TauAt(lambda))
+		if float64(aer) > kocifajLargestAOD {
+			flags |= ExtrapolatedModel
+		}
 
 		t, err := OpticalParameterT(aer, aerosolScaleHeight,
 			rayleigh, molecularScaleHeight, separation, airmassSource)
@@ -441,6 +516,26 @@ func (a *ArtificialSkyglow) resolveSource(
 
 	return src, flags, nil
 }
+
+// The model's own error, and the domain it was validated over, from Kocifaj,
+// Bara & Falchi (2022) Sec. 3 (#933).
+//
+// kocifajModelDiscrepancy is the top of every range the paper reports for
+// the model against MSOS1, a multiple-scattering code run to the fifth order:
+// a mean discrepancy over all sky elements of 20% aerosol-free at 450 nm,
+// 20-25% at aerosol optical depths of 0.23 and 0.57, and 15-25% across the
+// 550 nm set. It is a mean over the sky, not a 1-sigma for each direction,
+// and it is the model's alone: it is there with a perfect inventory.
+//
+// The 550 nm set put sources 1.3 to 81.3 km from the observer, and the
+// largest aerosol optical depth run was 0.57. A source or a band beyond
+// those is an extrapolation.
+const (
+	kocifajModelDiscrepancy = 0.25
+	kocifajNearestKM        = 1.3
+	kocifajFarthestKM       = 81.3
+	kocifajLargestAOD       = 0.57
+)
 
 // maxAsymmetry bounds the clamp applied when Eq. 4 leaves the physical
 // range. It is short of 1 by enough that the Henyey-Greenstein denominator

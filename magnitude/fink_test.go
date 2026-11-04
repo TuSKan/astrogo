@@ -653,7 +653,7 @@ func TestFINK_SpinCorrectionPhysics(t *testing.T) {
 		}
 	}
 
-	t.Logf("Spin params: RA=%.1f° Dec=%.1f° R=%.4f", tgt.SpinRA, tgt.SpinDec, R)
+	t.Logf("Spin params: RA=%.1f° Dec=%.1f° R=%.4f", tgt.SpinRA.Degrees(), tgt.SpinDec.Degrees(), R)
 	t.Logf("Geometry stats (n=%d):", len(cosLambdas))
 	t.Logf("  cos Λ range:          [%.4f, %.4f]", minCos, maxCos)
 	t.Logf("  SpinCorrection range: [%.4f, %.4f] mag", minSpin, maxSpin)

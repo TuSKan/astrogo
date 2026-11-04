@@ -251,11 +251,11 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 		Unscheduled: []UnscheduledBlock{{Block: b1}},
 	}
 
-	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(planner), newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(planner), nil, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("swapPass returned %v, want it to wrap the constraint's error", err)
 	}
 
-	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(planner)); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(planner), nil); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
 	}
 }

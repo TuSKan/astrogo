@@ -46,6 +46,11 @@ type hemisphereField struct {
 
 	// components names what each sample's radiance slice holds, in order.
 	components []ComponentID
+
+	// longest is the length of the longest run of samples sharing a ring, which
+	// sizes the working storage of scatterInto. It is a property of samples and
+	// is set where they are: anything that changes them must set it again.
+	longest int
 }
 
 // hemisphereSample is one quadrature point of the incoming field.
@@ -147,6 +152,8 @@ func (m *Model) sampleHemisphere(
 		field.samples = append(field.samples, sample)
 	}
 
+	field.longest = longestRing(field.samples)
+
 	return field, nil
 }
 
@@ -155,8 +162,23 @@ func (m *Model) sampleHemisphere(
 //
 // This is the whole per-direction cost of the full scattering model once the
 // field is held: one path factor per ring, two phase-function values per
-// sample, and a multiply-add per wavelength. No coordinate transform, no
-// ephemeris, and no transcendental in the innermost loop.
+// sample, and two multiply-adds per wavelength per sample. No coordinate
+// transform, no ephemeris, and no transcendental in the innermost loop.
+//
+// # Why the sum is taken ring by ring
+//
+// Around a ring the path factor is constant, and the phase is a weighted sum of
+// two functions of the scattering angle alone. So for one component and one
+// wavelength
+//
+//	sum_s r_s * dOmega_s * (wR*pR_s + wA*pA_s) * path
+//	  = path * (wR * sum_s r_s*dOmega_s*pR_s + wA * sum_s r_s*dOmega_s*pA_s)
+//
+// and only the two inner sums depend on the sample, each a single multiply-add.
+// The weights and the path factor are applied once per ring instead of once per
+// sample, and a ring near the horizon carries dozens of samples. It is the same
+// sum reassociated, held to the per-sample form by
+// TestScatterIntoMatchesPerSampleAccumulation.
 func (f *hemisphereField) scatterInto(
 	est *Estimate, kernel *scatterKernel, view coord.AltAz, into map[ComponentID][]float64,
 ) error {
@@ -169,33 +191,118 @@ func (f *hemisphereField) scatterInto(
 		return fmt.Errorf("%w: view airmass: %w", ErrScattering, err)
 	}
 
-	width := f.grid.Len()
-	path := make([]float64, width)
-	ring := -1
+	scratch := newRingScratch(f.grid.Len(), f.longest)
 
-	for _, sample := range f.samples {
-		if sample.ring != ring {
-			kernel.pathFactor(path, f.ringAirmass[sample.ring], viewAirmass)
-			ring = sample.ring
-		}
+	for rest := f.samples; len(rest) > 0; {
+		ring := leadingRing(rest)
 
-		phaseRayleigh, phaseAerosol, err := kernel.phaseAt(separation(view, sample.dir))
-		if err != nil {
+		if err := f.scatterRing(kernel, view, viewAirmass, ring, into, scratch); err != nil {
 			return err
 		}
 
-		for c, id := range f.components {
-			dst, ok := into[id]
-			if !ok {
-				continue
-			}
-
-			kernel.accumulate(dst, sample.spectrumOf(c, width), path,
-				sample.dOmega, phaseRayleigh, phaseAerosol)
-		}
+		rest = rest[len(ring):]
 	}
 
 	_ = est
 
 	return nil
+}
+
+// scatterRing adds one ring's contribution to every requested component.
+func (f *hemisphereField) scatterRing(
+	kernel *scatterKernel, view coord.AltAz, viewAirmass float64,
+	ring []hemisphereSample, into map[ComponentID][]float64, s ringScratch,
+) error {
+	kernel.pathFactor(s.path, f.ringAirmass[ring[0].ring], viewAirmass)
+
+	// Once per sample, not once per component: the phase functions depend on
+	// the scattering angle alone, which every component shares.
+	for i, sample := range ring {
+		phaseRayleigh, phaseAerosol, err := kernel.phaseAt(separation(view, sample.dir))
+		if err != nil {
+			return err
+		}
+
+		s.coefRayleigh[i] = sample.dOmega * phaseRayleigh
+		s.coefAerosol[i] = sample.dOmega * phaseAerosol
+	}
+
+	width := f.grid.Len()
+
+	for c, id := range f.components {
+		dst, ok := into[id]
+		if !ok {
+			continue
+		}
+
+		for i, sample := range ring {
+			sumRingSample(s.sumRayleigh, s.sumAerosol, sample.spectrumOf(c, width),
+				s.coefRayleigh[i], s.coefAerosol[i])
+		}
+
+		kernel.applyRing(dst, s.sumRayleigh, s.sumAerosol, s.path)
+	}
+
+	return nil
+}
+
+// ringScratch is the working storage of one scatterInto call.
+type ringScratch struct {
+	// path is the path factor of the ring in hand.
+	path []float64
+
+	// sumRayleigh and sumAerosol are, per wavelength, the sums of
+	// r*dOmega*phase over the ring's samples for each phase function. They are
+	// zero between rings: applyRing clears them as it closes one.
+	sumRayleigh, sumAerosol []float64
+
+	// coefRayleigh and coefAerosol are dOmega*phase for each sample of the ring,
+	// indexed by its position in the ring.
+	coefRayleigh, coefAerosol []float64
+}
+
+// newRingScratch allocates the working storage once, as a single slab, for
+// spectra of the given width and rings of at most longest samples.
+func newRingScratch(width, longest int) ringScratch {
+	slab := make([]float64, 3*width+2*longest)
+
+	cut := func(n int) []float64 {
+		part := slab[:n:n]
+		slab = slab[n:]
+
+		return part
+	}
+
+	return ringScratch{
+		path:         cut(width),
+		sumRayleigh:  cut(width),
+		sumAerosol:   cut(width),
+		coefRayleigh: cut(longest),
+		coefAerosol:  cut(longest),
+	}
+}
+
+// leadingRing returns the run of samples at the front that share the first
+// one's ring. Samples arrive ring-major, so a run is a whole ring, but nothing
+// here depends on it: a run is closed wherever the ring changes.
+func leadingRing(samples []hemisphereSample) []hemisphereSample {
+	n := 1
+	for n < len(samples) && samples[n].ring == samples[0].ring {
+		n++
+	}
+
+	return samples[:n]
+}
+
+// longestRing is the length of the longest run leadingRing can return.
+func longestRing(samples []hemisphereSample) int {
+	longest := 0
+
+	for rest := samples; len(rest) > 0; {
+		n := len(leadingRing(rest))
+		longest = max(longest, n)
+		rest = rest[n:]
+	}
+
+	return longest
 }

@@ -94,6 +94,16 @@ func cellOf(l, b angle.Angle) cell {
 	}
 }
 
+// finiteDirection reports whether l and b are both finite. Only a finite
+// direction has a cell: cellOf converts to int, which turns NaN into MinInt64
+// on amd64 and into 0 on arm64, the key of the galactic center's own cell
+// (#982).
+func finiteDirection(l, b angle.Angle) bool {
+	lr, br := l.Radians(), b.Radians()
+
+	return !math.IsNaN(lr) && !math.IsInf(lr, 0) && !math.IsNaN(br) && !math.IsInf(br, 0)
+}
+
 // NewMap returns an empty map, ready to be filled by [Fetch].
 func NewMap() *Map {
 	return &Map{values: make(map[cell]float64)}
@@ -102,6 +112,12 @@ func NewMap() *Map {
 // IntensityAt implements
 // [github.com/TuSKan/astrogo/skybrightness.DustMap].
 func (m *Map) IntensityAt(l, b angle.Angle) (float64, error) {
+	// A non-finite direction has no cell, so no value can have been fetched for
+	// it. Looked up anyway, it would read whichever cell its NaN converts to.
+	if !finiteDirection(l, b) {
+		return 0, fmt.Errorf("%w: l=%v b=%v is not a direction", ErrNoCoverage, l.Degrees(), b.Degrees())
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -148,6 +164,15 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 
 	if len(directions) == 0 {
 		return into, nil
+	}
+
+	// Refused before the cache is read or the service asked: a non-finite
+	// direction has no cell, and its query could only fail or read the wrong one.
+	for i, d := range directions {
+		if !finiteDirection(d.L, d.B) {
+			return nil, fmt.Errorf("%w: direction %d, l=%v b=%v, is not a direction",
+				ErrNoCoverage, i, d.L.Degrees(), d.B.Degrees())
+		}
 	}
 
 	// What previous sessions already learned. A sightline's 100 micron

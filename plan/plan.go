@@ -370,6 +370,16 @@ func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 	return vec, nil
 }
 
+// urgencyProbes are the offsets from the scoring instant at which
+// estimateHoursUntilSet evaluates a target's altitude, nearest first.
+var urgencyProbes = [...]time.Duration{
+	30 * time.Minute,
+	1 * time.Hour,
+	2 * time.Hour,
+	4 * time.Hour,
+	8 * time.Hour,
+}
+
 // estimateHoursUntilSet computes a lightweight estimate of how many hours
 // remain before the target sets below minAlt. It evaluates altitude at a
 // small set of future offsets to avoid the cost of a full EventSolver call.
@@ -387,21 +397,12 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 		return 0
 	}
 
-	// Probe at +30m, +1h, +2h, +4h, +8h — 5 evaluations total.
-	probeOffsets := [5]time.Duration{
-		30 * time.Minute,
-		1 * time.Hour,
-		2 * time.Hour,
-		4 * time.Hour,
-		8 * time.Hour,
-	}
-
 	// The last instant known to be above the horizon, starting from now.
 	prevHours, prevAlt := 0.0, currentAlt
 
 	probe := *ctx
 
-	for _, offset := range probeOffsets {
+	for _, offset := range urgencyProbes {
 		ft := t.Add(time.FromGoDuration(offset))
 
 		pos, err := obj.Position(ft)
@@ -466,6 +467,37 @@ type Scorer struct {
 	// Constraints are the requirements a target must satisfy to score above
 	// zero.
 	Constraints []Constraint
+
+	// moon, when set, holds the Moon's place at each instant one scheduling
+	// run scores; nil uses the process-wide cache. See moonPlaces.
+	moon moonPlaces
+}
+
+// moonPlaces is the Moon's apparent geocentric vector at each instant one
+// scheduling run has scored, held for the whole run and dropped with it.
+//
+// A run's instants are its placements' midpoints, and its swap pass returns to
+// every one of them on every pass. The process-wide cache keeps the last
+// moonPosCacheSize, so once a schedule has more placements than that each
+// return was a miss: a 100-block schedule needed the Moon at 100 instants and
+// computed it 2,100 times (#959). The run knows its own instants, so it keeps
+// them; a failure is returned and never kept.
+type moonPlaces map[time.Time]vector.Vec3
+
+// at is the Moon's vector at t, computed once per run.
+func (m moonPlaces) at(t time.Time) (vector.Vec3, error) {
+	if v, ok := m[t]; ok {
+		return v, nil
+	}
+
+	v, err := getMoonGeocentricVec(t)
+	if err != nil {
+		return vector.Vec3{}, err
+	}
+
+	m[t] = v
+
+	return v, nil
 }
 
 // Score calculates a composite desirability score for a target at a given time.
@@ -521,7 +553,7 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	if wMoon > 0 {
 		// Both as the site sees them: the Moon's parallax moves it up to
 		// 0.95° from where the Earth's center has it (#634).
-		moonVec, err := getMoonGeocentricVec(t)
+		moonVec, err := s.moonAt(t)
 		if err == nil {
 			pos, posErr := topocentricPosition(obj, t, ctx)
 			if posErr != nil {
@@ -554,17 +586,48 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	return score, nil
 }
 
+// moonAt is the Moon's vector at t: from the scheduling run's own record when
+// the Scorer carries one, from the process-wide cache otherwise.
+func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
+	if s.moon != nil {
+		return s.moon.at(t)
+	}
+
+	return getMoonGeocentricVec(t)
+}
+
 // RankObservables evaluates and ranks a list of targets based on their
 // composite observability score at a specific time and site.
 // Objects are evaluated concurrently.
+//
+// They share one [coord.Context], built for the instant: the ~100 µs Apco13
+// solve is the same for every target, and was paid once for each (#916). So is
+// the bracket a target's urgency is estimated across, which each target built
+// again (#951). A [ConstraintCtx] is handed it from every goroutine at once, so
+// it must only read it; see that interface.
 func RankObservables(
 	objs []Observable,
 	t time.Time,
 	site *Site,
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
+	// Nothing to score needs no Context, and no site.
+	if len(objs) == 0 {
+		return nil, nil
+	}
+
+	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+
+	// Each target's urgency moves a copy of ctx as far as the farthest probe.
+	// A new Context holds the series at t alone, so every copy evaluated them
+	// again for the instant a day on, the same one for every target: 90% of a
+	// ranking (#951). Moved there and back, ctx is at t exactly as NewContext
+	// placed it and keeps what the move evaluated, so the copies interpolate.
+	ctx.SetTime(t.Add(time.FromGoDuration(urgencyProbes[len(urgencyProbes)-1])))
+	ctx.SetTime(t)
+
 	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
-		return Scorer{Site: site, Constraints: constraints}.Score(obj, t)
+		return Scorer{Site: site, Context: ctx, Constraints: constraints}.Score(obj, t)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("plan: score: %w", err)
@@ -611,7 +674,9 @@ var maxObservableStep = unit.Minutes(15)
 // eliminating the ±step quantization error of pure grid search.
 //
 // The step must be positive and at most 15 minutes. Larger steps risk missing
-// short visibility windows entirely and will return an error.
+// short visibility windows entirely and will return an error. A window that
+// ends before it starts is ErrReversedInterval, and one whose start or end is
+// not a finite time is ErrNonFiniteInterval.
 func ObservableWindows(
 	obj Observable,
 	start, end time.Time,
@@ -632,6 +697,11 @@ func observableWindows(
 	ctxAt func(time.Time) *coord.Context,
 	constraints ...Constraint,
 ) ([]Window, error) {
+	// For the reason visibleIntervals checks it (#996).
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	if step <= 0 {
 		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, step)
 	}

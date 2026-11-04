@@ -9,7 +9,7 @@ import (
 // resetForTest is Reset, named for this file's own cleanup call sites.
 // Deliberately not RegisterModel(ZeroModel{}): that call is now
 // authoritative (see RegisterModel's doc comment), so using it as generic
-// test cleanup would leave explicitModel set and silently no-op every
+// test cleanup would leave the model explicit and silently no-op every
 // later test's own EnsureLoaded calls.
 func resetForTest() { Reset() }
 

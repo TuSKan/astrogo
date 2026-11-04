@@ -2,7 +2,9 @@ package skybrightness
 
 import (
 	"context"
+	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -99,7 +101,7 @@ func TestExtragalacticUnitConversion(t *testing.T) {
 
 	e := NewExtragalacticBackground()
 
-	got, extrapolated := e.at(631.2)
+	got, extrapolated := interpolatePivots(e.spectral, 631.2)
 	if extrapolated {
 		t.Error("a tabulated pivot wavelength reported as extrapolated")
 	}
@@ -129,7 +131,7 @@ func TestExtragalacticInterpolation(t *testing.T) {
 	e := NewExtragalacticBackground()
 
 	for i, p := range koushanIGL {
-		got, _ := e.at(p.PivotNM)
+		got, _ := interpolatePivots(e.spectral, p.PivotNM)
 
 		want := p.NuInu * 1e-9 / p.PivotNM
 		if math.Abs(got-want)/want > 1e-12 {
@@ -142,7 +144,7 @@ func TestExtragalacticInterpolation(t *testing.T) {
 
 		// Midway between two pivots the value must lie between them.
 		prev := koushanIGL[i-1]
-		mid, _ := e.at(0.5 * (prev.PivotNM + p.PivotNM))
+		mid, _ := interpolatePivots(e.spectral, 0.5*(prev.PivotNM+p.PivotNM))
 
 		lo, hi := e.spectral[i-1], e.spectral[i]
 		if lo > hi {
@@ -166,7 +168,7 @@ func TestExtragalacticRefusesToExtrapolate(t *testing.T) {
 
 	e := NewExtragalacticBackground()
 
-	blue, extrapolated := e.at(300)
+	blue, extrapolated := interpolatePivots(e.spectral, 300)
 	if !extrapolated {
 		t.Error("300 nm is below the u pivot and must be flagged")
 	}
@@ -175,7 +177,7 @@ func TestExtragalacticRefusesToExtrapolate(t *testing.T) {
 		t.Errorf("below the table = %.4e, want the endpoint %.4e", blue, want)
 	}
 
-	red, extrapolated := e.at(3000)
+	red, extrapolated := interpolatePivots(e.spectral, 3000)
 	if !extrapolated {
 		t.Error("3000 nm is above the Ks pivot and must be flagged")
 	}
@@ -186,7 +188,7 @@ func TestExtragalacticRefusesToExtrapolate(t *testing.T) {
 
 	// Nothing anywhere may be negative or zero.
 	for _, lambda := range []float64{200, 300, 357.7, 500, 1000, 2154.9, 5000} {
-		if v, _ := e.at(lambda); v <= 0 {
+		if v, _ := interpolatePivots(e.spectral, lambda); v <= 0 {
 			t.Errorf("%.0f nm gives %.4e, which is not a radiance", lambda, v)
 		}
 	}
@@ -203,13 +205,13 @@ func TestExtragalacticAddRadiance(t *testing.T) {
 	eval := func(alt, az float64) (SpectralRadiance, Flag) {
 		dst := NewSpectralRadiance(grid)
 
-		flags, err := e.AddRadiance(context.Background(), dst, grid,
+		contribution, err := e.AddRadiance(context.Background(), dst, grid,
 			coord.NewAltAz(angle.Deg(alt), angle.Deg(az)), scene)
 		if err != nil {
 			t.Fatalf("AddRadiance(%v): %v", alt, err)
 		}
 
-		return dst, flags
+		return dst, contribution.Flags
 	}
 
 	below, _ := eval(-10, 0)
@@ -241,7 +243,7 @@ func TestExtragalacticAddRadiance(t *testing.T) {
 		t.Errorf("a longer path did not attenuate more: %v at 15 deg vs %v at 89", low[mid], zenith[mid])
 	}
 
-	unattenuated, _ := e.at(float64(grid.At(mid)))
+	unattenuated, _ := interpolatePivots(e.spectral, float64(grid.At(mid)))
 	if zenith[mid] >= unattenuated {
 		t.Errorf("zenith %v is not below the extra-atmospheric %v", zenith[mid], unattenuated)
 	}
@@ -276,6 +278,26 @@ func TestExtragalacticProvenanceRecordsTheLowerLimit(t *testing.T) {
 
 	if !saysLimit {
 		t.Errorf("provenance does not record that the IGL is a lower limit: %v", p.KnownApproximations)
+	}
+}
+
+// TestExtragalacticAccuracyMatchesTheTable holds the range the provenance
+// quotes to the table's total errors, rounded as the text rounds them, so the
+// two cannot drift apart (#936).
+func TestExtragalacticAccuracyMatchesTheTable(t *testing.T) {
+	t.Parallel()
+
+	lo, hi := math.Inf(1), math.Inf(-1)
+
+	for _, p := range koushanIGL {
+		lo, hi = min(lo, p.TotalErrorPercent), max(hi, p.TotalErrorPercent)
+	}
+
+	figure := fmt.Sprintf("%.1f-%.1f%% from u to Ks", lo, hi)
+
+	text := NewExtragalacticBackground().Provenance().ExpectedAccuracy
+	if !strings.Contains(text, figure) {
+		t.Errorf("the provenance does not quote the table's %q: %q", figure, text)
 	}
 }
 

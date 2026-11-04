@@ -181,8 +181,8 @@ func TestTheObserverRotatesOntoItsOwnSite(t *testing.T) {
 		t.Fatalf("FromECEF: %v", err)
 	}
 
-	t.Logf("site     lon %.9f lat %.9f h %.4f m", site.Lon().Degrees(), site.Lat().Degrees(), site.Height())
-	t.Logf("recovered lon %.9f lat %.9f h %.4f m", got.Lon().Degrees(), got.Lat().Degrees(), got.Height())
+	t.Logf("site     lon %.9f lat %.9f h %.4f m", site.Lon().Degrees(), site.Lat().Degrees(), site.Height().Meters())
+	t.Logf("recovered lon %.9f lat %.9f h %.4f m", got.Lon().Degrees(), got.Lat().Degrees(), got.Height().Meters())
 
 	// A milliarcsecond of latitude is about 3 cm on the ground, which is the
 	// scale polar motion works at and well inside what this can resolve.

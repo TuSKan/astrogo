@@ -2,9 +2,10 @@
 // distinct "run independent work across goroutines" shapes this codebase
 // otherwise hand-rolls per call site:
 //
-//   - Map: one goroutine call per item, bounded concurrency — right for
-//     uneven or expensive per-item work (a network fetch, an ephemeris
-//     lookup). Used by plan.FilterObservable, plan.RankObservable,
+//   - Map: one call per item, bounded concurrency, on workers that each
+//     take the next item as they finish one — right for uneven or
+//     expensive per-item work (a network fetch, an ephemeris lookup).
+//     Used by plan.FilterObservable, plan.RankObservable,
 //     plan.RankObservables, plan.gatherPlanetaryMoons, and
 //     plan.VisibleTonight's candidate-gathering stages, each of which
 //     hand-rolled its own errgroup before this package existed.
@@ -20,8 +21,7 @@ package parallel
 import (
 	"runtime"
 	"sync"
-
-	"golang.org/x/sync/errgroup"
+	"sync/atomic"
 )
 
 // Map applies f to each element of in concurrently, bounded by limit
@@ -32,11 +32,17 @@ import (
 // limit for work that hits a shared external service (e.g. a handful of
 // concurrent network requests to the same API).
 //
-// If any call returns a non-nil error, Map returns that error (the first
-// one errgroup.Group observes; the others' results are discarded) once
-// every in-flight call has finished — matching errgroup.Group's own
-// first-error-wins semantics, not a hard cancellation of work already in
-// flight.
+// If any call returns a non-nil error, Map returns the first one returned
+// (the others' results are discarded) once every call has finished. Nothing
+// is canceled: every item is still called, as errgroup.Group without a
+// context did.
+//
+// The calls run on min(limit, len(in)) goroutines, each taking the next
+// index as it finishes one, so uneven work still balances. It used to start
+// a goroutine per item, and each one grew its stack afresh on the way into
+// the work: in plan.RankObservables, which reaches deep into SOFA, growing
+// those stacks was a fifth of all CPU (#955). A panic in f crashes in the
+// goroutine that raised it, as it did under errgroup.
 func Map[T, R any](in []T, limit int, f func(i int, item T) (R, error)) ([]R, error) {
 	if limit <= 0 {
 		limit = runtime.GOMAXPROCS(0)
@@ -44,24 +50,37 @@ func Map[T, R any](in []T, limit int, f func(i int, item T) (R, error)) ([]R, er
 
 	out := make([]R, len(in))
 
-	g := new(errgroup.Group)
-	g.SetLimit(limit)
+	var (
+		next  atomic.Int64
+		once  sync.Once
+		first error
+		wg    sync.WaitGroup
+	)
 
-	for i, item := range in {
-		g.Go(func() error {
-			r, err := f(i, item)
-			if err != nil {
-				return err
+	for range min(limit, len(in)) {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1) - 1)
+				if i >= len(in) {
+					return
+				}
+
+				r, err := f(i, in[i])
+				if err != nil {
+					once.Do(func() { first = err })
+
+					continue
+				}
+
+				out[i] = r
 			}
-
-			out[i] = r
-
-			return nil
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return nil, err //nolint:wrapcheck // transparent passthrough of f's own error is the point — wrapping here would break a caller's errors.Is against f's sentinel
+	wg.Wait()
+
+	if first != nil {
+		return nil, first
 	}
 
 	return out, nil

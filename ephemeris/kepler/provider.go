@@ -110,6 +110,14 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
 func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
+	// SOFA's theories compute a NaN position from a NaN date, and Moon98 has
+	// no status to say so, so ephemeris.Default answered the Sun and the Moon
+	// at a NaN or infinite time with NaN and no error (#1002). Checked before
+	// the elements lookup, so registered elements and any base are covered.
+	if jd := t.JD(); !finite(jd) {
+		return core.State{}, fmt.Errorf("%w: JD %v", ErrNonFiniteTime, jd)
+	}
+
 	el, ok := p.elements[id]
 	if !ok {
 		st, err := p.base.Locate(id, t)
@@ -190,7 +198,10 @@ type sofaBase struct{}
 // epv00At is one Epv00 evaluation: the Earth's heliocentric and barycentric
 // position and velocity at the TDB two-part date d1 + d2.
 type epv00At struct {
-	set      bool
+	set bool
+	// outside is Epv00's status +1: the date is outside its fitted span, and
+	// the result is a worse position, not a failure.
+	outside  bool
 	d1, d2   float64
 	pvh, pvb [2][3]float64
 }
@@ -258,9 +269,17 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 			np = int(id / 100)
 		}
 
+		// SOFA returns the most serious of three conditions: -1, an illegal
+		// planet number; +2, a failure to converge; +1, a year outside
+		// 1000-3000. Only +1 is a warning. A +2 position is not a solution
+		// of Kepler's equation, and was returned as one until #1003.
 		pv, status := gofaext.Plan94(d1, d2, np)
-		if status < 0 {
+		if status < 0 || status == 2 {
 			return core.State{}, fmt.Errorf("%w: gofaext.Plan94 status %d", ErrSofaFailure, status)
+		}
+
+		if status == 1 {
+			warnOutsideSpan(plan94Span, d1+d2)
 		}
 
 		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]), vector.V3(pv[1][0], pv[1][1], pv[1][2]), core.Sun)
@@ -292,6 +311,20 @@ func (s *sofaBase) Close() error { return nil }
 
 // epv00 is Epv00 at d1 + d2, from the memo every sofaBase shares when it holds
 // that date (see [epv00Memo]).
+//
+// The warning for a date outside Epv00's fitted span is given here, from the
+// status the held evaluation carries, and not where the series is evaluated: a
+// date the memo already holds must warn as the first request for it did, or
+// whether a caller was told would depend on who asked first.
 func (*sofaBase) epv00(d1, d2 float64) (epv00At, error) {
-	return sharedEpv00.epv00(d1, d2, gofaext.Epv00)
+	e, err := sharedEpv00.epv00(d1, d2, gofaext.Epv00)
+	if err != nil {
+		return epv00At{}, err
+	}
+
+	if e.outside {
+		warnOutsideSpan(epv00Span, d1+d2)
+	}
+
+	return e, nil
 }

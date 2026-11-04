@@ -94,7 +94,9 @@ func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 // error is at most a few hundred meters — negligible at any scale this
 // shape would actually be rendered or reasoned about at.
 //
-// Returns ErrTooFewPoints if n < 3, or an error if center is nil.
+// Returns ErrTooFewPoints if n < 3, ErrNilCenter if center is nil, or
+// ErrNotFinite for a non-finite radius, which would otherwise make every point
+// NaN: a Geodetic NewGeodetic and FromECEF both refuse to build (#979).
 func SmallCircle(center *Geodetic, radius angle.Angle, n int) ([]*Geodetic, error) {
 	if n < 3 {
 		return nil, fmt.Errorf("coord: smallcircle: n=%d: %w", n, ErrTooFewPoints)
@@ -102,6 +104,10 @@ func SmallCircle(center *Geodetic, radius angle.Angle, n int) ([]*Geodetic, erro
 
 	if center == nil {
 		return nil, fmt.Errorf("coord: smallcircle: %w", ErrNilCenter)
+	}
+
+	if r := radius.Radians(); math.IsNaN(r) || math.IsInf(r, 0) {
+		return nil, fmt.Errorf("coord: smallcircle: radius %v rad: %w", r, ErrNotFinite)
 	}
 
 	c := center.ToUnitVector()

@@ -18,6 +18,14 @@ name: Changelog
 # removing `no-changelog` from a pull request that does need an entry must turn
 # the check red again rather than leaving it green until the next push.
 #
+# Naming the types was not enough on its own. A push and a label arriving
+# together start two runs, each holding its own event's payload, and the pull
+# request shows whichever finishes last. On #939 the push's run saw no label,
+# finished last and stayed red, and re-running it replayed the same payload.
+# So the job reads the labels the pull request has when it runs, and each
+# run cancels the one before it: the last run started is the one that
+# counts, and it reads labels set after both events (#942).
+#
 # Widening the trigger in ci.yml instead would have applied it to every job in
 # that file, so adding a triage label would re-run the whole matrix, Race
 # Detection and the external-API suite included. A metadata check belongs on a
@@ -28,6 +36,11 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read # the labels, read when the job runs (#942)
+
+concurrency:
+  group: changelog-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   # CONTRIBUTING.md's pull request process asks for a changelog fragment, and
@@ -41,9 +54,10 @@ jobs:
   # and names a real section. It cannot know which pull request is running, so
   # the existence check has to live here, where the number is.
   #
-  # Label a pull request `no-changelog` when it genuinely warrants no entry —
-  # pure test coverage for shipped behavior, or a change to CI that no user
-  # can observe. The label is deliberate and reviewable; silence was not.
+  # Every change gets a fragment, tests and benchmarks included (#925). Label a
+  # pull request `no-changelog` only when a release reader could not act on
+  # it: a dependency-bot bump or a pure spelling pass. The label is deliberate
+  # and reviewable; silence was not.
   #
   # The job name is unchanged from when this lived in ci.yml, so the required
   # check keeps matching.
@@ -68,12 +82,19 @@ jobs:
       - name: Require a changelog fragment naming this pull request
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           PR_HEAD: ${{ github.head_ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [[ ",${PR_LABELS}," == *",no-changelog,"* ]]; then
+          # The labels the pull request has now, not the ones in the event
+          # that started this run, which a re-run replays unchanged (#942).
+          # A failed lookup fails the step: the shell runs with -e, so the
+          # check cannot pass for want of an answer.
+          labels=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '[.labels[].name] | join(",")')
+
+          if [[ ",${labels}," == *",no-changelog,"* ]]; then
             echo "Labeled no-changelog — skipping."
             exit 0
           fi
@@ -104,6 +125,7 @@ jobs:
 
           echo "::error::No changelog fragment for pull request #${PR_NUMBER}."
           echo "Add docs/changelog.d/${PR_NUMBER}-<short-slug>.md — see docs/changelog.d/README.md"
-          echo "and docs/PULL_REQUESTS.md section 4. If this change warrants no entry,"
-          echo "label the pull request 'no-changelog' — which now re-runs this check by itself."
+          echo "and docs/PULL_REQUESTS.md section 4. Tests and benchmarks need one too. Only a"
+          echo "dependency bump or a pure spelling pass takes the 'no-changelog' label instead,"
+          echo "which re-runs this check by itself."
           exit 1
