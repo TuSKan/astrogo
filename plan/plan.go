@@ -674,7 +674,9 @@ var maxObservableStep = unit.Minutes(15)
 // eliminating the ±step quantization error of pure grid search.
 //
 // The step must be positive and at most 15 minutes. Larger steps risk missing
-// short visibility windows entirely and will return an error.
+// short visibility windows entirely and will return an error. A window that
+// ends before it starts is ErrReversedInterval, and one whose start or end is
+// not a finite time is ErrNonFiniteInterval.
 func ObservableWindows(
 	obj Observable,
 	start, end time.Time,
@@ -695,6 +697,11 @@ func observableWindows(
 	ctxAt func(time.Time) *coord.Context,
 	constraints ...Constraint,
 ) ([]Window, error) {
+	// For the reason visibleIntervals checks it (#996).
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	if step <= 0 {
 		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, step)
 	}

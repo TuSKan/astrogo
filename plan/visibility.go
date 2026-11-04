@@ -109,7 +109,9 @@ func refineBisect(a, b time.Time, aState bool, check func(time.Time) (bool, erro
 // each boundary using Chandrupatla root-finding (sub-second precision).
 //
 // The step must be positive and at most 15 minutes. Larger steps risk missing
-// short visibility windows entirely and will return an error.
+// short visibility windows entirely and will return an error. A window that
+// ends before it starts is ErrReversedInterval, and one whose start or end is
+// not a finite time is ErrNonFiniteInterval.
 func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
@@ -156,6 +158,12 @@ func visibleIntervals(
 	step time.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
+	// Unchecked, a reversed window gave no intervals and no error, and one
+	// ending at a NaN time gave an interval ending there (#996).
+	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
 	if step <= 0 {
 		step = 5 * time.Minute
 	}
