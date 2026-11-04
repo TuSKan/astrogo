@@ -145,7 +145,16 @@ var (
 // An epoch past the bulletin's end is a different notice with a Once of its
 // own: there DUT1 is not zero but held, and with one Once between them
 // whichever case came first would silence the other for the process.
+//
+// A non-finite mjd gets no notice at all. It is a time with no instant, not
+// degraded accuracy, and its answer already carries a NaN DUT1 (#963). Warned
+// about, it would say no EOP data could be found when none was missing, and
+// spend the Once, silencing the real notice for the rest of the process (#988).
 func warnEOPUnavailable(mjd float64, cause error) {
+	if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+		return
+	}
+
 	if held, ok := errors.AsType[*deltaTHeldError](cause); ok {
 		warnDeltaTHeldOnce.Do(func() { logDeltaTHeld(mjd, held) })
 
