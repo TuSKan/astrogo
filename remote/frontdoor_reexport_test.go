@@ -166,7 +166,11 @@ func TestAPIOptionsReachTheRequest(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client := Default()
+	// A clone, taken after SetURL so it carries the test server's URL. Set on
+	// Default itself, these options outlived the test: Capture and Reset do not
+	// hold API options, so every later test in the binary inherited a 10 s
+	// timeout and this Authorization header (#990).
+	client := Default().Clone()
 	client.SetAPIOptions(
 		WithUserAgent("astrogo-test/1.0"),
 		WithAuthToken("Token", "s3cret"),
@@ -231,7 +235,9 @@ func TestWithRetryPolicyReachesTheClient(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	client := Default()
+	// A clone, for the reason TestAPIOptionsReachTheRequest gives: on Default,
+	// this never-retry policy would outlive the test (#990).
+	client := Default().Clone()
 	client.SetAPIOptions(
 		WithRetries(3),
 		WithRetryPolicy(func(Attempt) bool { return false }),
