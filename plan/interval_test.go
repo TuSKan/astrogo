@@ -2,6 +2,7 @@ package plan_test
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -22,13 +23,11 @@ type fixedObject struct{ pos coord.ICRS }
 
 func (o fixedObject) ICRS(time.Time) (coord.ICRS, error) { return o.pos, nil }
 
-// TestEveryIntervalSearchRefusesAReversedInterval calls each function that
-// searches an interval with its end before its start, by a minute and by two
-// days, and requires ErrReversedInterval: never a panic, never an empty
-// answer that could be taken for a quiet sky (#418). The minute is the case
-// that indexed an empty sample list; the two days, the one that asked make
-// for a negative capacity.
-func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
+// intervalSearches returns every function that searches an interval, each
+// called over [start, end] and keeping only its error.
+func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error {
+	t.Helper()
+
 	prov := eph.Default()
 
 	site, err := plan.NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
@@ -45,7 +44,7 @@ func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	calls := map[string]func(start, end time.Time) error{
+	return map[string]func(start, end time.Time) error{
 		"EventSolver.Find": func(s, e time.Time) error {
 			return errOf(plan.NewEventSolver(0, 0).Find(plan.EventSpec{
 				Family: plan.EventFamilyVisibility, Kind: plan.EventRise, Target: sun, Observer: site,
@@ -81,11 +80,27 @@ func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
 		"MaxAltitudeInWindow": func(s, e time.Time) error { return errOf(plan.MaxAltitudeInWindow(vega, site, s, e)) },
 		"Episode":             func(s, e time.Time) error { return errOf2(plan.Episode(s, e, star, site)) },
 		"Find":                func(s, e time.Time) error { return errOf(plan.Find(vega, site, nil, s, e, 5*time.Minute)) },
+		"VisibleIntervals": func(s, e time.Time) error {
+			return errOf(plan.VisibleIntervals(vega, site, s, e, 5*time.Minute, angle.Deg(10)))
+		},
+		"ObservableWindows": func(s, e time.Time) error {
+			return errOf(plan.ObservableWindows(star, s, e, unit.Minutes(5), site))
+		},
 	}
+}
 
+// TestEveryIntervalSearchRefusesAReversedInterval calls each function that
+// searches an interval with its end before its start, by a minute and by two
+// days, and requires ErrReversedInterval: never a panic, never an empty
+// answer that could be taken for a quiet sky (#418). The minute is the case
+// that indexed an empty sample list; the two days, the one that asked make
+// for a negative capacity. VisibleIntervals and ObservableWindows were missing
+// from the list, and had no check: both answered a reversed window with
+// nothing and no error (#996).
+func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
 	start := time.Date(2026, 9, 24, 12, 0, 0, 0, time.LocationUTC)
 
-	for name, call := range calls {
+	for name, call := range intervalSearches(t) {
 		for _, back := range []unit.Duration{unit.Minutes(1), unit.Days(2)} {
 			func() {
 				defer func() {
@@ -96,6 +111,40 @@ func TestEveryIntervalSearchRefusesAReversedInterval(t *testing.T) {
 
 				if err := call(start, start.Add(-back)); !errors.Is(err, plan.ErrReversedInterval) {
 					t.Errorf("%s over an interval reversed by %v: err %v, want ErrReversedInterval", name, back, err)
+				}
+			}()
+		}
+	}
+}
+
+// TestEveryIntervalSearchRefusesANonFiniteInterval calls each function that
+// searches an interval with a NaN or infinite start or end, and requires
+// ErrNonFiniteInterval. Such a time compares false both ways, so it passed the
+// reversed-interval check: 18 of these searches then panicked sizing their
+// sample buffer, RankObservable panicked in a goroutine no caller could
+// recover, Oppositions never returned, and the rest answered with no error
+// (#996). FromJD(+Inf) is a case of its own, a time whose JD is NaN.
+func TestEveryIntervalSearchRefusesANonFiniteInterval(t *testing.T) {
+	start := time.Date(2026, 9, 24, 12, 0, 0, 0, time.LocationUTC)
+
+	windows := map[string][2]time.Time{
+		"end FromJD(+Inf)":   {start, time.FromJD(math.Inf(1), time.UTC)},
+		"end FromJD(NaN)":    {start, time.FromJD(math.NaN(), time.UTC)},
+		"start FromJD(NaN)":  {time.FromJD(math.NaN(), time.UTC), start},
+		"start FromJD(-Inf)": {time.FromJD(math.Inf(-1), time.UTC), start},
+	}
+
+	for name, call := range intervalSearches(t) {
+		for wname, w := range windows {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Errorf("%s with %s: panicked: %v", name, wname, r)
+					}
+				}()
+
+				if err := call(w[0], w[1]); !errors.Is(err, plan.ErrNonFiniteInterval) {
+					t.Errorf("%s with %s: err %v, want ErrNonFiniteInterval", name, wname, err)
 				}
 			}()
 		}

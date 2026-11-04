@@ -3,6 +3,7 @@ package plan
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -27,6 +28,11 @@ var (
 	// its start. Until #418 such a call panicked, inside a sampler that sized
 	// its buffer from the interval's length.
 	ErrReversedInterval = errors.New("plan: interval ends before it starts")
+	// ErrNonFiniteInterval is returned for a search interval whose start or
+	// end is a NaN or infinite time. Such a time compares false both ways, so
+	// it passed the reversed-interval check, and until #996 most searches then
+	// panicked sizing their sample buffer from the interval's length.
+	ErrNonFiniteInterval = errors.New("plan: interval start or end is not a finite time")
 	// ErrFamilyNotImpl indicates an event solver for the given family is not implemented.
 	ErrFamilyNotImpl = errors.New("event solver for family is not implemented")
 	// ErrOppositionNeedsSun indicates an Oppositions call where neither body
@@ -141,12 +147,26 @@ var (
 	ErrMalformedMPCRow = errors.New("plan: malformed MPC observatory row")
 )
 
-// checkInterval refuses a search interval that ends before it starts. An empty
-// one, start equal to end, is valid: it has nothing in it.
+// checkInterval refuses a search interval that ends before it starts, or whose
+// start or end is not a finite time. An empty one, start equal to end, is
+// valid: it has nothing in it.
 func checkInterval(start, end time.Time) error {
+	// First, because a non-finite time compares false both ways and so is
+	// never reversed. FromJD(+Inf) is one too: its JD is NaN (#996).
+	if !finiteTime(start) || !finiteTime(end) {
+		return fmt.Errorf("%w: [%v, %v]", ErrNonFiniteInterval, start, end)
+	}
+
 	if end.Before(start) {
 		return fmt.Errorf("%w: [%v, %v]", ErrReversedInterval, start, end)
 	}
 
 	return nil
+}
+
+// finiteTime reports whether t's Julian date is a finite number.
+func finiteTime(t time.Time) bool {
+	jd := t.JD()
+
+	return !math.IsNaN(jd) && !math.IsInf(jd, 0)
 }
