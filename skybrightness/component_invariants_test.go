@@ -54,8 +54,13 @@ func TestComponentsAreConcurrencySafe(t *testing.T) {
 		for range 8 {
 			for i, d := range dirs {
 				wg.Go(func() {
+					// The serial pass above succeeded with these inputs, so an
+					// error here can only come from running concurrently. It
+					// was returned unreported, and the test passed (#994).
 					dst := skybrightness.NewSpectralRadiance(grid)
 					if _, err := c.AddRadiance(context.Background(), dst, grid, d, scene); err != nil {
+						t.Errorf("%s at %v failed under concurrency, though it succeeded serially: %v", name, d, err)
+
 						return
 					}
 
