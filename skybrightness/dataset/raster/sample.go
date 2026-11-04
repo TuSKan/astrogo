@@ -22,6 +22,14 @@ func bilinear(gt GeoTransform, width, height int, lonDeg, latDeg float64, at pix
 		return 0, fmt.Errorf("%w: degenerate geotransform", ErrInvalidGrid)
 	}
 
+	// A NaN pixel position fails every comparison in the coverage check below,
+	// and would reach the corner index as MinInt64 on amd64 and 0 on arm64: no
+	// data on one, NaN with no error on the other (#982). ±Inf already fails the
+	// check, as outside coverage, and so does this.
+	if math.IsNaN(colF) || math.IsNaN(rowF) {
+		return 0, fmt.Errorf("%w: lon=%.4f lat=%.4f", ErrOutOfCoverage, lonDeg, latDeg)
+	}
+
 	// GDAL pixel coordinates place the pixel center at integer+0.5; shift so that
 	// integer indices land on pixel centers for interpolation.
 	colF -= 0.5
