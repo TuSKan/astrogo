@@ -172,7 +172,18 @@ func (a Angle) String() string {
 }
 
 // DMSString returns a formatted string in ±DD°MM'SS.S" format.
+//
+// A NaN or infinite angle has no degrees, minutes or seconds, and formats as
+// String does.
 func (a Angle) DMSString(precision int) string {
+	// Checked first because nothing below holds for it: int64 of a NaN or an
+	// infinity is MinInt64 on amd64 and 0 or a saturated value on arm64, so a
+	// NaN printed "+0-9223372036854775808°…" on one and a zero-looking
+	// "+00°00'0\"" on the other (#992).
+	if a.nonFinite() {
+		return a.String()
+	}
+
 	var b strings.Builder
 
 	degVal := a.Degrees()
@@ -192,8 +203,12 @@ func (a Angle) DMSString(precision int) string {
 	// bit that printing reveals.
 	degVal = math.Abs(degVal)
 
-	d := int64(degVal)
-	rem := (degVal - float64(d)) * 60
+	// Whole degrees as a float64, not an int64. DMSString does not wrap, and
+	// int64(degVal) overflows from 2^63 degrees, which printed Deg(1e19) as
+	// MinInt64 digits. Below 2^63 this is the same integer and prints the same
+	// digits (#992).
+	d := math.Trunc(degVal)
+	rem := (degVal - d) * 60
 	m := int64(rem)
 
 	// Clamped at zero. m truncates rem, so this difference is non-negative
@@ -219,14 +234,7 @@ func (a Angle) DMSString(precision int) string {
 	// use this same rounding (not a separately-computed one) so a value
 	// that carries under one rule but not the other can't render the
 	// invalid `00'60"` this previously risked for negative precision.
-	var sRounded float64
-
-	if precision > 0 {
-		pow := math.Pow10(precision)
-		sRounded = math.Round(s*pow) / pow
-	} else {
-		sRounded = math.Round(s)
-	}
+	sRounded := roundSeconds(s, precision)
 
 	if sRounded >= 60 {
 		sRounded = 0
@@ -243,7 +251,7 @@ func (a Angle) DMSString(precision int) string {
 		b.WriteByte('0')
 	}
 
-	b.WriteString(strconv.FormatInt(d, 10))
+	b.WriteString(strconv.FormatFloat(d, 'f', 0, 64))
 	b.WriteString("°")
 	// Minute
 	if m < 10 {
@@ -269,7 +277,16 @@ func (a Angle) DMSString(precision int) string {
 }
 
 // HMSString returns a formatted string in HHhMMmSS.Ss format.
+//
+// A NaN or infinite angle has no hours, minutes or seconds, and formats as
+// String does.
 func (a Angle) HMSString(precision int) string {
+	// For the reason DMSString gives, and checked before Wrap2Pi, which turns
+	// an infinity into a NaN (#992).
+	if a.nonFinite() {
+		return a.String()
+	}
+
 	var b strings.Builder
 
 	// Absolute value for the same reason DMSString takes one: Wrap2Pi carries
@@ -298,14 +315,7 @@ func (a Angle) HMSString(precision int) string {
 	// comment in DMSString for why using the raw (unrounded) s for the
 	// leading-zero check while printing a separately-rounded value is
 	// wrong at a rounding boundary.
-	var sRounded float64
-
-	if precision > 0 {
-		pow := math.Pow10(precision)
-		sRounded = math.Round(s*pow) / pow
-	} else {
-		sRounded = math.Round(s)
-	}
+	sRounded := roundSeconds(s, precision)
 
 	if sRounded >= 60 {
 		sRounded = 0
@@ -349,4 +359,37 @@ func (a Angle) HMSString(precision int) string {
 	b.WriteString("s")
 
 	return b.String()
+}
+
+// nonFinite reports whether a is a NaN or an infinity, which have no
+// sexagesimal form.
+func (a Angle) nonFinite() bool {
+	return math.IsNaN(float64(a)) || math.IsInf(float64(a), 0)
+}
+
+// roundSeconds rounds a seconds field s, in [0, 60), to the precision that will
+// be printed, so the carry check, the leading-zero decision and the printed
+// digits all use one value.
+//
+// It scales by 10^precision only while s·10^precision is below 2^53. From there
+// on every float64 is an integer, so rounding the product does nothing and
+// dividing back only adds error: seconds of 59.9950000000000117 printed as
+// 59.995000000000005 at precision 15, at 307 the product overflowed to +Inf,
+// which carried a minute and printed 1°30'30" as 1°31'00", and from 309
+// 10^precision is itself +Inf, which made every seconds field NaN. Past the
+// bound s is kept as it is, and FormatFloat rounds it exactly. No carry can arise there, nor a
+// change of digit count at 10: the bound puts half a unit of the last printed
+// place below one ULP of s, and s is at least one ULP below 10 or 60. A NaN
+// product, 0 times +Inf, fails the comparison and keeps s as well (#992).
+func roundSeconds(s float64, precision int) float64 {
+	if precision <= 0 {
+		return math.Round(s)
+	}
+
+	pow := math.Pow10(precision)
+	if scaled := s * pow; scaled < 1<<53 {
+		return math.Round(scaled) / pow
+	}
+
+	return s
 }
