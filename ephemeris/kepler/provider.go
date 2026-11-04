@@ -274,9 +274,17 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 			np = int(id / 100)
 		}
 
+		// SOFA returns the most serious of three conditions: -1, an illegal
+		// planet number; +2, a failure to converge; +1, a year outside
+		// 1000-3000. Only +1 is a warning. A +2 position is not a solution
+		// of Kepler's equation, and was returned as one until #1003.
 		pv, status := gofaext.Plan94(d1, d2, np)
-		if status < 0 {
+		if status < 0 || status == 2 {
 			return core.State{}, fmt.Errorf("%w: gofaext.Plan94 status %d", ErrSofaFailure, status)
+		}
+
+		if status == 1 {
+			warnOutsideSpan(plan94Span, d1+d2)
 		}
 
 		return state(vector.V3(pv[0][0], pv[0][1], pv[0][2]), vector.V3(pv[1][0], pv[1][1], pv[1][2]), core.Sun)
@@ -320,6 +328,10 @@ func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
 	pvh, pvb, status := gofaext.Epv00(d1, d2)
 	if status < 0 {
 		return epv00At{}, fmt.Errorf("%w: gofaext.Epv00 status %d", ErrSofaFailure, status)
+	}
+
+	if status == 1 {
+		warnOutsideSpan(epv00Span, d1+d2)
 	}
 
 	e = epv00At{set: true, d1: d1, d2: d2, pvh: pvh, pvb: pvb}

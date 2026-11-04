@@ -361,6 +361,20 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 // the same [kepler.PlutoElements], that registration is now belt and braces
 // rather than the only thing closing the gap — it keeps Default's contract
 // visible at the call site instead of resting on a lower layer's behavior.
+//
+// SOFA fits each theory to a span of dates. Epv00 (the Sun and the Earth) is
+// fitted to 1900-2100 AD: SOFA's notes give its position errors as about
+// double that span's by 1800 and 2200, 10 times by 1500 and 2500, and 60
+// times by 1000 and 3000. Plan94 (the planets' barycenters) is fitted to
+// 1000-3000 AD, and no worse there than 1.5 times its 1800-2050 accuracy.
+// Moon98 states no span; SOFA compared it with ELP/MPP02 over 1950-2100.
+// astrogo's own metrology covers 1900-2100 (docs/VALIDATION.md). A date
+// outside Epv00's or Plan94's span is still answered, since 1800 and 2200 are
+// ordinary dates to plan for, but the first such date in a process writes a
+// warning through the logging package naming the theory and the span. A
+// Plan94 solution that SOFA reports failed to converge is an error,
+// kepler.ErrSofaFailure. For dates well outside these spans, use an SPK
+// kernel: NewProvider with Planets.
 func Default() Provider {
 	p := kepler.New()
 	if err := p.Register(PlutoBarycenter, kepler.PlutoElements()); err != nil {
