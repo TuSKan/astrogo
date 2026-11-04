@@ -184,6 +184,16 @@ func gridIndex(dims map[string]int, site *coord.Geodetic) (lat, lon int, err err
 			"latitude-longitude grid", ErrAOD, dims)
 	}
 
+	// A non-finite site has no cell. Converting its NaN to an int gives
+	// MinInt64 on amd64, which reaches Var.At as longitude -8 on the 0.4° grid,
+	// and 0 on arm64, which silently reads the cell at the North Pole and
+	// Greenwich (#979).
+	if siteLat, siteLon := site.Lat().Radians(), site.Lon().Radians(); math.IsNaN(siteLat) || math.IsInf(siteLat, 0) ||
+		math.IsNaN(siteLon) || math.IsInf(siteLon, 0) {
+		return 0, 0, fmt.Errorf("%w: the site's latitude %v and longitude %v must be finite",
+			ErrAOD, site.Lat().Degrees(), site.Lon().Degrees())
+	}
+
 	// Latitude runs from +90 to -90 inclusive, so nLat points span 180
 	// degrees in nLat-1 steps.
 	latStep := 180.0 / float64(nLat-1)
