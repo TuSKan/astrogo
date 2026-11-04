@@ -252,10 +252,25 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	// request retried after a timeout is counted twice (#981).
 	before := calls.Load()
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, _ error) bool {
+	// The iterator yields a zero target with its error. Dropped, a request
+	// that failed read as a target with every field empty (#1008).
+	var searchErr error
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			searchErr = err
+
+			return false
+		}
+
 		defaultTargets = append(defaultTargets, tar)
+
 		return true
 	})
+
+	if searchErr != nil {
+		t.Fatalf("the default-table cone search: %v", searchErr)
+	}
 
 	if calls.Load() == before {
 		t.Fatal("the default-table cone search sent no request")
@@ -263,10 +278,21 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 
 	before = calls.Load()
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, _ error) bool {
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			searchErr = err
+
+			return false
+		}
+
 		hipTargets = append(hipTargets, tar)
+
 		return true
 	})
+
+	if searchErr != nil {
+		t.Fatalf("the HIP cone search: %v", searchErr)
+	}
 
 	if calls.Load() == before {
 		t.Fatal("the HIP cone search sent no request: it collided with the default table's cache entry")
