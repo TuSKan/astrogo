@@ -3,6 +3,7 @@ package skybrightness
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -247,6 +248,12 @@ func (e *ExtragalacticBackground) Provenance() Provenance {
 // inside the 4 to 7 per cent the measurements themselves carry.
 func interpolatePivots(table []float64, lambdaNM float64) (value float64, extrapolated bool) {
 	n := len(koushanIGL)
+
+	// A NaN fails both range checks below and would then index one past the
+	// last pivot; a non-finite wavelength is not from the table (#963).
+	if math.IsNaN(lambdaNM) || math.IsInf(lambdaNM, 0) {
+		return math.NaN(), true
+	}
 
 	if lambdaNM <= koushanIGL[0].PivotNM {
 		return table[0], lambdaNM < koushanIGL[0].PivotNM
