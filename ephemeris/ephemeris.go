@@ -333,12 +333,19 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 // ─── Default SOFA Provider ───────────────────────────────────────────────────
 
-// Default returns the standard offline ephemeris provider for every
-// named body core.ID defines: the Sun, Moon, Mercury through Neptune,
-// and the Solar System Barycenter via SOFA analytical models (no kernel
-// or network access), plus Pluto — which SOFA has no analytical model
-// for — via two-body Keplerian propagation from plutoElements. No named
-// core.ID this library defines returns ErrUnsupportedBody from here.
+// Default returns the standard offline ephemeris provider: SOFA's analytical
+// models (no kernel or network access) for the Sun, the Moon, the Earth,
+// Mercury and Venus, the Solar System Barycenter and the system barycenters
+// of Mercury through Neptune, plus Pluto's barycenter — which SOFA has no
+// analytical model for — by two-body Keplerian propagation from
+// plutoElements.
+//
+// The planet centers of Mars through Pluto (Mars, Jupiter, Saturn, Uranus,
+// Neptune and Pluto, NAIF 499 to 999) are ErrUnsupportedBody. An ID is a
+// NAIF code, and SOFA's theory places each system's barycenter, not its
+// planet: ask for MarsBarycenter through PlutoBarycenter instead. Mercury and
+// Venus have no moons, so their centers are their barycenters and are
+// answered.
 //
 // Pluto's accuracy is the same documented limitation as any other
 // Kepler-backed body (see Elements' doc comment): two-body propagation
