@@ -21,8 +21,9 @@ import (
 
 // Sentinel errors for the raw OpenNGC CSV format.
 var (
-	errInvalidRA  = errors.New("openngc: invalid RA format")
-	errInvalidDec = errors.New("openngc: invalid Dec format")
+	errInvalidRA     = errors.New("openngc: invalid RA format")
+	errInvalidDec    = errors.New("openngc: invalid Dec format")
+	errMissingColumn = errors.New("openngc: header lacks a column")
 )
 
 // fetch downloads the OpenNGC source CSVs, merges them, and returns the
@@ -62,22 +63,29 @@ func fetch(ctx context.Context) ([]resolve.Target, error) {
 
 // fetchSource downloads and parses one OpenNGC source CSV, reusing the
 // on-disk cache when remote.GetFile's HEAD probe shows it's still current.
+//
+// It parses through remote.WithRead, so a cached CSV that does not parse is
+// replaced rather than served to every later call (#1014).
 func fetchSource(ctx context.Context, sourceFile string) ([]targetRecord, error) {
-	fsys, key, err := remote.GetFile(ctx, remote.OpenNGC, sourceFile)
-	if err != nil {
+	var recs []targetRecord
+
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("openngc: open %s: %w", sourceFile, err)
+		}
+
+		defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
+
+		if recs, err = parseOpenNGC(r); err != nil {
+			return fmt.Errorf("openngc: parse %s: %w", sourceFile, err)
+		}
+
+		return nil
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.OpenNGC, sourceFile, remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("openngc: %s: %w", sourceFile, err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("openngc: open %s: %w", sourceFile, err)
-	}
-
-	defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
-
-	recs, err := parseOpenNGC(r)
-	if err != nil {
-		return nil, fmt.Errorf("openngc: parse %s: %w", sourceFile, err)
 	}
 
 	return recs, nil
@@ -177,6 +185,16 @@ func parseOpenNGC(input io.Reader) ([]targetRecord, error) {
 	col := make(map[string]int)
 	for i, h := range header {
 		col[h] = i
+	}
+
+	// A header without a column read below is not an OpenNGC file. Looked up
+	// anyway, a missing column reads as index 0, so an error page served in
+	// place of the CSV parsed as an empty catalog, and was kept as one, and a
+	// column renamed upstream would silently read the first field (#1014).
+	for _, name := range []string{"Name", "Type", "RA", "Dec", "M", "Common names", "Identifiers"} {
+		if _, ok := col[name]; !ok {
+			return nil, fmt.Errorf("%w: %q", errMissingColumn, name)
+		}
 	}
 
 	var records []targetRecord

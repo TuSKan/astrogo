@@ -119,21 +119,25 @@ func Open(ctx context.Context, v Vision) (magnitude.Passband, error) {
 		return magnitude.Passband{}, err
 	}
 
-	fsys, key, err := remote.GetFile(ctx, remote.CIELuminosity, name)
-	if err != nil {
+	var band magnitude.Passband
+
+	// Parsed through remote.WithRead, so a cached curve that does not parse is
+	// replaced rather than served to every later call (#1014).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("%w: open %s: %w", ErrCurve, key, err)
+		}
+
+		defer func() { _ = r.Close() }()
+
+		band, err = Parse(r)
+
+		return err
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.CIELuminosity, name, remote.WithRead(read)); err != nil {
 		return magnitude.Passband{}, fmt.Errorf("%w: fetch %s: %w", ErrCurve, name, err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return magnitude.Passband{}, fmt.Errorf("%w: open %s: %w", ErrCurve, key, err)
-	}
-
-	defer func() { _ = r.Close() }()
-
-	band, err := Parse(r)
-	if err != nil {
-		return magnitude.Passband{}, err
 	}
 
 	band.Name = "CIE " + v.String()

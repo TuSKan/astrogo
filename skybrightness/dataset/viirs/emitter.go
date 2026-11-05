@@ -253,42 +253,42 @@ func emitterFor(at *coord.Geodetic, radiance float64, scale []float64, region Re
 }
 
 // extractTIFF unpacks the single GeoTIFF entry from a downloaded archive
-// into the same fsys, and returns its key. An already-extracted object is
-// reused.
-func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year int) (string, error) {
+// into the same fsys, and returns its key, and whether it was extracted by
+// this call. An already-extracted object is reused.
+func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year int) (key string, extracted bool, err error) {
 	tiffKey := entryName(year)
 
 	// fs.ErrNotExist rather than a remote-specific predicate: this is the
 	// standard library's own vocabulary and works identically against every
 	// backend, which is what replaced remote.IsNotFound.
 	if _, err := fs.Stat(fsys, tiffKey); err == nil {
-		return tiffKey, nil
+		return tiffKey, false, nil
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return "", fmt.Errorf("viirs: check for %s: %w", tiffKey, err)
+		return "", false, fmt.Errorf("viirs: check for %s: %w", tiffKey, err)
 	}
 
 	at, err := remote.Open(ctx, fsys, archiveKey)
 	if err != nil {
-		return "", fmt.Errorf("viirs: open archive: %w", err)
+		return "", false, fmt.Errorf("viirs: open archive: %w", err)
 	}
 	defer closeQuietly(at)
 
 	info, err := at.Stat()
 	if err != nil {
-		return "", fmt.Errorf("viirs: stat archive: %w", err)
+		return "", false, fmt.Errorf("viirs: stat archive: %w", err)
 	}
 
 	entry, closeEntry, err := openZIPEntry(at, info.Size(), tiffKey)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer closeEntry()
 
 	if err := remote.WriteFile(ctx, fsys, tiffKey, entry); err != nil {
-		return "", fmt.Errorf("viirs: extract %s: %w", tiffKey, err)
+		return "", false, fmt.Errorf("viirs: extract %s: %w", tiffKey, err)
 	}
 
-	return tiffKey, nil
+	return tiffKey, true, nil
 }
 
 // closeQuietly closes c, discarding an error that a caller in a failure path

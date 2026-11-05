@@ -71,7 +71,7 @@ func cached(t *testing.T, fsys remote.FS, key string) bool {
 
 // A cached kernel that does not parse is removed when Cache reports it. Kept,
 // it failed every later call the same way, though the doc promised
-// "auto-healing" (#1010).
+// "auto-healing" (#1010). Here the source has no kernel to replace it with.
 func TestCacheRemovesACorruptCachedKernel(t *testing.T) {
 	cache, key, _ := lskCacheAndSource(t)
 	write(t, cache, key, corruptLSK)
@@ -85,20 +85,16 @@ func TestCacheRemovesACorruptCachedKernel(t *testing.T) {
 	}
 }
 
-// And so the next call heals: with the corrupt copy gone, it fetches the
-// source's and succeeds.
-func TestCacheFetchesAFreshKernelAfterACorruptOne(t *testing.T) {
+// Where the source has a good kernel, the same call replaces the corrupt copy
+// with it and succeeds (#1014).
+func TestCacheReplacesACorruptCachedKernel(t *testing.T) {
 	cache, key, src := lskCacheAndSource(t)
 	write(t, cache, key, corruptLSK)
 	write(t, src, healKernel, minimalLSK)
 
-	if _, err := lsk.Cache(context.Background(), healKernel); !errors.Is(err, lsk.ErrNoLeapseconds) {
-		t.Fatalf("first Cache, over the corrupt copy: err %v, want ErrNoLeapseconds", err)
-	}
-
 	r, err := lsk.Cache(context.Background(), healKernel)
 	if err != nil {
-		t.Fatalf("second Cache, with a valid source: %v", err)
+		t.Fatalf("Cache over %s, with a valid source: %v", corruptDesc, err)
 	}
 
 	t.Cleanup(func() { _ = r.Close() })
@@ -108,17 +104,21 @@ func TestCacheFetchesAFreshKernelAfterACorruptOne(t *testing.T) {
 	}
 }
 
-// A download is parsed before it is cached: a corrupt one is refused and
-// never lands in the cache to fail later calls.
+// A download that does not parse never lands in the cache to fail later calls,
+// and while the source still serves it, it is not downloaded again (#1014).
 func TestCacheRefusesACorruptDownload(t *testing.T) {
 	cache, key, src := lskCacheAndSource(t)
 	write(t, src, healKernel, corruptLSK)
 
-	if _, err := lsk.Cache(context.Background(), healKernel); err == nil {
-		t.Fatalf("Cache with a source serving %s: no error", corruptDesc)
+	if _, err := lsk.Cache(context.Background(), healKernel); !errors.Is(err, lsk.ErrNoLeapseconds) {
+		t.Fatalf("Cache with a source serving %s: err %v, want ErrNoLeapseconds", corruptDesc, err)
 	}
 
 	if cached(t, cache, key) {
 		t.Error("a corrupt download was cached")
+	}
+
+	if _, err := lsk.Cache(context.Background(), healKernel); !errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("second Cache, source unchanged: err %v, want remote.ErrRejectedSource", err)
 	}
 }

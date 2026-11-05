@@ -96,33 +96,58 @@ func AOD550(ctx context.Context, site *coord.Geodetic, when time.GoTime) (float6
 		return 0, fmt.Errorf("%w: needs a site", ErrAOD)
 	}
 
-	bucket, key, err := remote.GetFile(ctx, remote.CopernicusEODATA, AODKey(when))
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w\n\n%s", ErrAOD, err, RegistrationAdvice)
-	}
-
-	f, err := Open(ctx, bucket, key)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrAOD, err)
-	}
-
-	defer func() { _ = f.Close() }()
-
-	v, err := f.Var(AODVariable)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrAOD, err)
-	}
-
-	lat, lon, err := gridIndex(f.Dims(), site)
-	if err != nil {
+	// The site is the caller's to fix, and is checked before anything is
+	// fetched. Found inside the read below, its error would condemn the file.
+	if err := checkSite(site); err != nil {
 		return 0, err
 	}
 
-	// One time step per file, and this variable has no vertical level: the
-	// column is what an optical depth already is.
-	aod, err := v.At(0, 0, lat, lon)
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrAOD, err)
+	var (
+		aod      float64
+		lat, lon int
+		read     bool
+	)
+
+	// Read through remote.WithRead, so a cached file that does not open, or
+	// lacks the variable, is replaced rather than served to every later call
+	// (#1014). A value that is not an optical depth is checked after: it
+	// belongs to one cell, not to the file.
+	readFile := func(bucket remote.FS, key string) error {
+		read = true
+
+		f, err := Open(ctx, bucket, key)
+		if err != nil {
+			return err
+		}
+
+		defer func() { _ = f.Close() }()
+
+		v, err := f.Var(AODVariable)
+		if err != nil {
+			return err
+		}
+
+		if lat, lon, err = gridIndex(f.Dims(), site); err != nil {
+			return err
+		}
+
+		// One time step per file, and this variable has no vertical level: the
+		// column is what an optical depth already is.
+		aod, err = v.At(0, 0, lat, lon)
+
+		return err
+	}
+
+	key := AODKey(when)
+
+	if _, _, err := remote.GetFile(ctx, remote.CopernicusEODATA, key, remote.WithRead(readFile)); err != nil {
+		switch {
+		case read, errors.Is(err, remote.ErrRejectedSource):
+			// The file's own failure, which no credential fixes.
+			return 0, fmt.Errorf("%w: %s: %w", ErrAOD, key, err)
+		default:
+			return 0, fmt.Errorf("%w: %w\n\n%s", ErrAOD, err, RegistrationAdvice)
+		}
 	}
 
 	if aod < 0 || math.IsNaN(aod) || math.IsInf(aod, 0) {
@@ -184,14 +209,8 @@ func gridIndex(dims map[string]int, site *coord.Geodetic) (lat, lon int, err err
 			"latitude-longitude grid", ErrAOD, dims)
 	}
 
-	// A non-finite site has no cell. Converting its NaN to an int gives
-	// MinInt64 on amd64, which reaches Var.At as longitude -8 on the 0.4° grid,
-	// and 0 on arm64, which silently reads the cell at the North Pole and
-	// Greenwich (#979).
-	if siteLat, siteLon := site.Lat().Radians(), site.Lon().Radians(); math.IsNaN(siteLat) || math.IsInf(siteLat, 0) ||
-		math.IsNaN(siteLon) || math.IsInf(siteLon, 0) {
-		return 0, 0, fmt.Errorf("%w: the site's latitude %v and longitude %v must be finite",
-			ErrAOD, site.Lat().Degrees(), site.Lon().Degrees())
+	if err := checkSite(site); err != nil {
+		return 0, 0, err
 	}
 
 	// Latitude runs from +90 to -90 inclusive, so nLat points span 180
@@ -212,4 +231,19 @@ func gridIndex(dims map[string]int, site *coord.Geodetic) (lat, lon int, err err
 	lon = int(math.Round(deg/lonStep)) % nLon
 
 	return lat, lon, nil
+}
+
+// checkSite refuses a site that has no cell on any grid.
+//
+// A non-finite site has no cell. Converting its NaN to an int gives MinInt64 on
+// amd64, which reaches Var.At as longitude -8 on the 0.4° grid, and 0 on arm64,
+// which silently reads the cell at the North Pole and Greenwich (#979).
+func checkSite(site *coord.Geodetic) error {
+	if lat, lon := site.Lat().Radians(), site.Lon().Radians(); math.IsNaN(lat) || math.IsInf(lat, 0) ||
+		math.IsNaN(lon) || math.IsInf(lon, 0) {
+		return fmt.Errorf("%w: the site's latitude %v and longitude %v must be finite",
+			ErrAOD, site.Lat().Degrees(), site.Lon().Degrees())
+	}
+
+	return nil
 }

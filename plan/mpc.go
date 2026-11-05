@@ -142,21 +142,27 @@ func MPCObservatories(ctx context.Context) ([]MPCObservatory, error) {
 		return mpcCache.list, nil
 	}
 
-	fsys, key, err := remote.GetFile(ctx, remote.MPCObsCodes, mpcObsCodesFile)
-	if err != nil {
+	var list []MPCObservatory
+
+	// Parsed through remote.WithRead, so a cached list that does not parse is
+	// replaced rather than served to every later call (#1014).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("plan: open MPC observatory codes: %w", err)
+		}
+
+		defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
+
+		if list, err = parseMPCObsCodes(r); err != nil {
+			return fmt.Errorf("plan: parse MPC observatory codes: %w", err)
+		}
+
+		return nil
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.MPCObsCodes, mpcObsCodesFile, remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("plan: fetch MPC observatory codes: %w", err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("plan: open MPC observatory codes: %w", err)
-	}
-
-	defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
-
-	list, err := parseMPCObsCodes(r)
-	if err != nil {
-		return nil, fmt.Errorf("plan: parse MPC observatory codes: %w", err)
 	}
 
 	mpcCache.list = list

@@ -67,8 +67,8 @@ func synthFixture(tb testing.TB) (remote.FS, string) {
 		tb.Fatalf("CreateForWrite: %v", err)
 	}
 
-	writeDimScale(tb, fw, "/longitude", hdf5.Float32, []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
-	writeDimScale(tb, fw, "/latitude", hdf5.Float32, []float32{90, 0, -90}, 1, "degrees_north", "latitude")
+	writeDimScale(tb, fw, "/longitude", []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
+	writeDimScale(tb, fw, "/latitude", []float32{90, 0, -90}, 1, "degrees_north", "latitude")
 	writeLevelDim(tb, fw, []int32{1, 2}, 2)
 	writeTimeDim(tb, fw, []int32{1078200}, 3)
 
@@ -151,12 +151,10 @@ func synthFixture(tb testing.TB) (remote.FS, string) {
 	return bucket, key
 }
 
-func writeDimScale(tb testing.TB, fw *hdf5.FileWriter, name string, dtype hdf5.Datatype, data any, dimid int32, units, longName string) {
+func writeDimScale(tb testing.TB, fw *hdf5.FileWriter, name string, data []float32, dimid int32, units, longName string) {
 	tb.Helper()
 
-	n := reflectLen(tb, data)
-
-	ds, err := fw.CreateDataset(name, dtype, []uint64{uint64(n)})
+	ds, err := fw.CreateDataset(name, hdf5.Float32, []uint64{uint64(len(data))})
 	if err != nil {
 		tb.Fatalf("CreateDataset %s: %v", name, err)
 	}
@@ -231,21 +229,6 @@ func mustWriteAttr(tb testing.TB, ds *hdf5.DatasetWriter, name string, value any
 
 	if err := ds.WriteAttribute(name, value); err != nil {
 		tb.Fatalf("WriteAttribute %s: %v", name, err)
-	}
-}
-
-func reflectLen(tb testing.TB, data any) int {
-	tb.Helper()
-
-	switch d := data.(type) {
-	case []float32:
-		return len(d)
-	case []int32:
-		return len(d)
-	default:
-		tb.Fatalf("reflectLen: unsupported type %T", data)
-
-		return 0
 	}
 }
 
