@@ -104,14 +104,14 @@ func iterate(t *testing.T) (rows int, errs []error) {
 		t.Fatalf("Open: %v", err)
 	}
 
+	// Every error is kept and counted by the caller, which fails on any it
+	// does not expect.
 	for _, err := range seq {
-		if err != nil {
+		if err == nil {
+			rows++
+		} else {
 			errs = append(errs, err)
-
-			continue
 		}
-
-		rows++
 	}
 
 	return rows, errs

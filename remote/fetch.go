@@ -66,7 +66,7 @@ func WithValidate(f func(io.Reader) error) ReadOption {
 //     difference that matters.
 //
 // The record is this client's and is never written to the cache. A rejection
-// is the judgement of the code that made it, and a cached one would outlive
+// is the judgment of the code that made it, and a cached one would outlive
 // that code: an astrogo release that learns a source's new format would still
 // be refused the file. A new process, or a new client, fetches again.
 //
