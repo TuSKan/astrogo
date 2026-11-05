@@ -32,6 +32,13 @@ var (
 	// write failed after the consent checks passed.
 	ErrDownloadFailed = errors.New("remote: download failed")
 
+	// ErrRejectedSource is returned by GetFile when the source still serves a
+	// version whose copy this client already refused, through [WithRead] or
+	// [WithValidate]. Nothing was downloaded, since the same bytes would fail
+	// the same way. The wrapped message carries the earlier failure. A new
+	// version at the source, or a new client, fetches again.
+	ErrRejectedSource = errors.New("remote: source still serves a refused copy")
+
 	// ErrRetriable marks a failure that was retried and failed anyway.
 	//
 	// remote/api's Client wraps it around the final *api.HTTPError whenever the

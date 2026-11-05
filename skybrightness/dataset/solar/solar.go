@@ -75,20 +75,24 @@ type Spectrum struct {
 // [remote.EnableDownloads] with [remote.CALSPEC] first, or this fails with
 // [remote.ErrDownloadDenied]. The file is a few megabytes.
 func Open(ctx context.Context) (*Spectrum, error) {
-	fsys, key, err := remote.GetFile(ctx, remote.CALSPEC, CALSPECSolarReference)
-	if err != nil {
+	var s *Spectrum
+
+	// Parsed through remote.WithRead, so a cached copy that does not parse is
+	// replaced rather than served to every later call (#1014).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("solar: open %s: %w", key, err)
+		}
+		defer func() { _ = r.Close() }()
+
+		s, err = Parse(r)
+
+		return err
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.CALSPEC, CALSPECSolarReference, remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("solar: fetch %s: %w", CALSPECSolarReference, err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("solar: open %s: %w", key, err)
-	}
-	defer func() { _ = r.Close() }()
-
-	s, err := Parse(r)
-	if err != nil {
-		return nil, err
 	}
 
 	s.Source = CALSPECSolarReference

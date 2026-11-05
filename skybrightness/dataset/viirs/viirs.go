@@ -185,16 +185,68 @@ func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 	// NewestYear useless the moment upstream published past the compiled-in
 	// constant. A year upstream does not carry surfaces as a fetch error,
 	// which is accurate and self-updating.
-	fsys, key, err := remote.GetFile(ctx, remote.VIIRSAnnual, archiveName(year))
-	if err != nil {
+	//
+	// Opened through remote.WithRead, so an archive that does not yield a
+	// composite is replaced rather than served to every later call, and one
+	// that upstream serves that way is not downloaded again while upstream
+	// still does (#1014): at this size, that is a gigabyte per call.
+	var (
+		at     remote.File
+		reader *raster.Reader
+	)
+
+	read := func(fsys remote.FS, key string) error {
+		var err error
+
+		at, reader, err = openComposite(ctx, fsys, key, year)
+
+		return err
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.VIIRSAnnual, archiveName(year), remote.WithRead(read)); err != nil {
 		return nil, nil, fmt.Errorf("viirs: fetch %d composite: %w", year, err)
 	}
 
-	tiffKey, err := extractTIFF(ctx, fsys, key, year)
+	return &Raster{src: reader, year: year}, at, nil
+}
+
+// openComposite opens the composite in the archive at archiveKey, extracting
+// its TIFF first unless an earlier call did.
+//
+// The TIFF is derived from the archive, so one that does not decode is removed
+// either way. One extracted just now came from this archive, which is then
+// what the error is about. One an earlier call extracted may instead have been
+// damaged where it sat, so it is extracted again from this archive before the
+// archive, a gigabyte to download again, is blamed.
+func openComposite(ctx context.Context, fsys remote.FS, archiveKey string, year int) (remote.File, *raster.Reader, error) {
+	tiffKey, extracted, err := extractTIFF(ctx, fsys, archiveKey, year)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	at, reader, err := openTIFF(ctx, fsys, tiffKey)
+	if err == nil {
+		return at, reader, nil
+	}
+
+	if rmErr := remote.RemoveFile(ctx, fsys, tiffKey); rmErr != nil || extracted {
+		return nil, nil, errors.Join(err, rmErr)
+	}
+
+	if tiffKey, _, err = extractTIFF(ctx, fsys, archiveKey, year); err != nil {
+		return nil, nil, err
+	}
+
+	if at, reader, err = openTIFF(ctx, fsys, tiffKey); err != nil {
+		return nil, nil, errors.Join(err, remote.RemoveFile(ctx, fsys, tiffKey))
+	}
+
+	return at, reader, nil
+}
+
+// openTIFF opens an extracted composite for random access and decodes its
+// header, closing it again when the header does not decode.
+func openTIFF(ctx context.Context, fsys remote.FS, tiffKey string) (remote.File, *raster.Reader, error) {
 	at, err := remote.Open(ctx, fsys, tiffKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("viirs: open %s: %w", tiffKey, err)
@@ -207,7 +259,7 @@ func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 		return nil, nil, fmt.Errorf("viirs: decode %s: %w", tiffKey, err)
 	}
 
-	return &Raster{src: reader, year: year}, at, nil
+	return at, reader, nil
 }
 
 // NewestYear reports the newest annual composite upstream actually

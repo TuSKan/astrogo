@@ -17,6 +17,7 @@ import (
 type readConfig struct {
 	cacheName string
 	validate  func(io.Reader) error
+	read      func(fsys FS, key string) error
 	timeout   time.Duration
 	progress  func(downloaded, total int64)
 }
@@ -34,8 +35,46 @@ func WithCacheName(key string) ReadOption {
 // promoted into the cache, so a corrupt fetch is never cached and never
 // reused. f is not called for a cache hit. It reads a stream, not a
 // buffer: a multi-GB kernel must not have to fit in memory to be checked.
+//
+// The source version f refused is not downloaded again by this client while
+// the source still serves it: GetFile fails with [ErrRejectedSource] after
+// asking the source only for its metadata. See [WithRead] for why the record
+// lasts as long as the client and no longer.
 func WithValidate(f func(io.Reader) error) ReadOption {
 	return func(c *readConfig) { c.validate = f }
+}
+
+// WithRead hands the copy GetFile found or fetched to read before GetFile
+// returns, and takes an error from read to mean the copy is unusable. read is
+// the caller's own use of the file, usually its parser; whatever it builds, it
+// keeps by closing over a variable. GetFile returns read's error, wrapped
+// only when GetFile has more to say.
+//
+// A copy that read refuses is never left in the cache, where every later call
+// would be handed it again. What happens next depends on where it came from:
+//
+//   - A copy that was already cached may have been damaged where it sits, or
+//     left by something other than GetFile. It is removed and fetched once
+//     more in the same call, so a corrupt cache heals without the caller
+//     noticing.
+//   - A copy this call downloaded is what the source serves. It is removed,
+//     and its source version (the ETag its source reported) is recorded:
+//     until the source serves a different version, GetFile fails with
+//     [ErrRejectedSource] after asking only for metadata, instead of
+//     downloading the same bytes to fail the same way. One download per
+//     source version, not one per call, which for a gigabyte archive is the
+//     difference that matters.
+//
+// The record is this client's and is never written to the cache. A rejection
+// is the judgement of the code that made it, and a cached one would outlive
+// that code: an astrogo release that learns a source's new format would still
+// be refused the file. A new process, or a new client, fetches again.
+//
+// A source that reports no validator at all cannot be recognized again, so
+// such a version is fetched again on every call that rejects it. A read that
+// fails because ctx ended says nothing about the copy, which is kept.
+func WithRead(read func(fsys FS, key string) error) ReadOption {
+	return func(c *readConfig) { c.read = read }
 }
 
 // WithDownloadTimeout overrides Endpoint.DownloadTimeout for one call.
@@ -71,9 +110,100 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 // the package-level [GetFile]; the consent, offline and URL decisions it makes
 // are this client's, and the cache it fills is this client's.
 func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
+	var cfg readConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	fsys, key, got, err := c.getFile(ctx, id, name, cfg)
+	if err != nil || cfg.read == nil {
+		return fsys, key, err
+	}
+
+	return c.readCopy(ctx, id, name, cfg, fsys, key, got)
+}
+
+// fetched describes the download one getFile call made: none, or one of the
+// source version named by sourceETag.
+type fetched struct {
+	ok         bool
+	sourceETag string
+}
+
+// readCopy hands the copy getFile returned to cfg.read, and deals with one that
+// read refuses as [WithRead] documents: a copy that was already cached is
+// removed and fetched once more, and a copy just downloaded is removed and its
+// source version rejected.
+func (c *Client) readCopy(ctx context.Context, id EndpointID, name string, cfg readConfig,
+	fsys FS, key string, got fetched,
+) (FS, string, error) {
+	readErr := cfg.read(fsys, key)
+
+	switch {
+	case readErr == nil:
+		return fsys, key, nil
+	case ctx.Err() != nil:
+		return nil, "", readErr
+	}
+
+	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
+		return nil, "", errors.Join(readErr, err)
+	}
+
+	if got.ok {
+		return nil, "", readErr
+	}
+
+	fsys, key, got, err := c.getFile(ctx, id, name, cfg)
+	if err != nil {
+		return nil, "", fmt.Errorf("%w; fetching a fresh copy: %w", readErr, err)
+	}
+
+	readErr = cfg.read(fsys, key)
+
+	switch {
+	case readErr == nil:
+		return fsys, key, nil
+	case ctx.Err() != nil:
+		return nil, "", readErr
+	}
+
+	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
+		return nil, "", errors.Join(readErr, err)
+	}
+
+	return nil, "", readErr
+}
+
+// discard removes a copy cfg.read refused, with the source ETag recorded beside
+// it, first rejecting its source version when this call is the one that
+// downloaded it.
+func (c *Client) discard(ctx context.Context, fsys FS, key string, got fetched, readErr error) error {
+	if got.ok {
+		c.reject(key, got.sourceETag, readErr)
+	}
+
+	if err := file.Remove(ctx, fsys, key); err != nil {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return err
+	}
+
+	// Only a Mutable endpoint's copy has one, and a leftover would be inert,
+	// but nothing of a refused copy is left behind.
+	if err := file.Remove(ctx, fsys, key+file.SourceETagSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return err
+	}
+
+	return nil
+}
+
+// getFile is GetFile without cfg.read: it finds the object in the cache or
+// fetches it, and reports which.
+func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg readConfig) (fsys FS, key string, got fetched, err error) {
 	ep, ok := c.Lookup(id)
 	if !ok {
-		return nil, "", fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
+		return nil, "", fetched{}, fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
 	// URL is the offline/Disable gate. A disabled endpoint fails here,
@@ -89,16 +219,11 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 
 	offline := errors.Is(gateErr, ErrOffline) && ep.Enabled
 	if gateErr != nil && !offline {
-		return nil, "", gateErr
+		return nil, "", fetched{}, gateErr
 	}
 
 	if !ep.Kind.cacheable() {
-		return nil, "", fmt.Errorf("%w: %q", ErrNotFileEndpoint, id)
-	}
-
-	var cfg readConfig
-	for _, opt := range opts {
-		opt(&cfg)
+		return nil, "", fetched{}, fmt.Errorf("%w: %q", ErrNotFileEndpoint, id)
 	}
 
 	cacheName := cfg.cacheName
@@ -107,12 +232,12 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	}
 
 	if cacheName == "" {
-		return nil, "", fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
+		return nil, "", fetched{}, fmt.Errorf("%w: endpoint %q", ErrCacheNameRequired, id)
 	}
 
 	cacheFS, prefix, err := c.CacheDir(ctx, id)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fetched{}, err
 	}
 
 	cacheKey := prefix + cacheName
@@ -125,12 +250,12 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// saying there is none to ask.
 	if !ep.Mutable || offline {
 		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
-			return cacheFS, cacheKey, nil
+			return cacheFS, cacheKey, fetched{}, nil
 		}
 	}
 
 	if offline {
-		return nil, "", gateErr
+		return nil, "", fetched{}, gateErr
 	}
 
 	// Consent first, before any request, routed through CheckDownload so a
@@ -153,19 +278,19 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	// fetchInto checks again, on the size the source reports.
 	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
 		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
-			return cacheFS, cacheKey, nil
+			return cacheFS, cacheKey, fetched{}, nil
 		}
 
-		return nil, "", err
+		return nil, "", fetched{}, err
 	}
 
 	srcFS, err := OpenFS(ctx, ep.URL)
 	if err != nil {
-		return nil, "", fmt.Errorf("remote: open source %s: %w", ep.URL, err)
+		return nil, "", fetched{}, fmt.Errorf("remote: open source %s: %w", ep.URL, err)
 	}
 
 	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
-		return cacheFS, cacheKey, nil
+		return cacheFS, cacheKey, fetched{}, nil
 	}
 
 	// The lock spans the "still missing? then download" decision, not just
@@ -182,17 +307,18 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 	release, err := file.AcquireLock(ctx, cacheFS, cacheKey, 2*timeout)
 	if err != nil {
 		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-		return nil, "", err
+		return nil, "", fetched{}, err
 	}
 
 	defer release()
 
 	// Whoever held the lock before us may have filled the entry already.
 	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
-		return cacheFS, cacheKey, nil
+		return cacheFS, cacheKey, fetched{}, nil
 	}
 
-	if err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg); err != nil {
+	sourceETag, err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg)
+	if err != nil {
 		// A failed fetch is not the same as a missing file, and the difference
 		// used to be a whole class of CI failure.
 		//
@@ -216,13 +342,13 @@ func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts .
 		// a fetch that failed for any other reason still finds nothing and
 		// still fails.
 		if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
-			return cacheFS, cacheKey, nil
+			return cacheFS, cacheKey, fetched{}, nil
 		}
 
-		return nil, "", fmt.Errorf("remote: fetch %s: %w", name, err)
+		return nil, "", fetched{}, fmt.Errorf("remote: fetch %s: %w", name, err)
 	}
 
-	return cacheFS, cacheKey, nil
+	return cacheFS, cacheKey, fetched{ok: true, sourceETag: sourceETag}, nil
 }
 
 // Exists reports whether endpoint id currently serves an object at name.
@@ -316,14 +442,15 @@ func unchanged(ctx context.Context, srcFS, cacheFS FS, name, cacheKey string) bo
 
 // fetchInto performs the transfer from srcFS/name into cacheFS/cacheKey. It
 // owns all policy — consent, timeout, progress, resume, validation — for every
-// backend uniformly; a filesystem only moves bytes.
+// backend uniformly; a filesystem only moves bytes. It returns the source
+// version it fetched, the ETag the source reported for it.
 func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcFS, cacheFS FS,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
-) error {
+) (sourceETag string, err error) {
 	// Consent is checked twice: once on the registered estimate before any
 	// request, and again below on the size the source actually reports.
 	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
-		return err
+		return "", err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -335,30 +462,35 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 	// here — before any byte moves — rather than at ctrl-C.
 	bound, err := file.RequireContext(ctx, srcFS)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+		return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
 	info, err := fs.Stat(bound, name)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+		return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	sourceETag := file.ETag(info)
+	sourceETag = file.ETag(info)
+
+	// The same bytes would fail the same way, so the body is not fetched.
+	if r, rejected := c.rejection(cacheKey, sourceETag); rejected {
+		return "", fmt.Errorf("%w: %s, at source version %s, failed: %s", ErrRejectedSource, name, sourceETag, r.cause)
+	}
 
 	if err := c.CheckDownload(id, name, info.Size()); err != nil {
-		return err
+		return "", err
 	}
 
 	offset, err := file.ResumePoint(ctx, cacheFS, cacheKey, sourceETag)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+		return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
 	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", info.Size())
 
 	f, err := bound.Open(name)
 	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+		return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
 	defer func() { _ = f.Close() }()
@@ -371,11 +503,11 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 	if offset > 0 {
 		seeker, ok := f.(io.Seeker)
 		if !ok {
-			return fmt.Errorf("%w: %s: cannot resume, source is not seekable", ErrDownloadFailed, name)
+			return "", fmt.Errorf("%w: %s: cannot resume, source is not seekable", ErrDownloadFailed, name)
 		}
 
 		if _, err := seeker.Seek(offset, io.SeekStart); err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
+			return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 		}
 	}
 
@@ -384,21 +516,44 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 		body = &progressReader{r: f, total: info.Size(), read: offset, onProgress: cfg.progress}
 	}
 
-	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, cfg.validate); err != nil {
-		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-		return err
+	// Only the validator's own refusal rejects the version. A transfer or a
+	// write that failed says nothing about what the source serves.
+	validate, refused := cfg.validate, error(nil)
+	if validate != nil {
+		validate = func(r io.Reader) error {
+			refused = cfg.validate(r)
+
+			return refused
+		}
 	}
+
+	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, validate); err != nil {
+		if refused != nil && ctx.Err() == nil {
+			c.reject(cacheKey, sourceETag, refused)
+		}
+
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return "", err
+	}
+
+	// A version GetFile could fetch is not one it rejected: rejection stops
+	// the fetch above. Whatever was rejected under this key is gone upstream.
+	c.forgetRejection(cacheKey)
 
 	// Only a Mutable endpoint keeps its ETag. unchanged() is the sole reader of
 	// one, and it runs only for those — so an immutable kernel, which is the
 	// multi-gigabyte case and the one a user is most likely to go looking at in
 	// their cache directory, gets the object and nothing beside it.
 	if !ep.Mutable {
-		return nil
+		return sourceETag, nil
 	}
 
-	//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-	return file.WriteETag(ctx, cacheFS, cacheKey, sourceETag)
+	if err := file.WriteETag(ctx, cacheFS, cacheKey, sourceETag); err != nil {
+		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
+		return "", err
+	}
+
+	return sourceETag, nil
 }
 
 // progressReader reports the running byte count after every Read that
