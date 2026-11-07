@@ -278,7 +278,9 @@ func TestVMagOnlyWhereTheColorRelationHolds(t *testing.T) {
 // the nearest sources rather than whichever the archive reaches first (#605).
 // Its live counterpart is TestGaiaConeSearchReturnsTheNearestSources.
 func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
-	var adql string
+	// Recorded, not a plain string: a retried request can leave the first
+	// attempt's handler writing after the test reads it (#1012).
+	var query testutil.Recorded[string]
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -286,7 +288,7 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 			return
 		}
 
-		adql = r.PostFormValue("QUERY")
+		query.Set(r.PostFormValue("QUERY"))
 
 		w.Header().Set("Content-Type", "text/csv")
 		_, _ = fmt.Fprint(w, "source_id,ra,dec\n1,83.8221,-5.3911\n")
@@ -299,6 +301,8 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 
 	req := resolve.ConeRequest{Center: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), Radius: angle.Deg(0.2), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	adql := query.Get()
 
 	for _, want := range []string{"ORDER BY dist ASC", "TOP 5 "} {
 		if !strings.Contains(adql, want) {
@@ -325,7 +329,9 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 // row, 4472832130942575872 at (269.4485025254, 4.7394200511); unmoved, the
 // search would be centered 166" away.
 func TestGaiaConeCenterIsMovedToJ2016(t *testing.T) {
-	var adql string
+	// Recorded, not a plain string: a retried request can leave the first
+	// attempt's handler writing after the test reads it (#1012).
+	var query testutil.Recorded[string]
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -333,7 +339,7 @@ func TestGaiaConeCenterIsMovedToJ2016(t *testing.T) {
 			return
 		}
 
-		adql = r.PostFormValue("QUERY")
+		query.Set(r.PostFormValue("QUERY"))
 
 		w.Header().Set("Content-Type", "text/csv")
 		_, _ = fmt.Fprint(w, "source_id,ra,dec\n")
@@ -349,6 +355,8 @@ func TestGaiaConeCenterIsMovedToJ2016(t *testing.T) {
 
 	req := resolve.ConeRequest{Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	adql := query.Get()
 
 	m := regexp.MustCompile(`CIRCLE\('ICRS', ([-0-9.]+), ([-0-9.]+),`).FindStringSubmatch(adql)
 	if m == nil {

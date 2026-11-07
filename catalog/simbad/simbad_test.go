@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -102,10 +103,11 @@ func TestResolveMock(t *testing.T) {
 }
 
 func TestRetryTimeout(t *testing.T) {
-	attempts := 0
+	// Atomic: a retried request can overlap the attempt it retries (#1012).
+	var attempts atomic.Int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		attempts++
+		attempts.Add(1)
 
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
@@ -129,8 +131,8 @@ func TestRetryTimeout(t *testing.T) {
 
 	// More than one: this asked for "multiple attempts" but checked for any,
 	// and so passed while a POST was never retried (#845).
-	if attempts < 2 {
-		t.Errorf("the 429 was sent %d time(s), want it retried", attempts)
+	if n := attempts.Load(); n < 2 {
+		t.Errorf("the 429 was sent %d time(s), want it retried", n)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -223,7 +224,7 @@ func TestBrightConstraintExcludesTheDistantBodies(t *testing.T) {
 // perihelionArchive serves the SBDB Query API with the asteroid rows given,
 // each a name, H and q, ignoring the constraint as a server that did not
 // apply it would, and honoring the limit. It records the last sb-cdata.
-func perihelionArchive(t *testing.T, rows [][3]string, cdata *string) {
+func perihelionArchive(t *testing.T, rows [][3]string, cdata *testutil.Recorded[string]) {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +236,9 @@ func perihelionArchive(t *testing.T, rows [][3]string, cdata *string) {
 			return
 		}
 
-		*cdata = query.Get("sb-cdata")
+		// Recorded: a retried request can leave an earlier attempt's handler
+		// writing after the test reads (#1012).
+		cdata.Set(query.Get("sb-cdata"))
 
 		limit, err := strconv.Atoi(query.Get("limit"))
 		if err != nil {
@@ -266,7 +269,7 @@ func perihelionArchive(t *testing.T, rows [][3]string, cdata *string) {
 }
 
 func TestSearchBrightKeepsOnlyBodiesThatCouldReach(t *testing.T) {
-	var cdata string
+	var cdata testutil.Recorded[string]
 
 	perihelionArchive(t, [][3]string{
 		{"136199 Eris (2003 UB313)", "-1.26", "38.16"},
@@ -288,15 +291,15 @@ func TestSearchBrightKeepsOnlyBodiesThatCouldReach(t *testing.T) {
 		t.Errorf("candidates %q, want Juno and Iris and not Eris", names)
 	}
 
-	if !strings.Contains(cdata, `"q|LT|`) {
-		t.Errorf("sb-cdata = %s, want a perihelion bound", cdata)
+	if got := cdata.Get(); !strings.Contains(got, `"q|LT|`) {
+		t.Errorf("sb-cdata = %s, want a perihelion bound", got)
 	}
 }
 
 // Whether the list was cut is decided by the rows SBDB sent. A full page of
 // bodies that the exact test then drops still means SBDB had more.
 func TestSearchBrightSaysItWasCutWhenTheExactTestDropsTheRows(t *testing.T) {
-	var cdata string
+	var cdata testutil.Recorded[string]
 
 	rows := make([][3]string, 60)
 	for i := range rows {

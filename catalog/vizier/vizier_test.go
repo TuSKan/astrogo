@@ -252,10 +252,25 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	// request retried after a timeout is counted twice (#981).
 	before := calls.Load()
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, _ error) bool {
+	// The iterator yields a zero target with its error. Dropped, a request
+	// that failed read as a target with every field empty (#1008).
+	var searchErr error
+
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			searchErr = err
+
+			return false
+		}
+
 		defaultTargets = append(defaultTargets, tar)
+
 		return true
 	})
+
+	if searchErr != nil {
+		t.Fatalf("the default-table cone search: %v", searchErr)
+	}
 
 	if calls.Load() == before {
 		t.Fatal("the default-table cone search sent no request")
@@ -263,10 +278,21 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 
 	before = calls.Load()
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, _ error) bool {
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, err error) bool {
+		if err != nil {
+			searchErr = err
+
+			return false
+		}
+
 		hipTargets = append(hipTargets, tar)
+
 		return true
 	})
+
+	if searchErr != nil {
+		t.Fatalf("the HIP cone search: %v", searchErr)
+	}
 
 	if calls.Load() == before {
 		t.Fatal("the HIP cone search sent no request: it collided with the default table's cache entry")
@@ -336,7 +362,9 @@ func redirect(t *testing.T, url string) {
 // the nearest sources rather than whichever the service reaches first (#605).
 // Its live counterpart is TestVizierConeSearchReturnsTheNearestSources.
 func TestVizierConeQueryOrdersByDistance(t *testing.T) {
-	var adql string
+	// Recorded, not a plain string: a retried request can leave the first
+	// attempt's handler writing after the test reads it (#1012).
+	var query testutil.Recorded[string]
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -344,7 +372,7 @@ func TestVizierConeQueryOrdersByDistance(t *testing.T) {
 			return
 		}
 
-		adql = r.PostFormValue("QUERY")
+		query.Set(r.PostFormValue("QUERY"))
 
 		w.Header().Set("Content-Type", "text/csv")
 		_, _ = fmt.Fprint(w, "designation,ra,dec\n1,83.8221,-5.3911\n")
@@ -355,6 +383,8 @@ func TestVizierConeQueryOrdersByDistance(t *testing.T) {
 
 	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), Radius: angle.Deg(5), Limit: 5}
 	New().ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	adql := query.Get()
 
 	for _, want := range []string{"ORDER BY dist ASC", "TOP 5\n"} {
 		if !strings.Contains(adql, want) {
@@ -404,7 +434,9 @@ func TestTableEpochsAreTheirJulianEpochs(t *testing.T) {
 // and lands 0.35" from its own row there, HIP 87937 at (269.45402305,
 // 4.66828815), where unmoved it would be 91" away.
 func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
-	var adql string
+	// Recorded, not a plain string: a retried request can leave the first
+	// attempt's handler writing after the test reads it (#1012).
+	var query testutil.Recorded[string]
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
@@ -412,7 +444,7 @@ func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
 			return
 		}
 
-		adql = r.PostFormValue("QUERY")
+		query.Set(r.PostFormValue("QUERY"))
 
 		w.Header().Set("Content-Type", "text/csv")
 		_, _ = fmt.Fprint(w, "designation,ra,dec\n")
@@ -428,6 +460,8 @@ func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
 
 	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
+
+	adql := query.Get()
 
 	m := regexp.MustCompile(`CIRCLE\('ICRS', ([-0-9.]+), ([-0-9.]+),`).FindStringSubmatch(adql)
 	if m == nil {

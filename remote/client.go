@@ -87,6 +87,15 @@ type Client struct {
 	offline bool
 
 	mu sync.RWMutex
+
+	// rejected holds, per cached object, the source version whose copy a
+	// [WithRead] read or a [WithValidate] check refused, so the same bytes are
+	// not downloaded again to fail the same way. Only in memory, and never
+	// copied by Clone: see [WithRead] for why.
+	//
+	// It has its own lock because its key needs DataDirURL, which takes mu.
+	rejected   map[string]rejection
+	rejectedMu sync.Mutex
 }
 
 // NewClient returns a client with the default policy: online, every endpoint

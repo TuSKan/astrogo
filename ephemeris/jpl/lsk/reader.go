@@ -49,20 +49,38 @@ type Reader struct {
 // remote.EnableDownloads(0, remote.NAIFLSK) (naif0012.tls is only ~5 KB) or
 // pre-seed the file to stay fully offline.
 //
-// It provides an auto-healing mechanism for CI environments by automatically
-// removing corrupt or truncated files.
+// A kernel that does not parse is never left in the cache, through
+// [remote.WithRead]. One cached long before is replaced in the same call where
+// downloads are consented to; one just downloaded (a truncated file, an error
+// page) is what NAIF serves, and is not downloaded again until NAIF serves
+// something else ([remote.ErrRejectedSource]).
+//
+// The doc promised this "auto-healing" before any of it existed: a corrupt
+// cached kernel failed every call until it was deleted by hand, and the file
+// opened for it was not closed (#1010).
 func Cache(ctx context.Context, kernel string) (*Reader, error) {
-	fsys, key, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel))
-	if err != nil {
+	var l *Reader
+
+	read := func(fsys remote.FS, key string) error {
+		ls, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("open %s: %w", key, err)
+		}
+
+		// NewReader keeps the file only when it parses, so it is closed here
+		// before remote removes it.
+		if l, err = NewReader(ls); err != nil {
+			return errors.Join(err, ls.Close())
+		}
+
+		return nil
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.NAIFLSK, kernel, remote.WithCacheName(kernel), remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("jpl: LSK %s: %w", kernel, err)
 	}
 
-	ls, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("jpl: failed to load LSK %s: %w", key, err)
-	}
-
-	return NewReader(ls)
+	return l, nil
 }
 
 // NewReader parses an LSK kernel from the given reader.

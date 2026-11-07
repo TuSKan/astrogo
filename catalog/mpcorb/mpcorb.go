@@ -42,6 +42,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -71,8 +72,18 @@ import (
 // file is opened when iteration starts and closed when it ends, including on
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
+//
+// A copy that cannot be read is not kept (#1014). A download is read in full
+// before it is cached, and one that [Read] cannot finish, or that holds no
+// orbit row at all (an error page served in its place reads as nothing but
+// skipped lines), is refused: its error is this call's, and the MPC's copy is
+// not downloaded again while the MPC still serves it
+// ([remote.ErrRejectedSource]). A cached copy found that way while iterating,
+// damaged where it sat, is removed when its error is yielded, so the next Open
+// fetches a fresh one. A malformed row refuses nothing, for the reason [Read]
+// gives.
 func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], error) {
-	fsys, key, err := remote.GetFile(ctx, remote.MPCORB, name)
+	fsys, key, err := remote.GetFile(ctx, remote.MPCORB, name, remote.WithValidate(readable))
 	if err != nil {
 		return nil, fmt.Errorf("mpcorb: fetch %s: %w", name, err)
 	}
@@ -85,15 +96,71 @@ func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], e
 			return
 		}
 
-		defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
+		rows, unreadable := 0, error(nil)
 
 		for t, err := range Read(r) {
+			if errors.As(err, new(streamError)) {
+				unreadable = err
+
+				break
+			}
+
+			if err == nil {
+				rows++
+			}
+
 			if !yield(t, err) {
+				_ = r.Close()
+
 				return
 			}
 		}
+
+		// Closed before the removal below, which Windows refuses on an open file.
+		_ = r.Close()
+
+		if unreadable == nil && rows == 0 {
+			unreadable = fmt.Errorf("%w: %s", errNoRows, name)
+		}
+
+		if unreadable != nil {
+			yield(resolve.Target{}, errors.Join(unreadable, remote.RemoveFile(ctx, fsys, key)))
+		}
 	}, nil
 }
+
+// errNoRows reports an orbit file with no orbit row in it.
+var errNoRows = errors.New("mpcorb: no orbit rows")
+
+// readable refuses a download that [Read] cannot finish, or that holds no
+// orbit row at all. It reads to the end, since a truncated gzip stream is
+// detected only there.
+func readable(r io.Reader) error {
+	rows := 0
+
+	for _, err := range Read(r) {
+		switch {
+		case errors.As(err, new(streamError)):
+			return err
+		case err == nil:
+			rows++
+		}
+	}
+
+	if rows == 0 {
+		return errNoRows
+	}
+
+	return nil
+}
+
+// streamError is an error that ends [Read]: the stream failed, rather than one
+// row of it. Its message is the error's own.
+type streamError struct{ err error }
+
+func (e streamError) Error() string { return e.err.Error() }
+
+func (e streamError) Unwrap() error { return e.err }
 
 // Read streams the rows of an MPC orbit file, for a caller holding one
 // already — a local copy, an archived snapshot, a file from a source other
@@ -125,7 +192,7 @@ func Read(r io.Reader) iter.Seq2[resolve.Target, error] {
 		if magic, err := br.Peek(2); err == nil && magic[0] == 0x1f && magic[1] == 0x8b {
 			gz, err := gzip.NewReader(br)
 			if err != nil {
-				yield(resolve.Target{}, fmt.Errorf("mpcorb: gzip: %w", err))
+				yield(resolve.Target{}, streamError{fmt.Errorf("mpcorb: gzip: %w", err)})
 
 				return
 			}
@@ -177,7 +244,7 @@ func Read(r io.Reader) iter.Seq2[resolve.Target, error] {
 		}
 
 		if err := sc.Err(); err != nil {
-			yield(resolve.Target{}, fmt.Errorf("mpcorb: read: %w", err))
+			yield(resolve.Target{}, streamError{fmt.Errorf("mpcorb: read: %w", err)})
 		}
 	}
 }

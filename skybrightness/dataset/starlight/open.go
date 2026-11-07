@@ -66,39 +66,42 @@ const TotalStarlightMap = "starmap-o8-BVRI-total.txt.gz"
 // [remote.EnableDownloads] with [remote.GaiaStarMap] first, or this fails with
 // [remote.ErrDownloadDenied].
 func Open(ctx context.Context) (*Map, error) {
-	fsys, key, err := remote.GetFile(ctx, remote.GaiaStarMap, TotalStarlightMap)
-	if err != nil {
+	var m *Map
+
+	// Loaded and checked through remote.WithRead, so a cached map that does
+	// not load, or is not the map its name promises, is replaced rather than
+	// served to every later call (#1014).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("starlight: open %s: %w", key, err)
+		}
+		defer func() { _ = r.Close() }()
+
+		gz, err := gzip.NewReader(r)
+		if err != nil {
+			return fmt.Errorf("starlight: decompress %s: %w", key, err)
+		}
+		defer func() { _ = gz.Close() }()
+
+		if m, err = Load(gz, ICRS); err != nil {
+			return err
+		}
+
+		// The name promises an order and the content has to keep that promise.
+		// A map served under the wrong name is indistinguishable from the right
+		// one at every later call site, and would put the sky at the wrong
+		// resolution without any value looking out of place.
+		if want := pixelsPerOrder(GaiaMapOrder); m.Grid().NumPixels() != want {
+			return fmt.Errorf("%w: %s holds %d pixels, order %d needs %d",
+				ErrNoPublishedMap, TotalStarlightMap, m.Grid().NumPixels(), GaiaMapOrder, want)
+		}
+
+		return m.plausibleSky()
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.GaiaStarMap, TotalStarlightMap, remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("starlight: fetch %s: %w", TotalStarlightMap, err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("starlight: open %s: %w", key, err)
-	}
-	defer func() { _ = r.Close() }()
-
-	gz, err := gzip.NewReader(r)
-	if err != nil {
-		return nil, fmt.Errorf("starlight: decompress %s: %w", key, err)
-	}
-	defer func() { _ = gz.Close() }()
-
-	m, err := Load(gz, ICRS)
-	if err != nil {
-		return nil, err
-	}
-
-	// The name promises an order and the content has to keep that promise. A
-	// map served under the wrong name is indistinguishable from the right one
-	// at every later call site, and would put the sky at the wrong resolution
-	// without any value looking out of place.
-	if want := pixelsPerOrder(GaiaMapOrder); m.Grid().NumPixels() != want {
-		return nil, fmt.Errorf("%w: %s holds %d pixels, order %d needs %d",
-			ErrNoPublishedMap, TotalStarlightMap, m.Grid().NumPixels(), GaiaMapOrder, want)
-	}
-
-	if err := m.plausibleSky(); err != nil {
-		return nil, err
 	}
 
 	m.Source = TotalStarlightMap

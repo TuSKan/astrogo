@@ -99,33 +99,43 @@ const (
 
 // openHemisphere fetches and decodes one hemisphere.
 func openHemisphere(ctx context.Context, name string) (*hemisphere, error) {
-	fsys, key, err := remote.GetFile(ctx, remote.SFDDustMap, name)
-	if err != nil {
+	var h *hemisphere
+
+	// Decoded through remote.WithRead, so a cached hemisphere that does not
+	// decode, or is not the map it should be, is replaced rather than served
+	// to every later call (#1014).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
+		}
+
+		defer func() { _ = r.Close() }()
+
+		f, err := fits.Read(r)
+		if err != nil {
+			return fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
+		}
+
+		if len(f.HDUs) == 0 {
+			return fmt.Errorf("%w: %s holds no HDU", ErrSFD, name)
+		}
+
+		img, ok := f.HDUs[0].(*fits.ImageHDU)
+		if !ok {
+			return fmt.Errorf("%w: %s is not an image", ErrSFD, name)
+		}
+
+		h, err = fromImage(img, name)
+
+		return err
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.SFDDustMap, name, remote.WithRead(read)); err != nil {
 		return nil, fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
 	}
 
-	r, err := fsys.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
-	}
-
-	defer func() { _ = r.Close() }()
-
-	f, err := fits.Read(r)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %w", ErrSFD, name, err)
-	}
-
-	if len(f.HDUs) == 0 {
-		return nil, fmt.Errorf("%w: %s holds no HDU", ErrSFD, name)
-	}
-
-	img, ok := f.HDUs[0].(*fits.ImageHDU)
-	if !ok {
-		return nil, fmt.Errorf("%w: %s is not an image", ErrSFD, name)
-	}
-
-	return fromImage(img, name)
+	return h, nil
 }
 
 // fromImage turns a decoded image into a hemisphere, checking that it is the
