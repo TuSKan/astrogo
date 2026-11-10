@@ -27,6 +27,29 @@ func requireJPL(t *testing.T) {
 	testutil.RequireReachable(t, "ssd-api.jpl.nasa.gov:443")
 }
 
+// simbadControl is a request a working SIMBAD cannot reject, for
+// testutil.SkipOnDegradedService: one main_id from basic, a table and column
+// SIMBAD has served for as long as it has had a TAP service. The reachability
+// check misses an outage that still accepts connections, as SIMBAD's whole web
+// application answering 404 did on 2026-11-10 (#1026).
+//
+// Its deadline starts when it runs, not when the test did.
+func simbadControl(t *testing.T) func() error {
+	t.Helper()
+
+	syncURL, err := remote.URL(remote.SIMBAD)
+	if err != nil {
+		t.Fatalf("SIMBAD endpoint: %v", err)
+	}
+
+	return func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		return testutil.TAPControl(ctx, syncURL, "basic", "main_id")()
+	}
+}
+
 // TestVisibleTonight_MinorBodiesRespectMagLimit is the live end-to-end
 // test of the asteroid/comet path (catalog/sbdb.SearchBright Stage 1 +
 // VisibleTonight's per-candidate Stage-2 real ephemeris fetch): a tight
@@ -222,7 +245,7 @@ func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 
 	results, err := plan.VisibleTonight(context.Background(), site, night, 4.5,
 		[]resolve.BrightObjectSearcher{simbad.New()}, ephemeris.Default())
-	testutil.SkipOnUpstreamFailure(t, err)
+	testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
