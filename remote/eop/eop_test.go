@@ -167,6 +167,53 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 	}
 }
 
+// A cached bulletin that no longer parses is replaced from the source in the
+// same Fetch, though the source's ETag has not changed. The parser was passed
+// as WithValidate, which sees only a download, so GetFile returned such a copy
+// for as long as the ETag held, and time failed to parse it each time (#1043).
+//
+// The damage here is a NaN UT1-UTC: a copy cached before #1037, when the
+// parser accepted one, is exactly a copy that went bad in place.
+func TestEOPLoaderReplacesADamagedCachedBulletin(t *testing.T) {
+	scratchCache(t)
+	fakeIERSSource(t, sampleFinals2000A)
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
+
+	ctx := context.Background()
+
+	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+		t.Fatalf("first Fetch: %v", err)
+	}
+
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatalf("remote.CacheDir: %v", err)
+	}
+
+	damaged := strings.Replace(sampleFinals2000A, " 0.8084178", "       NaN", 1)
+	if damaged == sampleFinals2000A {
+		t.Fatal("the damage did not apply")
+	}
+
+	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(damaged)); err != nil {
+		t.Fatalf("damage the cached copy: %v", err)
+	}
+
+	data, err := (eopLoader{}).Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch over a damaged cached copy: %v", err)
+	}
+
+	if string(data.Raw) != sampleFinals2000A {
+		t.Errorf("Fetch returned %q, want the source's bulletin", data.Raw[:min(len(data.Raw), 60)])
+	}
+
+	cached, err := fs.ReadFile(fsys, prefix+eopCacheName)
+	if err != nil || string(cached) != sampleFinals2000A {
+		t.Errorf("the cached copy is not the source's after the heal (err %v)", err)
+	}
+}
+
 // TestEOPLoaderCachedReadsAPreSeededFile covers the offline deployment:
 // a file copied in by hand has no recorded ETag, so remote.GetFile's cache-hit
 // path cannot find it and Cached must read the object directly.

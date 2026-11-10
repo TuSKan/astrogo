@@ -36,9 +36,9 @@
 package eop
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"io/fs"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -90,25 +90,34 @@ func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 	// remote.GetFile reuses the cache untouched when the source's current ETag
 	// shows the IERS bulletin has not changed since it was last
 	// downloaded — a content check rather than a wall-clock expiry, since
-	// finals2000A is updated on IERS's schedule, not ours. remote.WithValidate
-	// parses a fresh download before it is cached, so a corrupt response
-	// is never trusted as the new cache.
-	fsys, key, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
-		remote.WithCacheName(eopCacheName),
-		remote.WithValidate(func(r io.Reader) error {
-			if _, perr := time.ParseFinals2000A(r); perr != nil {
-				return fmt.Errorf("remote: EOP data does not parse: %w", perr)
-			}
+	// finals2000A is updated on IERS's schedule, not ours.
+	//
+	// The bulletin is parsed through remote.WithRead, on whichever copy
+	// GetFile returns. A corrupt download is never trusted as the new cache,
+	// and a cached copy that no longer parses is replaced in the same call.
+	// With WithValidate, which sees only a download, such a copy came back
+	// from here for as long as the source's ETag held, and time failed to
+	// parse it each time (#1043).
+	var raw []byte
 
-			return nil
-		}))
-	if err != nil {
-		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
+	read := func(fsys remote.FS, key string) error {
+		b, err := fs.ReadFile(fsys, key)
+		if err != nil {
+			return fmt.Errorf("remote: read EOP data: %w", err)
+		}
+
+		if _, perr := time.ParseFinals2000A(bytes.NewReader(b)); perr != nil {
+			return fmt.Errorf("remote: EOP data does not parse: %w", perr)
+		}
+
+		raw = b
+
+		return nil
 	}
 
-	raw, err := fs.ReadFile(fsys, key)
-	if err != nil {
-		return time.EOPData{}, fmt.Errorf("remote: read EOP data: %w", err)
+	if _, _, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
+		remote.WithCacheName(eopCacheName), remote.WithRead(read)); err != nil {
+		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
 	}
 
 	return time.EOPData{Raw: raw}, nil
