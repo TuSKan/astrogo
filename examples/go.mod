@@ -28,7 +28,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/klauspost/pgzip v1.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
-	github.com/scigolib/hdf5 v0.14.2 // indirect
+	github.com/scigolib/hdf5 v0.15.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/net v0.62.0 // indirect
