@@ -8,9 +8,11 @@ import (
 	"io"
 	"io/fs"
 	"path"
+	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/unit"
@@ -252,17 +254,40 @@ func emitterFor(at *coord.Geodetic, radiance float64, scale []float64, region Re
 	}
 }
 
-// extractTIFF unpacks the single GeoTIFF entry from a downloaded archive
-// into the same fsys, and returns its key, and whether it was extracted by
-// this call. An already-extracted object is reused.
+// extractedFromSuffix names the record beside an extracted composite of the
+// archive copy it came from.
+const extractedFromSuffix = ".archive"
+
+// extractTIFF unpacks the single GeoTIFF entry from a downloaded archive into
+// the archive's own directory, and returns its key, and whether it was
+// extracted by this call.
+//
+// A composite extracted earlier is reused only when it came from the archive
+// copy cached now. VIIRSAnnual is Mutable, since past years are reprocessed in
+// place, and remote replaces the archive when upstream does. Reusing any
+// composite that existed downloaded the new archive, a gigabyte, and then
+// served the old pixels (#1015). Each extraction now records the copy it was
+// made from, by archiveCopy, and a composite whose record does not match is
+// extracted again.
+//
+// The composite used to be written at the root of the data directory, outside
+// the endpoint's prefix. One left there is removed after an extraction, as
+// nothing reads it any more.
 func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year int) (key string, extracted bool, err error) {
-	tiffKey := entryName(year)
+	tiffKey := path.Join(path.Dir(archiveKey), entryName(year))
+
+	source, err := archiveCopy(fsys, archiveKey)
+	if err != nil {
+		return "", false, err
+	}
 
 	// fs.ErrNotExist rather than a remote-specific predicate: this is the
 	// standard library's own vocabulary and works identically against every
 	// backend, which is what replaced remote.IsNotFound.
 	if _, err := fs.Stat(fsys, tiffKey); err == nil {
-		return tiffKey, false, nil
+		if recorded, err := fs.ReadFile(fsys, tiffKey+extractedFromSuffix); err == nil && string(recorded) == source {
+			return tiffKey, false, nil
+		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return "", false, fmt.Errorf("viirs: check for %s: %w", tiffKey, err)
 	}
@@ -278,7 +303,7 @@ func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year in
 		return "", false, fmt.Errorf("viirs: stat archive: %w", err)
 	}
 
-	entry, closeEntry, err := openZIPEntry(at, info.Size(), tiffKey)
+	entry, closeEntry, err := openZIPEntry(at, info.Size(), entryName(year))
 	if err != nil {
 		return "", false, err
 	}
@@ -288,7 +313,37 @@ func extractTIFF(ctx context.Context, fsys remote.FS, archiveKey string, year in
 		return "", false, fmt.Errorf("viirs: extract %s: %w", tiffKey, err)
 	}
 
+	// Written after the composite, so an extraction cut short between the two
+	// leaves a record that does not match, and the next call extracts again.
+	if err := remote.WriteFile(ctx, fsys, tiffKey+extractedFromSuffix, strings.NewReader(source)); err != nil {
+		return "", false, fmt.Errorf("viirs: record the archive %s came from: %w", tiffKey, err)
+	}
+
+	// Best effort: a leftover is only disk space, and not this call's failure.
+	if err := remote.RemoveFile(ctx, fsys, entryName(year)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		logging.WarnContext(ctx, "viirs: could not remove a composite older versions extracted to the cache root",
+			"key", entryName(year), "error", err)
+	}
+
 	return tiffKey, true, nil
+}
+
+// archiveCopy names the copy of the archive at key that is cached now: its
+// size and modification time. remote replaces the copy whenever it fetches the
+// archive again, after upstream reprocessed the year or after a damaged copy
+// was healed, and the replacement is written anew, so both change with it.
+// It names the copy, not the source's version, because a composite has to
+// match the bytes it was extracted from.
+//
+// A backend that reports no modification time leaves the size alone to tell
+// two copies apart.
+func archiveCopy(fsys remote.FS, key string) (string, error) {
+	info, err := fs.Stat(fsys, key)
+	if err != nil {
+		return "", fmt.Errorf("viirs: stat archive %s: %w", key, err)
+	}
+
+	return fmt.Sprintf("size=%d modified=%d", info.Size(), info.ModTime().UnixNano()), nil
 }
 
 // closeQuietly closes c, discarding an error that a caller in a failure path
