@@ -147,6 +147,10 @@ func TestParseRefusesUnusableMetadata(t *testing.T) {
 		{"zero point in erg", func(p map[string]string) { p["ZeroPointUnit"] = "erg/cm2/s/A" }},
 		{"no zero point", func(p map[string]string) { delete(p, "ZeroPoint") }},
 		{"negative zero point", func(p map[string]string) { p["ZeroPoint"] = "-3630" }},
+		// strconv.ParseFloat reads both, and zeroPointJy's v <= 0 let both
+		// through (#1033).
+		{"NaN zero point", func(p map[string]string) { p["ZeroPoint"] = "NaN" }},
+		{"infinite zero point", func(p map[string]string) { p["ZeroPoint"] = "Inf" }},
 	} {
 		p := goodParams()
 		c.breakIt(p)

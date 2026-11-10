@@ -75,6 +75,22 @@ func TestVegaZeroFluxNeedsAZeroPoint(t *testing.T) {
 	}
 }
 
+// A zero point that is not a flux density is refused, not converted. Its check
+// was z <= 0, so NaN and +Inf passed and came back as the map band's zero flux
+// (#1033).
+func TestVegaZeroFluxRefusesAZeroPointThatIsNotAFluxDensity(t *testing.T) {
+	t.Parallel()
+
+	for _, z := range []float64{math.NaN(), math.Inf(1)} {
+		b := bessellVLike()
+		b.VegaZeroPointJy = z
+
+		if got, err := starlight.VegaZeroFlux(b); !errors.Is(err, magnitude.ErrPassbandZeroPoint) {
+			t.Errorf("zero point %v Jy: %v and err %v, want magnitude.ErrPassbandZeroPoint", z, got, err)
+		}
+	}
+}
+
 // The four published relations resolve and U does not.
 //
 // Gaia's bluest band starts around 330 nm and Table 5.9 publishes no G-to-U

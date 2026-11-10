@@ -28,6 +28,10 @@ var (
 	// which is reference-spectrum dependent and must be supplied.
 	ErrZeroPointUnknown = errors.New("magnitude: passband has no zero point for this system")
 
+	// ErrPassbandZeroPoint is returned by [Passband.Validate] for a Vega
+	// zero point that is negative or not finite. Zero, "unknown", is valid.
+	ErrPassbandZeroPoint = errors.New("magnitude: passband Vega zero point must be zero or a positive, finite flux density")
+
 	// ErrLuminousEfficacy is returned for an efficacy that cannot scale a
 	// luminance. It belongs to the efficiency curve rather than to the
 	// spectrum, so a zero here means the caller has not chosen one.
@@ -151,6 +155,14 @@ func (p Passband) Validate() error {
 
 	if total == 0 {
 		return fmt.Errorf("%w: %q is identically zero", ErrPassbandResponse, p.Name)
+	}
+
+	// Each consumer of the zero point tested only z <= 0, for "unknown". A NaN
+	// or an infinity passed, and came out as a NaN or infinite Vega magnitude
+	// with no error (#1033). Checked here, every path that uses it has
+	// validated the passband first.
+	if z := p.VegaZeroPointJy; z < 0 || math.IsNaN(z) || math.IsInf(z, 0) {
+		return fmt.Errorf("%w: %q has %g Jy", ErrPassbandZeroPoint, p.Name, z)
 	}
 
 	return nil

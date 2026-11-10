@@ -328,6 +328,54 @@ func TestSurfaceBrightnessVegaRequiresZeroPoint(t *testing.T) {
 	}
 }
 
+// A Vega zero point is zero, for "unknown", or a flux density. Every consumer
+// tested z <= 0 alone, so a NaN or an infinity passed them all (#1033).
+func TestValidateRefusesAZeroPointThatIsNotAFluxDensity(t *testing.T) {
+	t.Parallel()
+
+	for _, z := range []float64{-3600, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		band := topHat("test", 500, 600, magnitude.PhotonCounting)
+		band.VegaZeroPointJy = z
+
+		if err := band.Validate(); !errors.Is(err, magnitude.ErrPassbandZeroPoint) {
+			t.Errorf("zero point %v Jy: Validate = %v, want ErrPassbandZeroPoint", z, err)
+		}
+	}
+
+	for _, z := range []float64{0, 3600} {
+		band := topHat("test", 500, 600, magnitude.PhotonCounting)
+		band.VegaZeroPointJy = z
+
+		if err := band.Validate(); err != nil {
+			t.Errorf("zero point %v Jy: Validate = %v, want nil", z, err)
+		}
+	}
+}
+
+// What the check is for: a Vega magnitude through a NaN or infinite zero point
+// is an error. It was a NaN, or a +Inf that reads as arbitrarily faint, with a
+// nil error.
+func TestSurfaceBrightnessVegaRefusesAZeroPointThatIsNotAFluxDensity(t *testing.T) {
+	t.Parallel()
+
+	g := mustGrid(t, 400, 301)
+
+	spectrum := make([]float64, g.Len())
+	for i := range spectrum {
+		spectrum[i] = 1e-8
+	}
+
+	for _, z := range []float64{math.NaN(), math.Inf(1)} {
+		band := topHat("test", 500, 600, magnitude.PhotonCounting)
+		band.VegaZeroPointJy = z
+
+		got, err := magnitude.SurfaceBrightness(spectrum, g, band, magnitude.Vega, 0.99)
+		if !errors.Is(err, magnitude.ErrPassbandZeroPoint) {
+			t.Errorf("zero point %v Jy: %v mag/arcsec² and err %v, want ErrPassbandZeroPoint", z, got, err)
+		}
+	}
+}
+
 // The spec forbids assuming SQM ~ Johnson V internally: two different
 // response curves over one physical spectrum are different numbers, and
 // the difference is spectrum-dependent. This asserts the projections do
