@@ -18,6 +18,11 @@ var ErrOutOfRange = errors.New("iers: MJD out of EOP data coverage")
 // ErrNoRecords indicates the EOP table has no records loaded.
 var ErrNoRecords = errors.New("iers: no EOP records available")
 
+// ErrMalformed indicates a bulletin holding a field that parsed but is not a
+// number. strconv.ParseFloat reads NaN, Inf and their signed forms, and all
+// fit the bulletin's fixed-width columns.
+var ErrMalformed = errors.New("iers: malformed EOP bulletin")
+
 // Record is a single line of IERS EOP data.
 type Record struct {
 	MJD  float64
@@ -87,7 +92,11 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 
 	arcsec2rad := math.Pi / (180.0 * 3600.0)
 
+	lineNo := 0
+
 	for scanner.Scan() {
+		lineNo++
+
 		line := scanner.Text()
 		if len(line) < 86 {
 			continue // skip incomplete lines or headers
@@ -101,6 +110,16 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 		mjd, err := strconv.ParseFloat(mjdStr, 64)
 		if err != nil {
 			continue
+		}
+
+		// A field that holds NaN or an infinity is not missing, as a blank
+		// one is: it is a corrupt copy, and refusing it is what keeps the
+		// copy out of the cache. Served, a NaN MJD in the last row put NaN at
+		// the end of Coverage, which every later epoch then passed, and
+		// Table.EOP indexed past the last record and panicked; mid-file it
+		// broke the sort, and +Inf stretched Coverage to infinity (#1037).
+		if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+			return nil, fmt.Errorf("%w: line %d: MJD %q", ErrMalformed, lineNo, mjdStr)
 		}
 
 		xStr := strings.TrimSpace(line[18:27])
@@ -144,6 +163,15 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 		lod, err := strconv.ParseFloat(lodStr, 64)
 		if err != nil {
 			lod = 0
+		}
+
+		for _, f := range [...]struct {
+			name, text string
+			v          float64
+		}{{"x", xStr, x}, {"y", yStr, y}, {"UT1-UTC", dut1Str, dut1}, {"LOD", lodStr, lod}} {
+			if math.IsNaN(f.v) || math.IsInf(f.v, 0) {
+				return nil, fmt.Errorf("%w: line %d: %s %q", ErrMalformed, lineNo, f.name, f.text)
+			}
 		}
 
 		records = append(records, Record{
