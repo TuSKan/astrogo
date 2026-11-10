@@ -114,12 +114,13 @@ would have been missing from the release they belong to.
 **Every change gets one, tests and benchmarks included.** A new test changes
 what the project can claim is verified, measured or guarded, and the changelog
 is where a user learns it. "Tests only" was once a reason to skip the entry,
-and stopped being one with #390. The `no-changelog` label is kept for the few
-pull requests a reader of the release could not act on: dependency-bot bumps,
-which `.github/dependabot.yml` labels as it opens them (#943), and pure
-spelling passes. A release pull request needs neither; the check
-recognizes one by what it changes. The label is deliberate and shows up in
-review; silence did not.
+and stopped being one with #390. A pull request Dependabot opens needs no
+fragment: the check exempts it by its author, since Dependabot does not apply
+the labels its configuration asks for (#1019). The `no-changelog` label is kept
+for the few other pull requests a reader of the release could not act on: a
+dependency bump opened by hand, and pure spelling passes. A release pull
+request needs neither; the check recognizes one by what it changes. The label is
+deliberate and shows up in review; silence did not.
 
 Applying it re-runs the check on its own. That is why the job lives in
 `changelog.yml` rather than in `ci.yml`: a label change is not a `synchronize`,
