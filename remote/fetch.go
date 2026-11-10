@@ -137,42 +137,31 @@ type fetched struct {
 func (c *Client) readCopy(ctx context.Context, id EndpointID, name string, cfg readConfig,
 	fsys FS, key string, got fetched,
 ) (FS, string, error) {
-	readErr := cfg.read(fsys, key)
+	for healing := false; ; healing = true {
+		readErr := cfg.read(fsys, key)
 
-	switch {
-	case readErr == nil:
-		return fsys, key, nil
-	case ctx.Err() != nil:
-		return nil, "", readErr
+		switch {
+		case readErr == nil:
+			return fsys, key, nil
+		case ctx.Err() != nil:
+			return nil, "", readErr
+		}
+
+		if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
+			return nil, "", errors.Join(readErr, err)
+		}
+
+		// A copy this call downloaded is what the source serves, and one
+		// fetched to heal has had its chance: there is nothing fresher.
+		if got.ok || healing {
+			return nil, "", readErr
+		}
+
+		var err error
+		if fsys, key, got, err = c.getFile(ctx, id, name, cfg); err != nil {
+			return nil, "", fmt.Errorf("%w; fetching a fresh copy: %w", readErr, err)
+		}
 	}
-
-	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
-		return nil, "", errors.Join(readErr, err)
-	}
-
-	if got.ok {
-		return nil, "", readErr
-	}
-
-	fsys, key, got, err := c.getFile(ctx, id, name, cfg)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w; fetching a fresh copy: %w", readErr, err)
-	}
-
-	readErr = cfg.read(fsys, key)
-
-	switch {
-	case readErr == nil:
-		return fsys, key, nil
-	case ctx.Err() != nil:
-		return nil, "", readErr
-	}
-
-	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
-		return nil, "", errors.Join(readErr, err)
-	}
-
-	return nil, "", readErr
 }
 
 // discard removes a copy cfg.read refused, with the source ETag recorded beside
@@ -188,12 +177,11 @@ func (c *Client) discard(ctx context.Context, fsys FS, key string, got fetched, 
 		return err
 	}
 
-	// Only a Mutable endpoint's copy has one, and a leftover would be inert,
-	// but nothing of a refused copy is left behind.
-	if err := file.Remove(ctx, fsys, key+file.SourceETagSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-		return err
-	}
+	// Only a Mutable endpoint's copy has one. Its failure is ignored, as
+	// file.discardStaging ignores a staging leftover's: alone, the sidecar is
+	// inert, since unchanged() reads it only beside a cached object, and the
+	// next copy fetched overwrites it.
+	_ = file.Remove(ctx, fsys, key+file.SourceETagSuffix)
 
 	return nil
 }

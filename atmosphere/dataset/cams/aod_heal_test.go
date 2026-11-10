@@ -33,6 +33,14 @@ const aodErrorPage = "<html>503 Service Unavailable</html>"
 func aodFixture(tb testing.TB, value float64) []byte {
 	tb.Helper()
 
+	return aodFixtureOnAxes(tb, value, "latitude", "longitude")
+}
+
+// aodFixtureOnAxes is aodFixture with its two horizontal axes named lat and
+// lon instead.
+func aodFixtureOnAxes(tb testing.TB, value float64, lat, lon string) []byte {
+	tb.Helper()
+
 	path := filepath.Join(tb.TempDir(), "aod.nc")
 
 	fw, err := hdf5.CreateForWrite(path, hdf5.CreateTruncate)
@@ -40,8 +48,8 @@ func aodFixture(tb testing.TB, value float64) []byte {
 		tb.Fatalf("CreateForWrite: %v", err)
 	}
 
-	writeDimScale(tb, fw, "/longitude", []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
-	writeDimScale(tb, fw, "/latitude", []float32{90, 0, -90}, 1, "degrees_north", "latitude")
+	writeDimScale(tb, fw, "/"+lon, []float32{0, 90, 180, 270}, 0, "degrees_east", "longitude")
+	writeDimScale(tb, fw, "/"+lat, []float32{90, 0, -90}, 1, "degrees_north", "latitude")
 	writeLevelDim(tb, fw, []int32{1}, 2)
 	writeTimeDim(tb, fw, []int32{1078200}, 3)
 
@@ -224,5 +232,62 @@ func TestAOD550KeepsTheFileOverANonFiniteSite(t *testing.T) {
 
 	if _, err := fs.Stat(cache, key); err != nil {
 		t.Errorf("the cached file is gone after a call with a bad site: %v", err)
+	}
+}
+
+// A NetCDF file of another CAMS product opens, so it is not damaged, but it
+// holds no AODVariable: it is not the file asked for, and is refused like one
+// that is damaged, downloaded once and not again while the source serves it.
+func TestAOD550DownloadsAFileOfAnotherProductOnce(t *testing.T) {
+	cache, key, src := camsCacheAndSource(t)
+	putAOD(t, src, AODKey(aodWhen), fixtureBytes(t))
+
+	if _, err := AOD550(context.Background(), aodSite(t), aodWhen); !errors.Is(err, ErrAOD) ||
+		errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("first call: err %v, want ErrAOD from the missing variable", err)
+	}
+
+	if _, err := fs.Stat(cache, key); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the file of another product was cached (Stat: %v)", err)
+	}
+
+	if _, err := AOD550(context.Background(), aodSite(t), aodWhen); !errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("second call, source unchanged: err %v, want remote.ErrRejectedSource", err)
+	}
+}
+
+// A fetch that fails before any file is read keeps the registration advice:
+// that is the one failure credentials can fix.
+func TestAOD550AdvisesOnAFailedFetch(t *testing.T) {
+	camsCacheAndSource(t)
+	remote.DisableDownloads(remote.CopernicusEODATA)
+
+	_, err := AOD550(context.Background(), aodSite(t), aodWhen)
+	if !errors.Is(err, remote.ErrDownloadDenied) || !errors.Is(err, ErrAOD) {
+		t.Fatalf("err %v, want ErrAOD and remote.ErrDownloadDenied", err)
+	}
+
+	if !strings.Contains(err.Error(), RegistrationAdvice) {
+		t.Errorf("a refused download is answered without the registration advice: %v", err)
+	}
+}
+
+// A file whose grid is not on latitude and longitude axes cannot be indexed by
+// a site, however well it opens: it is refused like a damaged one.
+func TestAOD550DownloadsAFileOffTheGridOnce(t *testing.T) {
+	cache, key, src := camsCacheAndSource(t)
+	putAOD(t, src, AODKey(aodWhen), aodFixtureOnAxes(t, 0.15, "lat", "lon"))
+
+	if _, err := AOD550(context.Background(), aodSite(t), aodWhen); !errors.Is(err, ErrAOD) ||
+		errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("first call: err %v, want ErrAOD from the grid check", err)
+	}
+
+	if _, err := fs.Stat(cache, key); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the file off the grid was cached (Stat: %v)", err)
+	}
+
+	if _, err := AOD550(context.Background(), aodSite(t), aodWhen); !errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("second call, source unchanged: err %v, want remote.ErrRejectedSource", err)
 	}
 }

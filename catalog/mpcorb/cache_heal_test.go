@@ -208,3 +208,31 @@ func TestOpenKeepsACopyWithAMalformedRow(t *testing.T) {
 		t.Error("a copy with one malformed row was removed")
 	}
 }
+
+// A caller that stops early has found nothing wrong with the copy, which is
+// kept, and a later Open reads it again in full.
+func TestOpenKeepsTheCopyOnAnEarlyBreak(t *testing.T) {
+	cache, key, src := mpcorbCacheAndSource(t)
+	put(t, src, healFile, []byte(cometFixture()))
+
+	seq, err := mpcorb.Open(context.Background(), healFile)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	for _, err := range seq {
+		if err != nil {
+			t.Fatalf("first row: %v", err)
+		}
+
+		break
+	}
+
+	if !isCached(t, cache, key) {
+		t.Fatal("the copy was removed after an early break")
+	}
+
+	if rows, errs := iterate(t); rows == 0 || len(errs) > 0 {
+		t.Errorf("the kept copy read %d rows and errors %v", rows, errs)
+	}
+}
