@@ -89,6 +89,35 @@ func TestParseRefusesNonAscendingWavelengths(t *testing.T) {
 	}
 }
 
+// A curve holding a sample no consumer can use is refused, not returned.
+//
+// strconv.ParseFloat reads NaN and Inf, the response check was only v < 0,
+// the wavelength had none, and NaN passes the order check because every
+// comparison with it is false. Each of these curves parsed before (#1032).
+func TestParseRefusesASampleNoConsumerCanUse(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		body string
+	}{
+		{"NaN wavelength", "NaN, 0.9\n500, 0.8\n501, 0.7\n"},
+		{"infinite wavelength", "500, 0.9\n501, 0.8\nInf, 0.7\n"},
+		{"negatively infinite wavelength", "-Inf, 0.9\n500, 0.8\n501, 0.7\n"},
+		{"negative wavelength", "-500, 0.9\n500, 0.8\n501, 0.7\n"},
+		{"NaN response", "500, NaN\n501, 0.8\n502, 0.7\n"},
+		{"infinite response", "500, +Inf\n501, 0.8\n502, 0.7\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			if band, err := luminosity.Parse(strings.NewReader(c.body)); !errors.Is(err, luminosity.ErrCurve) {
+				t.Errorf("got %v / %v and err %v, want ErrCurve", band.WavelengthNM, band.Response, err)
+			}
+		})
+	}
+}
+
 // Rows that are not data are skipped, but a file with nothing usable is an
 // error rather than an empty curve.
 func TestParseSkipsJunkButRefusesAnEmptyCurve(t *testing.T) {

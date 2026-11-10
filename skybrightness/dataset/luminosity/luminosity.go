@@ -192,11 +192,21 @@ func Parse(r io.Reader) (magnitude.Passband, error) {
 		return magnitude.Passband{}, fmt.Errorf("%w: %d usable rows", ErrCurve, len(lambda))
 	}
 
-	return magnitude.Passband{
+	band := magnitude.Passband{
 		WavelengthNM: lambda,
 		Response:     response,
 		Detector:     magnitude.EnergyIntegrating,
-	}, nil
+	}
+
+	// The checks above skip rows that do not parse and refuse a curve out of
+	// order, but a NaN or an infinity parses, and NaN passes the order check.
+	// Validate states what a usable curve is, so a curve Open caches is one
+	// every consumer can use, and one that is not gets fetched again (#1032).
+	if err := band.Validate(); err != nil {
+		return magnitude.Passband{}, fmt.Errorf("%w: %w", ErrCurve, err)
+	}
+
+	return band, nil
 }
 
 // parseRow reads one "wavelength, value" line.

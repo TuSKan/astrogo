@@ -92,6 +92,28 @@ func TestOpenReplacesACorruptCachedCurve(t *testing.T) {
 	}
 }
 
+// A cached curve that parses but holds a NaN is replaced too. Parse accepted
+// it before, so remote kept the copy, and every use of the curve failed in
+// Passband.Validate until the cache was deleted by hand (#1032).
+func TestOpenReplacesACachedCurveHoldingANaN(t *testing.T) {
+	cache, key, src := cieCacheAndSource(t)
+	put(t, cache, key, "360,0.0000039170000\n361,NaN\n362,0.0000049296040\n")
+	put(t, src, photopicFile, photopicRows)
+
+	band, err := luminosity.Open(context.Background(), luminosity.Photopic)
+	if err != nil {
+		t.Fatalf("Open over a cached copy holding a NaN: %v", err)
+	}
+
+	if err := band.Validate(); err != nil {
+		t.Errorf("Open returned a curve that does not validate: %v", err)
+	}
+
+	if len(band.Response) != 3 || band.Response[1] != 0.0000043935810 {
+		t.Errorf("responses %v, want the source's, 4.393581e-06 at 361 nm", band.Response)
+	}
+}
+
 // A source serving a curve that does not parse is downloaded once and never
 // cached, and the next call is refused without downloading it again.
 func TestOpenDownloadsACorruptCurveOnce(t *testing.T) {
