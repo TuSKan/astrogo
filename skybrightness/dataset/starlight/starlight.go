@@ -315,7 +315,11 @@ func parseRow(text string) (int64, []float64, error) {
 			return 0, nil, fmt.Errorf("%w: radiance %q", ErrMapFormat, f)
 		}
 
-		if v < 0 || math.IsNaN(v) {
+		// Negative covers -Inf. +Inf has to be named: it is not negative and
+		// not NaN, and a map holding it passes plausibleSky, its contrast being
+		// infinite, so that direction of the sky came out infinitely bright
+		// (#1030).
+		if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			return 0, nil, fmt.Errorf("%w: radiance %q is not a usable value", ErrMapFormat, f)
 		}
 
