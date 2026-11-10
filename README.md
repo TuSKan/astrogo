@@ -1,11 +1,13 @@
 # astrogo
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/TuSKan/astrogo.svg)](https://pkg.go.dev/github.com/TuSKan/astrogo)
-[![Go Report Card](https://goreportcard.com/badge/github.com/TuSKan/astrogo)](https://goreportcard.com/report/github.com/TuSKan/astrogo)
-[![CI](https://github.com/TuSKan/astrogo/actions/workflows/ci.yml/badge.svg)](https://github.com/TuSKan/astrogo/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/TuSKan/astrogo/branch/main/graph/badge.svg)](https://codecov.io/gh/TuSKan/astrogo)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/TuSKan/astrogo)](https://github.com/TuSKan/astrogo/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/TuSKan/astrogo?include_prereleases&style=flat-square&logo=github&color=blue&label=version)](https://github.com/TuSKan/astrogo/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/TuSKan/astrogo?style=flat-square&logo=go)](https://go.dev)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/TuSKan/astrogo)
+[![CI](https://img.shields.io/github/actions/workflow/status/TuSKan/astrogo/ci.yml?branch=main&style=flat-square&logo=github&label=tests)](https://github.com/TuSKan/astrogo/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/TuSKan/astrogo/graph/badge.svg)](https://codecov.io/gh/TuSKan/astrogo)
+[![License](https://img.shields.io/github/license/TuSKan/astrogo?style=flat-square&color=blue)](https://github.com/TuSKan/astrogo/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/TuSKan/astrogo?style=flat-square&logo=github)](https://github.com/TuSKan/astrogo/stargazers)
+[![Discussions](https://img.shields.io/github/discussions/TuSKan/astrogo?style=flat-square&logo=github&label=discussions)](https://github.com/TuSKan/astrogo/discussions)
 
 ![astrogo — astronomy, computed. A night sky over an observatory ridge, with a target's altitude arc from rise through transit to set, the Moon's phase track, Jupiter and Saturn, a satellite pass, and a sky-brightness scale in mag/arcsec².](assets/image.png)
 
