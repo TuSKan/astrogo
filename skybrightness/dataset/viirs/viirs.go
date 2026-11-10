@@ -219,29 +219,24 @@ func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 // damaged where it sat, so it is extracted again from this archive before the
 // archive, a gigabyte to download again, is blamed.
 func openComposite(ctx context.Context, fsys remote.FS, archiveKey string, year int) (remote.File, *raster.Reader, error) {
-	tiffKey, extracted, err := extractTIFF(ctx, fsys, archiveKey, year)
-	if err != nil {
-		return nil, nil, err
-	}
+	// At most two passes: a composite that does not decode is removed, so the
+	// second extracts it again, and one extracted in this call that does not
+	// decode is the archive's to answer for.
+	for {
+		tiffKey, extracted, err := extractTIFF(ctx, fsys, archiveKey, year)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	at, reader, err := openTIFF(ctx, fsys, tiffKey)
-	if err == nil {
-		return at, reader, nil
-	}
+		at, reader, err := openTIFF(ctx, fsys, tiffKey)
+		if err == nil {
+			return at, reader, nil
+		}
 
-	if rmErr := remote.RemoveFile(ctx, fsys, tiffKey); rmErr != nil || extracted {
-		return nil, nil, errors.Join(err, rmErr)
+		if rmErr := remote.RemoveFile(ctx, fsys, tiffKey); rmErr != nil || extracted {
+			return nil, nil, errors.Join(err, rmErr)
+		}
 	}
-
-	if tiffKey, _, err = extractTIFF(ctx, fsys, archiveKey, year); err != nil {
-		return nil, nil, err
-	}
-
-	if at, reader, err = openTIFF(ctx, fsys, tiffKey); err != nil {
-		return nil, nil, errors.Join(err, remote.RemoveFile(ctx, fsys, tiffKey))
-	}
-
-	return at, reader, nil
 }
 
 // openTIFF opens an extracted composite for random access and decodes its
