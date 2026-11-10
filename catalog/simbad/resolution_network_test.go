@@ -4,9 +4,11 @@ package simbad
 
 import (
 	"context"
+	"errors"
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -54,7 +56,7 @@ func TestResolveReturnsTheObjectAsked(t *testing.T) {
 			// reading the error may not support: SIMBAD being unreachable is
 			// not SIMBAD saying no. That inversion is #102's defect, here in
 			// the test rather than the library.
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 			if err != nil {
 				t.Fatalf("Resolve(%q) failed (%s): %v", tc.query, tc.why, err)
@@ -80,12 +82,25 @@ func TestResolveReturnsTheObjectAsked(t *testing.T) {
 // TestResolveFindsNothingRatherThanSomethingWrong pins the other half of the
 // contract: an unknown name is an answer a caller can act on, and the least
 // wrong of ten wrong objects is not.
+//
+// The answer has to be resolve.ErrNotFound, not just any error. Checking only
+// for an error, this passed while SIMBAD's whole service answered 404 (#1026):
+// an outage looked exactly like SIMBAD saying the object does not exist, the
+// confusion #102 removed from the library.
 func TestResolveFindsNothingRatherThanSomethingWrong(t *testing.T) {
 	testutil.RequireReachable(t, simbadTAPHost)
 
 	p := New()
 
-	if tgt, err := p.Resolve(context.Background(), "NoSuchObjectXYZ123"); err == nil {
-		t.Errorf("Resolve of a nonexistent name returned %q", tgt.Name)
+	tgt, err := p.Resolve(context.Background(), "NoSuchObjectXYZ123")
+	if err == nil {
+		t.Fatalf("Resolve of a nonexistent name returned %q", tgt.Name)
 	}
+
+	if errors.Is(err, resolve.ErrNotFound) {
+		return
+	}
+
+	testutil.SkipOnDegradedService(t, err, simbadControl(t))
+	t.Fatalf("Resolve of a nonexistent name: %v, want resolve.ErrNotFound", err)
 }
