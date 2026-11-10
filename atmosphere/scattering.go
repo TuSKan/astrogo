@@ -29,8 +29,9 @@ var (
 	ErrSourceIrradiance = errors.New("atmosphere: source irradiance must be non-negative and finite")
 
 	// ErrAirmassRange is returned for an airmass below 1, which no real
-	// line of sight through the atmosphere can have.
-	ErrAirmassRange = errors.New("atmosphere: airmass must be at least 1")
+	// line of sight through the atmosphere can have, or one that is not
+	// finite.
+	ErrAirmassRange = errors.New("atmosphere: airmass must be finite and at least 1")
 
 	// ErrTemperature is returned for a non-positive or non-finite
 	// temperature.
