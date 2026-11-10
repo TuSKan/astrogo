@@ -377,3 +377,25 @@ func TestOpenRefusesAnArchiveWhoseTIFFDoesNotDecode(t *testing.T) {
 		t.Errorf("%d downloads, want 1", n)
 	}
 }
+
+// The cached archive and the TIFF extracted from it both damaged: the TIFF is
+// removed, extracting it again finds the archive unreadable, and the archive is
+// replaced in the same call.
+func TestOpenReplacesADamagedArchiveAndTIFF(t *testing.T) {
+	cache, archiveKey, src := viirsCacheAndSource(t, archive(t, compositeTIFF()))
+
+	if err := open(t); err != nil {
+		t.Fatalf("first Open: %v", err)
+	}
+
+	put(t, cache, tiffFile, []byte(errorPage))
+	put(t, cache, archiveKey, []byte(errorPage))
+
+	if err := open(t); err != nil {
+		t.Fatalf("Open over a damaged archive and TIFF: %v", err)
+	}
+
+	if n := src.downloads.Load(); n != 2 {
+		t.Errorf("%d downloads, want 2", n)
+	}
+}

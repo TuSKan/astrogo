@@ -96,6 +96,8 @@ func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], e
 			return
 		}
 
+		defer r.Close() //nolint:errcheck // read-only handle, nothing actionable on close failure
+
 		rows, unreadable := 0, error(nil)
 
 		for t, err := range Read(r) {
@@ -110,20 +112,19 @@ func Open(ctx context.Context, name string) (iter.Seq2[resolve.Target, error], e
 			}
 
 			if !yield(t, err) {
-				_ = r.Close()
-
 				return
 			}
 		}
-
-		// Closed before the removal below, which Windows refuses on an open file.
-		_ = r.Close()
 
 		if unreadable == nil && rows == 0 {
 			unreadable = fmt.Errorf("%w: %s", errNoRows, name)
 		}
 
 		if unreadable != nil {
+			// The handle goes before the file does. Closing twice is
+			// harmless: the deferred Close only reports that it already was.
+			_ = r.Close()
+
 			yield(resolve.Target{}, errors.Join(unreadable, remote.RemoveFile(ctx, fsys, key)))
 		}
 	}, nil

@@ -2,8 +2,10 @@ package starlight_test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"testing"
 
@@ -100,5 +102,73 @@ func TestOpenDownloadsACorruptMapOnce(t *testing.T) {
 
 	if _, err := starlight.Open(context.Background()); !errors.Is(err, remote.ErrRejectedSource) {
 		t.Fatalf("second Open, source unchanged: err %v, want remote.ErrRejectedSource", err)
+	}
+}
+
+// gzipped compresses b.
+func gzipped(t *testing.T, b []byte) []byte {
+	t.Helper()
+
+	var out bytes.Buffer
+
+	w := gzip.NewWriter(&out)
+	if _, err := w.Write(b); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	return out.Bytes()
+}
+
+// A gzip stream that decompresses but is not a map is refused like one that
+// does not decompress at all.
+func TestOpenDownloadsANonMapOnce(t *testing.T) {
+	cache, key, src := gaiaMapCacheAndSource(t)
+	put(t, src, starlight.TotalStarlightMap, gzipped(t, []byte(errorPage)))
+
+	if _, err := starlight.Open(context.Background()); err == nil || errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("first Open: err %v, want the map's parse error", err)
+	}
+
+	if isCached(t, cache, key) {
+		t.Error("the stream that is not a map was cached")
+	}
+
+	if _, err := starlight.Open(context.Background()); !errors.Is(err, remote.ErrRejectedSource) {
+		t.Fatalf("second Open, source unchanged: err %v, want remote.ErrRejectedSource", err)
+	}
+}
+
+// A good map of another order, served under the name that promises order
+// GaiaMapOrder, is not the map asked for: it is refused and not cached.
+func TestOpenRefusesAMapOfAnotherOrder(t *testing.T) {
+	cache, key, src := gaiaMapCacheAndSource(t)
+
+	spec := starlight.GaiaBuild{Order: 1, Bands: []starlight.GaiaBand{starlight.GaiaJohnsonV()}}
+
+	var plain bytes.Buffer
+
+	plain.WriteString(spec.Header())
+
+	// Order 1 is 48 pixels. Their values span a factor of 48, past
+	// MinPublishedSkyContrast, so the map is a plausible sky and only its order
+	// can refuse it.
+	for pixel := range 48 {
+		if _, err := fmt.Fprintf(&plain, "%d %.6e\n", pixel, 1e-10*float64(1+pixel)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	put(t, src, starlight.TotalStarlightMap, gzipped(t, plain.Bytes()))
+
+	if _, err := starlight.Open(context.Background()); !errors.Is(err, starlight.ErrNoPublishedMap) {
+		t.Fatalf("Open: err %v, want ErrNoPublishedMap from the order check", err)
+	}
+
+	if isCached(t, cache, key) {
+		t.Error("the map of another order was cached")
 	}
 }
