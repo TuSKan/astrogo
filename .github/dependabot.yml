@@ -5,9 +5,12 @@ version: 2
 #
 # The PR must be mergeable as Dependabot opens it, with no maintainer commit or
 # label added afterwards. A commit on a bot's pull request leaves it waiting on
-# a second approver this repository does not have, and a label added after the
-# bot's push races that push's changelog run (#942). #768, #851 and #939 each
-# needed one or the other (#943).
+# a second approver this repository does not have. #768, #851 and #939 each
+# needed a commit or a label (#943).
+#
+# Nothing here exempts it from a changelog fragment: changelog.yml does, by its
+# author. #944 put a no-changelog label in this group's labels, and Dependabot
+# ignored it, opening #1017 with only its default labels (#1019).
 multi-ecosystem-groups:
   weekly-dependencies:
     schedule:
@@ -16,12 +19,6 @@ multi-ecosystem-groups:
     commit-message:
       prefix: chore
       include: scope
-    labels:
-      - dependencies
-      # docs/PULL_REQUESTS.md exempts a dependency-bot bump from a changelog
-      # fragment. Applied here, the label is in the event that opens the pull
-      # request, so the fragment check never sees it unlabeled.
-      - no-changelog
 
 updates:
   - package-ecosystem: gomod

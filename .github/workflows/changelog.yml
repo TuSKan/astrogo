@@ -54,10 +54,11 @@ jobs:
   # and names a real section. It cannot know which pull request is running, so
   # the existence check has to live here, where the number is.
   #
-  # Every change gets a fragment, tests and benchmarks included (#925). Label a
+  # Every change gets a fragment, tests and benchmarks included (#925). A
+  # Dependabot pull request is exempt by its author (#1019). Label any other
   # pull request `no-changelog` only when a release reader could not act on
-  # it: a dependency-bot bump or a pure spelling pass. The label is deliberate
-  # and reviewable; silence was not.
+  # it: a dependency bump opened by hand, or a pure spelling pass. The label is
+  # deliberate and reviewable; silence was not.
   #
   # The job name is unchanged from when this lived in ci.yml, so the required
   # check keeps matching.
@@ -88,11 +89,23 @@ jobs:
           PR_HEAD: ${{ github.head_ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # The labels the pull request has now, not the ones in the event
-          # that started this run, which a re-run replays unchanged (#942).
-          # A failed lookup fails the step: the shell runs with -e, so the
-          # check cannot pass for want of an answer.
-          labels=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '[.labels[].name] | join(",")')
+          # The author and labels the pull request has now, not the ones in
+          # the event that started this run, which a re-run replays unchanged
+          # (#942). A failed lookup fails the step: the shell runs with -e, so
+          # the check cannot pass for want of an answer.
+          pr=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '"\(.user.login) " + ([.labels[].name] | join(","))')
+          author=${pr%% *}
+          labels=${pr#* }
+
+          # A Dependabot bump is exempt because of who opened it, not because
+          # of a label it would have to apply. Dependabot ignores the labels a
+          # multi-ecosystem group sets, so #1017 opened with only its defaults
+          # and failed here, after #944 had put no-changelog in that group
+          # (#1019). No one else can open a pull request as dependabot[bot].
+          if [[ "$author" == "dependabot[bot]" ]]; then
+            echo "Opened by dependabot[bot]: a dependency bump, exempt."
+            exit 0
+          fi
 
           if [[ ",${labels}," == *",no-changelog,"* ]]; then
             echo "Labeled no-changelog — skipping."
@@ -126,6 +139,6 @@ jobs:
           echo "::error::No changelog fragment for pull request #${PR_NUMBER}."
           echo "Add docs/changelog.d/${PR_NUMBER}-<short-slug>.md — see docs/changelog.d/README.md"
           echo "and docs/PULL_REQUESTS.md section 4. Tests and benchmarks need one too. Only a"
-          echo "dependency bump or a pure spelling pass takes the 'no-changelog' label instead,"
-          echo "which re-runs this check by itself."
+          echo "dependency bump opened by hand or a pure spelling pass takes the 'no-changelog'"
+          echo "label instead, which re-runs this check by itself. Dependabot's need neither."
           exit 1
