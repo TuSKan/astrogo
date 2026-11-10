@@ -277,8 +277,10 @@ func parseCache(r io.Reader, values []float64, counts []int64) error {
 			continue
 		}
 
+		// v <= 0 alone let NaN through, since every comparison with NaN is
+		// false, and +Inf, which is positive (#1030).
 		v, err := strconv.ParseFloat(fields[1], 64)
-		if err != nil || v <= 0 {
+		if err != nil || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			continue
 		}
 
