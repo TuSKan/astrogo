@@ -6,7 +6,7 @@ require (
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/hebl/gofa v1.19.1
 	github.com/klauspost/pgzip v1.3.0
-	github.com/scigolib/hdf5 v0.14.2
+	github.com/scigolib/hdf5 v0.15.0
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/sync v0.25.0
 	golang.org/x/tools v0.52.0

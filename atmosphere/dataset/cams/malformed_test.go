@@ -16,18 +16,29 @@ import (
 
 // A malformed file is an error, never the end of the caller's process (#794).
 //
-// Each case is one byte of synthFixture's 426,636-byte file changed, found by
-// overwriting random bytes of its metadata and reading every variant through
-// Open, Var and ReadPlane. Before the fix the first three were a fatal "out of
-// memory" — the decoder sized a buffer from what the file declared, 8.8 TB in
-// the first — which no recover can catch, and the fourth a panic inside the
-// decoder's own Open.
+// Each case is one byte of synthFixture's file changed. They were first found
+// by overwriting random bytes of its metadata and reading every variant
+// through Open, Var and ReadPlane. Before the fix the first three were a fatal
+// "out of memory" (the decoder sized a buffer from what the file declared,
+// 8.8 TB in the first), which no recover can catch, and the fourth a panic
+// inside the decoder's own Open.
+//
+// Each offset is a field of the HDF5 format, named in its case, so a new
+// writer layout is met by finding the same fields again rather than by
+// searching. scigolib/hdf5 v0.15.0 moved every one of them: it writes a
+// dataset's attributes as compact messages in its object header, where v0.14.2
+// kept them in dense storage, and the file shrank from 426,636 bytes to 8,090
+// (#1024). The v0.15.0 object headers, from the start of the file:
+// longitude's at 5320, latitude's, level's, time's, then aermr01's at 7099
+// and lnsp's at 7691.
 
 // fixtureSize pins the fixture the offsets below refer to. A change to
 // synthFixture moves them, and has to be met by finding them again.
-const fixtureSize = 426636
+const fixtureSize = 8090
 
-func corruptFixture(t *testing.T, offset int, value byte) (remote.FS, string) {
+// corruptFixture writes synthFixture with each byte at an offset in edits
+// replaced by its value.
+func corruptFixture(t *testing.T, edits map[int]byte) (remote.FS, string) {
 	t.Helper()
 
 	fsys, key := synthFixture(t)
@@ -48,7 +59,9 @@ func corruptFixture(t *testing.T, offset int, value byte) (remote.FS, string) {
 		t.Fatalf("the fixture is %d bytes, not %d: synthFixture changed, and these offsets have to be found again", len(b), fixtureSize)
 	}
 
-	b[offset] = value
+	for offset, value := range edits {
+		b[offset] = value
+	}
 
 	out, err := remote.OpenFS(context.Background(), testutil.FileURL(t, t.TempDir()))
 	if err != nil {
@@ -66,26 +79,53 @@ func TestOpenRefusesAMalformedFile(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name   string
-		offset int
-		value  byte
-		want   string
+		name  string
+		edits map[int]byte
+		want  string
 	}{
-		{"a dimension scale claiming 2.2 trillion values", 5368, 0x02, "longitude declares 2199023255556 values"},
-		{"a string attribute claiming 386 MB in 16 bytes", 5824, 0x17, `attribute "CLASS" declares`},
-		{"an integer attribute claiming 16 GB in 4 bytes", 5953, 0xf2, `attribute "_Netcdf4Dimid" declares`},
+		// Byte 5 of the first dimension, 4, in longitude's dataspace message:
+		// the first message of its object header, a version 2 dataspace
+		// whose dimensions start 4 bytes in, at 5336.
+		//
+		// v0.15.0 refuses it on its own: it checks a dimension against the
+		// maximum the dataspace also stores, 4 here. Raising that maximum to
+		// match does not reach this package's bound either, since v0.15.0
+		// then bounds the contiguous storage the dataset declares, by the
+		// file and by 1 TiB, before checkExtent can read it. For a contiguous
+		// dataset that bound is now the decoder's, and checkExtent the second
+		// line behind it.
+		{"a dimension scale claiming 2.2 trillion values, refused by the decoder",
+			map[int]byte{5341: 0x02}, "dimension 0 size 2199023255556 is greater than its maximum 4"},
+		// Byte 3 of the size, 16, in the string datatype of longitude's CLASS
+		// attribute: the attribute message's name, "CLASS\0", ends at 5423,
+		// and the datatype's size follows its 4-byte header.
+		{"a string attribute claiming 386 MB in 16 bytes",
+			map[int]byte{5430: 0x17}, `attribute "CLASS" declares`},
+		// Byte 3 of the one dimension, 1, in the dataspace of longitude's
+		// _Netcdf4Dimid attribute: a version 2 dataspace after the
+		// attribute's 12-byte integer datatype, its dimension at 5566 and
+		// its maximum, also 1, at 5574. Both are raised, since v0.15.0
+		// refuses a dimension past its maximum before this package's
+		// attribute bound sees it.
+		{"an integer attribute claiming 16 GB in 4 bytes",
+			map[int]byte{5569: 0xf2, 5577: 0xf2}, `attribute "_Netcdf4Dimid" declares`},
+		// Byte 7 of the data segment size in the root group's local heap,
+		// whose "HEAP" signature is at 48 in both writers' files.
+		//
 		// Until scigolib/hdf5 v0.14.2 this byte led the decoder into a panic,
-		// which decode recovers as "the decoder failed"; v0.14.2 refuses the
-		// 720 PB local heap it makes on its own. Either way the file is
-		// malformed, and the panic path is TestDecodeTurnsAPanicIntoAnError's.
-		{"a local heap claiming 720 PB, refused by the decoder", 63, 0x0a, "exceeds maximum"},
+		// which decode recovers as "the decoder failed"; v0.14.2 and later
+		// refuse the 720 PB local heap it makes on their own. Either way the
+		// file is malformed, and the panic path is
+		// TestDecodeTurnsAPanicIntoAnError's.
+		{"a local heap claiming 720 PB, refused by the decoder",
+			map[int]byte{63: 0x0a}, "exceeds maximum"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fsys, key := corruptFixture(t, tt.offset, tt.value)
+			fsys, key := corruptFixture(t, tt.edits)
 
 			cf, err := Open(context.Background(), fsys, key)
 			if err == nil {
@@ -108,7 +148,15 @@ func TestOpenRefusesAMalformedFile(t *testing.T) {
 // aermr01's 12 values, and ended the test binary on Linux and on Windows.
 //
 // Each offset is the third byte of the size in a float64 variable's datatype
-// message, 08 00 00 00, so 0x10 there declares 1 MiB and 8 bytes a value.
+// message, 08 00 00 00, so 0x10 there declares 1 MiB and 8 bytes a value. The
+// datatype message is the second in each variable's object header, after its
+// dataspace: at 7183 for aermr01 and 7759 for lnsp, its size 4 bytes in.
+//
+// v0.15.0 now bounds a contiguous dataset's storage by the file itself, in
+// the Info that checkExtent reads before computing its own bound, and that
+// check is the tighter of the two: it counts the storage's offset in the
+// file. So the refusal is the decoder's, arriving as ErrMalformed through
+// checkExtent, and this package's bound is the second line behind it.
 func TestReadPlaneRefusesAnElementSizeTheFileCannotHold(t *testing.T) {
 	t.Parallel()
 
@@ -116,13 +164,13 @@ func TestReadPlaneRefusesAnElementSizeTheFileCannotHold(t *testing.T) {
 		name   string
 		offset int
 	}{
-		{"aermr01", 286194},
-		{"lnsp", 356441},
+		{"aermr01", 7189},
+		{"lnsp", 7765},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fsys, key := corruptFixture(t, tt.offset, 0x10)
+			fsys, key := corruptFixture(t, map[int]byte{tt.offset: 0x10})
 
 			cf, err := Open(context.Background(), fsys, key)
 			if err != nil {
@@ -138,7 +186,7 @@ func TestReadPlaneRefusesAnElementSizeTheFileCannotHold(t *testing.T) {
 
 			_, err = v.ReadPlane(0, 0)
 
-			want := tt.name + " declares 12 values of 1048584 bytes"
+			want := `dataset "` + tt.name + `": hdf5: corrupt file: contiguous dataset storage: read beyond end of file`
 			if !errors.Is(err, ErrMalformed) || !strings.Contains(err.Error(), want) {
 				t.Errorf("ReadPlane = %v, want ErrMalformed saying %q", err, want)
 			}
