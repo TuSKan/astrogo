@@ -123,8 +123,11 @@ func Parse(r io.Reader) (*Spectrum, error) {
 	}
 
 	for i := range wavelength {
+		// An infinity is dropped as a NaN is. Kept, an infinite flux read as
+		// +Inf across a hundred nanometers of At, and an infinite wavelength
+		// held the last real value out to infinity (#1038).
 		nm := wavelength[i] * angstromToNM
-		if nm <= 0 || math.IsNaN(nm) || math.IsNaN(flux[i]) {
+		if nm <= 0 || math.IsNaN(nm) || math.IsInf(nm, 0) || math.IsNaN(flux[i]) || math.IsInf(flux[i], 0) {
 			continue
 		}
 
@@ -140,6 +143,13 @@ func Parse(r io.Reader) (*Spectrum, error) {
 
 	if len(out.WavelengthNM) < 2 {
 		return nil, fmt.Errorf("%w: %d usable rows", ErrNoSpectrum, len(out.WavelengthNM))
+	}
+
+	// At bisects, so it needs the wavelengths ascending. A file in descending
+	// order parsed and then read zero at every wavelength, which is zero
+	// moonlight (#1038).
+	if err := unit.ValidateWavelengths(out.WavelengthNM); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrNoSpectrum, err)
 	}
 
 	return out, nil

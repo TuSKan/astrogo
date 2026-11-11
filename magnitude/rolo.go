@@ -22,8 +22,9 @@ var (
 	// error says the result is an extrapolation.
 	ErrROLOPhaseRange = errors.New("magnitude: phase angle outside the ROLO fitted range")
 
-	// ErrROLODistance is returned for a non-positive distance.
-	ErrROLODistance = errors.New("magnitude: distance must be positive")
+	// ErrROLODistance is returned for a distance that is not positive and
+	// finite.
+	ErrROLODistance = errors.New("magnitude: distance must be positive and finite")
 )
 
 // ROLO model reference values and their provenance.
@@ -281,8 +282,10 @@ func ROLOIrradiance(dst, reflectance, solar []float64, sunDistance, moonDistance
 			ErrROLOBandCount, len(dst), len(reflectance), len(solar))
 	}
 
+	// Finite as well as positive: an infinite distance gave zero irradiance
+	// in every band, with no error (#1038).
 	sunAU, moonM := sunDistance.AU(), moonDistance.Meters()
-	if sunAU <= 0 || moonM <= 0 || math.IsNaN(sunAU) || math.IsNaN(moonM) {
+	if !(sunAU > 0) || !(moonM > 0) || math.IsInf(sunAU, 1) || math.IsInf(moonM, 1) {
 		return fmt.Errorf("%w: sun %g AU, moon %g km",
 			ErrROLODistance, sunAU, moonDistance.Km())
 	}

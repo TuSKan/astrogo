@@ -113,6 +113,19 @@ func (s SourceSpectrum) scale() ([]float64, error) {
 		return nil, fmt.Errorf("%w: %w", ErrSpectrum, err)
 	}
 
+	// A power distribution and a response are both non-negative and finite.
+	// An infinite shape value scaled every other wavelength to zero and its
+	// own to NaN, an infinite response scaled them all to zero, and a negative
+	// shape gave a negative radiance, all with no error (#1038).
+	for i := range n {
+		for _, v := range [2]float64{s.Shape[i], s.Response[i]} {
+			if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
+				return nil, fmt.Errorf("%w: at %v nm, shape %g and response %g",
+					ErrSpectrum, s.WavelengthNM[i], s.Shape[i], s.Response[i])
+			}
+		}
+	}
+
 	var overlap float64
 
 	for i := 1; i < n; i++ {
