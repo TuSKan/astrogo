@@ -40,7 +40,7 @@ A pull request vets all three tags and runs `integration` in a non-blocking job.
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Twenty-four packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -49,6 +49,7 @@ Twenty-four packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds 
 | `ephemeris/satellite` | `FuzzValidateTLE`, `FuzzNewFromTLE` | CelesTrak or user-supplied element sets |
 | `ephemeris/satellite/sgp4` | `FuzzParseTLE`, `FuzzVerifyTLEChecksums` | the same element sets, at the SGP4 backend's own parser and checksum |
 | `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
+| `catalog/fink` | `FuzzResolve` | FINK's single-object JSON and its SSOFT Parquet table, through Arrow's decoder, served through `httptest` |
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
 | `catalog/mpcorb` | `FuzzRead` | the Minor Planet Center's orbit files, MPCORB and CometEls |
@@ -108,7 +109,7 @@ Two things follow, and both matter more than the numbers.
 
 The low `fits` figures are minimization, not a slow parser: those two targets find ~110 interesting inputs from a fresh corpus and pay up to 5s minimizing each. `fits`'s `FuzzRead` measures ~800 exec/s here, against the "~4" this table claimed before it was measured this way — that figure was the default 60s minimize time, not the parser.
 
-Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Six are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, a VOTable with rows but no field declarations, a GeoTIFF with a tile width but no tile length (#744), and from #746 a comet row ending before its name column, a star-map band header whose lowercase is a different length, and a star-map row numbered 200000000000000 that sized a 200 TB allocation.
+Any crasher Go writes to `testdata/fuzz/` should be committed — that's the one place a small binary fixture is legitimate here, since it's a regression test for a bug the fuzzer found, not a data source. Seven are checked in: an out-of-range TLE epoch day that panicked inside the SGP4 backend, a VOTable with rows but no field declarations, a GeoTIFF with a tile width but no tile length (#744), from #746 a comet row ending before its name column, a star-map band header whose lowercase is a different length, and a star-map row numbered 200000000000000 that sized a 200 TB allocation, and a FINK SSOFT Parquet file whose schema panicked Arrow's decoder with a slice capacity out of range (#1062).
 
 ## Performance
 

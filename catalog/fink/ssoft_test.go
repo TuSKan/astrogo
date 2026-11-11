@@ -70,8 +70,8 @@ func (r ssoftRow) numberText() string {
 // Written through the same Arrow parquet stack the reader uses, so a schema the
 // writer accepts is one the reader can open — the alternative, a hand-rolled
 // byte fixture, would test this package against a file format nobody produces.
-func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
-	t.Helper()
+func ssoftParquet(tb testing.TB, rows []ssoftRow) []byte {
+	tb.Helper()
 
 	pool := memory.NewGoAllocator()
 
@@ -105,7 +105,7 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 	str := func(i int) *array.StringBuilder {
 		fb, ok := b.Field(i).(*array.StringBuilder)
 		if !ok {
-			t.Fatalf("field %d is %T, not a string builder", i, b.Field(i))
+			tb.Fatalf("field %d is %T, not a string builder", i, b.Field(i))
 		}
 
 		return fb
@@ -114,7 +114,7 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 	f64 := func(i int) *array.Float64Builder {
 		fb, ok := b.Field(i).(*array.Float64Builder)
 		if !ok {
-			t.Fatalf("field %d is %T, not a float64 builder", i, b.Field(i))
+			tb.Fatalf("field %d is %T, not a float64 builder", i, b.Field(i))
 		}
 
 		return fb
@@ -150,7 +150,7 @@ func ssoftParquet(t *testing.T, rows []ssoftRow) []byte {
 
 	var buf bytes.Buffer
 	if err := pqarrow.WriteTable(tbl, &buf, 1024, parquet.NewWriterProperties(), pqarrow.DefaultWriterProps()); err != nil {
-		t.Fatalf("writing parquet fixture: %v", err)
+		tb.Fatalf("writing parquet fixture: %v", err)
 	}
 
 	return buf.Bytes()
