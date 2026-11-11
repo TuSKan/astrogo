@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
@@ -120,10 +120,12 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		hasCoord := false
 
 		if raStr != "" && decStr != "" {
-			raDeg, errRA := strconv.ParseFloat(raStr, 64)
+			// A NaN, infinite or impossible position is no position, read as
+			// one that does not parse (#1080).
+			raDeg, okRA := finite.Parse(raStr)
 
-			decDeg, errDec := strconv.ParseFloat(decStr, 64)
-			if errRA == nil && errDec == nil {
+			decDeg, okDec := finite.Parse(decStr)
+			if okRA && okDec && finite.Position(raDeg, decDeg) {
 				c = coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg))
 				hasCoord = true
 			}
@@ -146,25 +148,25 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
 
 			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
-				if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {
+				if v, ok := finite.Parse(row[pmRAStr]); ok {
 					t.PmRA = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
-				if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
+				if v, ok := finite.Parse(row[pmDecStr]); ok {
 					t.PmDec = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
-				if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
+				if v, ok := finite.Parse(row[plxStr]); ok {
 					t.Parallax = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
-				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
+				if v, ok := finite.Parse(row[rvStr]); ok {
 					// SIMBAD's rvz_radvel is km/s.
 					t.RadialVelocity = unit.KmPerSec(v)
 					t.HasRadialVelocity = true
@@ -174,7 +176,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 			// "V" (uppercase) in SIMBAD's live TAP response — confirmed
 			// directly against the real service, not "v".
 			if vmagIdx, ok := colIdx["V"]; ok && row[vmagIdx] != "" {
-				if v, err := strconv.ParseFloat(row[vmagIdx], 64); err == nil {
+				if v, ok := finite.Parse(row[vmagIdx]); ok {
 					t.VMag = v
 					t.HasVMag = true
 				}
@@ -255,10 +257,12 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 		hasCoord := false
 
 		if raStr != "" && decStr != "" {
-			raDeg, errRA := strconv.ParseFloat(raStr, 64)
+			// A NaN, infinite or impossible position is no position, read as
+			// one that does not parse (#1080).
+			raDeg, okRA := finite.Parse(raStr)
 
-			decDeg, errDec := strconv.ParseFloat(decStr, 64)
-			if errRA == nil && errDec == nil {
+			decDeg, okDec := finite.Parse(decStr)
+			if okRA && okDec && finite.Position(raDeg, decDeg) {
 				c = coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg))
 				hasCoord = true
 			}
@@ -281,25 +285,25 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
 
 			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
-				if v, err := strconv.ParseFloat(row[pmRAStr], 64); err == nil {
+				if v, ok := finite.Parse(row[pmRAStr]); ok {
 					t.PmRA = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
-				if v, err := strconv.ParseFloat(row[pmDecStr], 64); err == nil {
+				if v, ok := finite.Parse(row[pmDecStr]); ok {
 					t.PmDec = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
-				if v, err := strconv.ParseFloat(row[plxStr], 64); err == nil {
+				if v, ok := finite.Parse(row[plxStr]); ok {
 					t.Parallax = angle.Arcsec(v / 1000.0)
 				}
 			}
 
 			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
-				if v, err := strconv.ParseFloat(row[rvStr], 64); err == nil {
+				if v, ok := finite.Parse(row[rvStr]); ok {
 					// SIMBAD's rvz_radvel is km/s.
 					t.RadialVelocity = unit.KmPerSec(v)
 					t.HasRadialVelocity = true
@@ -312,7 +316,7 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 		// table.column reference in ORDER BY), so the response column is
 		// named "vmag", not "v"/"V".
 		if vmagIdx, ok := colIdx["vmag"]; ok && row[vmagIdx] != "" {
-			if v, err := strconv.ParseFloat(row[vmagIdx], 64); err == nil {
+			if v, ok := finite.Parse(row[vmagIdx]); ok {
 				t.VMag = v
 				t.HasVMag = true
 			}

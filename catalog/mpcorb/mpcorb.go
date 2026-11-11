@@ -50,6 +50,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -297,9 +298,9 @@ func isElementRow(row string) bool {
 		return false
 	}
 
-	_, err := strconv.ParseFloat(strings.TrimSpace(row[colEccStart:colEccEnd]), 64)
+	_, ok := finite.Parse(strings.TrimSpace(row[colEccStart:colEccEnd]))
 
-	return err == nil
+	return ok
 }
 
 // parseRow converts one MPCORB row into a resolve.Target.
@@ -330,8 +331,8 @@ func parseRow(row string) (resolve.Target, error) {
 		{"argument of perihelion", row[colPeriStart:colPeriEnd], func(v float64) { t.ArgPeriapsis = angle.Deg(v) }, true},
 		{"mean anomaly", row[colMStart:colMEnd], func(v float64) { t.MeanAnomaly = angle.Deg(v) }, true},
 	} {
-		v, err := strconv.ParseFloat(strings.TrimSpace(f.text), 64)
-		if err != nil {
+		v, ok := finite.Parse(strings.TrimSpace(f.text))
+		if !ok {
 			return resolve.Target{}, fmt.Errorf("%w: %s: %s %q", ErrMalformedRow, t.ID, f.name, f.text)
 		}
 
@@ -345,14 +346,14 @@ func parseRow(row string) (resolve.Target, error) {
 	// absent whenever H is. Left unset rather than defaulted: H = 0 is a
 	// magnitude, and an object reported at absolute magnitude zero is the
 	// brightest thing in the solar system rather than one nobody has measured.
-	if h, err := strconv.ParseFloat(strings.TrimSpace(row[colHStart:colHEnd]), 64); err == nil {
+	if h, ok := finite.Parse(strings.TrimSpace(row[colHStart:colHEnd])); ok {
 		t.H = h
 		t.HasH = true
 
 		// G is only meaningful alongside H, and the MPC defaults it to 0.15
 		// where it has not been fitted — which is a real published value, not
 		// a gap, so it is taken as given.
-		if g, err := strconv.ParseFloat(strings.TrimSpace(row[colGStart:colGEnd]), 64); err == nil {
+		if g, ok := finite.Parse(strings.TrimSpace(row[colGStart:colGEnd])); ok {
 			t.G = g
 		}
 	}

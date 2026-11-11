@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 
@@ -383,35 +384,38 @@ func (p *Provider) recordToTarget(rec *ssoRecord) resolve.Target {
 		t.ID, t.Designation = rec.Name, ""
 	}
 
+	// FINK reads an absent value as NaN, and its JSON strings and Parquet
+	// floats can carry an infinity too; neither is a value (#1080).
+
 	// Use r-band (filter 2) as primary — closer to V than g-band.
-	if !math.IsNaN(rec.H2) {
+	if finite.Is(rec.H2) {
 		t.H = rec.H2
 		t.HasH = true
-	} else if !math.IsNaN(rec.H1) {
+	} else if finite.Is(rec.H1) {
 		t.H = rec.H1
 		t.HasH = true
 	}
 
 	// G1, G2 phase parameters.
-	if !math.IsNaN(rec.G1_2) && !math.IsNaN(rec.G2_2) {
+	if finite.Is(rec.G1_2) && finite.Is(rec.G2_2) {
 		t.G1 = rec.G1_2
 		t.G2 = rec.G2_2
 		t.HasG1G2 = true
-	} else if !math.IsNaN(rec.G1_1) && !math.IsNaN(rec.G2_1) {
+	} else if finite.Is(rec.G1_1) && finite.Is(rec.G2_1) {
 		t.G1 = rec.G1_1
 		t.G2 = rec.G2_1
 		t.HasG1G2 = true
 	}
 
 	// Spin axis.
-	if !math.IsNaN(rec.Alpha0) && !math.IsNaN(rec.Delta0) {
+	if finite.Is(rec.Alpha0) && finite.Is(rec.Delta0) {
 		t.SpinRA = angle.Deg(rec.Alpha0)
 		t.SpinDec = angle.Deg(rec.Delta0)
 		t.HasSpin = true
 	}
 
 	// Oblateness.
-	if !math.IsNaN(rec.R) && rec.R > 0 && rec.R <= 1 {
+	if finite.Is(rec.R) && rec.R > 0 && rec.R <= 1 {
 		t.Oblateness = rec.R
 		t.HasOblateness = true
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/fits"
 
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
@@ -105,17 +105,10 @@ func New(filePath string) (*Provider, error) {
 // radians. Neither is repairable by guessing, so the row keeps its name and
 // loses its claim to a position.
 func usableCoord(ra, dec float64) bool {
-	if math.IsNaN(ra) || math.IsNaN(dec) || math.IsInf(ra, 0) || math.IsInf(dec, 0) {
-		return false
-	}
-
-	if dec < -90 || dec > 90 {
-		return false
-	}
-
-	// Both conventions for right ascension are accepted, 0 to 360 and -180 to
-	// 180; NewICRS wraps either.
-	if ra < -360 || ra > 360 {
+	// Finite, and in range in both conventions for right ascension, 0 to 360
+	// and -180 to 180, which NewICRS wraps: the rule every catalog parser
+	// reads positions by (#1080).
+	if !finite.Position(ra, dec) {
 		return false
 	}
 

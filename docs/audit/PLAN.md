@@ -77,6 +77,9 @@ These packages decide whether other tests can fail, so each bound they apply is 
 
 To be discussed before the items that depend on them.
 
-- **Non-finite values from catalog services** (phase 2): whether a row with a non-finite required field, such as RA or Dec, is dropped with an error, and whether optional fields may keep NaN to mean "absent", as VOTable nulls can arrive.
+- ~~**Non-finite values from catalog services**~~ (phase 2). **Decided 2026-11-11, #1080:**
+  - A non-finite number in a catalog answer is read exactly as an empty or unparseable one, wherever it appears. A position that is non-finite or impossible is no position, and each parser does what it already does with one that will not parse.
+  - A non-finite optional field is absent; nothing keeps NaN to mean "absent".
+  - `plan.FromCatalog` refuses a non-finite coordinate and ignores non-finite kinematics, as a backstop.
 - **#115**, `plan`'s 356 exported symbols and the three packages named `plan`: an API design question rather than an audit finding. Schedule it before 1.0, or close it.
 - **`plan`'s slew time conversion**: the float-to-Duration conversion overflows only below a slew rate of 2e-8 deg/s. Record it as a waiver, or add the guard.

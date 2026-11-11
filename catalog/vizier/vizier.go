@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
@@ -245,14 +246,20 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 
 		designation := strings.TrimSpace(record[desigIdx])
 
-		raDeg, err := strconv.ParseFloat(strings.TrimSpace(record[raIdx]), 64)
-		if err != nil {
-			return nil, fmt.Errorf("vizier: parse ra %q: %w", record[raIdx], err)
+		// A NaN, infinite or impossible position is read as one that does
+		// not parse, which this parser has always refused (#1080).
+		raDeg, okRA := finite.Parse(strings.TrimSpace(record[raIdx]))
+		if !okRA {
+			return nil, fmt.Errorf("%w: ra %q is not a number", ErrUnexpectedSchema, record[raIdx])
 		}
 
-		decDeg, err := strconv.ParseFloat(strings.TrimSpace(record[decIdx]), 64)
-		if err != nil {
-			return nil, fmt.Errorf("vizier: parse dec %q: %w", record[decIdx], err)
+		decDeg, okDec := finite.Parse(strings.TrimSpace(record[decIdx]))
+		if !okDec {
+			return nil, fmt.Errorf("%w: dec %q is not a number", ErrUnexpectedSchema, record[decIdx])
+		}
+
+		if !finite.Position(raDeg, decDeg) {
+			return nil, fmt.Errorf("%w: ra %g, dec %g is not a position", ErrUnexpectedSchema, raDeg, decDeg)
 		}
 
 		// A row's own epoch is the date its position was measured. Its time
@@ -260,9 +267,9 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 		epoch := schema.Epoch
 
 		if schema.EpochCol != "" {
-			jd, err := strconv.ParseFloat(strings.TrimSpace(record[epochIdx]), 64)
-			if err != nil {
-				return nil, fmt.Errorf("vizier: parse epoch %q: %w", record[epochIdx], err)
+			jd, ok := finite.Parse(strings.TrimSpace(record[epochIdx]))
+			if !ok {
+				return nil, fmt.Errorf("%w: epoch %q is not a number", ErrUnexpectedSchema, record[epochIdx])
 			}
 
 			epoch = time.FromJD(jd, time.UTC)
