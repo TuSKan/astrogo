@@ -26,8 +26,8 @@
 //
 // # Why github.com/scigolib/hdf5, and what was verified before using it
 //
-// astrogo used to depend on this library (removed when skybrightness/atlas
-// was deleted; see docs/reports/skybrightness-phase1.md). Re-adopting it
+// astrogo used to depend on this library, and dropped it when
+// skybrightness/atlas was deleted. Re-adopting it
 // here was gated on a live decision-gate spike against the real CAMS
 // files this package targets — not assumed to still work, and not
 // assumed to work at all for a 4-dimensional, chunked, deflate-compressed

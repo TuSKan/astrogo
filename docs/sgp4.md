@@ -20,7 +20,7 @@ measured how wrong without knowing why.
 
 ### 1.1 What the Vallado suite has been saying
 
-`ephemeris/satellite/sgp4_vallado_validation_test.go` compares astrogo against
+`ephemeris/satellite/sgp4/vallado_test.go` compares astrogo against
 the reference states published with Vallado et al. (2006), *Revisiting
 Spacetrack Report #3* (AIAA 2006-6753). Twenty-three of the thirty readable
 cases agree to a median of 4 cm. Seven do not:
@@ -372,8 +372,8 @@ relationship** rather than leaving it to a comment:
   attached, so that a future reader who notices the mismatch finds an answer
   instead of filing a bug.
 
-This also closes the duplication the question came from: `ephemeris/satellite/regime.go`
-currently carries a third private copy of these constants, and §6.8 deletes it
+This also closes the duplication the question came from: `ephemeris/satellite`'s
+`regime.go` carried a third private copy of these constants, and §6.8 deleted it
 outright rather than re-plumbing it.
 
 ### 6.5 Checksums are a separate call from parsing

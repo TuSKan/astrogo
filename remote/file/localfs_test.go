@@ -315,11 +315,11 @@ func TestConcurrentWritersInOneProcess(t *testing.T) {
 // TestConcurrentWritersAcrossProcesses is the other half of #315, and the half
 // no in-process lock could ever reach.
 //
-// remote/file/writelock.go's own doc comment states the boundary: "Two
-// processes writing the same key into the same bucket directory. That is what
-// remote's cross-process lock object is for, and it is a separate mechanism
-// with its own limits." The staging collision was underneath that mechanism,
-// which is why it survived two attempts to fix it.
+// The in-process write lock this package had then drew the boundary in its own
+// doc comment: "Two processes writing the same key into the same bucket
+// directory. That is what remote's cross-process lock object is for, and it is
+// a separate mechanism with its own limits." The staging collision was
+// underneath that mechanism, which is why it survived two attempts to fix it.
 //
 // This runs the test binary again as a child, twice, both writing one key.
 func TestConcurrentWritersAcrossProcesses(t *testing.T) {

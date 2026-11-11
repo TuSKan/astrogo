@@ -350,7 +350,7 @@ body is placed against today (#810).
 
 ### 6.1 The prototype, and the record cache it became
 
-`internal/workload/prototype_test.go` (since deleted, replaced by the
+A prototype test in `internal/workload` (since deleted, replaced by the
 production cache below) built the two internals every option needs and
 nothing else:
 
