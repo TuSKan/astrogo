@@ -1,6 +1,7 @@
 package posmatch
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -44,6 +45,73 @@ func TestCoordCarriesTheTargetsOwnMotion(t *testing.T) {
 	still := resolve.Target{Coord: barnard.Coord, HasCoord: true}
 	if got := Coord(still); got != still.Coord {
 		t.Errorf("Coord of a Target with no motion is %v, want its Coord unchanged", got)
+	}
+}
+
+// TestCoordCarriesEachKinematicFieldOnItsOwn: Coord's shortcut returns the
+// bare position only when all four fields are zero. A Target carrying just
+// one of them must still get it attached. Dropping any one term from the
+// shortcut's condition would hand that Target back without the value its
+// provider read.
+func TestCoordCarriesEachKinematicFieldOnItsOwn(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		set  func(*resolve.Target)
+		got  func(coord.ICRS) bool
+	}{
+		{"proper motion in RA", func(tg *resolve.Target) { tg.PmRA = barnard.PmRA }, func(c coord.ICRS) bool { return c.PmRA() == barnard.PmRA }},
+		{"proper motion in Dec", func(tg *resolve.Target) { tg.PmDec = barnard.PmDec }, func(c coord.ICRS) bool { return c.PmDec() == barnard.PmDec }},
+		{"parallax", func(tg *resolve.Target) { tg.Parallax = barnard.Parallax }, func(c coord.ICRS) bool { return c.Parallax() == barnard.Parallax }},
+		{"radial velocity", func(tg *resolve.Target) { tg.RadialVelocity = barnard.RadialVelocity }, func(c coord.ICRS) bool { return c.RV() == barnard.RadialVelocity }},
+	} {
+		tgt := resolve.Target{Coord: barnard.Coord, HasCoord: true, Epoch: time.J2000()}
+		c.set(&tgt)
+
+		if !c.got(Coord(tgt)) {
+			t.Errorf("%s alone: Coord dropped it", c.name)
+		}
+	}
+}
+
+// TestSeparationReportsAPositionItCannotMove: a position that cannot be
+// propagated is an error, never a separation. Answering 0 instead would put
+// that target within any threshold of everything it is compared with.
+//
+// The position here cannot be moved because of its parallax. 1e300″ puts
+// the star at a distance that underflows to zero, and SOFA's Pmsafe refuses
+// the space motion with status -1. It is the one way found to make
+// coord.PropagateEpoch fail: every parallax up to 1e12″ propagates, and a
+// NaN anywhere propagates to NaN with status 0. A catalog parser would pass
+// 1e300 on, since it is finite. Each of Separation's four propagations is
+// made to fail on its own: the star that cannot be moved is given at the Gaia
+// epoch, so taking it to J2000, or to the other side's epoch, means moving it.
+func TestSeparationReportsAPositionItCannotMove(t *testing.T) {
+	t.Parallel()
+
+	gaiaEpoch := time.FromJD(time.J2000().JD()+16*365.25, time.TT)
+	unmovable := coord.NewICRSWithKinematics(angle.Deg(150), angle.Deg(20),
+		angle.Arcsec(0.1), angle.Arcsec(0.1), angle.Arcsec(1e300), unit.KmPerSec(0))
+	moving := Coord(barnard)
+	still := coord.NewICRS(angle.Deg(150), angle.Deg(20))
+
+	for _, c := range []struct {
+		name   string
+		a      coord.ICRS
+		aEpoch time.Time
+		b      coord.ICRS
+		bEpoch time.Time
+	}{
+		{"both moving, the first cannot be", unmovable, gaiaEpoch, moving, time.J2000()},
+		{"both moving, the second cannot be", moving, time.J2000(), unmovable, gaiaEpoch},
+		{"only the first moving", unmovable, gaiaEpoch, still, time.J2000()},
+		{"only the second moving", still, time.J2000(), unmovable, gaiaEpoch},
+	} {
+		sep, err := Separation(c.a, c.aEpoch, c.b, c.bEpoch)
+		if !errors.Is(err, coord.ErrPropagationFailed) {
+			t.Errorf("%s: Separation = %v, %v; want coord.ErrPropagationFailed", c.name, sep, err)
+		}
 	}
 }
 
