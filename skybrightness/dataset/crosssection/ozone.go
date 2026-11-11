@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/remote"
@@ -42,42 +41,43 @@ const OzoneTemperatureK = 223
 // lines instead, and a band-averaged cross section is systematically wrong for
 // them — see [atmosphere.CrossSection] and docs/skybrightness.md section 16.
 func Ozone(ctx context.Context) (atmosphere.CrossSection, error) {
-	// The atlas is fetched with a validator, so a response that parses but is
-	// not an ozone cross section is rejected before it is promoted into the
-	// cache rather than after — the same shape iers uses for the EOP bulletin.
-	fsys, key, err := remote.GetFile(ctx, remote.MPIMainzCrossSections, remote.OzoneSerdyuchenko223K,
-		remote.WithValidate(func(r io.Reader) error {
-			xs, err := Parse(r, "O3", Nanometer)
-			if err != nil {
-				return err
-			}
+	var xs atmosphere.CrossSection
 
-			return plausibleOzone(xs)
-		}))
-	if err != nil {
+	// Parsed through remote.WithRead, on whichever copy GetFile returns. A
+	// fresh download that is not an ozone cross section is refused before
+	// anyone reads it, and so is a cached copy: the endpoint is immutable, so
+	// GetFile reuses its copy on existence alone, and with WithValidate,
+	// which sees only a download, a copy that went bad in the cache failed
+	// every call and was never replaced (#1043).
+	read := func(fsys remote.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("crosssection: open %s: %w", key, err)
+		}
+		defer func() { _ = r.Close() }()
+
+		// The atlas publishes this file as two columns, wavelength in
+		// nanometers and cross section in cm^2 per molecule, with no header.
+		// The unit is passed rather than sniffed because the atlas also
+		// serves wavenumber and angstrom files that a sniffer would confuse
+		// for one another.
+		parsed, err := Parse(r, "O3", Nanometer)
+		if err != nil {
+			return err
+		}
+
+		if err := plausibleOzone(parsed); err != nil {
+			return err
+		}
+
+		xs = parsed
+
+		return nil
+	}
+
+	if _, _, err := remote.GetFile(ctx, remote.MPIMainzCrossSections, remote.OzoneSerdyuchenko223K,
+		remote.WithRead(read)); err != nil {
 		return atmosphere.CrossSection{}, fmt.Errorf("crosssection: fetch ozone: %w", err)
-	}
-
-	r, err := fsys.Open(key)
-	if err != nil {
-		return atmosphere.CrossSection{}, fmt.Errorf("crosssection: open %s: %w", key, err)
-	}
-	defer func() { _ = r.Close() }()
-
-	// The atlas publishes this file as two columns, wavelength in nanometers
-	// and cross section in cm^2 per molecule, with no header. The unit is
-	// passed rather than sniffed because the atlas also serves wavenumber and
-	// angstrom files that a sniffer would confuse for one another.
-	xs, err := Parse(r, "O3", Nanometer)
-	if err != nil {
-		return atmosphere.CrossSection{}, err
-	}
-
-	// Checked again on the way out, because a cache written before this
-	// validator existed is not re-validated by GetFile — it is reused on
-	// existence alone, the endpoint being immutable.
-	if err := plausibleOzone(xs); err != nil {
-		return atmosphere.CrossSection{}, err
 	}
 
 	return xs, nil
