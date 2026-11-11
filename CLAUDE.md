@@ -50,6 +50,7 @@ Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds 
 | `ephemeris/satellite/sgp4` | `FuzzParseTLE`, `FuzzVerifyTLEChecksums` | the same element sets, at the SGP4 backend's own parser and checksum |
 | `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
 | `catalog/fink` | `FuzzResolve` | FINK's single-object JSON and its SSOFT Parquet table, through Arrow's decoder, served through `httptest` |
+| `catalog/sbdb` | `FuzzSearchBright` | JPL SBDB's column-oriented bulk query answers, served through `httptest` (#1058) |
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
 | `catalog/mpcorb` | `FuzzRead` | the Minor Planet Center's orbit files, MPCORB and CometEls |
