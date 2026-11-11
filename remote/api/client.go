@@ -198,7 +198,15 @@ func (c *Client) Timeout() time.Duration { return c.timeout }
 
 // Close releases the client's idle connections. A Client is usually held
 // for the life of a provider, so this is optional.
+//
+// The release is done here because resty's own Close does not do it. That
+// Close runs close hooks, of which this package registers none, and stops a
+// certificate watcher. It never reaches the transport. Until #1089 every idle
+// connection outlived Close by the transport's idle timeout, 90 seconds by
+// resty's default.
 func (c *Client) Close() error {
+	c.rc.Client().CloseIdleConnections()
+
 	if err := c.rc.Close(); err != nil {
 		return fmt.Errorf("remote/api: close: %w", err)
 	}
