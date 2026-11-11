@@ -62,11 +62,12 @@ func (g Gravity) valid() bool { return g == WGS72 || g == WGS84 || g == WGS72Old
 
 // gravityModel is one row of Vallado's getgravconst, in SGP4's own units.
 //
-// # Why these are literals, when regime.go reads the same numbers from constants
+// # Why these are literals, when constants publishes the same numbers
 //
-// A fair question, because the two files hold identical values and resolve it
-// differently. The answer is not the same for all three rows, and stating it
-// row by row is the point:
+// A fair question, because constants.WGS72 holds identical values, and the
+// satellite package once kept a private copy that read them live (its
+// regime.go, which docs/sgp4.md §6.8 deleted). The answer is not the same for
+// all three rows, and stating it row by row is the point:
 //
 //   - The WGS84 row MUST be frozen. Its mu is 398600.5, where
 //     constants.WGS84 carries the standard's 398600.4418 and DE440 measures
@@ -77,7 +78,7 @@ func (g Gravity) valid() bool { return g == WGS72 || g == WGS84 || g == WGS72Old
 //
 //   - The WGS72 row need not be. WGS 72 is a closed standard — superseded in
 //     1984, never to gain a new realization — so nothing can move underneath it,
-//     which is exactly why ephemeris/satellite/regime.go does read it live.
+//     and a live read would be safe.
 //
 // So for the WGS-72 row this is a choice, and the reason is legibility rather
 // than safety. CLAUDE.md: "Do not abstract constants out of published formulas;
@@ -88,9 +89,6 @@ func (g Gravity) valid() bool { return g == WGS72 || g == WGS84 || g == WGS72Old
 // terms rather than defining parameters — so the row would become three from
 // one place, two from another and one derived, which is harder to verify than
 // five literals, not easier.
-//
-// regime.go faces the opposite arithmetic: it needs exactly the three constants
-// publishes, and it is not transcribing a table, so there the live read wins.
 //
 // Either way the duplication is guarded rather than trusted:
 // TestGravityAgreesWithTheConstantsPackage requires the WGS-72 row to equal
