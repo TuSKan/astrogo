@@ -17,29 +17,27 @@ var (
 	// package, then its targets, each in backticks.
 	fuzzTableRow = regexp.MustCompile("(?m)^\\| `([a-z0-9/]+)` \\| ((?:`Fuzz\\w+`(?:, )?)+) \\|")
 
-	// fuzzPackageCount is the sentence introducing that table.
-	fuzzPackageCount = regexp.MustCompile(`(?m)^([\w-]+) packages carry targets\b`)
-
 	fuzzTarget = regexp.MustCompile("`(Fuzz\\w+)`")
 )
 
-// countWords spells the package counts the sentence can plausibly need.
-var countWords = map[string]int{
-	"Five": 5, "Six": 6, "Seven": 7, "Eight": 8, "Nine": 9, "Ten": 10, "Eleven": 11, "Twelve": 12,
-	"Thirteen": 13, "Fourteen": 14, "Fifteen": 15, "Sixteen": 16, "Seventeen": 17, "Eighteen": 18,
-	"Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22, "Twenty-three": 23,
-	"Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26, "Twenty-seven": 27, "Twenty-eight": 28,
-	"Twenty-nine": 29, "Thirty": 30,
-}
-
 // TestEveryFuzzTargetIsDocumented holds CLAUDE.md's table of fuzz targets to
-// the code, in both directions, along with the count of packages above it.
+// the code, in both directions.
 //
 // The table is where the extended-fuzzing step starts: a target missing from
 // it is one nobody runs beyond its seed corpus. It had already drifted. It said
 // six packages and left out ephemeris/satellite/sgp4, whose FuzzParseTLE and
 // FuzzVerifyTLEChecksums guard the parser that replaced an SGP4 backend the
 // fuzzer had crashed in about two seconds.
+//
+// # Why there is no count to check
+//
+// The sentence above the table used to spell how many packages it held, and
+// this test held that word to the code too. A number in prose that every new
+// target must edit is a merge conflict between any two pull requests that add
+// one, and an identical edit is a conflict git does not see: #1060 and #1063
+// each wrote "Twenty-seven", both merged, and main said twenty-seven against
+// 28. The table already is the count, and both directions of this check
+// already hold it to the code.
 func TestEveryFuzzTargetIsDocumented(t *testing.T) {
 	t.Parallel()
 
@@ -119,14 +117,5 @@ func TestEveryFuzzTargetIsDocumented(t *testing.T) {
 				t.Errorf("CLAUDE.md lists %s in %s, which has no such fuzz target", target, pkg)
 			}
 		}
-	}
-
-	m := fuzzPackageCount.FindStringSubmatch(string(doc))
-	if m == nil {
-		t.Fatal("CLAUDE.md no longer says how many packages carry fuzz targets")
-	}
-
-	if n, ok := countWords[m[1]]; !ok || n != len(inCode) {
-		t.Errorf("CLAUDE.md says %q packages carry fuzz targets; the code has %d", m[1], len(inCode))
 	}
 }
