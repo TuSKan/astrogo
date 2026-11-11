@@ -149,7 +149,23 @@ func TestNewFromTLERejectsWithTheRightKind(t *testing.T) {
 			line1: good1,
 			line2: withValidChecksum(good2[:52] + " 0.00000000" + good2[63:]),
 		},
+		// Text strconv.ParseFloat reads as a number, which made a satellite
+		// whose every position was NaN (#1052).
+		{
+			name:  "NaN in the RAAN column, checksum recomputed to match",
+			line1: good1,
+			line2: withValidChecksum(good2[:17] + "     NaN" + good2[25:]),
+		},
+		{
+			name:  "Inf in the mean motion column, checksum recomputed to match",
+			line1: good1,
+			line2: withValidChecksum(good2[:52] + "        Inf" + good2[63:]),
+		},
 	} {
+		if verr := satellite.ValidateTLE(tc.line1, tc.line2); !errors.Is(verr, satellite.ErrMalformedTLE) {
+			t.Errorf("%s: ValidateTLE returned %v, want one wrapping ErrMalformedTLE", tc.name, verr)
+		}
+
 		_, err := satellite.NewFromTLE("bad", tc.line1, tc.line2)
 		if !errors.Is(err, satellite.ErrMalformedTLE) {
 			t.Errorf("%s: NewFromTLE returned %v, want one wrapping ErrMalformedTLE",

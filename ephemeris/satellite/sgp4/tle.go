@@ -383,13 +383,45 @@ func parseExponential(line string, at span, name string) (float64, error) {
 // parseFloatField reads an ordinary decimal field.
 func parseFloatField(line string, at span, name string) (float64, error) {
 	raw := field(line, at)
+	text := strings.TrimSpace(raw)
 
-	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	// strconv.ParseFloat also reads NaN, Inf, infinity and hex floats, none of
+	// which a TLE column holds, and a NaN read here would pass every range
+	// check after it (#1052).
+	if !isDecimal(text) {
+		return 0, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, name, raw)
+	}
+
+	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %s is %q, which is not a number", ErrMalformedTLE, name, raw)
 	}
 
 	return v, nil
+}
+
+// isDecimal reports whether s is a plain decimal number, the only kind a TLE's
+// decimal columns hold: an optional sign, then digits with at most one decimal
+// point, and at least one digit.
+func isDecimal(s string) bool {
+	if s != "" && (s[0] == '+' || s[0] == '-') {
+		s = s[1:]
+	}
+
+	digits, points := 0, 0
+
+	for i := range len(s) {
+		switch c := s[i]; {
+		case c >= '0' && c <= '9':
+			digits++
+		case c == '.':
+			points++
+		default:
+			return false
+		}
+	}
+
+	return digits > 0 && points <= 1
 }
 
 // parseAngleField reads a decimal field in degrees.

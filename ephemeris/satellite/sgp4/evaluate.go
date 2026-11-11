@@ -268,6 +268,15 @@ func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) 
 		(mvt*uz+rvdot*vz)*vkmpersec,
 	)
 
+	// The two advisory errors below promise a state that exists. One the
+	// arithmetic overflowed to compute — an element set or a time so far
+	// outside the model's range that a NaN or an infinity came out — is not
+	// one, and is refused as every other failed computation is (#1052).
+	if !finiteState(pos, vel) {
+		return vector.Vec3{}, vector.Vec3{},
+			fmt.Errorf("%w: the state at tsince %g overflowed", ErrNotFinite, tsince)
+	}
+
 	// Both of the conditions below leave the state populated, because both
 	// describe a result that exists and should not be trusted — which is a
 	// different thing from a computation that could not be performed.
@@ -284,4 +293,16 @@ func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) 
 	}
 
 	return pos, vel, nil
+}
+
+// finiteState reports whether every component of a position and velocity is a
+// finite number.
+func finiteState(pos, vel vector.Vec3) bool {
+	for _, x := range [...]float64{pos.X, pos.Y, pos.Z, vel.X, vel.Y, vel.Z} {
+		if !finite(x) {
+			return false
+		}
+	}
+
+	return true
 }
