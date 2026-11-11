@@ -2,7 +2,6 @@ package file_test
 
 import (
 	"errors"
-	"io"
 	"io/fs"
 	"strings"
 	"testing"
@@ -243,7 +242,7 @@ func TestStageAndPromoteCachesNothingWhenValidationFails(t *testing.T) {
 	fsys := newFS(t)
 
 	err := file.StageAndPromote(t.Context(), fsys, key, strings.NewReader("truncated"), 0, `"etag"`,
-		func(io.Reader) error { return errValidationFailed })
+		func(fs.FS, string) error { return errValidationFailed })
 	if !errors.Is(err, errValidationFailed) {
 		t.Fatalf("StageAndPromote = %v, want the validator's own error", err)
 	}
