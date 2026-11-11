@@ -288,8 +288,13 @@ SGP4's own argument is minutes-since-epoch as a real number. Taking it directly:
   rather than merely bounding it;
 - gives sub-microsecond time resolution instead of one second.
 
-`AtTime` is the convenience wrapper and uses `time.Time.JDParts` so the
-difference is formed in two-part arithmetic rather than losing the fraction.
+`AtTime` is the convenience wrapper. It subtracts the UTC labels of the time and
+the epoch as whole seconds and nanoseconds since the Unix epoch (`utcLabel`), so
+the difference is exact integer arithmetic rather than a subtraction of two
+nearly equal Julian Dates. It does not use `time.Time.JDParts`, which an earlier
+version of this section said it did: a UTC Julian Date lets a day that ends in a
+leap second run to 86401 seconds, and a difference across such a day came out a
+second off (#144).
 
 ### 6.2 Errors are returned, and some come with a usable state
 
@@ -307,10 +312,17 @@ conditions:
 | `ErrEccentricity` | error 1 | no |
 | `ErrPerturbedEccentricity` | error 3 | no |
 | `ErrSemiLatusRectum` | error 4 | no |
-| `ErrSubOrbital` | error 5 | no (at `New`) |
+| — (none) | error 5, disabled in the reference | — |
 | `ErrDecayed` | error 6 | **yes** |
 | `ErrKeplerNotConverged` | — (new) | **yes** |
 | `ErrNotFinite` | — (new) | no |
+
+Error 5, a sub-orbital element set, has no sentinel because the reference no
+longer raises it. Vallado's `sgp4init` carries that check commented out ("sgp4fix
+remove this check as it is unnecessary"), since the decay check in `sgp4` already
+handles an epoch below the surface. astrogo follows the reference, so such an
+element set builds, and `At` reports `ErrDecayed`. This table named a sentinel
+`ErrSubOrbital` until #1054; none ever existed.
 
 The rule, stated once and tested: **`ErrDecayed` and `ErrKeplerNotConverged`
 come with a populated state; every other error leaves the vectors zero.** Both
