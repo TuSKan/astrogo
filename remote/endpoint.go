@@ -847,8 +847,8 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Description: "Copernicus Data Space Ecosystem EODATA object store " +
 				"(https://eodata.dataspace.copernicus.eu) — a multi-product bucket (Sentinel, CLMS, " +
 				"CAMS, ...) keyed by product prefix. astrogo reads the CAMS/GLOBAL/... prefix for " +
-				"CAMS global analysis NetCDF-4 files. Requires Copernicus S3 credentials via the " +
-				"AWS SDK default chain, and a blank import of remote/s3.",
+				"CAMS global analysis NetCDF-4 files. Not reachable at present: the URL is s3:// and " +
+				"no s3:// backend is registered (see docs/storage.md).",
 			ApproxSize:      SizeVaries, // 1.3 MB (lnsp) to ~180 MB (a 137-level aerosol tracer)
 			Enabled:         true,
 			DownloadTimeout: 30 * time.Minute,

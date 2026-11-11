@@ -16,9 +16,9 @@ import (
 
 // Registered from init because that is what a blank-import registry is: a
 // backend package exists to be imported for its side effect, the way
-// database/sql drivers and image decoders are, and remote/file/s3 exports
-// nothing at all. There is no other moment at which a scheme can announce
-// itself before the first URL is opened.
+// database/sql drivers and image decoders are, and a backend for a further
+// scheme would export nothing at all. There is no other moment at which a
+// scheme can announce itself before the first URL is opened.
 //
 //nolint:gochecknoinits // the registry pattern this package is built on
 func init() { Register("file", openLocal) }
