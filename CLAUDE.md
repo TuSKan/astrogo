@@ -40,7 +40,7 @@ A pull request vets all three tags and runs `integration` in a non-blocking job.
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Twenty-six packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-seven packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -51,6 +51,7 @@ Twenty-six packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds t
 | `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
 | `catalog/sbdb` | `FuzzSearchBright` | JPL SBDB's column-oriented bulk query answers, served through `httptest` (#1058) |
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
+| `catalog/mast` | `FuzzResolveObject` | MAST's name-resolution answers, JSON or XML, served through `httptest` |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
 | `catalog/mpcorb` | `FuzzRead` | the Minor Planet Center's orbit files, MPCORB and CometEls |
 | `catalog/simbad` | `FuzzParseCSV` | SIMBAD TAP CSV answers |
