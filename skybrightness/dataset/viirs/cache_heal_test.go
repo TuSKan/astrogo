@@ -117,8 +117,8 @@ func compositeTIFF(px [4]float64) []byte {
 }
 
 // archive zips one entry named tiffFile holding tiff.
-func archive(t *testing.T, tiff []byte) []byte {
-	t.Helper()
+func archive(tb testing.TB, tiff []byte) []byte {
+	tb.Helper()
 
 	var b bytes.Buffer
 
@@ -126,15 +126,15 @@ func archive(t *testing.T, tiff []byte) []byte {
 
 	w, err := zw.Create(tiffFile)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	if _, err := w.Write(tiff); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	if err := zw.Close(); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	return b.Bytes()

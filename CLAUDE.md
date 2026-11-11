@@ -68,6 +68,7 @@ Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds 
 | `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
 | `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
 | `skybrightness/dataset/raster` | `FuzzOpen` | GeoTIFFs from a third-party mirror (VIIRS), or any file a caller opens |
+| `skybrightness/dataset/viirs` | `FuzzOpen` | the VIIRS annual archive, a ZIP holding the composite GeoTIFF, through extraction, decoding and emitter building |
 | `atmosphere/dataset/cams` | `FuzzOpen` | CAMS NetCDF-4 files, through scigolib/hdf5, which sizes allocations from what a file declares (#794) |
 
 **Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
