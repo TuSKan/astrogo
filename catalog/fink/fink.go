@@ -281,6 +281,14 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 		return nil, fmt.Errorf("%w: %s", ErrRemoteException, jsonStr(obj, "RemoteException"))
 	}
 
+	// An answer is about one body, and one that names none answers nothing.
+	// Read as a record, an empty object resolved to a target with no ID and no
+	// error, and kept Resolve from the bulk table that would have answered
+	// (#1061). Refused, it is a failed route like any other.
+	if jsonStr(obj, "sso_name") == "" && jsonInt(obj, "sso_number") <= 0 {
+		return nil, fmt.Errorf("%w: the answer names no object", ErrResponseFormat)
+	}
+
 	rec := &ssoRecord{
 		Name:   jsonStr(obj, "sso_name"),
 		Number: jsonInt(obj, "sso_number"),
@@ -559,7 +567,21 @@ func (p *Provider) downloadSSOFT(ctx context.Context) (_ []ssoRecord, err error)
 }
 
 // readParquet extracts ssoRecords from a SSOFT parquet file.
+//
+// A panic inside Arrow's decoder is returned as an error wrapping
+// [ErrInvalidParquet]. The decoder sizes what it builds from what the file
+// declares, and a malformed file led it into "makeslice: cap out of range"
+// while parsing the schema (#1062); the file is FINK's bytes, so the failure is
+// the file's, as atmosphere/dataset/cams treats its HDF5 decoder's (#794). A
+// failed allocation is fatal in Go rather than a panic, and is not caught here.
 func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord, err error) {
+	// Registered first, so it runs last and covers the reader's Close too.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: the parquet decoder failed: %v", ErrInvalidParquet, r)
+		}
+	}()
+
 	rdr, err := file.OpenParquetFile(path, false)
 	if err != nil {
 		return nil, fmt.Errorf("opening parquet: %w", err)
