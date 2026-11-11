@@ -1,0 +1,402 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="844" viewBox="0 0 960 844" role="img" aria-label="Treemap of the astrogo packages by layer, sized by lines of code, colored by audit depth, with a badge counting the items still missing">
+<title>Treemap of the astrogo packages by layer, sized by lines of code, colored by audit depth, with a badge counting the items still missing</title>
+<rect x="0" y="8" width="14" height="14" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.5"/>
+<text x="20" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6edf3" text-anchor="start">Deep</text>
+<rect x="71.75999999999999" y="8" width="14" height="14" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.5"/>
+<text x="91.8" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6edf3" text-anchor="start">Moderate</text>
+<rect x="173.27999999999997" y="8" width="14" height="14" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.5"/>
+<text x="193.3" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6edf3" text-anchor="start">Light</text>
+<rect x="252.47999999999996" y="8" width="14" height="14" rx="3" fill="#3d1418" stroke="#f85149" stroke-width="1.5"/>
+<text x="272.5" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6edf3" text-anchor="start">Untouched</text>
+<circle cx="369.4" cy="15" r="8" fill="#d29922"/>
+<text x="369.4" y="19" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+<text x="383.4" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6edf3" text-anchor="start">items still missing</text>
+<text x="960" y="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#9198a1" text-anchor="end">area: √ lines of code</text>
+<rect x="2" y="42" width="535.7" height="412.3" rx="6" fill="none" stroke="#3d444d"/>
+<text x="8" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#9198a1" text-anchor="start" font-weight="600">Scientific engines</text>
+<g><title>skybrightness: Deep, 33 findings, 0 items missing</title>
+<rect x="6" y="63" width="138.5" height="199.6" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="11" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">skybrightness</text>
+<text x="11" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">33 findings</text>
+</g>
+<g><title>fits: Moderate, 16 findings, 0 items missing</title>
+<rect x="6" y="264.6" width="138.5" height="185.7" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="11" y="278.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">fits</text>
+<text x="11" y="292.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">16 findings</text>
+</g>
+<g><title>coord: Deep, 51 findings, 0 items missing</title>
+<rect x="146.5" y="63" width="136.4" height="140.6" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="151.5" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">coord</text>
+<text x="151.5" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">51 findings</text>
+</g>
+<g><title>constellation: Light, 2 findings, 2 items missing</title>
+<rect x="284.9" y="63" width="132.3" height="140.6" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="289.9" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">constellation</text>
+<text x="289.9" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">2 findings</text>
+<circle cx="406.1" cy="74" r="8" fill="#d29922"/>
+<text x="406.1" y="77.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>ephemeris/satellite/sgp4: Moderate, 3 findings, 2 items missing</title>
+<rect x="419.1" y="63" width="114.6" height="140.6" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="424.1" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">sgp4</text>
+<text x="424.1" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">3 findings</text>
+<circle cx="522.7" cy="74" r="8" fill="#d29922"/>
+<text x="522.7" y="77.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>magnitude: Deep, 26 findings, 0 items missing</title>
+<rect x="146.5" y="205.6" width="119.3" height="127.4" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="151.5" y="219.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">magnitude</text>
+<text x="151.5" y="233.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">26 findings</text>
+</g>
+<g><title>ephemeris/kepler: Deep, 23 findings, 0 items missing</title>
+<rect x="146.5" y="335" width="119.3" height="115.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="151.5" y="349" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">ephemeris/kepler</text>
+<text x="151.5" y="363" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">23 findings</text>
+</g>
+<g><title>atmosphere: Deep, 21 findings, 0 items missing</title>
+<rect x="267.8" y="205.6" width="109.8" height="124.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="272.8" y="219.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">atmosphere</text>
+<text x="272.8" y="233.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">21 findings</text>
+</g>
+<g><title>ephemeris/jpl/spk: Deep, 11 findings, 0 items missing</title>
+<rect x="267.8" y="331.8" width="109.8" height="118.5" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="272.8" y="345.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">spk</text>
+<text x="272.8" y="359.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">11 findings</text>
+</g>
+<g><title>ephemeris: Deep, 28 findings, 1 items missing</title>
+<rect x="379.6" y="205.6" width="80.7" height="124.4" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="384.6" y="217.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3" text-anchor="start">ephemeris</text>
+<text x="384.6" y="233.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">28 findings</text>
+<circle cx="449.3" cy="216.6" r="8" fill="#d29922"/>
+<text x="449.3" y="220.1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>ephemeris/jpl: Deep, 20 findings, 1 items missing</title>
+<rect x="462.3" y="205.6" width="71.4" height="124.4" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text transform="translate(501.9,325.1) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3">ephemeris/jpl</text>
+<circle cx="522.7" cy="216.6" r="8" fill="#d29922"/>
+<text x="522.7" y="220.1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>ephemeris/jpl/lsk: Moderate, 10 findings, 0 items missing</title>
+<rect x="379.6" y="332.1" width="105.4" height="62" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="384.6" y="346.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">lsk</text>
+<text x="384.6" y="360.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">10 findings</text>
+</g>
+<g><title>ephemeris/core: Deep, 10 findings, 1 items missing</title>
+<rect x="379.6" y="396.1" width="105.4" height="54.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="384.6" y="410.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">core</text>
+<text x="384.6" y="424.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">10 findings</text>
+<circle cx="474" cy="407.1" r="8" fill="#d29922"/>
+<text x="474" y="410.6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>ephemeris/satellite: Deep, 15 findings, 1 items missing</title>
+<rect x="487" y="332.1" width="46.7" height="109" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text transform="translate(514.2,436.1) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3">satellite</text>
+<circle cx="522.7" cy="343.1" r="8" fill="#d29922"/>
+<text x="522.7" y="346.6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>ephemeris/jpl/validation: Deep, 19 findings, 0 items missing</title>
+<rect x="487" y="443.1" width="46.7" height="7.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+</g>
+<rect x="2" y="458.3" width="535.7" height="339.7" rx="6" fill="none" stroke="#3d444d"/>
+<text x="8" y="472.3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#9198a1" text-anchor="start" font-weight="600">Orchestration</text>
+<g><title>plan: Deep, 141 findings, 2 items missing</title>
+<rect x="6" y="479.3" width="159.9" height="242.6" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="11" y="493.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">plan</text>
+<text x="11" y="507.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">141 findings</text>
+<circle cx="154.9" cy="490.3" r="8" fill="#d29922"/>
+<text x="154.9" y="493.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>catalog/simbad: Deep, 12 findings, 2 items missing</title>
+<rect x="6" y="723.9" width="159.9" height="70.1" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="11" y="737.9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">catalog/simbad</text>
+<text x="11" y="751.9" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">12 findings</text>
+<circle cx="154.9" cy="734.9" r="8" fill="#d29922"/>
+<text x="154.9" y="738.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>catalog: Deep, 13 findings, 0 items missing</title>
+<rect x="167.9" y="479.3" width="97.5" height="108.1" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="172.9" y="493.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">catalog</text>
+<text x="172.9" y="507.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">13 findings</text>
+</g>
+<g><title>catalog/sbdb: Deep, 10 findings, 1 items missing</title>
+<rect x="167.9" y="589.4" width="97.5" height="104.9" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="172.9" y="603.4" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">sbdb</text>
+<text x="172.9" y="617.4" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">10 findings</text>
+<circle cx="254.5" cy="600.4" r="8" fill="#d29922"/>
+<text x="254.5" y="603.9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>catalog/fink: Moderate, 4 findings, 1 items missing</title>
+<rect x="167.9" y="696.2" width="97.5" height="97.8" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="172.9" y="710.2" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">fink</text>
+<text x="172.9" y="724.2" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+<circle cx="254.5" cy="707.2" r="8" fill="#d29922"/>
+<text x="254.5" y="710.7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>catalog/mpcorb: Moderate, 9 findings, 0 items missing</title>
+<rect x="267.5" y="479.3" width="88" height="94.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="272.5" y="493.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">mpcorb</text>
+<text x="272.5" y="507.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">9 findings</text>
+</g>
+<g><title>catalog/openngc: Moderate, 6 findings, 0 items missing</title>
+<rect x="357.5" y="479.3" width="87.3" height="94.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="362.5" y="493.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">openngc</text>
+<text x="362.5" y="507.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">6 findings</text>
+</g>
+<g><title>catalog/jpl: Moderate, 5 findings, 0 items missing</title>
+<rect x="446.8" y="479.3" width="87" height="94.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="451.8" y="493.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">catalog/jpl</text>
+<text x="451.8" y="507.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">5 findings</text>
+</g>
+<g><title>catalog/norad: Moderate, 8 findings, 0 items missing</title>
+<rect x="267.5" y="575.6" width="98.9" height="77.5" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="272.5" y="589.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">catalog/norad</text>
+<text x="272.5" y="603.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">8 findings</text>
+</g>
+<g><title>catalog/resolve: Moderate, 8 findings, 0 items missing</title>
+<rect x="267.5" y="655.1" width="98.9" height="70" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="272.5" y="669.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">resolve</text>
+<text x="272.5" y="683.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">8 findings</text>
+</g>
+<g><title>fits/plan: Light, 2 findings, 0 items missing</title>
+<rect x="267.5" y="727.1" width="98.9" height="66.9" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="272.5" y="741.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">fits/plan</text>
+<text x="272.5" y="755.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">2 findings</text>
+</g>
+<g><title>catalog/gaia: Deep, 12 findings, 2 items missing</title>
+<rect x="368.4" y="575.6" width="85.3" height="76.8" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="373.4" y="589.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">gaia</text>
+<text x="373.4" y="603.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">12 findings</text>
+<circle cx="442.7" cy="586.6" r="8" fill="#d29922"/>
+<text x="442.7" y="590.1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>catalog/vizier: Deep, 14 findings, 2 items missing</title>
+<rect x="455.7" y="575.6" width="78" height="76.8" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="460.7" y="589.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">vizier</text>
+<text x="460.7" y="603.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">14 findings</text>
+<circle cx="522.7" cy="586.6" r="8" fill="#d29922"/>
+<text x="522.7" y="590.1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>catalog/xmatch: Light, 3 findings, 1 items missing</title>
+<rect x="368.4" y="654.5" width="79.7" height="73.4" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="373.4" y="668.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">xmatch</text>
+<text x="373.4" y="682.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">3 findings</text>
+<circle cx="437.1" cy="665.5" r="8" fill="#d29922"/>
+<text x="437.1" y="669" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>catalog/mast: Light, 3 findings, 2 items missing</title>
+<rect x="368.4" y="729.8" width="79.7" height="64.2" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="373.4" y="743.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">mast</text>
+<text x="373.4" y="757.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">3 findings</text>
+<circle cx="437.1" cy="740.8" r="8" fill="#d29922"/>
+<text x="437.1" y="744.3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">2</text>
+</g>
+<g><title>skybrightness/plan: Moderate, 4 findings, 0 items missing</title>
+<rect x="450.1" y="654.5" width="83.7" height="56.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="455.1" y="682.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>catalog/fits: Light, 2 findings, 0 items missing</title>
+<rect x="450.1" y="712.5" width="51.2" height="81.5" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text transform="translate(478.8,789) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3">catalog/fits</text>
+</g>
+<g><title>catalog/internal/posmatch: Light, 1 findings, 1 items missing</title>
+<rect x="503.3" y="712.5" width="30.5" height="81.5" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text transform="translate(521.7,789) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3">posmatch</text>
+<circle cx="522.7" cy="723.5" r="8" fill="#d29922"/>
+<text x="522.7" y="727" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<rect x="541.7" y="42" width="416.3" height="311.5" rx="6" fill="none" stroke="#3d444d"/>
+<text x="547.7" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#9198a1" text-anchor="start" font-weight="600">Primitives</text>
+<g><title>remote/file: Deep, 15 findings, 0 items missing</title>
+<rect x="545.7" y="63" width="120.1" height="149.3" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="550.7" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">remote/file</text>
+<text x="550.7" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">15 findings</text>
+</g>
+<g><title>time: Deep, 42 findings, 0 items missing</title>
+<rect x="545.7" y="214.3" width="120.1" height="135.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="550.7" y="228.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">time</text>
+<text x="550.7" y="242.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">42 findings</text>
+</g>
+<g><title>remote: Deep, 30 findings, 0 items missing</title>
+<rect x="667.8" y="63" width="122.5" height="127.3" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="672.8" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">remote</text>
+<text x="672.8" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">30 findings</text>
+</g>
+<g><title>constants: Moderate, 4 findings, 0 items missing</title>
+<rect x="792.4" y="63" width="82.8" height="127.3" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="797.4" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">constants</text>
+<text x="797.4" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>unit: Moderate, 4 findings, 0 items missing</title>
+<rect x="877.2" y="63" width="76.8" height="127.3" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="882.2" y="77" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">unit</text>
+<text x="882.2" y="91" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>time/internal/iers: Deep, 17 findings, 0 items missing</title>
+<rect x="667.8" y="192.3" width="105.9" height="80.8" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="672.8" y="206.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">iers</text>
+<text x="672.8" y="220.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">17 findings</text>
+</g>
+<g><title>angle: Moderate, 4 findings, 0 items missing</title>
+<rect x="667.8" y="275.1" width="105.9" height="74.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="672.8" y="289.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">angle</text>
+<text x="672.8" y="303.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>optics: Light, 2 findings, 0 items missing</title>
+<rect x="775.7" y="192.3" width="90.7" height="81.1" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="780.7" y="206.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">optics</text>
+<text x="780.7" y="220.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">2 findings</text>
+</g>
+<g><title>remote/api: Light, 2 findings, 0 items missing</title>
+<rect x="775.7" y="275.3" width="90.7" height="74.2" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="780.7" y="289.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">remote/api</text>
+<text x="780.7" y="303.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">2 findings</text>
+</g>
+<g><title>vector: Light, 2 findings, 1 items missing</title>
+<rect x="868.5" y="192.3" width="85.5" height="44.8" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="873.5" y="206.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">vector</text>
+<text x="873.5" y="220.3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">2 findings</text>
+<circle cx="943" cy="203.3" r="8" fill="#d29922"/>
+<text x="943" y="206.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>unit/dim: Light, 2 findings, 0 items missing</title>
+<rect x="868.5" y="239" width="43.8" height="75.1" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="873.5" y="253" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">dim</text>
+</g>
+<g><title>logging: Light, 1 findings, 1 items missing</title>
+<rect x="914.2" y="239" width="39.8" height="75.1" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text transform="translate(937.3,309.1) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3">logging</text>
+<circle cx="943" cy="250" r="8" fill="#d29922"/>
+<text x="943" y="253.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>remote/eop: Moderate, 4 findings, 0 items missing</title>
+<rect x="868.5" y="316.1" width="85.5" height="33.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="873.5" y="330.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">remote/eop</text>
+<text x="873.5" y="344.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<rect x="541.7" y="357.5" width="416.3" height="257.2" rx="6" fill="none" stroke="#3d444d"/>
+<text x="547.7" y="371.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#9198a1" text-anchor="start" font-weight="600">Dataset providers (I/O)</text>
+<g><title>skybrightness/dataset/starlight: Deep, 14 findings, 1 items missing</title>
+<rect x="545.7" y="378.5" width="127" height="140.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="550.7" y="392.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">starlight</text>
+<text x="550.7" y="406.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">14 findings</text>
+<circle cx="661.7" cy="389.5" r="8" fill="#d29922"/>
+<text x="661.7" y="393" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>skybrightness/dataset/raster: Moderate, 4 findings, 0 items missing</title>
+<rect x="545.7" y="520.7" width="127" height="90.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="550.7" y="534.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">raster</text>
+<text x="550.7" y="548.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>atmosphere/dataset/cams: Moderate, 6 findings, 0 items missing</title>
+<rect x="674.7" y="378.5" width="86.2" height="122.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="679.7" y="392.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">cams</text>
+<text x="679.7" y="406.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">6 findings</text>
+</g>
+<g><title>skybrightness/dataset/airglow: Moderate, 7 findings, 1 items missing</title>
+<rect x="674.7" y="502.6" width="86.2" height="108.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="679.7" y="516.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">airglow</text>
+<text x="679.7" y="530.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">7 findings</text>
+<circle cx="749.9" cy="513.6" r="8" fill="#d29922"/>
+<text x="749.9" y="517.1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>skybrightness/dataset/dust: Moderate, 4 findings, 0 items missing</title>
+<rect x="762.9" y="378.5" width="98.9" height="81.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="767.9" y="392.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">dust</text>
+<text x="767.9" y="406.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>skybrightness/dataset/viirs: Moderate, 4 findings, 1 items missing</title>
+<rect x="863.8" y="378.5" width="90.2" height="81.4" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="868.8" y="392.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">viirs</text>
+<text x="868.8" y="406.5" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+<circle cx="943" cy="389.5" r="8" fill="#d29922"/>
+<text x="943" y="393" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>skybrightness/dataset: Moderate, 4 findings, 1 items missing</title>
+<rect x="762.9" y="462" width="84.6" height="83.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="767.9" y="476" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">dataset</text>
+<text x="767.9" y="490" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+<circle cx="836.6" cy="473" r="8" fill="#d29922"/>
+<text x="836.6" y="476.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>skybrightness/dataset/crosssection: Light, 3 findings, 0 items missing</title>
+<rect x="762.9" y="547" width="84.6" height="63.7" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="767.9" y="559" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3" text-anchor="start">crosssection</text>
+<text x="767.9" y="575" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">3 findings</text>
+</g>
+<g><title>skybrightness/dataset/passband: Moderate, 4 findings, 0 items missing</title>
+<rect x="849.6" y="462" width="51.2" height="104.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text transform="translate(879,561) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3">passband</text>
+</g>
+<g><title>skybrightness/dataset/solar: Moderate, 5 findings, 0 items missing</title>
+<rect x="902.8" y="462" width="51.2" height="104.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="907.8" y="476" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">solar</text>
+</g>
+<g><title>skybrightness/dataset/luminosity: Moderate, 5 findings, 0 items missing</title>
+<rect x="849.6" y="568" width="104.4" height="42.7" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="854.6" y="582" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">luminosity</text>
+<text x="854.6" y="596" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">5 findings</text>
+</g>
+<rect x="541.7" y="618.7" width="416.3" height="179.3" rx="6" fill="none" stroke="#3d444d"/>
+<text x="547.7" y="632.7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#9198a1" text-anchor="start" font-weight="600">Internal support</text>
+<g><title>internal/metrology: Light, 1 findings, 1 items missing</title>
+<rect x="545.7" y="639.7" width="124.2" height="78.7" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="550.7" y="653.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">metrology</text>
+<text x="550.7" y="667.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">1 findings</text>
+<circle cx="659" cy="650.7" r="8" fill="#d29922"/>
+<text x="659" y="654.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>internal/oracle: Light, 1 findings, 1 items missing</title>
+<rect x="545.7" y="720.4" width="124.2" height="73.6" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="550.7" y="734.4" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">oracle</text>
+<text x="550.7" y="748.4" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">1 findings</text>
+<circle cx="659" cy="731.4" r="8" fill="#d29922"/>
+<text x="659" y="734.9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>internal/testutil: Deep, 12 findings, 0 items missing</title>
+<rect x="672" y="639.7" width="108.5" height="78.1" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="677" y="653.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">testutil</text>
+<text x="677" y="667.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">12 findings</text>
+</g>
+<g><title>internal/gofaext: Deep, 21 findings, 0 items missing</title>
+<rect x="672" y="719.8" width="108.5" height="74.2" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+<text x="677" y="733.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">gofaext</text>
+<text x="677" y="747.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">21 findings</text>
+</g>
+<g><title>internal/changelog: Moderate, 4 findings, 0 items missing</title>
+<rect x="782.4" y="639.7" width="81.2" height="93.1" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="787.4" y="653.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">changelog</text>
+<text x="787.4" y="667.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">4 findings</text>
+</g>
+<g><title>internal/refraction: Untouched, 0 findings, 1 items missing</title>
+<rect x="782.4" y="734.8" width="81.2" height="59.2" rx="3" fill="#3d1418" stroke="#f85149" stroke-width="1.2"/>
+<text x="787.4" y="762.8" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">0 findings</text>
+<circle cx="852.6" cy="745.8" r="8" fill="#d29922"/>
+<text x="852.6" y="749.3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>internal/votable: Moderate, 3 findings, 0 items missing</title>
+<rect x="865.6" y="639.7" width="88.4" height="53.6" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+<text x="870.6" y="653.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3" text-anchor="start">votable</text>
+<text x="870.6" y="667.7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#9198a1" text-anchor="start">3 findings</text>
+</g>
+<g><title>internal/leakcheck: Untouched, 0 findings, 1 items missing</title>
+<rect x="865.6" y="695.3" width="43.9" height="70.7" rx="3" fill="#3d1418" stroke="#f85149" stroke-width="1.2"/>
+<circle cx="898.5" cy="706.3" r="8" fill="#d29922"/>
+<text x="898.5" y="709.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#0d1117" text-anchor="middle" font-weight="700">1</text>
+</g>
+<g><title>internal/parallel: Light, 1 findings, 0 items missing</title>
+<rect x="911.5" y="695.3" width="42.5" height="70.7" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text transform="translate(936.6,761) rotate(-90)" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#e6edf3">parallel</text>
+</g>
+<g><title>internal/horizons: Light, 1 findings, 0 items missing</title>
+<rect x="865.6" y="768" width="59.4" height="26" rx="3" fill="#3a2d0c" stroke="#d29922" stroke-width="1.2"/>
+<text x="870.6" y="780" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9" fill="#e6edf3" text-anchor="start">horizons</text>
+</g>
+<g><title>internal/docsguard: Deep, 36 findings, 0 items missing</title>
+<rect x="927" y="768" width="12.5" height="26" rx="3" fill="#12321c" stroke="#3fb950" stroke-width="1.2"/>
+</g>
+<g><title>internal/workload: Moderate, 6 findings, 0 items missing</title>
+<rect x="941.5" y="768" width="12.5" height="26" rx="3" fill="#262c36" stroke="#8b949e" stroke-width="1.2"/>
+</g>
+<text x="0" y="818" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#9198a1" text-anchor="start">Too small to label: ephemeris/jpl/validation (Deep), internal/docsguard (Deep), internal/leakcheck (Untouched, 1 missing),</text>
+<text x="0" y="835" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#9198a1" text-anchor="start">internal/refraction (Untouched, 1 missing), internal/workload (Moderate), skybrightness/plan (Moderate)</text>
+</svg>

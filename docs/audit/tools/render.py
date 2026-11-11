@@ -1,9 +1,10 @@
-"""Render the audit map as Markdown, from build.py's tables.
+"""Render the audit map, from build.py's tables.
 
     python docs/audit/tools/render.py [--work DIR] [--check]
 
-Writes docs/audit/README.md. With --check it writes nothing and exits 1 when
-the checked-in map differs from what the tables give, so a stale map shows.
+Writes docs/audit/README.md and its charts in docs/audit/img/, each chart in a
+light and a dark version. With --check it writes nothing and exits 1 when any
+checked-in file differs from what the tables give, so a stale map shows.
 """
 import argparse
 import collections
@@ -13,8 +14,12 @@ import statistics
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # no __pycache__ beside the docs
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import charts  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, "..", "README.md"))
+ROOT = os.path.normpath(os.path.join(HERE, ".."))
 LAYERS = ["Primitives", "Dataset providers (I/O)", "Scientific engines", "Orchestration", "Internal support"]
 TIERS = ["Deep", "Moderate", "Light", "Untouched"]
 KINDS = [("nonfinite", "Inputs"), ("cache", "Cache"), ("parse", "Parsing"), ("accuracy", "Accuracy"),
@@ -29,10 +34,18 @@ def pct(v):
     return "—" if v is None else f"{v:.1f}%"
 
 
+def picture(name, alt):
+    return [f"<picture>",
+            f'  <source media="(prefers-color-scheme: dark)" srcset="img/{name}-dark.svg">',
+            f'  <img alt="{alt}" src="img/{name}.svg">',
+            f"</picture>"]
+
+
 def render(work):
+    """Every file the map consists of, by path under docs/audit."""
     def load(name):
-        with open(os.path.join(work, f"{name}.json"), encoding="utf-8") as f:
-            return json.load(f)
+        with open(os.path.join(work, f"{name}.json"), encoding="utf-8") as fh:
+            return json.load(fh)
 
     pk, sweeps, meta = load("packages"), load("sweeps"), load("meta")
     tiers = collections.Counter(p["depth"] for p in pk)
@@ -40,6 +53,19 @@ def render(work):
     covs = [p["coverage"] for p in pk if p["coverage"] is not None]
     touched = sum(1 for p in pk if p["findings"])
     items = sum(p["gap_count"] for p in pk)
+    median = statistics.median(covs)
+
+    files = {}
+    tiles = [("Findings fixed", f"{meta['distinct_findings']}", "closed by a commit on main"),
+             ("Audited deeply", f"{tiers['Deep']}", "10+ findings, 4+ kinds"),
+             ("Light or untouched", f"{tiers['Light'] + tiers['Untouched']}", "fewer than 4 findings"),
+             ("Something missing", f"{len(gapped)}", f"packages, {items} items in all"),
+             ("Median coverage", f"{median:.1f}%", "statements, untagged suite")]
+    for theme in charts.THEMES:
+        suffix = "" if theme == "light" else "-dark"
+        files[f"img/summary{suffix}.svg"] = charts.summary(tiles, theme)
+        files[f"img/map{suffix}.svg"] = charts.treemap(pk, LAYERS, theme)
+        files[f"img/kinds{suffix}.svg"] = charts.heatmap(pk, LAYERS, KINDS, theme)
 
     o = []
     w = o.append
@@ -49,40 +75,31 @@ def render(work):
       "[tools/](tools/) from main at `" + meta["head"] + "` (" + meta["date"] + "); do not edit by hand, "
       "regenerate it as the end of this page shows. [PLAN.md](PLAN.md) is how the missing items close.")
     w("")
-    w("## Summary")
+    o += picture("summary", f"{meta['distinct_findings']} findings fixed; {tiers['Deep']} packages audited deeply; "
+                 f"{len(gapped)} packages with something missing; median coverage {median:.1f}%")
     w("")
-    w(f"- **{meta['distinct_findings']} findings fixed**, each a GitHub issue closed by a commit on main, "
-      f"touching {touched} of the module's {len(pk)} packages.")
-    w("- Depth: " + ", ".join(f"{tiers[t]} {t.lower()}" for t in TIERS) + ".")
-    w(f"- **{len(gapped)} packages still have something missing**, {items} items in all.")
-    w(f"- Median statement coverage is {statistics.median(covs):.1f}% across the {len(covs)} packages "
-      "with statements.")
-    w(f"- {len(meta['unattributed_closed_bugs'])} closed bugs are not attributed to a package, because no "
-      "commit on main that changed Go files closed them with a closing keyword: "
-      + ", ".join(f"#{n}" for n in meta["unattributed_closed_bugs"]) + ".")
+    w(f"{meta['distinct_findings']} findings fixed, each a GitHub issue closed by a commit on main, touch "
+      f"{touched} of the module's {len(pk)} packages. By depth: "
+      + ", ".join(f"{tiers[t]} {t.lower()}" for t in TIERS) + f". Median statement coverage is {median:.1f}% "
+      f"across the {len(covs)} packages with statements. {len(meta['unattributed_closed_bugs'])} closed bugs "
+      "are not attributed to a package, because no commit on main that changed Go files closed them with a "
+      "closing keyword: " + ", ".join(f"#{n}" for n in meta["unattributed_closed_bugs"]) + ".")
     w("")
-    w("## Depth by package")
+    w("## Package map")
     w("")
-    w("Deep is 10 or more findings across 4 or more kinds of defect; Moderate is 4 or more findings, or 3 or "
-      "more kinds; Light is 1 to 3 findings; Untouched is none. *Missing* counts the items in the next section.")
-    for layer in LAYERS:
-        rows = sorted((p for p in pk if p["layer"] == layer), key=lambda p: p["package"])
-        if not rows:
-            continue
-        w("")
-        w(f"### {layer}")
-        w("")
-        w("| Package | Depth | Findings | Kinds | Coverage | Lines | Fuzz targets | Missing |")
-        w("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
-        for p in rows:
-            w(f"| `{p['package']}` | {p['depth']} | {p['findings']} | {p['themes_explored']} | "
-              f"{pct(p['coverage'])} | {p['loc']:,} | {p['fuzz_targets']} | {p['gap_count'] or ''} |")
+    w("Each block is a package, grouped by layer. Area grows with the square root of lines of code, which keeps "
+      "the order of sizes while leaving small packages room for their name; the few still too small are named "
+      "under the map. Color is audit depth, and a badge counts the items still missing. Deep is 10 or more findings "
+      "across 4 or more kinds of defect; Moderate is 4 or more findings, or 3 or more kinds; Light is 1 to 3 "
+      "findings; Untouched is none.")
+    w("")
+    o += picture("map", "Treemap of the packages by layer, sized by lines of code, colored by audit depth")
     w("")
     w("## What is still missing")
     w("")
-    w("Most items first. They come from rules over the numbers (a parser of outside data with no fuzz target, "
-      "coverage under 75%, few findings for a package's size, no finding about non-finite inputs where they "
-      "matter) and from things an audit run saw and did not file.")
+    w(f"{items} items in {len(gapped)} packages, most items first. They come from rules over the numbers (a "
+      "parser of outside data with no fuzz target, coverage under 75%, few findings for a package's size, no "
+      "finding about non-finite inputs where they matter) and from things an audit run saw and did not file.")
     w("")
     w("| Package | Depth | Findings | Coverage | Still missing |")
     w("| --- | --- | ---: | ---: | --- |")
@@ -96,6 +113,11 @@ def render(work):
       "there, which is either a clean bill or a check never run. Kinds are read from issue titles, so they "
       "are approximate.")
     w("")
+    o += picture("kinds", "Heat map of fixed findings by kind of defect for each package")
+    w("")
+    w("<details>")
+    w("<summary>The same, as a table</summary>")
+    w("")
     w("| Package | " + " | ".join(label for _, label in KINDS) + " | Total |")
     w("| --- | " + " | ".join("---:" for _ in KINDS) + " | ---: |")
     for layer in LAYERS:
@@ -105,6 +127,27 @@ def render(work):
         w(f"| **{layer}** |" + " |" * (len(KINDS) + 1))
         for p in rows:
             w(f"| `{p['package']}` | " + " | ".join(str(p[k] or "") for k, _ in KINDS) + f" | {p['findings']} |")
+    w("")
+    w("</details>")
+    w("")
+    w("## Depth by package")
+    w("")
+    w("<details>")
+    w("<summary>Every package with its depth, coverage, size and fuzz targets</summary>")
+    for layer in LAYERS:
+        rows = sorted((p for p in pk if p["layer"] == layer), key=lambda p: p["package"])
+        if not rows:
+            continue
+        w("")
+        w(f"### {layer}")
+        w("")
+        w("| Package | Depth | Findings | Kinds | Coverage | Lines | Fuzz targets | Missing |")
+        w("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for p in rows:
+            w(f"| `{p['package']}` | {p['depth']} | {p['findings']} | {p['themes_explored']} | "
+              f"{pct(p['coverage'])} | {p['loc']:,} | {p['fuzz_targets']} | {p['gap_count'] or ''} |")
+    w("")
+    w("</details>")
     w("")
     w("## Sweeps")
     w("")
@@ -121,8 +164,7 @@ def render(work):
       "for every package whose Go files that commit changed, so a finding that crossed two packages counts in "
       "both.")
     w("- **Kinds of defect** are read from each issue's title by keyword, the first matching kind winning.")
-    w("- **Coverage** is `go test -cover` on the untagged suite. Network, validation and integration tests "
-      "are counted by file in the tables the tools write, not here.")
+    w("- **Coverage** is `go test -cover` on the untagged suite.")
     w("- **Gaps** are rules over these numbers plus the judgments in [tools/judgments.py](tools/judgments.py): "
       "which packages decode outside bytes, which take floating-point inputs where non-finite values matter, "
       "which were swept and found clean, and what was seen and not filed.")
@@ -134,12 +176,13 @@ def render(work):
     w("```bash")
     w("python docs/audit/tools/collect.py   # facts: packages, sources, issues, go test -cover")
     w("python docs/audit/tools/build.py     # tables: packages, findings, sweeps")
-    w("python docs/audit/tools/render.py    # this page; --check reports a stale one")
+    w("python docs/audit/tools/render.py    # this page and its charts; --check reports a stale one")
     w("```")
     w("")
     w("`collect.py` runs the untagged test suite for coverage; pass `--cover-from FILE` to read a saved "
       "`go test -cover ./...` output instead.")
-    return "\n".join(o) + "\n"
+    files["README.md"] = "\n".join(o) + "\n"
+    return files
 
 
 def main():
@@ -147,18 +190,25 @@ def main():
     ap.add_argument("--work", default=os.path.join(tempfile.gettempdir(), "astrogo-auditmap"))
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
-    text = render(args.work)
+    files = render(args.work)
+    stale = []
+    for rel, content in sorted(files.items()):
+        path = os.path.join(ROOT, rel)
+        if args.check:
+            try:
+                with open(path, encoding="utf-8", newline="") as fh:
+                    if fh.read() != content:
+                        stale.append(rel)
+            except FileNotFoundError:
+                stale.append(rel)
+            continue
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            fh.write(content)
     if args.check:
-        try:
-            with open(OUT, encoding="utf-8", newline="") as f:
-                same = f.read() == text
-        except FileNotFoundError:
-            same = False
-        print("docs/audit/README.md is " + ("current" if same else "stale: rerun render.py"))
-        sys.exit(0 if same else 1)
-    with open(OUT, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-    print(f"wrote {OUT}")
+        print("docs/audit is current" if not stale else "stale, rerun render.py: " + ", ".join(stale))
+        sys.exit(1 if stale else 0)
+    print(f"wrote {len(files)} files under {ROOT}")
 
 
 if __name__ == "__main__":

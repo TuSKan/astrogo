@@ -14,6 +14,7 @@ import re
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # no __pycache__ beside the docs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import judgments  # noqa: E402
 
