@@ -72,16 +72,14 @@ func FuzzResolve(f *testing.F) {
 		tableAnswer.Store(&bulk)
 
 		for _, query := range []string{"8467", "Benoitcarry"} {
+			// An error is an answer the fuzzer is allowed to produce; only a
+			// target that resolved is held to anything.
 			tgt, err := New().Resolve(context.Background(), query)
-			if err != nil {
-				continue
-			}
-
-			if tgt.ID == "" {
+			if err == nil && tgt.ID == "" {
 				t.Errorf("Resolve(%q) resolved a target with no ID: %+v", query, tgt.Name)
 			}
 
-			if field := nonFinite(tgt); field != "" {
+			if field := nonFinite(tgt); err == nil && field != "" {
 				t.Errorf("Resolve(%q) resolved a target whose %s is not finite", query, field)
 			}
 		}
