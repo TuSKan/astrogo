@@ -3,6 +3,8 @@ package dataset_test
 import (
 	"context"
 	"errors"
+	"math"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -78,28 +80,303 @@ func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 	}
 }
 
+// LiveAerosol builds nothing when the optical depth cannot be had.
+//
+// The value of this function is that its optical depth was measured, so a
+// failed fetch must reach the caller rather than become a builder carrying
+// some other number. Without consent and with an empty cache the fetch is
+// refused before any source is asked.
+func TestLiveAerosolPassesOnARefusedFetch(t *testing.T) {
+	// Not parallel: consent and the data directory are process-global.
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.DisableDownloads()
+
+	air, err := dataset.LiveAerosol(context.Background(), skySite(t),
+		time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC), atmosphere.RuralAerosol)
+	if !errors.Is(err, remote.ErrDownloadDenied) {
+		t.Errorf("got %v, want the fetch's ErrDownloadDenied", err)
+	}
+
+	if air != nil {
+		t.Error("LiveAerosol returned a builder although no optical depth was fetched")
+	}
+}
+
 // The default magnitude system is Vega, and the option changes it.
 //
 // AB is the zero value of magnitude.System, so a Sky that forgot to default
 // would silently report AB — plausible numbers in the wrong system, which is
 // exactly why this is an option and not a Spec field.
+//
+// Until the audit's coverage pass this test checked only that Vega and AB
+// are different values and that the zero value is AB, and never built a Sky
+// or called WithMagSystem; the option it is named for could have done nothing
+// and it would still pass. It now holds both of a Sky's projections, in each
+// system, to the estimate's own.
 func TestWithMagSystemOverridesTheVegaDefault(t *testing.T) {
 	t.Parallel()
 
-	// Constructed directly rather than through Open, which needs a network:
-	// what is under test is the option plumbing, not the assembly.
-	vega := magnitude.Vega
-	ab := magnitude.AB
-
-	if vega == ab {
-		t.Fatal("Vega and AB are the same value; this test cannot distinguish them")
-	}
-
 	// The zero value must be AB, which is the premise the option exists for.
 	var zero magnitude.System
-	if zero != ab {
-		t.Errorf("the zero System is %v, not AB; WithMagSystem's rationale rests on it "+
-			"being the value an unset field would take", zero)
+	if zero != magnitude.AB || magnitude.Vega == magnitude.AB {
+		t.Fatalf("the zero System is %v and Vega is %v; WithMagSystem's rationale rests on "+
+			"AB being the value an unset field would take, and Vega a different one",
+			zero, magnitude.Vega)
+	}
+
+	in := skyInputs(t)
+
+	byDefault, err := dataset.NewSky(skybrightness.GAMBONSWeb, in)
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	ab, err := dataset.NewSky(skybrightness.GAMBONSWeb, in, dataset.WithMagSystem(magnitude.AB))
+	if err != nil {
+		t.Fatalf("NewSky(WithMagSystem(AB)): %v", err)
+	}
+
+	// One estimate for both, so the system is the only thing that differs.
+	scene, err := byDefault.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	if err != nil {
+		t.Fatalf("Scene: %v", err)
+	}
+
+	est, err := byDefault.Zenith(t.Context(), scene)
+	if err != nil {
+		t.Fatalf("Zenith: %v", err)
+	}
+
+	reported := map[magnitude.System]float64{}
+
+	for _, c := range []struct {
+		name string
+		sky  *dataset.Sky
+		want magnitude.System
+	}{
+		{"default", byDefault, magnitude.Vega},
+		{"WithMagSystem(AB)", ab, magnitude.AB},
+	} {
+		got, err := c.sky.SurfaceBrightness(est)
+		if err != nil {
+			t.Fatalf("%s: SurfaceBrightness: %v", c.name, err)
+		}
+
+		want, err := est.SurfaceBrightness(in.Band, c.want)
+		if err != nil {
+			t.Fatalf("%s: Estimate.SurfaceBrightness: %v", c.name, err)
+		}
+
+		if got != want {
+			t.Errorf("%s: the Sky reports %.6f mag/arcsec2, but the estimate in %v is %.6f",
+				c.name, got, c.want, want)
+		}
+
+		reported[c.want] = got
+
+		rows, err := c.sky.Composition(est)
+		if err != nil {
+			t.Fatalf("%s: Composition: %v", c.name, err)
+		}
+
+		wantRows, err := est.Composition(in.Band, c.want)
+		if err != nil {
+			t.Fatalf("%s: Estimate.Composition: %v", c.name, err)
+		}
+
+		// Brightnesses compare exactly, since each is one component's own.
+		// The fractions share a total that Composition sums in map order
+		// (#1066), so two calls on one estimate can differ by that sum's
+		// regrouping: at most one rounding per term, len(rows) eps relative.
+		tol := float64(len(wantRows)) * 0x1p-52
+
+		same := len(rows) == len(wantRows)
+		for i := 0; same && i < len(rows); i++ {
+			g, w := rows[i], wantRows[i]
+			same = g.Component == w.Component && g.Brightness == w.Brightness &&
+				math.Abs(g.Fraction-w.Fraction) <= tol*w.Fraction
+		}
+
+		if !same {
+			t.Errorf("%s: the Sky's composition is\n%v\nbut the estimate's in %v is\n%v",
+				c.name, rows, c.want, wantRows)
+		}
+	}
+
+	// Without this the two rows above could agree by both being one system.
+	if reported[magnitude.Vega] == reported[magnitude.AB] {
+		t.Fatalf("Vega and AB both read %.6f mag/arcsec2 through this band; the test "+
+			"cannot tell the systems apart", reported[magnitude.Vega])
+	}
+}
+
+// A Sky hands back what it was built from, and that is what it evaluates.
+//
+// Model and Inputs are the escape hatches for a caller who needs something
+// the facade does not expose, and Inputs exists so that a second model can be
+// built without fetching again. Both are only useful if they are the real
+// thing: a model built from Inputs must give the Sky's own answer, and so must
+// the model Model returns, asked at the preset's grid and fidelity.
+func TestASkyHandsBackWhatItEvaluates(t *testing.T) {
+	t.Parallel()
+
+	in := skyInputs(t)
+
+	sky, err := dataset.NewSky(skybrightness.GAMBONSWeb, in)
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	if sky.Preset() != skybrightness.GAMBONSWeb {
+		t.Errorf("Preset is %q, want %q", sky.Preset(), skybrightness.GAMBONSWeb)
+	}
+
+	if sky.Grid() != in.Grid {
+		t.Errorf("Grid is %v, want the inputs' %v", sky.Grid(), in.Grid)
+	}
+
+	if got := sky.Band(); got.Name != in.Band.Name || !slices.Equal(got.Response, in.Band.Response) {
+		t.Errorf("Band is %q, want the inputs' %q", got.Name, in.Band.Name)
+	}
+
+	scene, err := sky.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	if err != nil {
+		t.Fatalf("Scene: %v", err)
+	}
+
+	est, err := sky.Zenith(t.Context(), scene)
+	if err != nil {
+		t.Fatalf("Zenith: %v", err)
+	}
+
+	fidelity, err := sky.Preset().Fidelity()
+	if err != nil {
+		t.Fatalf("Fidelity: %v", err)
+	}
+
+	rebuilt, err := skybrightness.NewPreset(sky.Preset(), sky.Inputs())
+	if err != nil {
+		t.Fatalf("NewPreset from the Sky's Inputs: %v", err)
+	}
+
+	for name, model := range map[string]*skybrightness.Model{
+		"Model()":                  sky.Model(),
+		"NewPreset(..., Inputs())": rebuilt,
+	} {
+		got, err := model.Zenith(t.Context(), skybrightness.Query{
+			Scene: scene, Grid: sky.Grid(), Fidelity: fidelity,
+		})
+		if err != nil {
+			t.Fatalf("%s: Zenith: %v", name, err)
+		}
+
+		if !slices.Equal(got.SpectralRadiance(), est.SpectralRadiance()) {
+			t.Errorf("%s gives a zenith spectrum other than the Sky's own", name)
+		}
+	}
+}
+
+// SkyMap evaluates the hemisphere at the ring count asked for, on the Sky's
+// own grid, and its result feeds HorizontalIlluminance directly, as its doc
+// says.
+func TestSkyMapFeedsTheHemisphereIntegrals(t *testing.T) {
+	t.Parallel()
+
+	sky, err := dataset.NewSky(skybrightness.GAMBONSWeb, skyInputs(t))
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	scene, err := sky.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	if err != nil {
+		t.Fatalf("Scene: %v", err)
+	}
+
+	counts := map[int]int{}
+
+	for _, rings := range []int{2, 4} {
+		points, err := sky.SkyMap(t.Context(), scene, rings)
+		if err != nil {
+			t.Fatalf("SkyMap(%d): %v", rings, err)
+		}
+
+		counts[rings] = len(points)
+
+		for _, p := range points {
+			if p.Estimate == nil || p.Estimate.Grid() != sky.Grid() {
+				t.Fatalf("SkyMap(%d): a point at %v is not on the Sky's grid", rings, p.Direction)
+			}
+		}
+
+		e, err := skybrightness.HorizontalIlluminance(points, sky.Grid())
+		if err != nil {
+			t.Fatalf("HorizontalIlluminance(SkyMap(%d)): %v", rings, err)
+		}
+
+		if v := float64(e); !(v > 0) || math.IsInf(v, 0) {
+			t.Errorf("the illuminance from SkyMap(%d) is %g; a lit sky gives a positive, "+
+				"finite one", rings, v)
+		}
+	}
+
+	if counts[4] <= counts[2] {
+		t.Errorf("4 rings give %d points and 2 give %d; the ring count is not reaching "+
+			"the map", counts[4], counts[2])
+	}
+
+	if _, err := sky.SkyMap(t.Context(), scene, 0); !errors.Is(err, skybrightness.ErrRingCount) {
+		t.Errorf("SkyMap(0) returned %v, want ErrRingCount", err)
+	}
+}
+
+// A Sky refuses what it cannot evaluate, with the error that says why, and
+// never dereferences what it was not given.
+func TestASkyRefusesWhatItCannotEvaluate(t *testing.T) {
+	t.Parallel()
+
+	in := skyInputs(t)
+
+	if _, err := dataset.NewSky("no-such-preset", in); err == nil {
+		t.Error("NewSky accepted an unknown preset")
+	}
+
+	noDust := in
+	noDust.Dust = nil
+
+	if _, err := dataset.NewSky(skybrightness.GAMBONSWeb, noDust); !errors.Is(err, skybrightness.ErrPreset) {
+		t.Errorf("NewSky with no dust map returned %v, want ErrPreset", err)
+	}
+
+	sky, err := dataset.NewSky(skybrightness.GAMBONSWeb, in)
+	if err != nil {
+		t.Fatalf("NewSky: %v", err)
+	}
+
+	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
+
+	if _, err := sky.Scene(nil, when, nil); !errors.Is(err, dataset.ErrSpec) {
+		t.Errorf("Scene with no site returned %v, want ErrSpec", err)
+	}
+
+	// An atmosphere the caller described wrongly fails at Scene, where they
+	// described it, rather than at the first evaluation.
+	bad := atmosphere.NewBuilder().Ozone(-1)
+	if _, err := sky.Scene(skySite(t), when, bad); !errors.Is(err, atmosphere.ErrAtmosphereBuilder) {
+		t.Errorf("Scene with a negative ozone column returned %v, want ErrAtmosphereBuilder", err)
+	}
+
+	// No scene at all is the caller's error to hear about, not a panic.
+	if _, err := sky.Zenith(t.Context(), nil); !errors.Is(err, skybrightness.ErrNoObserver) {
+		t.Errorf("Zenith(nil) returned %v, want ErrNoObserver", err)
+	}
+
+	if _, err := sky.Direction(t.Context(), nil, angle.Deg(45), angle.Deg(0)); !errors.Is(err, skybrightness.ErrNoObserver) {
+		t.Errorf("Direction(nil) returned %v, want ErrNoObserver", err)
+	}
+
+	if _, err := sky.SkyMap(t.Context(), nil, 2); !errors.Is(err, skybrightness.ErrNoObserver) {
+		t.Errorf("SkyMap(nil) returned %v, want ErrNoObserver", err)
 	}
 }
 
