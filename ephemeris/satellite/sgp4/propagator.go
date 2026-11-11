@@ -2,6 +2,7 @@ package sgp4
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -184,7 +185,15 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 // stated here because `if err != nil { return }` is the right handling for both
 // — a caller who wants to look at a decayed satellite's position has to ask for
 // it deliberately.
+//
+// A NaN or infinite tsince is refused with [ErrNotFinite] before the model
+// runs: on a resonant deep-space orbit the integrator would otherwise step
+// toward it forever (#1052).
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
+	if math.IsNaN(tsince) || math.IsInf(tsince, 0) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: tsince is %g minutes", ErrNotFinite, tsince)
+	}
+
 	return p.evaluate(tsince)
 }
 

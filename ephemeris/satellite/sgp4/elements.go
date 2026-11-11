@@ -122,14 +122,16 @@ const (
 // So this refuses only what cannot be an element set at all: a mean motion that
 // is zero or negative (there is no such orbit and SGP4 divides by it), an
 // eccentricity outside [0, 1) (SGP4 is an elliptical theory), an inclination
-// outside [0, pi] (the range the angle is defined on), and a zero epoch (an
-// element set has to be *for* some time). Everything else is the propagator's
-// to complain about, at the point where it actually fails.
+// outside [0, pi] (the range the angle is defined on), a zero epoch (an element
+// set has to be *for* some time), and a NaN or an infinity in any field, which
+// no orbit has and which SGP4 would carry through to a NaN state (#1052).
+// Everything else is the propagator's to complain about, at the point where it
+// actually fails.
 //
 // [ParseTLE] calls this, so a parsed element set is already validated.
 func (e Elements) Validate() error {
 	switch {
-	case e.MeanMotion <= 0:
+	case !(e.MeanMotion > 0) || math.IsInf(e.MeanMotion, 0):
 		return fmt.Errorf("%w: mean motion is %g revolutions per day, which is not an orbit",
 			ErrElements, e.MeanMotion)
 
@@ -142,8 +144,16 @@ func (e Elements) Validate() error {
 		return fmt.Errorf("%w: inclination is %g degrees, outside [0, 180]",
 			ErrElements, e.Inclination.Degrees())
 
-	case math.IsNaN(e.BStar) || math.IsInf(e.BStar, 0):
+	case !finite(e.RAAN.Radians()) || !finite(e.ArgPerigee.Radians()) || !finite(e.MeanAnomaly.Radians()):
+		return fmt.Errorf("%w: an angle is not a finite number: RAAN %g, argument of perigee %g, "+
+			"mean anomaly %g degrees", ErrElements, e.RAAN.Degrees(), e.ArgPerigee.Degrees(), e.MeanAnomaly.Degrees())
+
+	case !finite(e.BStar):
 		return fmt.Errorf("%w: B* is %g", ErrElements, e.BStar)
+
+	case !finite(e.MeanMotionDot) || !finite(e.MeanMotionDDot):
+		return fmt.Errorf("%w: a mean motion derivative is not a finite number: %g and %g",
+			ErrElements, e.MeanMotionDot, e.MeanMotionDDot)
 
 	case e.Epoch.IsZero():
 		return fmt.Errorf("%w: epoch is unset — an element set describes a particular instant",
@@ -152,3 +162,6 @@ func (e Elements) Validate() error {
 
 	return nil
 }
+
+// finite reports whether x is a number: neither NaN nor an infinity.
+func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }

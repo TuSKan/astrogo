@@ -310,11 +310,18 @@ conditions:
 | `ErrSubOrbital` | error 5 | no (at `New`) |
 | `ErrDecayed` | error 6 | **yes** |
 | `ErrKeplerNotConverged` | — (new) | **yes** |
+| `ErrNotFinite` | — (new) | no |
 
 The rule, stated once and tested: **`ErrDecayed` and `ErrKeplerNotConverged`
 come with a populated state; every other error leaves the vectors zero.** Both
 describe a result that exists and should not be trusted, which is a different
 thing from a computation that could not be performed.
+
+That state is always finite. A NaN or infinite time is refused with
+`ErrNotFinite` before the model runs, because the deep-space resonance
+integrator steps toward it and never arrives. A state the arithmetic overflowed
+to compute, from a time or an element set far outside the model's range, is
+refused the same way rather than returned as a convergence failure (#1052).
 
 `ErrKeplerNotConverged` has no counterpart in the reference, which silently
 stops after ten iterations and uses whatever it has. That silence *is* the 23333
