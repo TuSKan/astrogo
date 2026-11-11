@@ -8,6 +8,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -80,6 +81,43 @@ func TestAtRefusesANonFiniteTime(t *testing.T) {
 	}
 }
 
+// TestAtTimeRefusesANonFiniteTime is the absolute-time half of #1052. A time
+// whose Julian Date is NaN or infinite has the standard library's zero time as
+// its UTC label, so AtTime propagated to January 1st of the year 1: a drag-free
+// element set answered with a position there and no error, and one with drag
+// with an eccentricity error that named a time nobody asked for.
+func TestAtTimeRefusesANonFiniteTime(t *testing.T) {
+	t.Parallel()
+
+	dragless := leo()
+	dragless.BStar = 0
+
+	for _, c := range []struct {
+		name string
+		el   sgp4.Elements
+	}{
+		{"with drag", leo()},
+		{"without drag", dragless},
+	} {
+		p, err := sgp4.New(c.el)
+		if err != nil {
+			t.Fatalf("%s: New: %v", c.name, err)
+		}
+
+		for _, jd := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
+			pos, vel, err := p.AtTime(time.FromJD(jd, time.UTC))
+			if !errors.Is(err, sgp4.ErrNotFinite) {
+				t.Errorf("%s: AtTime at JD %g returned %v, want ErrNotFinite", c.name, jd, err)
+			}
+
+			if pos != (vector.Vec3{}) || vel != (vector.Vec3{}) {
+				t.Errorf("%s: AtTime at JD %g returned a state (%v, %v) alongside its error",
+					c.name, jd, pos, vel)
+			}
+		}
+	}
+}
+
 // TestAtNeverReturnsANonFiniteState holds At to the promise its two advisory
 // errors make: a state that comes back with an error exists. Before #1052 a
 // finite but absurd input overflowed to a NaN state labeled
@@ -140,6 +178,10 @@ func TestValidateRefusesNonFiniteElements(t *testing.T) {
 		{"BStar", func(e *sgp4.Elements, v float64) { e.BStar = v }},
 		{"MeanMotionDot", func(e *sgp4.Elements, v float64) { e.MeanMotionDot = v }},
 		{"MeanMotionDDot", func(e *sgp4.Elements, v float64) { e.MeanMotionDDot = v }},
+		// An epoch whose Julian Date is not finite has the standard library's
+		// zero time as its UTC label, and the model would propagate from the
+		// year 1.
+		{"Epoch", func(e *sgp4.Elements, v float64) { e.Epoch = time.FromJD(v, time.UTC) }},
 	}
 
 	for _, f := range fields {

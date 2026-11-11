@@ -158,6 +158,9 @@ func (e Elements) Validate() error {
 	case e.Epoch.IsZero():
 		return fmt.Errorf("%w: epoch is unset — an element set describes a particular instant",
 			ErrElements)
+
+	case !finite(e.Epoch.JD()):
+		return fmt.Errorf("%w: epoch's Julian Date is %g, which is no instant", ErrElements, e.Epoch.JD())
 	}
 
 	return nil

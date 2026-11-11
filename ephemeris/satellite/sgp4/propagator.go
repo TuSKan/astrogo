@@ -203,7 +203,15 @@ func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 // is not a formality: a TT instant taken at face value lands 69.184 s late,
 // which for a low Earth orbit is 530 km. [time.Time] is scale-aware precisely
 // so this cannot be left to the caller.
+//
+// A time whose Julian Date is NaN or infinite is refused with [ErrNotFinite].
+// Its UTC label would be the standard library's zero time, January 1st of the
+// year 1, and the model would answer for that instant instead (#1052).
 func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
+	if jd := t.JD(); !finite(jd) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: the time's Julian Date is %g", ErrNotFinite, jd)
+	}
+
 	// Whole seconds and nanoseconds, subtracted as integers, so a query far
 	// from epoch loses nothing to a subtraction of two large numbers.
 	ts, tn := utcLabel(t)
