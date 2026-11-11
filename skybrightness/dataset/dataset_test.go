@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Assembling a model's reference data is one call.
@@ -98,53 +101,77 @@ func TestEndpointsCoverWhatEachPresetFetches(t *testing.T) {
 	}
 }
 
-// Inputs refuses what it cannot honestly supply.
+// Inputs refuses what it cannot honestly supply, before it fetches anything.
 //
 // One of these is the package declining to guess: a ground-emitter inventory
 // has no default because satellite radiance alone cannot determine a source
 // spectrum or an upward emission function, so any default would be reporting
 // somebody else's city.
+//
+// # Why offline, with an empty cache
+//
+// So that any fetch fails with remote.ErrOffline. A case that comes back
+// ErrSpec was therefore refused before the first fetch, which is the
+// property: until #1067 most of these were found after one to four fetches,
+// two of them large downloads, and this test accepted the emitter case
+// failing on the offline passband fetch instead, since "what matters is that
+// it fails". Two were not refused at all: a set but invalid grid was replaced
+// with the default, and a star shape of the wrong length was returned.
 func TestInputsRefusesAnIncompleteSpec(t *testing.T) {
-	t.Parallel()
-
-	// Offline, so nothing here reaches a service: each case must fail on the
-	// spec before any fetch is attempted.
+	// Not parallel: offline mode and the data directory are process-global.
+	// Captured first, so the tests after this one do not inherit them (#971).
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetOffline(true)
-	t.Cleanup(func() { remote.SetOffline(false) })
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+
+	web := skybrightness.GAMBONSWeb
+	nan := math.NaN()
 
 	cases := []struct {
 		name string
 		spec dataset.Spec
 		want error
-	}{{
-		name: "unknown preset",
-		spec: dataset.Spec{Preset: "no-such-preset"},
-		want: skybrightness.ErrPreset,
-	}, {
-		name: "observatory without emitters",
-		spec: dataset.Spec{Preset: skybrightness.Observatory},
-		want: dataset.ErrSpec,
-	}}
+	}{
+		{"unknown preset", dataset.Spec{Preset: "no-such-preset"}, skybrightness.ErrPreset},
+		{"observatory without emitters", dataset.Spec{Preset: skybrightness.Observatory}, dataset.ErrSpec},
+		{"grid of one sample", dataset.Spec{Preset: web, Grid: unit.SpectralGrid{StartNM: 400, StepNM: 1, N: 1}}, dataset.ErrSpec},
+		{"grid with a negative step", dataset.Spec{Preset: web, Grid: unit.SpectralGrid{StartNM: 400, StepNM: -1, N: 100}}, dataset.ErrSpec},
+		{"star shape off the grid", dataset.Spec{Preset: web, StarShape: make(skybrightness.SpectralRadiance, 3)}, dataset.ErrSpec},
+		{"negative star temperature", dataset.Spec{Preset: web, StarTemperatureK: -1}, dataset.ErrSpec},
+		{"NaN star temperature", dataset.Spec{Preset: web, StarTemperatureK: nan}, dataset.ErrSpec},
+		{"unknown airglow observatory", dataset.Spec{Preset: web, Observatory: "nowhere"}, dataset.ErrSpec},
+		{"negative solar flux", dataset.Spec{Preset: web, SolarFluxSFU: -1}, dataset.ErrSpec},
+		{"NaN airglow scale", dataset.Spec{Preset: web, AirglowScale: nan}, dataset.ErrSpec},
+		{"negative airglow scale", dataset.Spec{Preset: web, AirglowScale: -2}, dataset.ErrSpec},
+	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
 			_, err := dataset.Inputs(context.Background(), c.spec)
-			if err == nil {
-				t.Fatal("an incomplete spec was accepted")
-			}
-
-			// The emitter case only reaches its own check with a network, so
-			// offline it fails earlier. What matters is that it fails.
-			if c.name == "observatory without emitters" {
-				return
+			if errors.Is(err, remote.ErrOffline) {
+				t.Fatalf("Inputs fetched before refusing the spec: %v", err)
 			}
 
 			if !errors.Is(err, c.want) {
 				t.Fatalf("got %v, want %v", err, c.want)
 			}
 		})
+	}
+
+	// A spec with every field set, and set right, passes those checks and
+	// reaches the first fetch, so the checks above refuse only what is wrong.
+	good := dataset.Spec{
+		Preset:           web,
+		Grid:             unit.SpectralGrid{StartNM: 400, StepNM: 1, N: 301},
+		StarTemperatureK: 5000,
+		Observatory:      "armazones",
+		SolarFluxSFU:     100,
+		AirglowScale:     1.5,
+	}
+
+	if _, err := dataset.Inputs(context.Background(), good); !errors.Is(err, remote.ErrOffline) {
+		t.Errorf("a valid spec returned %v; it should pass every check and fail on the first "+
+			"fetch, offline", err)
 	}
 }
 

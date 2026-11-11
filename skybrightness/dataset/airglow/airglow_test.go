@@ -95,9 +95,41 @@ func TestSpecValidates(t *testing.T) {
 		{"above SkyCalc's range", Spec{MinNM: 500, MaxNM: 40000}},
 		{"inverted range", Spec{MinNM: 900, MaxNM: 400}},
 		{"negative step", Spec{MinNM: 500, MaxNM: 600, StepNM: -0.1}},
+
+		// Non-finite values (#1068). NaN fails every comparison the range and
+		// step checks make, so these passed and failed later, in the JSON
+		// encoder, with an error that did not wrap ErrSpec.
+		{"infinite solar flux", Spec{SolarFluxSFU: math.Inf(1)}},
+		{"NaN lower bound", Spec{MinNM: unit.WavelengthNM(math.NaN()), MaxNM: 600}},
+		{"NaN upper bound", Spec{MinNM: 500, MaxNM: unit.WavelengthNM(math.NaN())}},
+		{"infinite upper bound", Spec{MinNM: 500, MaxNM: unit.WavelengthNM(math.Inf(1))}},
+		{"NaN step", Spec{StepNM: unit.WavelengthNM(math.NaN())}},
+		{"infinite step", Spec{StepNM: unit.WavelengthNM(math.Inf(1))}},
+
+		// The scale is not part of the request, and was never checked: a
+		// negative or NaN one was read as 1 and an infinite one made every
+		// radiance infinite.
+		{"negative scale", Spec{Scale: -2}},
+		{"NaN scale", Spec{Scale: math.NaN()}},
+		{"infinite scale", Spec{Scale: math.Inf(1)}},
 	} {
 		if _, err := c.spec.request(); !errors.Is(err, ErrSpec) {
 			t.Errorf("%s: err = %v, want ErrSpec", c.name, err)
+		}
+
+		if err := c.spec.Validate(); !errors.Is(err, ErrSpec) {
+			t.Errorf("%s: Validate returned %v, want ErrSpec", c.name, err)
+		}
+	}
+
+	// And Validate passes what Fetch would send, defaults and a scale
+	// included, so a caller checking up front is not refused for nothing.
+	for _, s := range []Spec{
+		{},
+		{Observatory: Armazones, SolarFluxSFU: 100, MinNM: 329, MaxNM: 1001, Scale: 1.5},
+	} {
+		if err := s.Validate(); err != nil {
+			t.Errorf("Validate(%+v) = %v, want nil", s, err)
 		}
 	}
 }
