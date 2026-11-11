@@ -65,7 +65,7 @@ These packages decide whether other tests can fail, so each bound they apply is 
 ### 6. Loose ends
 
 - [ ] #913: Epv00 evaluated again for an instant already asked for.
-- [ ] The 13 closed bugs the map cannot attribute to a package: attribute each to the commit that fixed it, or record why none did.
+- [ ] The closed bugs the map cannot attribute to a package, listed in its summary: attribute each to the commit that fixed it, or record why none did (#1045 was fixed upstream, at JPL).
 - [ ] #132: confirm every remaining item from the two external reviews is closed or has its own issue.
 
 ### 7. Close-out
