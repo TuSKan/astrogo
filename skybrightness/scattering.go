@@ -440,7 +440,16 @@ func (m *Model) addScatteredIn(
 		est.Quality.Add(ApproximateMultipleScattering)
 	}
 
-	for id, scattered := range into {
+	// In the field's own component order, not into's map order: every
+	// component adds into the same total, and floating-point addition is not
+	// associative, so a map's randomized order made the total spectrum differ
+	// in the last bit from one call to the next (#1066).
+	for _, id := range field.components {
+		scattered, ok := into[id]
+		if !ok {
+			continue
+		}
+
 		buf := est.components[id]
 
 		for i := range buf {

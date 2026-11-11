@@ -2,6 +2,7 @@ package skybrightness
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/TuSKan/astrogo/magnitude"
@@ -56,14 +57,14 @@ func (e *Estimate) Component(id ComponentID) (SpectralRadiance, bool) {
 	return s, ok
 }
 
-// ComponentIDs lists the components that contributed.
+// ComponentIDs lists the components that contributed, in sorted order.
+//
+// Sorted because the components are held in a map, and Go randomizes a map's
+// iteration order on every range. Anything that sums over components in the
+// order this returns, as [Estimate.Composition] does, would otherwise get a
+// different rounding on each call; until #1066 it did.
 func (e *Estimate) ComponentIDs() []ComponentID {
-	out := make([]ComponentID, 0, len(e.components))
-	for id := range e.components {
-		out = append(out, id)
-	}
-
-	return out
+	return slices.Sorted(maps.Keys(e.components))
 }
 
 // Radiance returns the total radiance integrated across the grid's span,
@@ -124,8 +125,8 @@ func (e *Estimate) ElectronRate(inst optics.Instrument) (unit.ElectronsPerPixelP
 func (e *Estimate) TotalUncertainty() (float64, error) {
 	weights := make(map[ComponentID]unit.Radiance, len(e.components))
 
-	for id, s := range e.components {
-		r, err := s.Integrate(e.grid)
+	for _, id := range e.ComponentIDs() {
+		r, err := e.components[id].Integrate(e.grid)
 		if err != nil {
 			return 0, err
 		}

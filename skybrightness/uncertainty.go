@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/unit"
@@ -71,12 +73,7 @@ func (b *UncertaintyBudget) Add(u Uncertainty) {
 // it is true. Linear is the conservative choice and is what a shared
 // systematic actually does.
 func (b *UncertaintyBudget) Total(weights map[ComponentID]unit.Radiance) float64 {
-	var total unit.Radiance
-
-	for _, w := range weights {
-		total += w
-	}
-
+	total := weightTotal(weights)
 	if total <= 0 {
 		return 0
 	}
@@ -108,15 +105,11 @@ func (b *UncertaintyBudget) Total(weights map[ComponentID]unit.Radiance) float64
 // this prediction?" — the question the budget exists to serve.
 func (b *UncertaintyBudget) Dominant(weights map[ComponentID]unit.Radiance) (Uncertainty, float64) {
 	var (
-		total unit.Radiance
 		best  Uncertainty
 		bestC float64
 	)
 
-	for _, w := range weights {
-		total += w
-	}
-
+	total := weightTotal(weights)
 	if total <= 0 {
 		return Uncertainty{}, 0
 	}
@@ -129,6 +122,21 @@ func (b *UncertaintyBudget) Dominant(weights map[ComponentID]unit.Radiance) (Unc
 	}
 
 	return best, bestC
+}
+
+// weightTotal sums the weights in sorted component order.
+//
+// Not in map order: Go randomizes that on every range, and floating-point
+// addition is not associative, so the shares divided by this total would
+// round differently from one call to the next (#1066).
+func weightTotal(weights map[ComponentID]unit.Radiance) unit.Radiance {
+	var total unit.Radiance
+
+	for _, id := range slices.Sorted(maps.Keys(weights)) {
+		total += weights[id]
+	}
+
+	return total
 }
 
 // spectralUncertainty accumulates a component's relative uncertainty over the
