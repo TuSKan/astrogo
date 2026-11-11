@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -76,9 +77,9 @@ func isCometRow(row string) bool {
 		return false
 	}
 
-	_, err := strconv.ParseFloat(strings.TrimSpace(row[cometEccStart:cometEccEnd]), 64)
+	_, ok := finite.Parse(strings.TrimSpace(row[cometEccStart:cometEccEnd]))
 
-	return err == nil
+	return ok
 }
 
 // parseCometRow converts one comet-format row into a resolve.Target carrying
@@ -126,8 +127,8 @@ func parseCometRow(row string) (resolve.Target, error) {
 		{"ascending node", row[cometNodeStart:cometNodeEnd], func(v float64) { t.AscendingNode = angle.Deg(v) }},
 		{"argument of perihelion", row[cometPeriStart:cometPeriEnd], func(v float64) { t.ArgPeriapsis = angle.Deg(v) }},
 	} {
-		v, err := strconv.ParseFloat(strings.TrimSpace(f.text), 64)
-		if err != nil {
+		v, ok := finite.Parse(strings.TrimSpace(f.text))
+		if !ok {
 			return resolve.Target{}, fmt.Errorf("%w: %s: %s %q", ErrMalformedRow, t.ID, f.name, f.text)
 		}
 
@@ -157,8 +158,8 @@ func parseCometRow(row string) (resolve.Target, error) {
 	// g + 5·log10(Δ) + 2.5·k·log10(r). astrogo's K1 multiplies log r
 	// directly, so it is 2.5·G — the 4.0 most rows carry is the familiar
 	// 10·log r.
-	if h, err := strconv.ParseFloat(strings.TrimSpace(row[cometHStart:cometHEnd]), 64); err == nil {
-		if g, err := strconv.ParseFloat(strings.TrimSpace(row[cometSlopeStart:cometSlopeEnd]), 64); err == nil {
+	if h, ok := finite.Parse(strings.TrimSpace(row[cometHStart:cometHEnd])); ok {
+		if g, ok := finite.Parse(strings.TrimSpace(row[cometSlopeStart:cometSlopeEnd])); ok {
 			t.M1, t.K1, t.HasM1 = h, cometSlopeToK1*g, true
 		}
 	}
@@ -199,8 +200,10 @@ func cometPerihelionTime(row string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("%w: month %q", errPerihelionDate, row[cometTMonthStart:cometTMonthEnd])
 	}
 
-	day, err := strconv.ParseFloat(strings.TrimSpace(row[cometTDayStart:cometTDayEnd]), 64)
-	if err != nil || day < 1 || day >= 32 {
+	// A NaN day passed both comparisons below and reached int(math.Floor),
+	// so it is refused as the text it is (#1080).
+	day, ok := finite.Parse(strings.TrimSpace(row[cometTDayStart:cometTDayEnd]))
+	if !ok || day < 1 || day >= 32 {
 		return time.Time{}, fmt.Errorf("%w: day %q", errPerihelionDate, row[cometTDayStart:cometTDayEnd])
 	}
 

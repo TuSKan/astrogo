@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
@@ -120,7 +121,8 @@ func toTargets(records []targetRecord) []resolve.Target {
 			Epoch:    time.J2000(), // OpenNGC's RA/Dec are J2000 by catalog convention
 		}
 
-		if v, err := strconv.ParseFloat(rec.VMag, 64); err == nil {
+		// A NaN or infinite magnitude is no magnitude (#1080).
+		if v, ok := finite.Parse(rec.VMag); ok {
 			t.VMag = v
 			t.HasVMag = true
 		}
@@ -284,7 +286,7 @@ func extractMag(row []string, col map[string]int, colName string) string {
 		return ""
 	}
 
-	if _, err := strconv.ParseFloat(v, 64); err != nil {
+	if _, ok := finite.Parse(v); !ok {
 		return ""
 	}
 

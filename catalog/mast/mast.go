@@ -11,6 +11,7 @@ import (
 	"net/url"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
@@ -205,7 +206,10 @@ func newMASTTarget(canonicalName string, ra, dec *float64) resolve.Target {
 		Epoch:   time.J2000(),
 	}
 
-	if ra != nil && dec != nil {
+	// encoding/xml and encoding/json decode into a float64 through
+	// strconv.ParseFloat, which accepts NaN and the infinities. A position
+	// like that, or an impossible one, is read as absent (#1080).
+	if ra != nil && dec != nil && finite.Position(*ra, *dec) {
 		t.Coord = coord.NewICRS(angle.Deg(*ra), angle.Deg(*dec))
 		t.HasCoord = true
 	}
