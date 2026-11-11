@@ -185,7 +185,8 @@ func GushchinAirmass(alt angle.Angle) (float64, error) {
 // aerosol loading, not a radiative-transfer solution. It moves a
 // single-scattering estimate toward the truth; it does not make it exact.
 func MultipleScatteringFactor(rayleigh unit.OpticalDepth) (float64, error) {
-	if rayleigh < 0 || math.IsNaN(float64(rayleigh)) {
+	// An infinite depth gave an infinite factor with no error (#1038).
+	if rayleigh < 0 || math.IsNaN(float64(rayleigh)) || math.IsInf(float64(rayleigh), 0) {
 		return 0, fmt.Errorf("%w: rayleigh %g", ErrOpticalDepth, float64(rayleigh))
 	}
 
@@ -311,12 +312,17 @@ func ExtendedSourceOpticalDepth(
 		return 0, fmt.Errorf("%w: rayleigh %g", ErrOpticalDepth, float64(rayleigh))
 	case aerosol < 0 || math.IsNaN(float64(aerosol)) || math.IsInf(float64(aerosol), 0):
 		return 0, fmt.Errorf("%w: aerosol %g", ErrOpticalDepth, float64(aerosol))
-	case molecularAirmass < 1 || aerosolAirmass < 1:
-		return 0, fmt.Errorf("%w: airmass %g/%g is below one",
+	// Written so that NaN fails each test: `< 1` and `<= 0 || > 1` are false
+	// for it, so a NaN airmass or kappa came back as a NaN depth, an infinite
+	// airmass as an infinite one, and an infinite height as zero, all with no
+	// error (#1038).
+	case !(molecularAirmass >= 1) || !(aerosolAirmass >= 1) ||
+		math.IsInf(molecularAirmass, 1) || math.IsInf(aerosolAirmass, 1):
+		return 0, fmt.Errorf("%w: airmass %g/%g is not a finite value of at least one",
 			ErrAirmassRange, molecularAirmass, aerosolAirmass)
-	case observerHeight < 0 || math.IsNaN(observerHeight.Meters()):
+	case !(observerHeight >= 0) || math.IsInf(observerHeight.Meters(), 1):
 		return 0, fmt.Errorf("%w: observer height %g m", ErrOpticalDepth, observerHeight.Meters())
-	case kappa <= 0 || kappa > 1:
+	case !(kappa > 0 && kappa <= 1):
 		return 0, fmt.Errorf("%w: kappa %g is outside (0, 1]", ErrOpticalDepth, kappa)
 	}
 

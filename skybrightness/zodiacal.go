@@ -389,9 +389,20 @@ func zodiacalRadiance(dst SpectralRadiance, grid unit.SpectralGrid, geom Zodiaca
 			unit.ErrGridMismatch, len(dst), grid.Len())
 	}
 
-	if geom.SunDistance <= 0 || math.IsNaN(float64(geom.SunDistance)) {
+	// Finite as well as positive: R^-2.3 of an infinite distance is zero, so
+	// the term vanished with no error (#1038).
+	if r := geom.SunDistance.AU(); !(r > 0) || math.IsInf(r, 1) {
 		return 0, 0, fmt.Errorf("%w: heliocentric distance %g AU",
 			ErrZodiacalGeometry, geom.SunDistance.AU())
+	}
+
+	// The Earth's longitude feeds only the seasonal factor, which applies
+	// above 60 degrees of ecliptic latitude. ZodiacalBrightnessAt checks the
+	// direction (#998), so a NaN longitude passed and came out as a NaN
+	// radiance there with no error (#1038).
+	if l := geom.EarthLongitude.Degrees(); math.IsNaN(l) || math.IsInf(l, 0) {
+		return 0, 0, fmt.Errorf("%w: Earth's ecliptic longitude %g deg is not finite",
+			ErrZodiacalGeometry, l)
 	}
 
 	reference, err = ZodiacalBrightnessAt(geom)

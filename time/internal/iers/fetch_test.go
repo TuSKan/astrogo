@@ -173,12 +173,21 @@ func TestEnsureLoadedReportsWhyTheCacheWasUnusable(t *testing.T) {
 			want:   "read cached EOP data",
 		},
 		{
-			// The parser skips lines it cannot read, so garbage parses to an
-			// empty table rather than failing. What does fail is the scanner,
-			// on a line past bufio's 64 KiB token limit.
+			// A line past bufio's 64 KiB token limit fails the scanner.
 			name: "unparseable",
 			loader: &fakeLoader{
 				cached:   Data{Raw: []byte(strings.Repeat("x", 70000))},
+				fetchErr: ErrNoEOPData,
+			},
+			want: "parse cached EOP data",
+		},
+		{
+			// An error page has no line long enough to be a row. It parsed into
+			// an empty table, so this case used to be the line above instead
+			// (#1042).
+			name: "an error page",
+			loader: &fakeLoader{
+				cached:   Data{Raw: []byte("<html><body><h1>503 Service Unavailable</h1></body></html>\n")},
 				fetchErr: ErrNoEOPData,
 			},
 			want: "parse cached EOP data",

@@ -125,7 +125,8 @@ func NewScatteredMoonlight(solarSpectrum []float64) (*ScatteredMoonlight, error)
 	}
 
 	for i, v := range solarSpectrum {
-		if v < 0 || math.IsNaN(v) {
+		// An infinite band was accepted, and lit the sky with it (#1038).
+		if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			return nil, fmt.Errorf("%w: band %d (%v nm) is %g",
 				ErrNoSolarSpectrum, i, bands[i], v)
 		}

@@ -142,28 +142,76 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 	scratchCache(t)
 
-	// A single line with no newline, past bufio.Scanner's default token
-	// limit, makes ParseFinals2000A's scan fail — a realistic stand-in for
-	// a truncated or garbled response. Short garbage will not do: it parses
-	// cleanly into an empty table.
-	fakeIERSSource(t, strings.Repeat("x", 70*1024))
+	for _, c := range []struct{ name, body string }{
+		// A single line with no newline, past bufio.Scanner's default token
+		// limit, makes ParseFinals2000A's scan fail: a garbled response.
+		{"a line past the scanner's limit", strings.Repeat("x", 70*1024)},
+		// What a server under maintenance sends with a 200. Every line is
+		// shorter than a bulletin row, and it parsed into an empty table, so
+		// this test used the line above instead and the page was accepted
+		// (#1042).
+		{"an error page", errorPage},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			scratchCache(t)
+			fakeIERSSource(t, c.body)
+			remote.EnableDownloads(0, remote.IERSFinals2000A)
+
+			if _, err := (eopLoader{}).Fetch(context.Background()); err == nil {
+				t.Fatal("Fetch accepted a corrupt download")
+			}
+
+			fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+			if err != nil {
+				t.Fatalf("remote.CacheDir: %v", err)
+			}
+
+			if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
+				t.Error("a corrupt download must not be cached")
+			}
+
+			if _, ok := time.GetModel().(time.ZeroModel); !ok {
+				t.Errorf("model must be unchanged after a rejected download, got %T", time.GetModel())
+			}
+		})
+	}
+}
+
+// errorPage is what a server under maintenance answers with a 200.
+const errorPage = "<html><body><h1>503 Service Unavailable</h1></body></html>\n"
+
+// A good bulletin in the cache survives the source starting to serve an error
+// page. The page parsed as an empty bulletin, passed the validator and
+// replaced the good copy on disk (#1042).
+func TestEOPLoaderKeepsAGoodBulletinOverAnErrorPage(t *testing.T) {
+	scratchCache(t)
+	fakeIERSSource(t, sampleFinals2000A)
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
-	if _, err := (eopLoader{}).Fetch(context.Background()); err == nil {
-		t.Fatal("Fetch accepted a corrupt download")
+	ctx := context.Background()
+
+	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+		t.Fatalf("first Fetch: %v", err)
 	}
 
-	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
+	fakeIERSSource(t, errorPage)
+
+	if data, err := (eopLoader{}).Fetch(ctx); err == nil {
+		t.Errorf("Fetch of an error page: %d bytes and no error", len(data.Raw))
+	}
+
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
-		t.Error("a corrupt download must not be cached")
+	cached, err := fs.ReadFile(fsys, prefix+eopCacheName)
+	if err != nil {
+		t.Fatalf("read the cached bulletin: %v", err)
 	}
 
-	if _, ok := time.GetModel().(time.ZeroModel); !ok {
-		t.Errorf("model must be unchanged after a rejected download, got %T", time.GetModel())
+	if string(cached) != sampleFinals2000A {
+		t.Errorf("the cached bulletin is now %q, want the good one kept", cached[:min(len(cached), 60)])
 	}
 }
 
