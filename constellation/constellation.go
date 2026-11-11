@@ -2,6 +2,7 @@ package constellation
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/coord"
@@ -120,7 +121,18 @@ var b1875Matrix = func() [3][3]float64 {
 // grid lines (constant right ascension or constant declination), never
 // diagonal or great-circle arcs, so an ordinary planar point-in-polygon
 // test against the raw (RA, Dec) vertices is exact, not an approximation.
+//
+// A position with a NaN or infinite component is refused with
+// [coord.ErrNotFinite]. The containment test is defined only for real
+// coordinates: a NaN crosses no boundary, and Ursa Minor's boundary encircles
+// the pole, so its inverted parity would call every such position Ursa Minor
+// (#1055).
 func Lookup(pos coord.ICRS) (name, abbreviation string, err error) {
+	if ra, dec := pos.RA().Radians(), pos.Dec().Radians(); !finite(ra) || !finite(dec) {
+		return "", "", fmt.Errorf("%w: RA %g, Dec %g degrees",
+			coord.ErrNotFinite, pos.RA().Degrees(), pos.Dec().Degrees())
+	}
+
 	v := pos.ToUnitVector()
 	v1875 := gofaext.Rxp(b1875Matrix, [3]float64{v.X, v.Y, v.Z})
 
@@ -215,3 +227,6 @@ func meridianCrosses(raA, raB, ra float64) bool {
 
 	return ra >= lo && ra < hi
 }
+
+// finite reports whether x is a number: neither NaN nor an infinity.
+func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }

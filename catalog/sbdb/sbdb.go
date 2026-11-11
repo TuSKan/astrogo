@@ -660,31 +660,50 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		col[name] = i
 	}
 
+	// An answer without the columns that say which body a row is cannot be
+	// the answer to this query, which asked for both. Read anyway, a missing
+	// column's index defaulted to 0 and every row took its name and SPK ID
+	// from whatever column came first (#1058).
+	for _, name := range []string{"spkid", "full_name"} {
+		if _, ok := col[name]; !ok {
+			return nil, 0, fmt.Errorf("%w: bulk query (sb-kind=%s) answered without a %s column",
+				ErrAPIError, sbKind, name)
+		}
+	}
+
+	// cell is a row's value in the named column, or "" when the answer has
+	// no such column or the row stops before it. A column-oriented answer
+	// promises every row has a cell per field, and a truncated or changed one
+	// does not keep that promise: indexing past a short row panicked
+	// SearchBright (#1058). An absent cell reads as an empty one, which every
+	// field below already treats as unset.
+	cell := func(row []any, name string) string {
+		idx, ok := col[name]
+		if !ok || idx >= len(row) {
+			return ""
+		}
+
+		return cellString(row[idx])
+	}
+
 	targets := make([]resolve.Target, 0, len(resp.Data))
 
 	for _, row := range resp.Data {
-		spkID := cellString(row[col["spkid"]])
-
-		// "class" is looked up via the two-value form (unlike the other
-		// fields below, which this function always requests itself and so
-		// can trust are present) since it's the one field an offline test
-		// fixture might reasonably omit — col["class"] defaulting to the
-		// int zero-value 0 would otherwise silently read the full_name
-		// column instead of failing loudly.
-		var orbitClass string
-		if idx, ok := col["class"]; ok {
-			orbitClass = cellString(row[idx])
+		// A row with no SPK ID names no body.
+		spkID := cell(row, "spkid")
+		if spkID == "" {
+			continue
 		}
+
+		orbitClass := cell(row, "class")
 
 		var (
 			eccentricity float64
 			hasE         bool
 		)
 
-		if idx, ok := col["e"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				eccentricity, hasE = v, true
-			}
+		if v, err := parseFloat(cell(row, "e")); err == nil {
+			eccentricity, hasE = v, true
 		}
 
 		// Same all-or-nothing gate as ResolveObject's identify-endpoint
@@ -699,52 +718,36 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 			hasEpoch                               bool
 		)
 
-		if idx, ok := col["a"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				semiMajorAxis, hasA = v, true
-			}
+		if v, err := parseFloat(cell(row, "a")); err == nil {
+			semiMajorAxis, hasA = v, true
 		}
 
-		if idx, ok := col["i"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				incl, hasIncl = v, true
-			}
+		if v, err := parseFloat(cell(row, "i")); err == nil {
+			incl, hasIncl = v, true
 		}
 
-		if idx, ok := col["om"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				node, hasNode = v, true
-			}
+		if v, err := parseFloat(cell(row, "om")); err == nil {
+			node, hasNode = v, true
 		}
 
-		if idx, ok := col["w"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				argp, hasArgp = v, true
-			}
+		if v, err := parseFloat(cell(row, "w")); err == nil {
+			argp, hasArgp = v, true
 		}
 
-		if idx, ok := col["ma"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				ma, hasMA = v, true
-			}
+		if v, err := parseFloat(cell(row, "ma")); err == nil {
+			ma, hasMA = v, true
 		}
 
-		if idx, ok := col["q"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				q, hasQ = v, true
-			}
+		if v, err := parseFloat(cell(row, "q")); err == nil {
+			q, hasQ = v, true
 		}
 
-		if idx, ok := col["tp"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				tp, hasTP = v, true
-			}
+		if v, err := parseFloat(cell(row, "tp")); err == nil {
+			tp, hasTP = v, true
 		}
 
-		if idx, ok := col["epoch"]; ok {
-			if v, err := parseFloat(cellString(row[idx])); err == nil {
-				epochJD, hasEpoch = v, true
-			}
+		if v, err := parseFloat(cell(row, "epoch")); err == nil {
+			epochJD, hasEpoch = v, true
 		}
 
 		hasAsteroidForm, hasCometForm := hasA && hasMA, hasQ && hasTP
@@ -752,7 +755,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 
 		t := resolve.Target{
 			ID:          spkID,
-			Name:        strings.TrimSpace(cellString(row[col["full_name"]])),
+			Name:        strings.TrimSpace(cell(row, "full_name")),
 			SPKID:       spkID,
 			Kind:        classifyKind(spkID, orbitClass, eccentricity, sbKind == "c"),
 			Catalog:     "sbdb",
@@ -769,19 +772,19 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		}
 
 		if magField == "H" {
-			if v, err := parseFloat(cellString(row[col["H"]])); err == nil {
+			if v, err := parseFloat(cell(row, "H")); err == nil {
 				t.H, t.HasH = v, true
 			}
 
-			if v, err := parseFloat(cellString(row[col["G"]])); err == nil {
+			if v, err := parseFloat(cell(row, "G")); err == nil {
 				t.G = v
 			}
 		} else {
-			if v, err := parseFloat(cellString(row[col["M1"]])); err == nil {
+			if v, err := parseFloat(cell(row, "M1")); err == nil {
 				t.M1, t.HasM1 = v, true
 			}
 
-			if v, err := parseFloat(cellString(row[col["K1"]])); err == nil {
+			if v, err := parseFloat(cell(row, "K1")); err == nil {
 				t.K1 = v
 			}
 		}
