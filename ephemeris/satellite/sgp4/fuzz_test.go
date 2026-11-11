@@ -47,6 +47,13 @@ func FuzzParseTLE(f *testing.F) {
 	// from the start rather than left for the fuzzer to stumble on.
 	f.Add(withCatalogField(issLine1, "E8493"), withCatalogField(issLine2, "E8493"))
 
+	// Text strconv.ParseFloat reads as a number and a TLE never holds (#1052):
+	// a NaN or an infinity in a decimal column, which the property below
+	// refuses and which the seed corpus did not reach until then.
+	f.Add(issLine1, withColumns(issLine2, 18, 25, "NaN"))
+	f.Add(issLine1, withColumns(issLine2, 53, 63, "Inf"))
+	f.Add(withColumns(issLine1, 21, 32, "NaN"), issLine2)
+
 	f.Fuzz(func(t *testing.T, line1, line2 string) {
 		el, err := sgp4.ParseTLE(line1, line2)
 		if err != nil {

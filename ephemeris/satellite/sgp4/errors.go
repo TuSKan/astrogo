@@ -37,7 +37,9 @@ var (
 // [ErrDecayed] and [ErrKeplerNotConverged] are returned alongside the position
 // and velocity that were computed, because both describe a result that exists
 // and should not be trusted — which is a different thing from a computation
-// that could not be performed. Every other error here leaves both vectors zero.
+// that could not be performed. That state is always finite: one that is not
+// comes back as [ErrNotFinite] instead. Every other error here leaves both
+// vectors zero.
 //
 // `if err != nil { return }` remains the right handling for all of them. A
 // caller who wants to look at a decayed satellite's position has to ask for it
@@ -88,4 +90,17 @@ var (
 	// periodics moved the eccentricity outside [0, 1]. Vallado's error 3, and
 	// reachable only in deep space, since only there are those terms applied.
 	ErrPerturbedEccentricity = errors.New("sgp4: perturbed eccentricity is outside [0, 1]")
+
+	// ErrNotFinite indicates a time since epoch that is NaN or infinite, or a
+	// state the model could not compute as a finite number: a time or an
+	// element set so far outside SGP4's range that its arithmetic overflows.
+	// Both vectors are zero.
+	//
+	// A non-finite time is refused before the model runs rather than left to
+	// fail inside it, because there it does not fail: the deep-space
+	// resonance integrator steps from epoch toward the requested time and
+	// never arrives at a NaN or an infinity (#1052). An overflowed state is
+	// refused because the two advisory errors above promise a state that
+	// exists, and a NaN is not one.
+	ErrNotFinite = errors.New("sgp4: time or state is not finite")
 )

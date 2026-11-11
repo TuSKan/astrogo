@@ -40,7 +40,7 @@ A pull request vets all three tags and runs `integration` in a non-blocking job.
 
 Every parser that eats bytes from someone else's server or a user's disk is fuzzed. The property under test is "never panics or hangs on attacker-influenceable input," not correctness (that's covered by ordinary tests elsewhere). Seed corpora are `f.Add(...)` literals only — no checked-in binary fixtures — so they run as ordinary tests under `go test ./...` and are part of every CI run for free. Extended fuzzing beyond the seed corpus is a manual, periodic step, not a CI gate — run it when touching a parser.
 
-Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
+Twenty-seven packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this table to the code in both directions:
 
 | package | targets | what the bytes are |
 | --- | --- | --- |
@@ -49,6 +49,7 @@ Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds 
 | `ephemeris/satellite` | `FuzzValidateTLE`, `FuzzNewFromTLE` | CelesTrak or user-supplied element sets |
 | `ephemeris/satellite/sgp4` | `FuzzParseTLE`, `FuzzVerifyTLEChecksums` | the same element sets, at the SGP4 backend's own parser and checksum |
 | `catalog/norad` | `FuzzGPToTLE` | CelesTrak JSON, through `ToTLE` into SGP4 |
+| `catalog/sbdb` | `FuzzSearchBright` | JPL SBDB's column-oriented bulk query answers, served through `httptest` (#1058) |
 | `catalog/fink` | `FuzzResolve` | FINK's single-object JSON and its SSOFT Parquet table, through Arrow's decoder, served through `httptest` |
 | `internal/votable` | `FuzzRead` | SIMBAD / VizieR / Gaia / MAST TAP responses |
 | `time/internal/iers` | `FuzzParseFinals2000A` | the IERS bulletin |
@@ -68,6 +69,7 @@ Twenty-five packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds 
 | `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
 | `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
 | `skybrightness/dataset/raster` | `FuzzOpen` | GeoTIFFs from a third-party mirror (VIIRS), or any file a caller opens |
+| `skybrightness/dataset/viirs` | `FuzzOpen` | the VIIRS annual archive, a ZIP holding the composite GeoTIFF, through extraction, decoding and emitter building |
 | `atmosphere/dataset/cams` | `FuzzOpen` | CAMS NetCDF-4 files, through scigolib/hdf5, which sizes allocations from what a file declares (#794) |
 
 **Always pass `-fuzzminimizetime`.** Its default is 60s *per interesting input*, and minimization executions are not counted in `execs`, so a target with expensive executions appears to freeze at a constant count while the engine is in fact busy. This cost #140 a long investigation; do not omit it.
