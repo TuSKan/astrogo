@@ -384,16 +384,22 @@ func WriteETag(ctx context.Context, fsys fs.FS, key, sourceETag string) error {
 	return WriteFile(ctx, fsys, key+SourceETagSuffix, strings.NewReader(sourceETag))
 }
 
-// StageAndPromote writes body into a staging object, validates it, and
-// only then promotes it to cacheKey. Nothing a reader can observe at
-// cacheKey is ever partial or unvalidated, and a transfer interrupted
-// partway leaves a partial the next attempt can resume from.
+// StageAndPromote writes body into a staging object, checks it, and only
+// then promotes it to cacheKey. Nothing a reader can observe at cacheKey is
+// ever partial or unchecked, and a transfer interrupted partway leaves a
+// partial the next attempt can resume from.
+//
+// check, when not nil, is handed fsys, bound to ctx, and the staged object's
+// key. An error from it leaves cacheKey as it was: whatever was cached there
+// before is neither replaced nor removed. It is handed a key rather than a
+// stream so that a caller's own reader, which opens the file however it needs
+// to, can decide before the cached copy is replaced (#1047).
 //
 // offset > 0 means body continues an existing partial: the two are
 // concatenated into a separate staging key rather than written back over
 // the partial while it is still open for reading, which Windows forbids.
 func StageAndPromote(ctx context.Context, fsys fs.FS, cacheKey string,
-	body io.Reader, offset int64, sourceETag string, validate func(io.Reader) error,
+	body io.Reader, offset int64, sourceETag string, check func(fsys fs.FS, key string) error,
 ) error {
 	bound := WithContext(ctx, fsys)
 	pKey := PartialKey(cacheKey)
@@ -417,8 +423,8 @@ func StageAndPromote(ctx context.Context, fsys fs.FS, cacheKey string,
 		return err
 	}
 
-	if validate != nil {
-		if err := validateStaged(ctx, fsys, writeKey, validate); err != nil {
+	if check != nil {
+		if err := check(bound, writeKey); err != nil {
 			discardStaging(ctx, fsys, writeKey, pKey)
 
 			return fmt.Errorf("remote: validate %s: %w", cacheKey, err)
@@ -507,20 +513,6 @@ func writeStaged(ctx context.Context, fsys fs.FS, writeKey string,
 	}
 
 	return nil
-}
-
-// validateStaged runs validate over the staged object's bytes, streaming
-// rather than buffering so a multi-GB kernel needs no memory to check.
-func validateStaged(ctx context.Context, fsys fs.FS, writeKey string, validate func(io.Reader) error) error {
-	r, err := WithContext(ctx, fsys).Open(writeKey)
-	if err != nil {
-		return fmt.Errorf("read staging %s: %w", writeKey, err)
-	}
-
-	verr := validate(r)
-	closeErr := r.Close()
-
-	return errors.Join(verr, closeErr)
 }
 
 // discardStaging removes the staging objects and their ETag sidecars. Failures

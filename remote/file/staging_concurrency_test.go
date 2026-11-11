@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -74,7 +73,7 @@ func TestStagingAndPartialWritesAcrossFilesystems(t *testing.T) {
 
 				err = file.StageAndPromote(t.Context(), filesystems[i], key,
 					strings.NewReader(payload), 0, "etag",
-					func(_ io.Reader) error { return errValidationFailed })
+					func(fs.FS, string) error { return errValidationFailed })
 				if !errors.Is(err, errValidationFailed) {
 					t.Errorf("round %d, writer %d: StageAndPromote = %v, want validation rejection",
 						round, i, err)

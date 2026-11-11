@@ -64,6 +64,11 @@ func WithValidate(f func(io.Reader) error) ReadOption {
 //     downloading the same bytes to fail the same way. One download per
 //     source version, not one per call, which for a gigabyte archive is the
 //     difference that matters.
+//   - A download that would replace a copy already cached, a Mutable
+//     source's update, is read before it replaces that copy, so a refusal
+//     leaves the cached copy and its recorded ETag as they were, and an
+//     offline call is still served it (#1047). Such an update is read twice
+//     when it is accepted: staged, and then where GetFile returns it.
 //
 // The record is this client's and is never written to the cache. A rejection
 // is the judgment of the code that made it, and a cached one would outlive
@@ -504,18 +509,47 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 		body = &progressReader{r: f, total: info.Size(), read: offset, onProgress: cfg.progress}
 	}
 
-	// Only the validator's own refusal rejects the version. A transfer or a
-	// write that failed says nothing about what the source serves.
-	validate, refused := cfg.validate, error(nil)
-	if validate != nil {
-		validate = func(r io.Reader) error {
-			refused = cfg.validate(r)
+	// What the staged download must pass before it is promoted over cacheKey.
+	// The validator, always. And the caller's reader when a copy is cached
+	// already: promoted first and read after, a download the reader refused had
+	// replaced that copy by the time it was refused, and removing it left
+	// nothing, so one bad answer from a source destroyed the copy that worked
+	// (#1047). Read before promotion, a refusal leaves the cached copy and its
+	// recorded ETag as they were, as a validator's always has. GetFile still
+	// hands the copy it returns to the reader afterwards, so a reader sees the
+	// key it is given, and only an update pays for the second read.
+	var checks []func(fs.FS, string) error
 
-			return refused
+	if cfg.validate != nil {
+		checks = append(checks, streamed(cfg.validate))
+	}
+
+	if cfg.read != nil {
+		if cached, err := file.Exists(ctx, cacheFS, cacheKey); err == nil && cached {
+			checks = append(checks, cfg.read)
 		}
 	}
 
-	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, validate); err != nil {
+	// Only a check's own refusal rejects the version. A transfer or a write
+	// that failed says nothing about what the source serves.
+	var (
+		check   func(fs.FS, string) error
+		refused error
+	)
+
+	if len(checks) > 0 {
+		check = func(fsys fs.FS, key string) error {
+			for _, c := range checks {
+				if refused = c(fsys, key); refused != nil {
+					return refused
+				}
+			}
+
+			return nil
+		}
+	}
+
+	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, check); err != nil {
 		if refused != nil && ctx.Err() == nil {
 			c.reject(cacheKey, sourceETag, refused)
 		}
@@ -542,6 +576,23 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 	}
 
 	return sourceETag, nil
+}
+
+// streamed adapts a [WithValidate] function to a check on a staged key: it
+// streams the object rather than buffering it, so a multi-GB kernel needs no
+// memory to be checked.
+func streamed(validate func(io.Reader) error) func(fs.FS, string) error {
+	return func(fsys fs.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("read staging %s: %w", key, err)
+		}
+
+		verr := validate(r)
+		closeErr := r.Close()
+
+		return errors.Join(verr, closeErr)
+	}
 }
 
 // progressReader reports the running byte count after every Read that
