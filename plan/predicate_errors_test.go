@@ -373,7 +373,7 @@ func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
 
 	ok, err := checkConstraintsInterval(
 		NewStar("A", angle.Zero(), angle.Zero()),
-		start, end, 10*time.Minute, site, movingContext(site.Location(), site.Refraction()),
+		start, end, 10*time.Minute, site, movingContext(site.Location(), site.Refraction()), nil,
 		endOnlyFailingConstraint{at: end},
 	)
 
