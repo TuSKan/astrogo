@@ -10,6 +10,41 @@ import (
 	"github.com/TuSKan/astrogo/internal/metrology"
 )
 
+// TestReportFailsASuiteThatMeasuredNothing: a suite to which no sample was
+// added has verified nothing, and says so (#1104). Before, nothing exceeded a
+// contract when there was nothing to compare, so an empty suite logged
+// VERIFIED, failed nothing and wrote a VERIFIED document: a corpus that loaded
+// empty read as the best result an accuracy suite can have.
+func TestReportFailsASuiteThatMeasuredNothing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(metrology.OutDirEnv, dir)
+
+	rec := &recorder{}
+	testSuite(1).Report(rec)
+
+	if len(rec.errors) == 0 {
+		t.Fatalf("a suite that measured nothing passed; its log: %s", rec.output())
+	}
+
+	if !strings.Contains(rec.output(), "measured nothing") {
+		t.Errorf("the failure does not say nothing was measured: %s", rec.output())
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, metrology.FileName("test.suite")))
+	if err != nil {
+		t.Fatalf("a suite that measured nothing wrote no document: %v", err)
+	}
+
+	res, err := metrology.ReadResult(data)
+	if err != nil {
+		t.Fatalf("ReadResult: %v", err)
+	}
+
+	if res.Status != metrology.StatusNotVerified || res.Status.OK() {
+		t.Errorf("Status = %q, want %q: an empty suite must not read as evidence", res.Status, metrology.StatusNotVerified)
+	}
+}
+
 func violatingSuite() *metrology.Suite {
 	s := metrology.NewSuite("ephemeris.example", metrology.Reference{
 		Kind:           metrology.KindSOFA,
