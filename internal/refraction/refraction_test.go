@@ -18,7 +18,10 @@ const (
 
 // TestFromTrueIsAtioqAboveTheHandOver: wherever the observed altitude is at
 // or above 10°, FromTrue is SOFAFromTrue to the last bit, so nothing above the
-// hand-over moves.
+// hand-over moves. That SOFAFromTrue is iauAtioq's series is held elsewhere,
+// against gofa's Atioq, by atmosphere's
+// TestRefractionSOFAIsAtioqAndAtoiqAboveTheHandOver, so this package's tests
+// still need no SOFA (#1103).
 func TestFromTrueIsAtioqAboveTheHandOver(t *testing.T) {
 	for h := 9.95; h <= 90; h += 0.05 {
 		alt := h * deg
