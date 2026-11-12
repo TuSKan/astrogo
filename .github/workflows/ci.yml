@@ -267,24 +267,27 @@ jobs:
             packages=$(go list ./... | grep -v -x -e "$module/plan" -e "$module/internal/docsguard")
           fi
 
+          # GitHub runs this script as `bash -e`, and set -uo pipefail does not
+          # turn -e off. So each status is caught where it happens. Until #1092,
+          # a failing go test ended the step on the spot: none of the report
+          # below ran, and a failed shard printed nothing at all, not its
+          # failing tests and not even the package result lines.
+          status=0
           # shellcheck disable=SC2086 # one package path per word
-          go test -race -short -count=1 -json $packages > race.json
-          status=$?
+          go test -race -short -count=1 -json $packages > race.json || status=$?
 
           # Two streaming passes rather than one --slurp: the failed tests
-          # first, then the output to print. Each status is reported on its
-          # own line. Until #1092 they were folded into one exit code, so a
-          # failure printed nothing at all, not even the package result
-          # lines, and the log could not say whether go test or jq had failed.
-          failed=$(jq -r 'select(.Action == "fail" and .Test != null) | "\(.Package) \(.Test)"' race.json)
-          select_status=$?
+          # first, then the output to print.
+          select_status=0
+          failed=$(jq -r 'select(.Action == "fail" and .Test != null) | "\(.Package) \(.Test)"' race.json) \
+            || select_status=$?
 
+          print_status=0
           jq -rj --arg failed "$failed" '
             ($failed | split("\n") | map(select(. != "") | {key: ., value: true}) | from_entries) as $f
             | select(.Action == "build-output"
                 or (.Action == "output" and (.Test == null or $f["\(.Package) \(.Test)"])))
-            | .Output' race.json
-          print_status=$?
+            | .Output' race.json || print_status=$?
 
           echo "go test exited $status"
           if [ "$select_status" -ne 0 ] || [ "$print_status" -ne 0 ]; then
@@ -294,8 +297,8 @@ jobs:
 
           exit "$status"
 
-      # A failure the step above cannot render is still readable afterwards.
-      # That is #1092: three failed attempts whose logs named nothing.
+      # A failure stays readable after the runner is gone. #1092: three failed
+      # attempts on one day left nothing to read.
       - name: Keep race.json from a failed run
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
