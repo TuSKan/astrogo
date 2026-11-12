@@ -2,6 +2,7 @@ package sgp4
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
@@ -184,7 +185,15 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 // stated here because `if err != nil { return }` is the right handling for both
 // — a caller who wants to look at a decayed satellite's position has to ask for
 // it deliberately.
+//
+// A NaN or infinite tsince is refused with [ErrNotFinite] before the model
+// runs: on a resonant deep-space orbit the integrator would otherwise step
+// toward it forever (#1052).
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
+	if math.IsNaN(tsince) || math.IsInf(tsince, 0) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: tsince is %g minutes", ErrNotFinite, tsince)
+	}
+
 	return p.evaluate(tsince)
 }
 
@@ -194,7 +203,15 @@ func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 // is not a formality: a TT instant taken at face value lands 69.184 s late,
 // which for a low Earth orbit is 530 km. [time.Time] is scale-aware precisely
 // so this cannot be left to the caller.
+//
+// A time whose Julian Date is NaN or infinite is refused with [ErrNotFinite].
+// Its UTC label would be the standard library's zero time, January 1st of the
+// year 1, and the model would answer for that instant instead (#1052).
 func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
+	if jd := t.JD(); !finite(jd) {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: the time's Julian Date is %g", ErrNotFinite, jd)
+	}
+
 	// Whole seconds and nanoseconds, subtracted as integers, so a query far
 	// from epoch loses nothing to a subtraction of two large numbers.
 	ts, tn := utcLabel(t)

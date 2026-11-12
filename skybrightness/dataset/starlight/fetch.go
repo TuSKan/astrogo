@@ -84,7 +84,7 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 
 	key := ""
 	if cacheErr == nil {
-		key = path.Join(prefix, spec.cacheKey())
+		key = path.Join(prefix, spec.cacheKeyFor(band))
 		// A cache that cannot be read is not a failure: it means fetching
 		// what it would have supplied.
 		_ = readCache(ctx, fsys, key, values, counts)
@@ -93,6 +93,15 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 	wanted := wantedPixels(grid, directions, values)
 	if len(wanted) == 0 {
 		return assembleFetch(spec, values, counts, band)
+	}
+
+	// Written on the way out, whether the fetch succeeded or not, as
+	// BuildFromGaia checkpoints: a batch that fails returns early, and before
+	// #1079 that discarded every batch already fetched, so a retry asked the
+	// archive for them again. A cache that cannot be written costs the next
+	// call its time, not this one its answer.
+	if cacheErr == nil {
+		defer func() { _ = writeCache(ctx, fsys, key, band, values, counts) }()
 	}
 
 	client := aggregationClient(remote.GaiaTAP)
@@ -109,12 +118,6 @@ func Fetch(ctx context.Context, spec GaiaBuild, directions ...coord.ICRS) (*Map,
 		if spec.Progress != nil {
 			spec.Progress(end, len(wanted))
 		}
-	}
-
-	if cacheErr == nil {
-		// A cache that cannot be written costs the next call its time, not
-		// this one its answer.
-		_ = writeCache(ctx, fsys, key, band, values, counts)
 	}
 
 	return assembleFetch(spec, values, counts, band)
@@ -229,12 +232,15 @@ func (g GaiaBuild) adqlForPixels(pixels []int64) (string, error) {
 	), nil
 }
 
-// cacheKey names the dataset this build produces.
+// cacheKeyFor names the partial map this build keeps for one band.
 //
 // The order and the band are both in it because both change the numbers, and
-// two files whose values differ must never share a name.
-func (g GaiaBuild) cacheKey() string {
-	return fmt.Sprintf("starmap-o%d-%s.txt", g.Order, g.Bands[0].Name)
+// two files whose values differ must never share a name. Each band has its
+// own: a multi-band build that cached only its first band resumed every other
+// band from nothing while skipping the chunks the first one held, and left
+// them zero (#1077).
+func (g GaiaBuild) cacheKeyFor(band string) string {
+	return fmt.Sprintf("starmap-o%d-%s.txt", g.Order, band)
 }
 
 // readCache fills values from a previously written partial map.
@@ -277,8 +283,10 @@ func parseCache(r io.Reader, values []float64, counts []int64) error {
 			continue
 		}
 
+		// v <= 0 alone let NaN through, since every comparison with NaN is
+		// false, and +Inf, which is positive (#1030).
 		v, err := strconv.ParseFloat(fields[1], 64)
-		if err != nil || v <= 0 {
+		if err != nil || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			continue
 		}
 
@@ -306,7 +314,9 @@ func writeCache(ctx context.Context, fsys remote.FS, key, band string, values []
 	// report the total that proves it tiled the sky. Without it, a build that
 	// resumed would count only the chunks its final run happened to fetch.
 	for pixel, v := range values {
-		if v <= 0 {
+		// The reader refuses a non-finite value (#1030), so writing one would
+		// only make the pixel fetched again on every call.
+		if v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			continue
 		}
 

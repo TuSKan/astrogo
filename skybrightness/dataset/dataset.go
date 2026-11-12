@@ -42,6 +42,7 @@
 package dataset
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -126,7 +127,8 @@ type Spec struct {
 	Preset skybrightness.Preset
 
 	// Grid is the spectral axis every component is sampled onto. Zero means
-	// [skybrightness.DefaultOpticalGrid].
+	// [skybrightness.DefaultOpticalGrid]. A grid that is set must be valid,
+	// and one that is not is refused with [ErrSpec] rather than replaced.
 	Grid unit.SpectralGrid
 
 	// BandID is the Spanish Virtual Observatory identifier of the passband
@@ -160,7 +162,8 @@ type Spec struct {
 	StarTemperatureK float64
 
 	// StarShape overrides StarTemperatureK entirely, for a caller who has a
-	// real ensemble spectrum rather than a blackbody. It must be on Grid.
+	// real ensemble spectrum rather than a blackbody. It must be on Grid, and
+	// one with a different number of samples is refused with [ErrSpec].
 	StarShape skybrightness.SpectralRadiance
 
 	// SolarFluxSFU is the 10.7 cm solar radio flux that sets airglow's
@@ -223,23 +226,21 @@ func Endpoints(p skybrightness.Preset) (ids []remote.EndpointID, maxSize int64) 
 // pays this once at start-up and never again: the objects are immutable and
 // are reused on existence alone.
 //
+// The spec is checked in full before anything is fetched, apart from
+// MapBand, which only the star map can answer; a spec it cannot satisfy is
+// refused with [ErrSpec].
+//
 // Returns [remote.ErrDownloadDenied] when consent has not been granted — see
 // [Endpoints] for what to grant.
 func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) {
 	var zero skybrightness.PresetInputs
 
-	// Asking the preset for something only a real preset can answer, so an
-	// unknown name fails here rather than after five downloads.
-	if _, err := spec.Preset.DiffuseKappa(); err != nil {
-		return zero, fmt.Errorf("dataset: %w", err)
+	plan, err := spec.resolve()
+	if err != nil {
+		return zero, err
 	}
 
-	grid := spec.Grid
-	if grid.Validate() != nil {
-		grid = skybrightness.DefaultOpticalGrid()
-	}
-
-	band, err := passband.Fetch(ctx, cmpOr(spec.BandID, DefaultBandID))
+	band, err := passband.Fetch(ctx, cmp.Or(spec.BandID, DefaultBandID))
 	if err != nil {
 		return zero, fmt.Errorf("dataset: passband: %w", err)
 	}
@@ -249,7 +250,8 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 		return zero, fmt.Errorf("dataset: star map: %w", err)
 	}
 
-	mapBand := cmpOr(spec.MapBand, DefaultMapBand)
+	// The one check that needs data: which columns the map carries.
+	mapBand := cmp.Or(spec.MapBand, DefaultMapBand)
 
 	stars, err := starMap.Band(mapBand)
 	if err != nil {
@@ -257,52 +259,29 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 			ErrSpec, mapBand, starMap.Bands())
 	}
 
-	shape := spec.StarShape
-	if len(shape) == 0 {
-		shape, err = skybrightness.BlackbodyShape(grid,
-			cmpOr(spec.StarTemperatureK, DefaultStarTemperatureK))
-		if err != nil {
-			return zero, fmt.Errorf("dataset: starlight shape: %w", err)
-		}
-	}
-
 	dustMap, err := dust.Open(ctx)
 	if err != nil {
 		return zero, fmt.Errorf("dataset: dust map: %w", err)
 	}
 
-	// The spectrum is fetched over the grid's own range, with a nanometer of
-	// slack at each end so the resampling interpolates rather than
-	// extrapolating at the edges.
-	glow, err := airglow.Fetch(ctx, airglow.Spec{
-		Observatory:  airglow.Observatory(spec.Observatory),
-		SolarFluxSFU: spec.SolarFluxSFU,
-		MinNM:        grid.At(0) - 1,
-		MaxNM:        grid.At(grid.Len()-1) + 1,
-		Scale:        spec.AirglowScale,
-	})
+	glow, err := airglow.Fetch(ctx, plan.airglow)
 	if err != nil {
 		return zero, fmt.Errorf("dataset: airglow: %w", err)
 	}
 
 	in := skybrightness.PresetInputs{
 		Stars:           stars,
-		StarShape:       shape,
+		StarShape:       plan.shape,
 		Dust:            dustMap,
-		AirglowZenith:   glow.Resample(grid),
+		AirglowZenith:   glow.Resample(plan.grid),
 		AirglowMeasured: spec.AirglowMeasured,
-		Grid:            grid,
+		Grid:            plan.grid,
 		Band:            band,
 		Emitters:        spec.Emitters,
 	}
 
 	if spec.Preset != skybrightness.Observatory {
 		return in, nil
-	}
-
-	if len(spec.Emitters) == 0 {
-		return zero, fmt.Errorf("%w: %q needs a ground-emitter inventory; build one with "+
-			"viirs.Region and pass it in Spec.Emitters", ErrSpec, spec.Preset)
 	}
 
 	sun, err := solar.Open(ctx)
@@ -320,13 +299,75 @@ func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) 
 	return in, nil
 }
 
-// cmpOr returns the first non-zero value, which Go 1.22 lacks and this file
-// wants three times.
-func cmpOr[T comparable](v, fallback T) T {
-	var zero T
-	if v == zero {
-		return fallback
+// resolved is a Spec with its defaults applied and everything checked that
+// can be checked without data.
+type resolved struct {
+	grid    unit.SpectralGrid
+	shape   skybrightness.SpectralRadiance
+	airglow airglow.Spec
+}
+
+// resolve applies a Spec's defaults and refuses what cannot be satisfied,
+// before anything is fetched.
+//
+// # Why all of it, up front
+//
+// Inputs makes up to five fetches, two of them large downloads on a cold
+// cache. A spec problem found after them has cost a caller those downloads
+// to learn the spec was never valid, and until #1067 most were: the star
+// temperature after two fetches, the airglow observatory after three, and a
+// missing emitter inventory after four. A grid that was set but invalid was
+// silently replaced with the default, and a star shape of the wrong length
+// was returned for skybrightness.NewPreset to refuse later.
+//
+// Only one check needs data, the star-map column, since which columns the
+// map carries is the map's to say.
+func (spec Spec) resolve() (resolved, error) {
+	// Asking the preset for something only a real preset can answer.
+	if _, err := spec.Preset.DiffuseKappa(); err != nil {
+		return resolved{}, fmt.Errorf("dataset: %w", err)
 	}
 
-	return v
+	grid := spec.Grid
+	if grid == (unit.SpectralGrid{}) {
+		grid = skybrightness.DefaultOpticalGrid()
+	} else if err := grid.Validate(); err != nil {
+		return resolved{}, fmt.Errorf("%w: grid: %w", ErrSpec, err)
+	}
+
+	shape := spec.StarShape
+	if len(shape) == 0 {
+		var err error
+
+		shape, err = skybrightness.BlackbodyShape(grid,
+			cmp.Or(spec.StarTemperatureK, DefaultStarTemperatureK))
+		if err != nil {
+			return resolved{}, fmt.Errorf("%w: starlight shape: %w", ErrSpec, err)
+		}
+	} else if len(shape) != grid.Len() {
+		return resolved{}, fmt.Errorf("%w: the star shape has %d samples and the grid %d",
+			ErrSpec, len(shape), grid.Len())
+	}
+
+	if spec.Preset == skybrightness.Observatory && len(spec.Emitters) == 0 {
+		return resolved{}, fmt.Errorf("%w: %q needs a ground-emitter inventory; build one with "+
+			"viirs.Region and pass it in Spec.Emitters", ErrSpec, spec.Preset)
+	}
+
+	// The spectrum is fetched over the grid's own range, with a nanometer of
+	// slack at each end so the resampling interpolates rather than
+	// extrapolating at the edges.
+	glow := airglow.Spec{
+		Observatory:  airglow.Observatory(spec.Observatory),
+		SolarFluxSFU: spec.SolarFluxSFU,
+		MinNM:        grid.At(0) - 1,
+		MaxNM:        grid.At(grid.Len()-1) + 1,
+		Scale:        spec.AirglowScale,
+	}
+
+	if err := glow.Validate(); err != nil {
+		return resolved{}, fmt.Errorf("%w: airglow: %w", ErrSpec, err)
+	}
+
+	return resolved{grid: grid, shape: shape, airglow: glow}, nil
 }

@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,19 +35,23 @@ var (
 	// archiveFile is the archive's name at the source and in the cache.
 	archiveFile = fmt.Sprintf("viirs_%d_raw.zip", healYear)
 
-	// tiffFile is the TIFF entry in the archive, and where the composite is
-	// extracted to: the root of the data directory, outside the endpoint's
-	// own prefix, which is where extractTIFF puts it today.
+	// tiffFile is the TIFF entry in the archive. The composite is extracted
+	// beside the archive, at tiffKey.
 	tiffFile = fmt.Sprintf("viirs_%d_raw.tif", healYear)
 )
+
+// tiffKey is where the composite in the archive cached at archiveKey is
+// extracted: the archive's own directory, the endpoint's prefix.
+func tiffKey(archiveKey string) string { return path.Join(path.Dir(archiveKey), tiffFile) }
 
 // pixels are the composite's four samples, west to east and north to south on
 // a 2 by 2 whole-sky grid.
 var pixels = [4]float64{1, 2, 3, 4}
 
 // compositeTIFF is a 2 by 2 float64 GeoTIFF covering the whole sky in
-// 180-degree pixels: the smallest file the composite reader decodes.
-func compositeTIFF() []byte {
+// 180-degree pixels, holding px: the smallest file the composite reader
+// decodes.
+func compositeTIFF(px [4]float64) []byte {
 	type entry struct {
 		tag, typ     uint16
 		count, value uint32
@@ -84,7 +89,7 @@ func compositeTIFF() []byte {
 	entries[9].value = uint32(scaleAt)
 	entries[10].value = uint32(tieAt)
 
-	b := make([]byte, dataAt+8*len(pixels))
+	b := make([]byte, dataAt+8*len(px))
 	copy(b, "II")
 	binary.LittleEndian.PutUint16(b[2:], 42)
 	binary.LittleEndian.PutUint32(b[4:], 8)
@@ -106,14 +111,14 @@ func compositeTIFF() []byte {
 
 	putDoubles(scaleAt, scale)
 	putDoubles(tieAt, tie)
-	putDoubles(dataAt, pixels[:])
+	putDoubles(dataAt, px[:])
 
 	return b
 }
 
 // archive zips one entry named tiffFile holding tiff.
-func archive(t *testing.T, tiff []byte) []byte {
-	t.Helper()
+func archive(tb testing.TB, tiff []byte) []byte {
+	tb.Helper()
 
 	var b bytes.Buffer
 
@@ -121,15 +126,15 @@ func archive(t *testing.T, tiff []byte) []byte {
 
 	w, err := zw.Create(tiffFile)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	if _, err := w.Write(tiff); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	if err := zw.Close(); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	return b.Bytes()
@@ -226,6 +231,13 @@ func isCached(t *testing.T, fsys remote.FS, key string) bool {
 func open(t *testing.T) error {
 	t.Helper()
 
+	return openReading(t, pixels[0])
+}
+
+// openReading is open, wanting the north-west pixel to read want.
+func openReading(t *testing.T, want float64) error {
+	t.Helper()
+
 	r, closer, err := viirs.Open(context.Background(), healYear)
 	if err != nil {
 		return fmt.Errorf("viirs.Open: %w", err)
@@ -240,8 +252,8 @@ func open(t *testing.T) error {
 
 	// At the pixel's center the neighbors' weights are zero, but only up to the
 	// rounding of the sample position, which FMA can change on arm64.
-	if math.Abs(got-pixels[0]) > 1e-9 {
-		t.Errorf("RadianceAt the north-west pixel's center = %g, want %g", got, pixels[0])
+	if math.Abs(got-want) > 1e-9 {
+		t.Errorf("RadianceAt the north-west pixel's center = %g, want %g", got, want)
 	}
 
 	return nil
@@ -249,7 +261,7 @@ func open(t *testing.T) error {
 
 // The composite end to end: downloaded, extracted, decoded and sampled.
 func TestOpenReadsAServedComposite(t *testing.T) {
-	_, _, src := viirsCacheAndSource(t, archive(t, compositeTIFF()))
+	_, _, src := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
 
 	if err := open(t); err != nil {
 		t.Fatalf("Open: %v", err)
@@ -263,13 +275,13 @@ func TestOpenReadsAServedComposite(t *testing.T) {
 // A cached archive damaged where it sits, while the source still serves the
 // copy it was fetched from, is replaced in the call that finds it (#1014).
 func TestOpenReplacesACorruptCachedArchive(t *testing.T) {
-	cache, archiveKey, src := viirsCacheAndSource(t, archive(t, compositeTIFF()))
+	cache, archiveKey, src := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
 
 	if err := open(t); err != nil {
 		t.Fatalf("first Open: %v", err)
 	}
 
-	if err := remote.RemoveFile(context.Background(), cache, tiffFile); err != nil {
+	if err := remote.RemoveFile(context.Background(), cache, tiffKey(archiveKey)); err != nil {
 		t.Fatalf("remove the extracted TIFF: %v", err)
 	}
 
@@ -287,13 +299,13 @@ func TestOpenReplacesACorruptCachedArchive(t *testing.T) {
 // A damaged extracted TIFF is extracted again from the cached archive, which
 // is not downloaded again: at a gigabyte, that is the difference that matters.
 func TestOpenReextractsACorruptTIFFWithoutDownloading(t *testing.T) {
-	cache, _, src := viirsCacheAndSource(t, archive(t, compositeTIFF()))
+	cache, archiveKey, src := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
 
 	if err := open(t); err != nil {
 		t.Fatalf("first Open: %v", err)
 	}
 
-	put(t, cache, tiffFile, []byte(errorPage))
+	put(t, cache, tiffKey(archiveKey), []byte(errorPage))
 
 	if err := open(t); err != nil {
 		t.Fatalf("Open over a corrupt extracted TIFF: %v", err)
@@ -325,18 +337,19 @@ func TestOpenDownloadsACorruptArchiveOnce(t *testing.T) {
 		t.Errorf("%d downloads, want 1", n)
 	}
 
-	src.serve(archive(t, compositeTIFF()), "v2")
+	src.serve(archive(t, compositeTIFF(pixels)), "v2")
 
 	if err := open(t); err != nil {
 		t.Fatalf("Open after the source changed: %v", err)
 	}
 }
 
-// An older extraction that does not decode, over an archive whose TIFF does not
-// either: the archive is refused, and no TIFF of either is left behind.
+// A TIFF with no record of the archive it came from, over an archive whose TIFF
+// does not decode: the first is replaced by an extraction, the archive is
+// refused, and no TIFF of either is left behind.
 func TestOpenLeavesNoTIFFFromARefusedArchive(t *testing.T) {
 	cache, archiveKey, _ := viirsCacheAndSource(t, archive(t, []byte(errorPage)))
-	put(t, cache, tiffFile, []byte(errorPage))
+	put(t, cache, tiffKey(archiveKey), []byte(errorPage))
 
 	if err := open(t); err == nil || errors.Is(err, remote.ErrRejectedSource) {
 		t.Fatalf("Open: err %v, want the decode error", err)
@@ -346,7 +359,7 @@ func TestOpenLeavesNoTIFFFromARefusedArchive(t *testing.T) {
 		t.Error("the archive was cached")
 	}
 
-	if isCached(t, cache, tiffFile) {
+	if isCached(t, cache, tiffKey(archiveKey)) {
 		t.Error("a TIFF that did not decode was left in the cache")
 	}
 }
@@ -365,7 +378,7 @@ func TestOpenRefusesAnArchiveWhoseTIFFDoesNotDecode(t *testing.T) {
 		t.Error("the archive was cached")
 	}
 
-	if isCached(t, cache, tiffFile) {
+	if isCached(t, cache, tiffKey(archiveKey)) {
 		t.Error("the TIFF that did not decode was left in the cache")
 	}
 
@@ -375,5 +388,119 @@ func TestOpenRefusesAnArchiveWhoseTIFFDoesNotDecode(t *testing.T) {
 
 	if n := src.downloads.Load(); n != 1 {
 		t.Errorf("%d downloads, want 1", n)
+	}
+}
+
+// The cached archive and the TIFF extracted from it both damaged: the TIFF no
+// longer matches the archive's record, extracting it again finds the archive
+// unreadable, and the archive is replaced in the same call.
+func TestOpenReplacesADamagedArchiveAndTIFF(t *testing.T) {
+	cache, archiveKey, src := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
+
+	if err := open(t); err != nil {
+		t.Fatalf("first Open: %v", err)
+	}
+
+	put(t, cache, tiffKey(archiveKey), []byte(errorPage))
+	put(t, cache, archiveKey, []byte(errorPage))
+
+	if err := open(t); err != nil {
+		t.Fatalf("Open over a damaged archive and TIFF: %v", err)
+	}
+
+	if n := src.downloads.Load(); n != 2 {
+		t.Errorf("%d downloads, want 2", n)
+	}
+}
+
+// A year reprocessed upstream is read from the new archive, not from the
+// composite extracted from the old one (#1015). Before, the new archive was
+// downloaded, a gigabyte in practice, and the old pixels served.
+func TestOpenReadsAReprocessedYear(t *testing.T) {
+	_, _, src := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
+
+	if err := open(t); err != nil {
+		t.Fatalf("first Open: %v", err)
+	}
+
+	reprocessed := [4]float64{10, 20, 30, 40}
+	src.serve(archive(t, compositeTIFF(reprocessed)), "v2")
+
+	if err := openReading(t, reprocessed[0]); err != nil {
+		t.Fatalf("Open after upstream reprocessed the year: %v", err)
+	}
+
+	if n := src.downloads.Load(); n != 2 {
+		t.Errorf("%d downloads, want 2", n)
+	}
+}
+
+// The composite is reused while the archive it came from is the one cached: a
+// second Open does not extract it again, a cost of hundreds of megabytes per
+// call at full size. Extracted again, it would be written anew and its
+// modification time would move.
+func TestOpenReusesTheCompositeOfTheCachedArchive(t *testing.T) {
+	cache, archiveKey, _ := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
+
+	if err := open(t); err != nil {
+		t.Fatalf("first Open: %v", err)
+	}
+
+	before, err := fs.Stat(cache, tiffKey(archiveKey))
+	if err != nil {
+		t.Fatalf("Stat the composite: %v", err)
+	}
+
+	if err := open(t); err != nil {
+		t.Fatalf("second Open: %v", err)
+	}
+
+	after, err := fs.Stat(cache, tiffKey(archiveKey))
+	if err != nil {
+		t.Fatalf("Stat the composite again: %v", err)
+	}
+
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Errorf("the composite was extracted again for an unchanged archive: modified %v, then %v",
+			before.ModTime(), after.ModTime())
+	}
+}
+
+// The composite is extracted beside its archive, under the endpoint's prefix,
+// with the record of the archive copy it came from. It used to be written at
+// the root of the data directory (#1015).
+func TestOpenExtractsBesideTheArchive(t *testing.T) {
+	cache, archiveKey, _ := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
+
+	if err := open(t); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	if !isCached(t, cache, tiffKey(archiveKey)) {
+		t.Errorf("no composite at %s, beside the archive", tiffKey(archiveKey))
+	}
+
+	if !isCached(t, cache, tiffKey(archiveKey)+".archive") {
+		t.Errorf("no record of the archive beside %s", tiffKey(archiveKey))
+	}
+
+	if isCached(t, cache, tiffFile) {
+		t.Errorf("a composite was written at the root of the data directory, %s", tiffFile)
+	}
+}
+
+// A composite an earlier version left at the root of the data directory is
+// removed once the composite is extracted where it belongs: nothing reads it
+// any more, and at full size it is hundreds of megabytes.
+func TestOpenRemovesTheCompositeOlderVersionsLeftAtTheRoot(t *testing.T) {
+	cache, _, _ := viirsCacheAndSource(t, archive(t, compositeTIFF(pixels)))
+	put(t, cache, tiffFile, compositeTIFF(pixels))
+
+	if err := open(t); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+
+	if isCached(t, cache, tiffFile) {
+		t.Errorf("the composite older versions left at the root, %s, is still there", tiffFile)
 	}
 }

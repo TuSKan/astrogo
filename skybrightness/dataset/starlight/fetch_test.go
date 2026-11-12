@@ -59,9 +59,9 @@ func TestCacheKeySeparatesDatasets(t *testing.T) {
 	otherBand.Bands = []GaiaBand{{Name: "G", FluxToRadiance: 1e-18}}
 
 	keys := map[string]string{
-		"order 8 V": base.cacheKey(),
-		"order 6 V": coarse.cacheKey(),
-		"order 8 G": otherBand.cacheKey(),
+		"order 8 V": base.cacheKeyFor(base.Bands[0].Name),
+		"order 6 V": coarse.cacheKeyFor(coarse.Bands[0].Name),
+		"order 8 G": otherBand.cacheKeyFor(otherBand.Bands[0].Name),
 	}
 
 	seen := map[string]string{}
@@ -223,8 +223,9 @@ func TestChunkIsCachedSkipsCompletedRanges(t *testing.T) {
 
 	build := fetchSpec()
 	values := make([]float64, 100)
+	bands := map[string][]float64{build.Bands[0].Name: values}
 
-	if build.chunkIsCached(values, 0, 9) {
+	if build.chunkIsCached(bands, 0, 9) {
 		t.Error("an empty range must not read as cached")
 	}
 
@@ -232,14 +233,26 @@ func TestChunkIsCachedSkipsCompletedRanges(t *testing.T) {
 		values[i] = 1e-9
 	}
 
-	if !build.chunkIsCached(values, 0, 9) {
+	if !build.chunkIsCached(bands, 0, 9) {
 		t.Error("a fully populated range must read as cached")
 	}
 
 	// One gap is enough to refetch: a partial chunk is not a chunk.
 	values[5] = 0
-	if build.chunkIsCached(values, 0, 9) {
+
+	if build.chunkIsCached(bands, 0, 9) {
 		t.Error("a range with a hole must be refetched")
+	}
+
+	// And a second band that lacks the range makes it not cached, however
+	// full the first is (#1077).
+	values[5] = 1e-9
+
+	build.Bands = append(build.Bands, GaiaBand{Name: "B", FluxToRadiance: 1e-18})
+	bands["B"] = make([]float64, 100)
+
+	if build.chunkIsCached(bands, 0, 9) {
+		t.Error("a range the second band does not hold must be refetched")
 	}
 }
 

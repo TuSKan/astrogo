@@ -20,7 +20,7 @@ measured how wrong without knowing why.
 
 ### 1.1 What the Vallado suite has been saying
 
-`ephemeris/satellite/sgp4_vallado_validation_test.go` compares astrogo against
+`ephemeris/satellite/sgp4/vallado_test.go` compares astrogo against
 the reference states published with Vallado et al. (2006), *Revisiting
 Spacetrack Report #3* (AIAA 2006-6753). Twenty-three of the thirty readable
 cases agree to a median of 4 cm. Seven do not:
@@ -288,8 +288,13 @@ SGP4's own argument is minutes-since-epoch as a real number. Taking it directly:
   rather than merely bounding it;
 - gives sub-microsecond time resolution instead of one second.
 
-`AtTime` is the convenience wrapper and uses `time.Time.JDParts` so the
-difference is formed in two-part arithmetic rather than losing the fraction.
+`AtTime` is the convenience wrapper. It subtracts the UTC labels of the time and
+the epoch as whole seconds and nanoseconds since the Unix epoch (`utcLabel`), so
+the difference is exact integer arithmetic rather than a subtraction of two
+nearly equal Julian Dates. It does not use `time.Time.JDParts`, which an earlier
+version of this section said it did: a UTC Julian Date lets a day that ends in a
+leap second run to 86401 seconds, and a difference across such a day came out a
+second off (#144).
 
 ### 6.2 Errors are returned, and some come with a usable state
 
@@ -307,14 +312,28 @@ conditions:
 | `ErrEccentricity` | error 1 | no |
 | `ErrPerturbedEccentricity` | error 3 | no |
 | `ErrSemiLatusRectum` | error 4 | no |
-| `ErrSubOrbital` | error 5 | no (at `New`) |
+| — (none) | error 5, disabled in the reference | — |
 | `ErrDecayed` | error 6 | **yes** |
 | `ErrKeplerNotConverged` | — (new) | **yes** |
+| `ErrNotFinite` | — (new) | no |
+
+Error 5, a sub-orbital element set, has no sentinel because the reference no
+longer raises it. Vallado's `sgp4init` carries that check commented out ("sgp4fix
+remove this check as it is unnecessary"), since the decay check in `sgp4` already
+handles an epoch below the surface. astrogo follows the reference, so such an
+element set builds, and `At` reports `ErrDecayed`. This table named a sentinel
+`ErrSubOrbital` until #1054; none ever existed.
 
 The rule, stated once and tested: **`ErrDecayed` and `ErrKeplerNotConverged`
 come with a populated state; every other error leaves the vectors zero.** Both
 describe a result that exists and should not be trusted, which is a different
 thing from a computation that could not be performed.
+
+That state is always finite. A NaN or infinite time is refused with
+`ErrNotFinite` before the model runs, because the deep-space resonance
+integrator steps toward it and never arrives. A state the arithmetic overflowed
+to compute, from a time or an element set far outside the model's range, is
+refused the same way rather than returned as a convergence failure (#1052).
 
 `ErrKeplerNotConverged` has no counterpart in the reference, which silently
 stops after ten iterations and uses whatever it has. That silence *is* the 23333
@@ -365,8 +384,8 @@ relationship** rather than leaving it to a comment:
   attached, so that a future reader who notices the mismatch finds an answer
   instead of filing a bug.
 
-This also closes the duplication the question came from: `ephemeris/satellite/regime.go`
-currently carries a third private copy of these constants, and §6.8 deletes it
+This also closes the duplication the question came from: `ephemeris/satellite`'s
+`regime.go` carried a third private copy of these constants, and §6.8 deleted it
 outright rather than re-plumbing it.
 
 ### 6.5 Checksums are a separate call from parsing

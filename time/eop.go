@@ -83,6 +83,11 @@ func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
 
 // ParseFinals2000A parses a finals2000A-format IERS bulletin into a Table.
 //
+// Rows whose polar motion or UT1−UTC is blank, as the bulletin's last rows
+// are, are skipped. A field that holds NaN or an infinity is an error: it is
+// not missing data but a corrupt copy. So is a bulletin with no rows left,
+// which is what an HTML error page parses to.
+//
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func ParseFinals2000A(r io.Reader) (*Table, error) { return iers.ParseFinals2000A(r) }
 

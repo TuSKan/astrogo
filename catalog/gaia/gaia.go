@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/votable"
@@ -352,9 +353,9 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 			return 0, false
 		}
 
-		v, err := strconv.ParseFloat(s, 64)
-
-		return v, err == nil
+		// NaN and the infinities parse, and VOTable allows NaN for a null
+		// float. Read as absent, as an empty cell is (#1080).
+		return finite.Parse(s)
 	}
 
 	id, ok := cell("source_id")
@@ -365,10 +366,10 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 	raDeg, okRA := number("ra")
 	decDeg, okDec := number("dec")
 
-	if !okRA || !okDec {
-		// A row with an unparseable or missing position is useless for
-		// astrometric cross-matching and worse than absent — drop it rather
-		// than reporting a fake (0,0) as if it were real.
+	if !okRA || !okDec || !finite.Position(raDeg, decDeg) {
+		// A row with an unparseable, missing or impossible position is
+		// useless for astrometric cross-matching and worse than absent — drop
+		// it rather than reporting a fake (0,0) as if it were real.
 		return resolve.Target{}, false
 	}
 

@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/leakcheck"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -38,8 +39,15 @@ import (
 // registering per-test would leave the next one to rediscover this. The
 // package's own rule is already that evaluation performs no I/O; ambient EOP
 // data is I/O arriving through a side door.
+//
+// # And under the leak check
+//
+// Because [skybrightness.Model.SkyMap] evaluates its directions on an errgroup.
+// It waits for the group before returning, and leakcheck is what keeps that
+// true: a worker started and not waited for fails the package rather than
+// growing a caller's process (#1099).
 func TestMain(m *testing.M) {
 	time.RegisterModel(time.ZeroModel{})
 
-	os.Exit(m.Run())
+	os.Exit(leakcheck.RunWithLeakCheck(m))
 }

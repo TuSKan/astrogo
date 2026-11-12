@@ -5,6 +5,7 @@ import (
 
 	"strconv"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
@@ -30,6 +31,37 @@ func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
 	}
 
 	return moved, nil
+}
+
+// withoutNonFiniteExtras treats a fixed target's non-finite kinematics and
+// magnitude as absent (#1080).
+//
+// A NaN proper motion is worse than none: a star at Gaia's J2016 epoch with a
+// good position and a NaN pmRA came out at a NaN position on every other date,
+// and so never rose. A NaN magnitude failed every brightness cut. Each is read
+// the way an empty catalog cell is, so the target keeps what is real about it.
+func withoutNonFiniteExtras(c catalog.Target) catalog.Target {
+	if !finite(c.PmRA.Radians()) {
+		c.PmRA = angle.Zero()
+	}
+
+	if !finite(c.PmDec.Radians()) {
+		c.PmDec = angle.Zero()
+	}
+
+	if !finite(c.Parallax.Radians()) {
+		c.Parallax = angle.Zero()
+	}
+
+	if !finite(c.RadialVelocity.MetersPerSec()) {
+		c.RadialVelocity, c.HasRadialVelocity = 0, false
+	}
+
+	if !finite(c.VMag) {
+		c.VMag, c.HasVMag = 0, false
+	}
+
+	return c
 }
 
 // FromCatalog converts a catalog.Target (wire format from resolvers) and an
@@ -174,9 +206,17 @@ func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
 	// Everything above this line gets its position from an ephemeris, so a
 	// missing catalog coordinate is irrelevant to it. Everything below is
 	// pinned to c.Coord and cannot be built without one.
-	if !c.HasCoord {
+	//
+	// A non-finite coordinate is no coordinate. The catalog parsers read one
+	// as absent since #1080, so this is the backstop for a target built by
+	// hand: before it, such a target was built, was "not observable" to every
+	// constraint but Airmass, never rose, and dropped out of a ranking and a
+	// schedule without an error anywhere.
+	if !c.HasCoord || !finite(c.Coord.RA().Radians()) || !finite(c.Coord.Dec().Radians()) {
 		return nil, fmt.Errorf("%w: %s", ErrNoCoordinates, c.Name)
 	}
+
+	c = withoutNonFiniteExtras(c)
 
 	// Star
 	if c.Kind == resolve.KindStar || c.Kind == resolve.KindDoubleStar {

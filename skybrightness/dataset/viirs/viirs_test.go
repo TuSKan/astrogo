@@ -158,6 +158,30 @@ func TestSourceSpectrumRejectsBadInput(t *testing.T) {
 			Shape:        []float64{1, 1, 1},
 			Response:     []float64{1, 1, 1},
 		}},
+		// Not a power distribution or a response (#1038). An infinite shape
+		// value scaled the other wavelengths to zero and its own to NaN, an
+		// infinite response scaled them all to zero, and a negative shape
+		// gave a negative radiance.
+		{"infinite shape", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, 700, 900},
+			Shape:        []float64{1, math.Inf(1), 1},
+			Response:     []float64{1, 1, 1},
+		}},
+		{"infinite response", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, 700, 900},
+			Shape:        []float64{1, 1, 1},
+			Response:     []float64{1, math.Inf(1), 1},
+		}},
+		{"negative shape", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, 700, 900},
+			Shape:        []float64{1, -0.5, 1},
+			Response:     []float64{1, 1, 1},
+		}},
+		{"negative response", viirs.SourceSpectrum{
+			WavelengthNM: []unit.WavelengthNM{500, 700, 900},
+			Shape:        []float64{1, 1, 1},
+			Response:     []float64{1, -0.5, 1},
+		}},
 	}
 
 	for _, tc := range cases {

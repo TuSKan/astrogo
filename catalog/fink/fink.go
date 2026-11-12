@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 
@@ -281,6 +282,14 @@ func (p *Provider) querySingle(ctx context.Context, number int64, name string) (
 		return nil, fmt.Errorf("%w: %s", ErrRemoteException, jsonStr(obj, "RemoteException"))
 	}
 
+	// An answer is about one body, and one that names none answers nothing.
+	// Read as a record, an empty object resolved to a target with no ID and no
+	// error, and kept Resolve from the bulk table that would have answered
+	// (#1061). Refused, it is a failed route like any other.
+	if jsonStr(obj, "sso_name") == "" && jsonInt(obj, "sso_number") <= 0 {
+		return nil, fmt.Errorf("%w: the answer names no object", ErrResponseFormat)
+	}
+
 	rec := &ssoRecord{
 		Name:   jsonStr(obj, "sso_name"),
 		Number: jsonInt(obj, "sso_number"),
@@ -383,35 +392,38 @@ func (p *Provider) recordToTarget(rec *ssoRecord) resolve.Target {
 		t.ID, t.Designation = rec.Name, ""
 	}
 
+	// FINK reads an absent value as NaN, and its JSON strings and Parquet
+	// floats can carry an infinity too; neither is a value (#1080).
+
 	// Use r-band (filter 2) as primary — closer to V than g-band.
-	if !math.IsNaN(rec.H2) {
+	if finite.Is(rec.H2) {
 		t.H = rec.H2
 		t.HasH = true
-	} else if !math.IsNaN(rec.H1) {
+	} else if finite.Is(rec.H1) {
 		t.H = rec.H1
 		t.HasH = true
 	}
 
 	// G1, G2 phase parameters.
-	if !math.IsNaN(rec.G1_2) && !math.IsNaN(rec.G2_2) {
+	if finite.Is(rec.G1_2) && finite.Is(rec.G2_2) {
 		t.G1 = rec.G1_2
 		t.G2 = rec.G2_2
 		t.HasG1G2 = true
-	} else if !math.IsNaN(rec.G1_1) && !math.IsNaN(rec.G2_1) {
+	} else if finite.Is(rec.G1_1) && finite.Is(rec.G2_1) {
 		t.G1 = rec.G1_1
 		t.G2 = rec.G2_1
 		t.HasG1G2 = true
 	}
 
 	// Spin axis.
-	if !math.IsNaN(rec.Alpha0) && !math.IsNaN(rec.Delta0) {
+	if finite.Is(rec.Alpha0) && finite.Is(rec.Delta0) {
 		t.SpinRA = angle.Deg(rec.Alpha0)
 		t.SpinDec = angle.Deg(rec.Delta0)
 		t.HasSpin = true
 	}
 
 	// Oblateness.
-	if !math.IsNaN(rec.R) && rec.R > 0 && rec.R <= 1 {
+	if finite.Is(rec.R) && rec.R > 0 && rec.R <= 1 {
 		t.Oblateness = rec.R
 		t.HasOblateness = true
 	}
@@ -559,7 +571,21 @@ func (p *Provider) downloadSSOFT(ctx context.Context) (_ []ssoRecord, err error)
 }
 
 // readParquet extracts ssoRecords from a SSOFT parquet file.
+//
+// A panic inside Arrow's decoder is returned as an error wrapping
+// [ErrInvalidParquet]. The decoder sizes what it builds from what the file
+// declares, and a malformed file led it into "makeslice: cap out of range"
+// while parsing the schema (#1062); the file is FINK's bytes, so the failure is
+// the file's, as atmosphere/dataset/cams treats its HDF5 decoder's (#794). A
+// failed allocation is fatal in Go rather than a panic, and is not caught here.
 func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord, err error) {
+	// Registered first, so it runs last and covers the reader's Close too.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: the parquet decoder failed: %v", ErrInvalidParquet, r)
+		}
+	}()
+
 	rdr, err := file.OpenParquetFile(path, false)
 	if err != nil {
 		return nil, fmt.Errorf("opening parquet: %w", err)

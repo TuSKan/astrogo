@@ -40,7 +40,7 @@ func TestPlanetConstructorsIncludesPluto(t *testing.T) {
 // This captures and restores only remote.NAIFSPK's own consent state (via
 // remote.Capture/Restore), rather than the blanket remote.Reset() the
 // sibling network tests in this package use — under the "integration"
-// build tag, plan/integration_main_test.go's TestMain grants unlimited
+// build tag, plan/main_test.go's TestMain grants unlimited
 // NAIFSPK consent for this package's entire test binary run (real
 // de441/de442 fetches need it); a plain remote.Reset() here would revoke
 // that for every test running afterward in the same binary, not just this

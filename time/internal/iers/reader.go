@@ -18,6 +18,11 @@ var ErrOutOfRange = errors.New("iers: MJD out of EOP data coverage")
 // ErrNoRecords indicates the EOP table has no records loaded.
 var ErrNoRecords = errors.New("iers: no EOP records available")
 
+// ErrMalformed indicates a bulletin holding a field that parsed but is not a
+// number. strconv.ParseFloat reads NaN, Inf and their signed forms, and all
+// fit the bulletin's fixed-width columns.
+var ErrMalformed = errors.New("iers: malformed EOP bulletin")
+
 // Record is a single line of IERS EOP data.
 type Record struct {
 	MJD  float64
@@ -87,7 +92,11 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 
 	arcsec2rad := math.Pi / (180.0 * 3600.0)
 
+	lineNo := 0
+
 	for scanner.Scan() {
+		lineNo++
+
 		line := scanner.Text()
 		if len(line) < 86 {
 			continue // skip incomplete lines or headers
@@ -101,6 +110,16 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 		mjd, err := strconv.ParseFloat(mjdStr, 64)
 		if err != nil {
 			continue
+		}
+
+		// A field that holds NaN or an infinity is not missing, as a blank
+		// one is: it is a corrupt copy, and refusing it is what keeps the
+		// copy out of the cache. Served, a NaN MJD in the last row put NaN at
+		// the end of Coverage, which every later epoch then passed, and
+		// Table.EOP indexed past the last record and panicked; mid-file it
+		// broke the sort, and +Inf stretched Coverage to infinity (#1037).
+		if math.IsNaN(mjd) || math.IsInf(mjd, 0) {
+			return nil, fmt.Errorf("%w: line %d: MJD %q", ErrMalformed, lineNo, mjdStr)
 		}
 
 		xStr := strings.TrimSpace(line[18:27])
@@ -146,6 +165,15 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 			lod = 0
 		}
 
+		for _, f := range [...]struct {
+			name, text string
+			v          float64
+		}{{"x", xStr, x}, {"y", yStr, y}, {"UT1-UTC", dut1Str, dut1}, {"LOD", lodStr, lod}} {
+			if math.IsNaN(f.v) || math.IsInf(f.v, 0) {
+				return nil, fmt.Errorf("%w: line %d: %s %q", ErrMalformed, lineNo, f.name, f.text)
+			}
+		}
+
 		records = append(records, Record{
 			MJD:  mjd,
 			XP:   x * arcsec2rad,
@@ -158,6 +186,16 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 	err := scanner.Err()
 	if err != nil {
 		return nil, fmt.Errorf("iers: scan EOP: %w", err)
+	}
+
+	// A bulletin is a row a day since 1973, so one with none is not a short
+	// bulletin but something else: an HTML error page, whose every line is
+	// shorter than a row, parsed into an empty table with no error. As
+	// remote/eop's validator that let a page served with a 200 replace a good
+	// bulletin in the cache, and the empty table then replaced the model in
+	// memory, taking the EOP of every epoch with it (#1042).
+	if len(records) == 0 {
+		return nil, fmt.Errorf("%w: no row of the bulletin holds polar motion and UT1-UTC", ErrNoRecords)
 	}
 
 	sort.Slice(records, func(i, j int) bool {

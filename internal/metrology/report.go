@@ -145,6 +145,21 @@ func (s *Suite) Report(tb TB) Stats {
 
 	stats := s.Stats()
 
+	// A suite that measured nothing has verified nothing (#1104). Without
+	// this, an empty suite reaches the report as VERIFIED: nothing exceeds a
+	// contract when there is nothing to compare. A corpus that loaded empty
+	// or a filter that dropped every point would then read as the best result
+	// a suite can have.
+	if stats.N == 0 && stats.Rejected == 0 {
+		const reason = "no samples were measured"
+
+		tb.Log(s.summary(stats, StatusNotVerified))
+		tb.Errorf("%s measured nothing: %s, so there is no result to verify", s.Name, reason)
+		s.write(tb, s.newResult(StatusNotVerified, reason, stats))
+
+		return stats
+	}
+
 	status := StatusVerified
 	if stats.Exceeding > 0 {
 		status = StatusViolated

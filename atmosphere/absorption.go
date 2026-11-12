@@ -20,8 +20,8 @@ var (
 	// section. Absorption cannot create photons.
 	ErrCrossSectionValue = errors.New("atmosphere: absorption cross section must be non-negative and finite")
 
-	// ErrColumnAmount is returned for a negative column amount.
-	ErrColumnAmount = errors.New("atmosphere: column amount must be non-negative")
+	// ErrColumnAmount is returned for a negative or non-finite column amount.
+	ErrColumnAmount = errors.New("atmosphere: column amount must be non-negative and finite")
 )
 
 // Molecular absorption over the optical range this module supports is
@@ -164,7 +164,9 @@ func (c CrossSection) OpticalDepth(dst []float64, grid unit.SpectralGrid, column
 		return err
 	}
 
-	if columnMoleculesPerCM2 < 0 || math.IsNaN(columnMoleculesPerCM2) {
+	// An infinite column gave an infinite depth inside the cross section's
+	// range and NaN, zero times infinity, outside it, with no error (#1038).
+	if columnMoleculesPerCM2 < 0 || math.IsNaN(columnMoleculesPerCM2) || math.IsInf(columnMoleculesPerCM2, 0) {
 		return fmt.Errorf("%w: %q column %g", ErrColumnAmount, c.Species, columnMoleculesPerCM2)
 	}
 

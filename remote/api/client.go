@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
@@ -198,7 +199,15 @@ func (c *Client) Timeout() time.Duration { return c.timeout }
 
 // Close releases the client's idle connections. A Client is usually held
 // for the life of a provider, so this is optional.
+//
+// The release is done here because resty's own Close does not do it. That
+// Close runs close hooks, of which this package registers none, and stops a
+// certificate watcher. It never reaches the transport. Until #1089 every idle
+// connection outlived Close by the transport's idle timeout, 90 seconds by
+// resty's default.
 func (c *Client) Close() error {
+	c.rc.Client().CloseIdleConnections()
+
 	if err := c.rc.Close(); err != nil {
 		return fmt.Errorf("remote/api: close: %w", err)
 	}
@@ -263,13 +272,7 @@ func (c *Client) PostForm(ctx context.Context, baseURL string, path string, form
 	}
 	defer release()
 
-	resp, err := c.rc.R().
-		SetContext(ctx).
-		SetFormDataFromValues(form).
-		SetResponseDoNotParse(true).
-		Post(full)
-
-	return c.body(resp, err)
+	return c.post(ctx, full, "application/x-www-form-urlencoded", []byte(form.Encode()))
 }
 
 // PostJSON marshals payload as the JSON request body and returns the raw
@@ -291,12 +294,37 @@ func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payl
 	}
 	defer release()
 
-	resp, err := c.rc.R().
+	return c.post(ctx, full, "application/json", encoded)
+}
+
+// post sends body to full, from a reader of its own on every attempt.
+//
+// # Why not resty's own form and byte-slice bodies
+//
+// resty copies those into a bytes.Buffer from a pool shared by the whole
+// process, and returns it to the pool when Execute finishes. net/http may
+// still be writing the body then: its contract lets the connection's write
+// loop outlive RoundTrip whenever the server answers before reading it all,
+// with an early 429 or 5xx, say. The buffer could then be taken by another
+// request before the old write finished, and that write would send the other
+// request's bytes and then reset them, leaving the other request an empty
+// body (#1107).
+//
+// resty uses an io.Reader as it is, and never pools it. A fresh *bytes.Reader
+// for each attempt, installed by a retry hook, also means a retry never
+// shares a cursor with an earlier attempt's write that is still running.
+func (c *Client) post(ctx context.Context, full, contentType string, body []byte) (io.ReadCloser, error) {
+	req := c.rc.R().
 		SetContext(ctx).
-		SetHeader("Content-Type", "application/json").
-		SetBody(encoded).
-		SetResponseDoNotParse(true).
-		Post(full)
+		SetHeader("Content-Type", contentType).
+		SetBody(bytes.NewReader(body)).
+		SetResponseDoNotParse(true)
+
+	req.AddRetryHooks(func(*resty.Response, error) {
+		req.SetBody(bytes.NewReader(body))
+	})
+
+	resp, err := req.Post(full)
 
 	return c.body(resp, err)
 }

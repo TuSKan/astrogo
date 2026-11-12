@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -19,6 +20,33 @@ func requireSimbad(t *testing.T) {
 	t.Helper()
 
 	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
+}
+
+// simbadControl is a request a working SIMBAD cannot reject, for
+// testutil.SkipOnDegradedService: one main_id from basic, a table and column
+// SIMBAD has served for as long as it has had a TAP service.
+//
+// requireSimbad's reachability check is not enough on its own. On 2026-11-10
+// SIMBAD's whole web application answered 404, its home page included, while
+// the host still accepted connections, and these tests failed on the outage
+// instead of skipping it (#1026). A 404 alone cannot say whose fault it is;
+// the control can, since it fails too only when SIMBAD is the one failing.
+//
+// Its deadline starts when it runs, not when the test did.
+func simbadControl(t *testing.T) func() error {
+	t.Helper()
+
+	syncURL, err := remote.URL(remote.SIMBAD)
+	if err != nil {
+		t.Fatalf("SIMBAD endpoint: %v", err)
+	}
+
+	return func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		return testutil.TAPControl(ctx, syncURL, "basic", "main_id")()
+	}
 }
 
 func TestSimbadNetworkResolve(t *testing.T) {
@@ -36,7 +64,7 @@ func TestSimbadNetworkResolve(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tar resolve.Target, err error) bool {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 		if err != nil {
 			t.Fatalf("Live network failed: %v", err)
@@ -73,7 +101,7 @@ func TestSimbadNetworkSearch(t *testing.T) {
 	defer cancel()
 
 	targets, err := New().Search(ctx, "HD 18973")
-	testutil.SkipOnUpstreamFailure(t, err)
+	testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 	if err != nil {
 		t.Fatalf("live Search failed: %v", err)
@@ -107,7 +135,7 @@ func TestSimbadNetworkSearchBright(t *testing.T) {
 	var targets []resolve.Target
 
 	iter(func(tgt resolve.Target, err error) bool {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 		if err != nil {
 			t.Fatalf("live SearchBright failed: %v", err)
@@ -173,7 +201,7 @@ func TestSimbadKindsFromTheLiveHierarchy(t *testing.T) {
 		got, err := prov.Resolve(ctx, c.query)
 
 		cancel()
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 		if err != nil {
 			t.Errorf("Resolve(%q): %v", c.query, err)
@@ -199,7 +227,7 @@ func TestSimbadSearchBrightReturnsEveryObject(t *testing.T) {
 	var n int
 
 	New().SearchBright(ctx, resolve.BrightRequest{MaxVMag: 4.5})(func(tgt resolve.Target, err error) bool {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 		if err != nil {
 			t.Fatalf("SearchBright: %v", err)

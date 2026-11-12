@@ -483,3 +483,97 @@ func TestARejectionStaysWithItsCache(t *testing.T) {
 		t.Errorf("the first source served %d downloads, want 1", n)
 	}
 }
+
+// A source that starts serving something the reader refuses does not cost the
+// cache the copy that worked. The download was promoted over the cached copy
+// and read after, so its refusal removed the only copy there was, and every
+// later call failed with nothing cached, offline ones included (#1047).
+func TestWithReadKeepsTheCachedCopyOverARefusedUpdate(t *testing.T) {
+	cleanRemoteState(t)
+
+	ctx := context.Background()
+	src := serveVersioned(t, OpenNGC, goodCopy, "v1")
+
+	var r reading
+
+	if _, _, err := GetFile(ctx, OpenNGC, readName, WithRead(r.read)); err != nil {
+		t.Fatalf("first GetFile: %v", err)
+	}
+
+	src.serve(badCopy, "v2")
+
+	if _, _, err := GetFile(ctx, OpenNGC, readName, WithRead(r.read)); !errors.Is(err, errUnreadable) {
+		t.Fatalf("GetFile of the refused update: err %v, want the read's own error", err)
+	}
+
+	fsys, key := cacheKeyFor(t, OpenNGC)
+
+	if b, err := fs.ReadFile(fsys, key); err != nil || string(b) != goodCopy {
+		t.Fatalf("cache holds %q (err %v), want the good copy kept", b, err)
+	}
+
+	if etag := file.RecordedETag(ctx, fsys, key); etag != "v1" {
+		t.Errorf("recorded ETag %q, want the kept copy's v1", etag)
+	}
+
+	// The version is still rejected, without a second download of it.
+	if _, _, err := GetFile(ctx, OpenNGC, readName, WithRead(r.read)); !errors.Is(err, ErrRejectedSource) {
+		t.Errorf("GetFile with the source unchanged: err %v, want ErrRejectedSource", err)
+	}
+
+	if n := src.downloads(); n != 2 {
+		t.Errorf("%d downloads, want 2: the good version and the refused one, once", n)
+	}
+
+	// And an offline caller is served the copy that worked.
+	SetOffline(true)
+	t.Cleanup(func() { SetOffline(false) })
+
+	if _, _, err := GetFile(ctx, OpenNGC, readName, WithRead(r.read)); err != nil {
+		t.Errorf("offline GetFile after the refused update: %v", err)
+	}
+}
+
+// An update the reader accepts replaces the cached copy as before. It is read
+// twice: once staged, to decide whether it may replace the copy, and once where
+// GetFile returns it, which is the read a caller keeps.
+func TestWithReadPromotesAnUpdateItAccepts(t *testing.T) {
+	cleanRemoteState(t)
+
+	const newer = "a newer catalog its reader also accepts"
+
+	ctx := context.Background()
+	src := serveVersioned(t, OpenNGC, goodCopy, "v1")
+
+	var seen []string
+
+	read := func(fsys FS, key string) error {
+		b, err := fs.ReadFile(fsys, key)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", key, err)
+		}
+
+		seen = append(seen, string(b))
+
+		return nil
+	}
+
+	if _, _, err := GetFile(ctx, OpenNGC, readName, WithRead(read)); err != nil {
+		t.Fatalf("first GetFile: %v", err)
+	}
+
+	src.serve(newer, "v2")
+
+	fsys, key, err := GetFile(ctx, OpenNGC, readName, WithRead(read))
+	if err != nil {
+		t.Fatalf("GetFile of the update: %v", err)
+	}
+
+	if b, _ := fs.ReadFile(fsys, key); string(b) != newer {
+		t.Errorf("cache holds %q, want the update", b)
+	}
+
+	if want := []string{goodCopy, newer, newer}; !slices.Equal(seen, want) {
+		t.Errorf("read was handed %q, want %q", seen, want)
+	}
+}

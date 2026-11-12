@@ -408,20 +408,27 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 	// as well as fourteen minutes of ours, and the only recovery was to ask
 	// for all of it again — which is precisely the behavior that gets a
 	// client throttled in the first place.
-	band := build.Bands[0].Name
-	values := bands[band]
-
+	//
+	// Every band has its own partial map (#1077). Only the first band's was
+	// kept before, and chunkIsCached looked only at it, so a multi-band build
+	// resuming from a cache skipped each chunk the first band held and left
+	// every other band zero there, with no error: a zero pixel reads as a dark
+	// sightline. The source count is per pixel rather than per band, so each
+	// band's file carries it and any of them restores it.
 	bucket, prefix, cacheErr := remote.CacheDir(ctx, remote.GaiaTAP)
-
-	key := ""
 	if cacheErr == nil {
-		key = path.Join(prefix, build.cacheKey())
-		_ = readCache(ctx, bucket, key, values, counts)
+		for _, b := range build.Bands {
+			_ = readCache(ctx, bucket, path.Join(prefix, build.cacheKeyFor(b.Name)), bands[b.Name], counts)
+		}
 	}
 
 	checkpoint := func() {
-		if cacheErr == nil {
-			_ = writeCache(ctx, bucket, key, band, values, counts)
+		if cacheErr != nil {
+			return
+		}
+
+		for _, b := range build.Bands {
+			_ = writeCache(ctx, bucket, path.Join(prefix, build.cacheKeyFor(b.Name)), b.Name, bands[b.Name], counts)
 		}
 	}
 	defer checkpoint() // a failed build still keeps its completed chunks
@@ -436,7 +443,7 @@ func BuildFromGaia(ctx context.Context, build GaiaBuild) (*Map, []int64, error) 
 			last = npix - 1
 		}
 
-		if build.chunkIsCached(values, first, last) {
+		if build.chunkIsCached(bands, first, last) {
 			if build.Progress != nil {
 				build.Progress(c+1, chunks)
 			}
@@ -553,17 +560,24 @@ const aggregationPace = 2 * time.Second
 // which is the most a stumble should cost.
 const checkpointEvery = 25
 
-// chunkIsCached reports whether every pixel in the range already has a value,
-// so a resumed build can skip the query rather than repeat it.
+// chunkIsCached reports whether every pixel in the range already has a value
+// in every band, so a resumed build can skip the query rather than repeat it.
+//
+// Every band, because one query fills all of them: skipping a chunk on the
+// first band's word alone left the others zero (#1077).
 //
 // A pixel with genuinely no flux is indistinguishable from an unfetched one
 // here, so such a pixel is queried again on every resume. At order 8 the real
 // map has none — every pixel holds sources — and paying one redundant chunk
 // beats inventing a separate presence bitmap to avoid it.
-func (g GaiaBuild) chunkIsCached(values []float64, first, last int64) bool {
-	for pixel := first; pixel <= last && pixel < int64(len(values)); pixel++ {
-		if values[pixel] <= 0 {
-			return false
+func (g GaiaBuild) chunkIsCached(bands map[string][]float64, first, last int64) bool {
+	for _, b := range g.Bands {
+		values := bands[b.Name]
+
+		for pixel := first; pixel <= last && pixel < int64(len(values)); pixel++ {
+			if values[pixel] <= 0 {
+				return false
+			}
 		}
 	}
 
@@ -769,9 +783,14 @@ func (g GaiaBuild) accumulate(
 				return fmt.Errorf("%w: no column for band %q", ErrGaiaResponse, b.Name)
 			}
 
+			// A pixel with no usable sources contributes nothing, and nor does
+			// a NaN or infinite sum. Until #1078 those passed, since NaN fails
+			// every comparison and +Inf is not negative, and went into the map
+			// that the map's own readers refuse since #1030: an infinite value
+			// is a direction of the sky infinitely bright.
 			flux, ok := rows.Number(col)
-			if !ok || flux < 0 {
-				continue // a pixel with no usable sources contributes nothing
+			if !ok || flux < 0 || math.IsNaN(flux) || math.IsInf(flux, 0) {
+				continue
 			}
 
 			flux += g.recoverColorless(b, rows)
@@ -822,12 +841,20 @@ func (g GaiaBuild) recoverColorless(b GaiaBand, rows resultRows) float64 {
 		return 0
 	}
 
+	// A non-finite column is no column (#1078), and a correction built from
+	// one would carry it into the pixel accumulate has just accepted.
 	dropped := all - colored
-	if dropped <= 0 {
+	if dropped <= 0 || math.IsNaN(dropped) || math.IsInf(dropped, 0) ||
+		math.IsNaN(mean) || math.IsInf(mean, 0) {
 		return 0
 	}
 
-	return dropped * b.colorFactor(mean)
+	correction := dropped * b.colorFactor(mean)
+	if math.IsNaN(correction) || math.IsInf(correction, 0) {
+		return 0
+	}
+
+	return correction
 }
 
 // GaiaJohnsonV is the Johnson V band on the zero point this package carries as

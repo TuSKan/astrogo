@@ -64,6 +64,11 @@ func WithValidate(f func(io.Reader) error) ReadOption {
 //     downloading the same bytes to fail the same way. One download per
 //     source version, not one per call, which for a gigabyte archive is the
 //     difference that matters.
+//   - A download that would replace a copy already cached, a Mutable
+//     source's update, is read before it replaces that copy, so a refusal
+//     leaves the cached copy and its recorded ETag as they were, and an
+//     offline call is still served it (#1047). Such an update is read twice
+//     when it is accepted: staged, and then where GetFile returns it.
 //
 // The record is this client's and is never written to the cache. A rejection
 // is the judgment of the code that made it, and a cached one would outlive
@@ -137,42 +142,31 @@ type fetched struct {
 func (c *Client) readCopy(ctx context.Context, id EndpointID, name string, cfg readConfig,
 	fsys FS, key string, got fetched,
 ) (FS, string, error) {
-	readErr := cfg.read(fsys, key)
+	for healing := false; ; healing = true {
+		readErr := cfg.read(fsys, key)
 
-	switch {
-	case readErr == nil:
-		return fsys, key, nil
-	case ctx.Err() != nil:
-		return nil, "", readErr
+		switch {
+		case readErr == nil:
+			return fsys, key, nil
+		case ctx.Err() != nil:
+			return nil, "", readErr
+		}
+
+		if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
+			return nil, "", errors.Join(readErr, err)
+		}
+
+		// A copy this call downloaded is what the source serves, and one
+		// fetched to heal has had its chance: there is nothing fresher.
+		if got.ok || healing {
+			return nil, "", readErr
+		}
+
+		var err error
+		if fsys, key, got, err = c.getFile(ctx, id, name, cfg); err != nil {
+			return nil, "", fmt.Errorf("%w; fetching a fresh copy: %w", readErr, err)
+		}
 	}
-
-	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
-		return nil, "", errors.Join(readErr, err)
-	}
-
-	if got.ok {
-		return nil, "", readErr
-	}
-
-	fsys, key, got, err := c.getFile(ctx, id, name, cfg)
-	if err != nil {
-		return nil, "", fmt.Errorf("%w; fetching a fresh copy: %w", readErr, err)
-	}
-
-	readErr = cfg.read(fsys, key)
-
-	switch {
-	case readErr == nil:
-		return fsys, key, nil
-	case ctx.Err() != nil:
-		return nil, "", readErr
-	}
-
-	if err := c.discard(ctx, fsys, key, got, readErr); err != nil {
-		return nil, "", errors.Join(readErr, err)
-	}
-
-	return nil, "", readErr
 }
 
 // discard removes a copy cfg.read refused, with the source ETag recorded beside
@@ -188,12 +182,11 @@ func (c *Client) discard(ctx context.Context, fsys FS, key string, got fetched, 
 		return err
 	}
 
-	// Only a Mutable endpoint's copy has one, and a leftover would be inert,
-	// but nothing of a refused copy is left behind.
-	if err := file.Remove(ctx, fsys, key+file.SourceETagSuffix); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
-		return err
-	}
+	// Only a Mutable endpoint's copy has one. Its failure is ignored, as
+	// file.discardStaging ignores a staging leftover's: alone, the sidecar is
+	// inert, since unchanged() reads it only beside a cached object, and the
+	// next copy fetched overwrites it.
+	_ = file.Remove(ctx, fsys, key+file.SourceETagSuffix)
 
 	return nil
 }
@@ -516,18 +509,47 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 		body = &progressReader{r: f, total: info.Size(), read: offset, onProgress: cfg.progress}
 	}
 
-	// Only the validator's own refusal rejects the version. A transfer or a
-	// write that failed says nothing about what the source serves.
-	validate, refused := cfg.validate, error(nil)
-	if validate != nil {
-		validate = func(r io.Reader) error {
-			refused = cfg.validate(r)
+	// What the staged download must pass before it is promoted over cacheKey.
+	// The validator, always. And the caller's reader when a copy is cached
+	// already: promoted first and read after, a download the reader refused had
+	// replaced that copy by the time it was refused, and removing it left
+	// nothing, so one bad answer from a source destroyed the copy that worked
+	// (#1047). Read before promotion, a refusal leaves the cached copy and its
+	// recorded ETag as they were, as a validator's always has. GetFile still
+	// hands the copy it returns to the reader afterwards, so a reader sees the
+	// key it is given, and only an update pays for the second read.
+	var checks []func(fs.FS, string) error
 
-			return refused
+	if cfg.validate != nil {
+		checks = append(checks, streamed(cfg.validate))
+	}
+
+	if cfg.read != nil {
+		if cached, err := file.Exists(ctx, cacheFS, cacheKey); err == nil && cached {
+			checks = append(checks, cfg.read)
 		}
 	}
 
-	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, validate); err != nil {
+	// Only a check's own refusal rejects the version. A transfer or a write
+	// that failed says nothing about what the source serves.
+	var (
+		check   func(fs.FS, string) error
+		refused error
+	)
+
+	if len(checks) > 0 {
+		check = func(fsys fs.FS, key string) error {
+			for _, c := range checks {
+				if refused = c(fsys, key); refused != nil {
+					return refused
+				}
+			}
+
+			return nil
+		}
+	}
+
+	if err := file.StageAndPromote(ctx, cacheFS, cacheKey, body, offset, sourceETag, check); err != nil {
 		if refused != nil && ctx.Err() == nil {
 			c.reject(cacheKey, sourceETag, refused)
 		}
@@ -554,6 +576,23 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 	}
 
 	return sourceETag, nil
+}
+
+// streamed adapts a [WithValidate] function to a check on a staged key: it
+// streams the object rather than buffering it, so a multi-GB kernel needs no
+// memory to be checked.
+func streamed(validate func(io.Reader) error) func(fs.FS, string) error {
+	return func(fsys fs.FS, key string) error {
+		r, err := fsys.Open(key)
+		if err != nil {
+			return fmt.Errorf("read staging %s: %w", key, err)
+		}
+
+		verr := validate(r)
+		closeErr := r.Close()
+
+		return errors.Join(verr, closeErr)
+	}
 }
 
 // progressReader reports the running byte count after every Read that

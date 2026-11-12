@@ -60,6 +60,13 @@ func FuzzParseFinals2000A(f *testing.F) {
 	// Very many records, to reach whatever the parser does with a large table.
 	f.Add(strings.Repeat(realRecord+"\n", 200))
 
+	// Fields that parse but are not numbers. A NaN MJD in the last row made
+	// Table.EOP panic past the end of the data, and the queries below, all
+	// derived from Coverage, could not reach it: Coverage ended in NaN (#1037).
+	f.Add(finalsTable(3, 2, mjdField, "NaN"))
+	f.Add(finalsTable(3, 2, mjdField, "+Inf"))
+	f.Add(finalsTable(3, 1, dut1Field, "NaN"))
+
 	f.Fuzz(func(t *testing.T, data string) {
 		table, err := ParseFinals2000A(strings.NewReader(data))
 		if err != nil {
@@ -73,10 +80,12 @@ func FuzzParseFinals2000A(f *testing.F) {
 		// A table that parsed must be queryable. Lookup interpolates between
 		// records and is where an out-of-order or single-record table would go
 		// wrong, so it is driven at, inside and outside whatever coverage the
-		// fuzzed input produced.
+		// fuzzed input produced, and at fixed epochs as well: a query derived
+		// from a Coverage that came out NaN is a NaN query, which EOP refuses
+		// before it reaches the records (#1037).
 		start, end := table.Coverage()
 
-		for _, mjd := range []float64{start - 1, start, (start + end) / 2, end, end + 1} {
+		for _, mjd := range []float64{start - 1, start, (start + end) / 2, end, end + 1, 0, 41686.5, 51544.5, 99999} {
 			_, _ = table.EOP(mjd)
 		}
 	})

@@ -123,7 +123,8 @@ type Spec struct {
 	TimeOfNight int
 
 	// Scale multiplies the returned radiance. Zero means 1, and 1 is what
-	// almost every caller wants.
+	// almost every caller wants. A negative, NaN or infinite scale is refused
+	// with [ErrSpec].
 	//
 	// # Why a multiplier on top of SolarFluxSFU
 	//
@@ -410,9 +411,9 @@ func cached(_ context.Context, fsys remote.FS, key string) (*Spectrum, bool) {
 // [Parse] is this package's own reader and re-running it on a cached file is
 // cheap, while re-running the request is three round trips to Garching.
 func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
+	// Not closed here: Default is the whole process's client, and closing it
+	// drops every endpoint's transport, not only this one's (#1090).
 	client := remote.Default()
-
-	defer func() { _ = client.Close() }()
 
 	posted, err := client.PostJSON(ctx, remote.ESOSkyCalc, "api/skycalc", req)
 	if err != nil {
@@ -634,6 +635,22 @@ func NewAirglow(
 	return component, nil
 }
 
+// Validate reports whether s is a request SkyCalc can answer, without asking
+// it. It makes exactly the checks [Fetch] makes before its first request, and
+// a refusal wraps [ErrSpec].
+//
+// For a caller that gathers several datasets and wants a bad spec refused
+// before any of them is fetched, rather than after the others have been: the
+// sky-brightness dataset tier's Inputs is that caller.
+func (s Spec) Validate() error {
+	_, err := s.request()
+
+	return err
+}
+
+// finite reports whether x is neither NaN nor infinite.
+func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
+
 // request builds and validates the JSON body.
 func (s Spec) request() (skycalcRequest, error) {
 	obs := s.Observatory
@@ -652,8 +669,16 @@ func (s Spec) request() (skycalcRequest, error) {
 		flux = 130 // SkyCalc's own default
 	}
 
-	if flux < 0 || math.IsNaN(flux) {
+	if flux < 0 || !finite(flux) {
 		return skycalcRequest{}, fmt.Errorf("%w: solar flux %v sfu", ErrSpec, flux)
+	}
+
+	// Checked here although it is not part of the request, so that a Spec is
+	// refused whole before anything is asked of SkyCalc. Zero means 1; a
+	// negative or NaN scale used to be read the same way, silently, and an
+	// infinite one made every radiance infinite (#1068).
+	if s.Scale < 0 || !finite(s.Scale) {
+		return skycalcRequest{}, fmt.Errorf("%w: airglow scale %v", ErrSpec, s.Scale)
 	}
 
 	if s.Season < 0 || s.Season > 6 {
@@ -671,8 +696,10 @@ func (s Spec) request() (skycalcRequest, error) {
 	}
 
 	// SkyCalc's own stated bounds. Asking outside them is a rejected request
-	// and a wasted round trip.
-	if minNM < 300 || maxNM > 30000 || minNM >= maxNM {
+	// and a wasted round trip. NaN fails every comparison below, so it is
+	// refused by name; an infinite bound is outside them already.
+	if !finite(float64(minNM)) || !finite(float64(maxNM)) ||
+		minNM < 300 || maxNM > 30000 || minNM >= maxNM {
 		return skycalcRequest{}, fmt.Errorf("%w: %g-%g nm is outside SkyCalc's 300-30000 nm",
 			ErrSpec, minNM, maxNM)
 	}
@@ -682,7 +709,7 @@ func (s Spec) request() (skycalcRequest, error) {
 		step = 0.1
 	}
 
-	if step <= 0 {
+	if step <= 0 || !finite(float64(step)) {
 		return skycalcRequest{}, fmt.Errorf("%w: wavelength step %v nm", ErrSpec, step)
 	}
 
