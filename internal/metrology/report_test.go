@@ -2,6 +2,7 @@ package metrology_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -289,6 +290,46 @@ func TestReadResultRefusesAnotherSchemaVersion(t *testing.T) {
 	_, err = metrology.ReadResult([]byte("not json"))
 	if !errors.Is(err, metrology.ErrDecodeReport) {
 		t.Errorf("error = %v, want %v", err, metrology.ErrDecodeReport)
+	}
+}
+
+// A status nobody wrote is refused, not read as one of the three (#1115).
+//
+// Read as verified, a suite that never ran would be compared with its baseline
+// and recorded in one as having measured zero error. The near misses are the
+// ones that matter: "NOT VERIFIED" with a space is how this was found, and a
+// lowercase or empty status is the same failure.
+func TestReadResultRefusesAStatusThatIsNoneOfTheThree(t *testing.T) {
+	t.Parallel()
+
+	doc := func(status string) []byte {
+		if status == "<absent>" {
+			return fmt.Appendf(nil, "{\"schema_version\": %d, \"suite\": \"s\"}", metrology.SchemaVersion)
+		}
+
+		return fmt.Appendf(nil, "{\"schema_version\": %d, \"suite\": \"s\", \"status\": %q}",
+			metrology.SchemaVersion, status)
+	}
+
+	for _, status := range []string{"NOT VERIFIED", "verified", "", "<absent>", "SKIPPED"} {
+		if _, err := metrology.ReadResult(doc(status)); !errors.Is(err, metrology.ErrDecodeReport) {
+			t.Errorf("status %q: error = %v, want %v", status, err, metrology.ErrDecodeReport)
+		}
+	}
+
+	for _, status := range []metrology.Status{
+		metrology.StatusVerified, metrology.StatusViolated, metrology.StatusNotVerified,
+	} {
+		res, err := metrology.ReadResult(doc(string(status)))
+		if err != nil {
+			t.Errorf("status %q: %v", status, err)
+
+			continue
+		}
+
+		if res.Status != status {
+			t.Errorf("status %q read back as %q", status, res.Status)
+		}
 	}
 }
 
