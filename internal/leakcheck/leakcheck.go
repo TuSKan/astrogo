@@ -7,9 +7,10 @@
 // process that grows, by which time the fan-out that leaked it is a hundred
 // commits back.
 //
-// astrogo starts goroutines in three places: internal/parallel's chunked
-// workers and catalog's two fan-outs. All of them join their work before
-// returning, and this is what keeps that true.
+// Every package that starts a goroutine runs its tests under it, and
+// TestEveryPackageThatStartsGoroutinesChecksForLeaks in internal/docsguard
+// keeps that true. The list used to be written here, and went stale when the
+// errgroup in skybrightness's Model.SkyMap was never added to it (#1099).
 package leakcheck
 
 import (
