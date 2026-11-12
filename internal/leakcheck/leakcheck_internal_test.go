@@ -64,18 +64,23 @@ func TestLeakCountReadsTheRuntimesOwnTotal(t *testing.T) {
 		name    string
 		profile string
 		want    int
+		wantOK  bool
 	}{
-		{"none", "goroutineleak profile: total 0\n", 0},
-		{"one", "goroutineleak profile: total 1\n1 @ 0x1 0x2\n#\t0x1\tpkg.fn+0x18\tfile.go:14\n", 1},
-		{"several", "goroutineleak profile: total 12\n", 12},
-		{"empty input", "", 0},
-		{"a header this code does not recognize", "something else entirely\n", 0},
+		{"none", "goroutineleak profile: total 0\n", 0, true},
+		{"one", "goroutineleak profile: total 1\n1 @ 0x1 0x2\n#\t0x1\tpkg.fn+0x18\tfile.go:14\n", 1, true},
+		{"several", "goroutineleak profile: total 12\n", 12, true},
+		// None of these says how many leaked, so none may read as zero (#1100).
+		{"empty input", "", 0, false},
+		{"a header this code does not recognize", "something else entirely\n", 0, false},
+		{"a total that is not a number", "goroutineleak profile: total many\n", 0, false},
+		{"a total with words after it", "goroutineleak profile: total 3 goroutines\n", 0, false},
+		{"a negative total", "goroutineleak profile: total -1\n", 0, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := leakCount(tc.profile); got != tc.want {
-				t.Errorf("leakCount = %d, want %d", got, tc.want)
+			if got, ok := leakCount(tc.profile); got != tc.want || ok != tc.wantOK {
+				t.Errorf("leakCount = %d, %v; want %d, %v", got, ok, tc.want, tc.wantOK)
 			}
 		})
 	}
@@ -100,16 +105,37 @@ func TestLeakedReportIsEmptyOnlyWhenNothingLeaked(t *testing.T) {
 		want    string
 	}{
 		{"a clean run still has a header", "goroutineleak profile: total 0\n", ""},
-		{"nothing at all", "", ""},
 		{"a leak is reported verbatim", leaked, leaked},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := leakedReport(tc.profile); got != tc.want {
-				t.Errorf("leakedReport(%q) = %q, want %q", tc.profile, got, tc.want)
+			got, err := leakedReport(tc.profile)
+			if err != nil || got != tc.want {
+				t.Errorf("leakedReport(%q) = %q, %v; want %q, nil", tc.profile, got, err, tc.want)
 			}
 		})
+	}
+}
+
+// TestLeakedReportRefusesAHeaderItCannotRead covers the guard switching itself
+// off without a sound. A profile whose header does not say how many goroutines
+// leaked is "nothing looked", the same answer as no profile at all, and it
+// must not read as "nothing leaked". Until #1100 it did. A change to the
+// runtime's wording would have passed every guarded package from then on.
+func TestLeakedReportRefusesAHeaderItCannotRead(t *testing.T) {
+	t.Parallel()
+
+	for _, profile := range []string{
+		"",
+		"something else entirely\n",
+		"goroutineleak profile: 3 leaked\n1 @ 0x1\n",
+		"goroutineleak profile: total many\n",
+	} {
+		got, err := leakedReport(profile)
+		if !errors.Is(err, ErrProfileUnavailable) {
+			t.Errorf("leakedReport(%q) = %q, %v; want ErrProfileUnavailable", profile, got, err)
+		}
 	}
 }
 
@@ -131,7 +157,7 @@ func TestLeakedNamesTheProfileItNeeds(t *testing.T) {
 	// repository builds with — if it stops existing, that is a finding rather
 	// than a quietly disabled guard.
 	if _, err := Leaked(); errors.Is(err, ErrProfileUnavailable) {
-		t.Fatalf("this toolchain has no %q profile, so the guard installed in "+
-			"internal/parallel and catalog is checking nothing", profileName)
+		t.Fatalf("this toolchain has no readable %q profile, so the guard installed in "+
+			"every package that starts goroutines is checking nothing: %v", profileName, err)
 	}
 }
