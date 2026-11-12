@@ -104,9 +104,9 @@ func AlmanacAt(ctx context.Context, when time.GoTime, obs Observatory) (Almanac,
 		Observatory: string(obs),
 	}
 
+	// Not closed here: Default is the whole process's client, and closing it
+	// drops every endpoint's transport, not only this one's (#1090).
 	client := remote.Default()
-
-	defer func() { _ = client.Close() }()
 
 	body, err := client.PostJSON(ctx, remote.ESOSkyCalc, "api/skycalc_almanac", req)
 	if err != nil {

@@ -411,9 +411,9 @@ func cached(_ context.Context, fsys remote.FS, key string) (*Spectrum, bool) {
 // [Parse] is this package's own reader and re-running it on a cached file is
 // cheap, while re-running the request is three round trips to Garching.
 func fetchSkytable(ctx context.Context, req skycalcRequest) ([]byte, error) {
+	// Not closed here: Default is the whole process's client, and closing it
+	// drops every endpoint's transport, not only this one's (#1090).
 	client := remote.Default()
-
-	defer func() { _ = client.Close() }()
 
 	posted, err := client.PostJSON(ctx, remote.ESOSkyCalc, "api/skycalc", req)
 	if err != nil {
