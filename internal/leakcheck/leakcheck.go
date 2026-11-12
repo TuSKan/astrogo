@@ -7,9 +7,10 @@
 // process that grows, by which time the fan-out that leaked it is a hundred
 // commits back.
 //
-// astrogo starts goroutines in three places: internal/parallel's chunked
-// workers and catalog's two fan-outs. All of them join their work before
-// returning, and this is what keeps that true.
+// Every package that starts a goroutine runs its tests under it, and
+// TestEveryPackageThatStartsGoroutinesChecksForLeaks in internal/docsguard
+// keeps that true. The list used to be written here, and went stale when the
+// errgroup in skybrightness's Model.SkyMap was never added to it (#1099).
 package leakcheck
 
 import (
@@ -17,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -141,7 +143,7 @@ func Leaked() (string, error) {
 		return "", fmt.Errorf("leakcheck: writing the %q profile: %w", profileName, err)
 	}
 
-	return leakedReport(buf.String()), nil
+	return leakedReport(buf.String())
 }
 
 // leakedReport is the profile when it holds a leak and "" when it does not.
@@ -149,42 +151,53 @@ func Leaked() (string, error) {
 // Separated from [Leaked] because it is the whole decision, and because
 // [Leaked] can only read the process it runs in: by the time any test has
 // leaked a goroutine on purpose, no later call can observe a clean profile
-// again. A pure function can be shown both answers.
+// again. A pure function can be shown every answer.
 //
 // The distinction is not cosmetic. The runtime emits a header even when
 // nothing leaked, so returning the profile unconditionally would report every
 // package as leaking, forever.
-func leakedReport(profile string) string {
-	if leakCount(profile) == 0 {
-		return ""
+//
+// A header that does not say how many goroutines leaked is an error, not a
+// clean result. It is the same "nothing looked" as a missing profile. Until
+// #1100 it read as zero leaks, so a change to the runtime's wording would
+// have switched the guard off in every package at once, without a sound.
+func leakedReport(profile string) (string, error) {
+	n, ok := leakCount(profile)
+	if !ok {
+		head, _, _ := strings.Cut(profile, "\n")
+
+		return "", fmt.Errorf("%w: its header %q does not say how many goroutines leaked",
+			ErrProfileUnavailable, head)
 	}
 
-	return profile
+	if n == 0 {
+		return "", nil
+	}
+
+	return profile, nil
 }
 
-// leakCount reads the count off the profile's header line, which reads
-// "goroutineleak profile: total 3".
+// leakCount reads the count off the profile's header line, which the runtime
+// writes as "goroutineleak profile: total 3", and reports whether the header
+// said.
 //
 // Parsed rather than counting stack lines because one leaked goroutine can
 // contribute several frames, and because the header is the runtime's own
-// answer rather than this package's arithmetic over its output.
-func leakCount(profile string) int {
+// answer rather than this package's arithmetic over its output. Parsed
+// strictly, because the runtime writes a bare %d there: anything else means
+// the format is not the one this reads.
+func leakCount(profile string) (n int, ok bool) {
 	head, _, _ := strings.Cut(profile, "\n")
 
-	_, total, ok := strings.Cut(head, "total ")
-	if !ok {
-		return 0
+	_, total, found := strings.Cut(head, "total ")
+	if !found {
+		return 0, false
 	}
 
-	var n int
-
-	for _, c := range strings.TrimSpace(total) {
-		if c < '0' || c > '9' {
-			break
-		}
-
-		n = n*10 + int(c-'0')
+	n, err := strconv.Atoi(strings.TrimSpace(total))
+	if err != nil || n < 0 {
+		return 0, false
 	}
 
-	return n
+	return n, true
 }

@@ -125,9 +125,7 @@ func chooseCenter(el Elements) (centerChoice, error) {
 		return centerChoice{}, err
 	}
 
-	sofa := &sofaBase{}
-
-	sun, _, err := barycentric(sofa, core.Sun, at)
+	sun, _, err := barycentric(sharedSOFA, core.Sun, at)
 	if err != nil {
 		return centerChoice{}, err
 	}
@@ -150,7 +148,7 @@ func chooseCenter(el Elements) (centerChoice, error) {
 	)
 
 	for _, p := range planetSystems {
-		pos, _, err := barycentric(sofa, p.id, at)
+		pos, _, err := barycentric(sharedSOFA, p.id, at)
 		if err != nil {
 			return centerChoice{}, err
 		}

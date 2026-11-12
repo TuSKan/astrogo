@@ -60,7 +60,7 @@ func New(opts ...Option) *Provider {
 	}
 
 	if cfg.base == nil {
-		cfg.base = &sofaBase{}
+		cfg.base = sharedSOFA
 	}
 
 	return &Provider{elements: make(map[core.ID]Elements), base: cfg.base}
@@ -313,6 +313,18 @@ func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
 }
 
 func (s *sofaBase) Close() error { return nil }
+
+// sharedSOFA is the one SOFA base that every Provider built without a base of
+// its own uses, and that chooseCenter uses too (#913).
+//
+// A base holds nothing but the memo of its last Epv00 evaluation, and that
+// memo belongs to the theory, not to a provider: the Sun and the Earth at one
+// epoch are the same series whoever asks. eph.Default() builds a Provider on
+// every call, and plan's Sun and Moon constraints call it on every check. With
+// a base per Provider, every check began with an empty memo and paid a full
+// Epv00, about 30 µs, for an instant the previous check had just evaluated. A
+// Provider's own state, the elements Register adds, stays its own.
+var sharedSOFA = &sofaBase{}
 
 // epv00 is Epv00 at d1 + d2, from the last evaluation when it was at the
 // same date.
