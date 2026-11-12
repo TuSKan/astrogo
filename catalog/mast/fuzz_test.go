@@ -2,6 +2,7 @@ package mast
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -18,7 +19,9 @@ import (
 //
 // The property is the one every parser of someone else's bytes here is held
 // to: it returns, and never panics. It also never yields a target alongside an
-// error, and every target carries the provider's own catalog name.
+// error, every target carries the provider's own catalog name, and a target
+// that claims a position has a finite one with its declination in range
+// (#1080): encoding/xml and encoding/json both decode NaN and the infinities.
 func FuzzResolveObject(f *testing.F) {
 	f.Add(`{"resolvedCoordinate":[{"canonicalName":"M  31","ra":10.684708,"decl":41.26875}],"status":""}`)
 	f.Add(`{"status":"ERROR","msg":"unresolvable"}`)
@@ -27,6 +30,8 @@ func FuzzResolveObject(f *testing.F) {
 		`<resolvedCoordinate><canonicalName>M  31</canonicalName><dec>41.26875</dec>` +
 		`<ra>10.684708</ra></resolvedCoordinate><status></status></ns2:resolvedItems>`)
 	f.Add(`<resolvedItems><resolvedCoordinate><ra>NaN</ra><dec>Inf</dec></resolvedCoordinate></resolvedItems>`)
+	f.Add(`<resolvedItems><resolvedCoordinate><canonicalName>pole</canonicalName><ra>10</ra><dec>95</dec>` +
+		`</resolvedCoordinate></resolvedItems>`)
 	f.Add(`<`)
 	f.Add(``)
 
@@ -57,6 +62,15 @@ func FuzzResolveObject(f *testing.F) {
 
 				if err == nil && tgt.Catalog != "mast" {
 					t.Errorf("ResolveObject yielded a target from catalog %q", tgt.Catalog)
+				}
+
+				if err == nil && tgt.HasCoord {
+					ra, dec := tgt.Coord.RA().Degrees(), tgt.Coord.Dec().Degrees()
+					if math.IsNaN(ra) || math.IsInf(ra, 0) || math.IsNaN(dec) || math.IsInf(dec, 0) ||
+						dec < -90 || dec > 90 {
+						t.Errorf("ResolveObject yielded %q with a position it cannot have: RA %v, Dec %v",
+							tgt.Name, ra, dec)
+					}
 				}
 
 				return true
