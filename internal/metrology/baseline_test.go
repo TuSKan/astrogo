@@ -31,7 +31,7 @@ func baselineResult(suite string, status metrology.Status, p50, p95, p99, maximu
 func TestBaselineFlagsARegressionInsideTheContract(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
+	base := metrology.Baseline{}.Update(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
 	now := baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.62, 0.70)
 
 	regressions := base.Compare(now, metrology.DefaultRegressionFactor)
@@ -77,7 +77,7 @@ func TestBaselineFlagsARegressionInsideTheContract(t *testing.T) {
 func TestBaselineIgnoresImprovementAndSmallDrift(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
+	base := metrology.Baseline{}.Update(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
 
 	for _, tc := range []struct {
 		name                   string
@@ -108,7 +108,7 @@ func TestBaselineIgnoresImprovementAndSmallDrift(t *testing.T) {
 func TestBaselineSaysNothingAboutAnUnknownSuite(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(baselineResult("known", metrology.StatusVerified, 1, 1, 1, 1))
+	base := metrology.Baseline{}.Update(baselineResult("known", metrology.StatusVerified, 1, 1, 1, 1))
 	now := baselineResult("brand-new", metrology.StatusVerified, 99, 99, 99, 99)
 
 	if got := base.Compare(now, metrology.DefaultRegressionFactor); got != nil {
@@ -125,7 +125,7 @@ func TestBaselineSaysNothingAboutAnUnknownSuite(t *testing.T) {
 func TestBaselineExcludesSuitesThatDidNotRun(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(
+	base := metrology.Baseline{}.Update(
 		baselineResult("ran", metrology.StatusVerified, 1, 1, 1, 1),
 		baselineResult("did-not", metrology.StatusNotVerified, 0, 0, 0, 0),
 	)
@@ -150,7 +150,7 @@ func TestBaselineExcludesSuitesThatDidNotRun(t *testing.T) {
 func TestBaselineSkipsZeroValuedStatistics(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(baselineResult("s", metrology.StatusVerified, 0, 0, 0, 0))
+	base := metrology.Baseline{}.Update(baselineResult("s", metrology.StatusVerified, 0, 0, 0, 0))
 	now := baselineResult("s", metrology.StatusVerified, 1, 1, 1, 1)
 
 	if got := base.Compare(now, metrology.DefaultRegressionFactor); len(got) != 0 {
@@ -158,10 +158,57 @@ func TestBaselineSkipsZeroValuedStatistics(t *testing.T) {
 	}
 }
 
+// An update records what an accepted run verified, and keeps the rest.
+//
+// The suites are collected by two jobs and some depend on live services, so
+// an update is made from whatever ran that day. A suite that could not run
+// must keep the entry it had: dropping it would end its regression check
+// until someone noticed, and recording its zeroes would claim zero error. The
+// baseline updated from must not change either, since a caller still holding
+// it would then compare against numbers it never accepted.
+func TestBaselineUpdateKeepsWhatARunDidNotVerify(t *testing.T) {
+	t.Parallel()
+
+	old := metrology.Baseline{}.Update(
+		baselineResult("measured again", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20),
+		baselineResult("down today", metrology.StatusVerified, 1, 2, 3, 4),
+	)
+
+	updated := old.Update(
+		baselineResult("measured again", metrology.StatusVerified, 0.06, 0.11, 0.16, 0.21),
+		baselineResult("down today", metrology.StatusNotVerified, 0, 0, 0, 0),
+		baselineResult("new", metrology.StatusVerified, 7, 7, 7, 7),
+	)
+
+	if got := updated.Suites["measured again"].P99; got != 0.16 {
+		t.Errorf("a re-measured suite records p99 %v, want the run's 0.16", got)
+	}
+
+	if got := updated.Suites["down today"].P99; got != 3 {
+		t.Errorf("a suite the run could not verify records p99 %v, want the 3 it held", got)
+	}
+
+	if _, ok := updated.Suites["new"]; !ok {
+		t.Error("a suite verified for the first time was not recorded")
+	}
+
+	if got := old.Suites["measured again"].P99; got != 0.15 {
+		t.Errorf("updating changed the baseline it was made from: p99 %v, want 0.15", got)
+	}
+
+	if _, ok := old.Suites["new"]; ok {
+		t.Error("updating added a suite to the baseline it was made from")
+	}
+
+	if updated.SchemaVersion != metrology.SchemaVersion {
+		t.Errorf("schema version %d, want %d", updated.SchemaVersion, metrology.SchemaVersion)
+	}
+}
+
 func TestBaselineRoundTripsAndRefusesAnotherSchema(t *testing.T) {
 	t.Parallel()
 
-	base := metrology.NewBaseline(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
+	base := metrology.Baseline{}.Update(baselineResult("s", metrology.StatusVerified, 0.05, 0.10, 0.15, 0.20))
 
 	data, err := base.JSON()
 	if err != nil {

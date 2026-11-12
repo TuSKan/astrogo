@@ -45,6 +45,14 @@ Encoding one as the other is how a validation suite stops being able to fail
 for the reason it exists, and this repository had that in two places before the
 generated table existed.
 
+A contract is a floor, though, and a suite can get several times worse without
+reaching it. So every scheduled run also compares each result with the accuracy
+its suite reached at the last accepted run, recorded in
+[`validation-baseline.json`](validation-baseline.json), and fails for a
+percentile that has more than doubled, contract or not. The baseline moves only
+as a reviewed diff; `TestResultsHoldTheBaseline` in `internal/metrology` says
+how.
+
 <!-- BEGIN GENERATED ACCURACY — do not edit by hand -->
 
 | Suite | Reference | Independence | N | p50 | p95 | p99 | Max | Contract | Status | Last verified |
