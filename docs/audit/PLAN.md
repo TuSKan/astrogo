@@ -94,8 +94,11 @@ These packages decide whether other tests can fail, so each bound they apply is 
   - #1110 gives every Kepler provider one SOFA base and its memo.
   - #1111 has a scheduling run compute each instant's Sun and Moon once.
   - #919, a bounded memo for instants a search comes back to, is open.
-- [ ] The closed bugs the map cannot attribute to a package, listed in its summary: attribute each to the commit that fixed it, or record why none did (#1045 was fixed upstream, at JPL).
-- [ ] #132: confirm every remaining item from the two external reviews is closed or has its own issue.
+- [x] The closed bugs the map cannot attribute to a package, listed in its summary: attribute each to the commit that fixed it, or record why none did (#1045 was fixed upstream, at JPL).
+  - 16 were listed. #694 was fixed by `e17454fc`, whose commit names only #696, the ΔT defect behind both, while #699's body closes #694. `judgments.FIXED_BY` records that commit, and `collect.py` reads its packages (`time`, `coord`, `plan`) from git.
+  - The other 15 changed no package's code: CI (5), dependencies and the go directive (3), Dependabot, the examples module, validation fixture data, a `go test -fuzz` behavior, upstream fixes at JPL (2) and a tracking issue. `judgments.OUTSIDE_PACKAGES` records where each was fixed, and the map lists them in a section of their own.
+- [x] #132: confirm every remaining item from the two external reviews is closed or has its own issue.
+  - All 43 issues the reviews produced, #100 to #142, were checked on 2026-11-12. 40 are closed. #115 is an open decision below and #131 a feature roadmap, each its own issue, so #132 is closed with that status.
 
 ### 7. Close-out
 
