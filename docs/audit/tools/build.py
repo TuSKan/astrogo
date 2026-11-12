@@ -103,7 +103,7 @@ def main():
             gaps.append(f"Statement coverage {cov:.1f}%, below 75%.")
         if p in judgments.NUMERIC and tc["nonfinite"] == 0 and p not in judgments.SWEPT_CLEAN:
             gaps.append("No finding about non-finite inputs yet.")
-        if v["loc"] >= 500 and n / (v["loc"] / 1000) < 3:
+        if v["loc"] >= 500 and n / (v["loc"] / 1000) < 3 and p not in judgments.AUDITED:
             gaps.append(f"Light audit for its size: {n} findings in {v['loc']} lines.")
         if n == 0 and v["loc"] > 0:
             gaps.append("No audit finding has ever touched it.")
