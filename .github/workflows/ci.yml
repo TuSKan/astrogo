@@ -271,15 +271,39 @@ jobs:
           go test -race -short -count=1 -json $packages > race.json
           status=$?
 
-          jq -rj --slurp '
-            (map(select(.Action == "fail" and .Test != null) | {key: "\(.Package) \(.Test)", value: true})
-              | from_entries) as $failed
-            | .[]
+          # Two streaming passes rather than one --slurp: the failed tests
+          # first, then the output to print. Each status is reported on its
+          # own line. Until #1092 they were folded into one exit code, so a
+          # failure printed nothing at all, not even the package result
+          # lines, and the log could not say whether go test or jq had failed.
+          failed=$(jq -r 'select(.Action == "fail" and .Test != null) | "\(.Package) \(.Test)"' race.json)
+          select_status=$?
+
+          jq -rj --arg failed "$failed" '
+            ($failed | split("\n") | map(select(. != "") | {key: ., value: true}) | from_entries) as $f
             | select(.Action == "build-output"
-                or (.Action == "output" and (.Test == null or $failed["\(.Package) \(.Test)"])))
-            | .Output' race.json || status=1
+                or (.Action == "output" and (.Test == null or $f["\(.Package) \(.Test)"])))
+            | .Output' race.json
+          print_status=$?
+
+          echo "go test exited $status"
+          if [ "$select_status" -ne 0 ] || [ "$print_status" -ne 0 ]; then
+            echo "::error::jq could not read race.json (exit $select_status, then $print_status); it is kept as an artifact of this run"
+            status=1
+          fi
 
           exit "$status"
+
+      # A failure the step above cannot render is still readable afterwards.
+      # That is #1092: three failed attempts whose logs named nothing.
+      - name: Keep race.json from a failed run
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: race-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+          path: race.json
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Report the slowest tests
         if: always()
