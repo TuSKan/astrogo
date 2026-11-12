@@ -76,12 +76,22 @@ def main():
     with open(os.path.join(args.work, "data.json"), encoding="utf-8") as f:
         d = json.load(f)
 
-    # Open issues, attributed to the package their title names first.
+    # Open issues, attributed to the package their title names first: by its
+    # path, or by its last element when no other package ends in the same one,
+    # since titles name a package as its own clause does ("metrology:", not
+    # "internal/metrology:").
+    by_name = collections.defaultdict(list)
+    for p in d["packages"]:
+        by_name[p.rsplit("/", 1)[-1]].append(p)
     open_by_pkg = collections.defaultdict(list)
     for i in d["open_issues"]:
-        m = re.match(r"^(?:\w+\()?([a-z/]+)\)?[:(]", i["title"])
-        if m and m.group(1) in d["packages"]:
-            open_by_pkg[m.group(1)].append(f"#{i['n']} {i['title']}")
+        m = re.match(r"^(?:\w+\()?([a-z0-9/]+)\)?[:(]", i["title"])
+        if not m:
+            continue
+        name = m.group(1)
+        p = name if name in d["packages"] else (by_name[name][0] if len(by_name[name]) == 1 else None)
+        if p:
+            open_by_pkg[p].append(f"#{i['n']} {i['title']}")
 
     packages, findings = [], []
     for p, v in d["packages"].items():
@@ -105,7 +115,7 @@ def main():
             gaps.append("No finding about non-finite inputs yet.")
         if v["loc"] >= 500 and n / (v["loc"] / 1000) < 3 and p not in judgments.AUDITED:
             gaps.append(f"Light audit for its size: {n} findings in {v['loc']} lines.")
-        if n == 0 and v["loc"] > 0:
+        if n == 0 and v["loc"] > 0 and p not in judgments.AUDITED:
             gaps.append("No audit finding has ever touched it.")
         if p in judgments.NOTED:
             gaps.append(judgments.NOTED[p])

@@ -29,10 +29,14 @@ NUMERIC = {
 SWEPT_CLEAN = {"optics", "unit", "catalog/openngc", "coord", "vector", "ephemeris/core", "ephemeris/jpl"}
 
 # Audited in depth against an outside reference, beyond the findings already
-# counted, so a low finding density is not a light audit. Each names the check
-# that cleared it.
+# counted, so neither a low finding density nor the absence of any finding is a
+# gap. Each names the check that cleared it.
 AUDITED = {
     "constellation": "Roman's table over 250,000 points, boundaries, poles and the 0h/24h wrap; astropy compared",
+    "internal/refraction": "the transcribed SOFA series against gofa's Atioq and Atoiq above the hand-over, "
+                           "to 1.4e-4 µas (#1105)",
+    "internal/oracle": "the 6,656 exact Kepler roots of the contract sweep against mpmath at 120 digits, "
+                       "to 2⁻²¹⁴ relative",
 }
 
 # Seen during an audit run and judged, but not filed.
@@ -90,4 +94,10 @@ SWEEPS = [
      "scope": "skybrightness/dataset, starlight, airglow, logging, catalog/internal/posmatch, catalog/mast",
      "outcome": "All six at 77% or more; 10 defects found, 9 fixed, 1 awaiting a decision",
      "issues": "#1066 #1067 #1068 #1069 #1077 #1078 #1079 #1088 #1089 #1090"},
+    {"date": "2026-11-12", "sweep": "Test infrastructure, each bound canaried with its fault",
+     "scope": "internal/leakcheck, internal/metrology, internal/refraction against gofa, internal/oracle against "
+              "mpmath",
+     "outcome": "4 defects fixed, one of them (a resty buffer race) found along the way; 1 awaiting a decision; "
+                "refraction and oracle clean",
+     "issues": "#1099 #1100 #1104 #1107 #1109"},
 ]
