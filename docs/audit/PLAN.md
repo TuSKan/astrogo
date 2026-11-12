@@ -72,20 +72,28 @@ Each of these packages is raised to at least 75% statement coverage. The uncover
 - [x] `catalog/internal/posmatch`, 73.3%, to 100% in #1094, with no defect. Its error returns looked unreachable, until a probe found that a parallax of 1e300″ makes SOFA's `Pmsafe` fail.
 - [x] `catalog/mast`, 74.6%, to 95.5% in #1095.
   - The rest cannot be reached: a `json.Marshal` of fixed strings, and `MapCache.Set`'s error.
-  - Reading it found #1088: an advertised cone search that always fails. It waits on a decision.
+  - Reading it found #1088: an advertised cone search that always fails. The stub was removed in #1098.
 
 ### 5. Test infrastructure and untouched packages
 
 These packages decide whether other tests can fail, so each bound they apply is canaried with the fault it exists to catch.
 
-- [ ] `internal/metrology`: 633 lines, 1 finding.
-- [ ] `internal/oracle`: 556 lines, 1 finding.
-- [ ] `internal/refraction`: never touched by a finding.
-- [ ] `internal/leakcheck`: never touched by a finding.
+- [x] `internal/metrology`: 633 lines, 1 finding. Two more:
+  - #1104: a suite that measured nothing reported `VERIFIED` and passed. Fixed in #1106.
+  - #1109: `Baseline`'s regression check is never run: no baseline is recorded and nothing calls `Check`. It waits on a decision.
+- [x] `internal/oracle`: 556 lines, 1 finding, and no defect. All 6,656 exact Kepler roots of the contract sweep agree with mpmath at 120 digits, to 2⁻²¹⁴ relative. The M = ±0 case its `ErrorOf` waives is checked exactly in the kepler contract test.
+- [x] `internal/refraction`: never touched by a finding, and no defect. The transcribed SOFA series agrees with gofa's own `Atioq` and `Atoiq` to 1.4e-4 µas, which nothing compared before #1105.
+- [x] `internal/leakcheck`: never touched by a finding until two:
+  - #1099: `skybrightness` starts goroutines and ran no leak check. #1101 adds the check, and a docsguard rule that requires it in every package that starts one.
+  - #1100: a profile header it could not read was reported as no leaks. Fixed in #1102.
+- Found along the way: #1107, resty recycling a POST body's buffer while net/http was still writing it, the hidden cause of the race shards' failures. Fixed in #1108.
 
 ### 6. Loose ends
 
-- [ ] #913: Epv00 evaluated again for an instant already asked for.
+- [x] #913: Epv00 evaluated again for an instant already asked for.
+  - #1110 gives every Kepler provider one SOFA base and its memo.
+  - #1111 has a scheduling run compute each instant's Sun and Moon once.
+  - #919, a bounded memo for instants a search comes back to, is open.
 - [ ] The closed bugs the map cannot attribute to a package, listed in its summary: attribute each to the commit that fixed it, or record why none did (#1045 was fixed upstream, at JPL).
 - [ ] #132: confirm every remaining item from the two external reviews is closed or has its own issue.
 
@@ -104,4 +112,5 @@ To be discussed before the items that depend on them.
   - `plan.FromCatalog` refuses a non-finite coordinate and ignores non-finite kinematics, as a backstop.
 - **#115**, `plan`'s 356 exported symbols and the three packages named `plan`: an API design question rather than an audit finding. Schedule it before 1.0, or close it.
 - **`plan`'s slew time conversion**: the float-to-Duration conversion overflows only below a slew rate of 2e-8 deg/s. Record it as a waiver, or add the guard.
-- **#1088**, MAST's cone search: `catalog/mast` advertises `CapConeSearch`, but `ConeSearch` is a stub that always fails, and the Resolver fans out to it on every resolution. Remove the stub, or implement it against a MAST service whose rows are sources.
+- ~~**#1088**, MAST's cone search~~ (phase 4). **Decided 2026-11-11:** the stub is removed, and `catalog/mast` no longer claims a cone search (#1098).
+- **#1109**, metrology's `Baseline` (phase 5): its regression check exists but nothing records a baseline or calls `Check`. Wire it into the metrology suites, or remove it.
