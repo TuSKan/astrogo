@@ -164,7 +164,7 @@ func IsObservable(
 	site *Site,
 	constraints ...Constraint,
 ) (Evaluation, error) {
-	eval, err := isObservableCtx(obj, t, site, nil, constraints...)
+	eval, err := isObservableCtx(obj, t, site, nil, nil, constraints...)
 	return eval, err
 }
 
@@ -178,6 +178,7 @@ func isObservableCtx(
 	t time.Time,
 	site *Site,
 	ctx *coord.Context,
+	sky *runSky,
 	constraints ...Constraint,
 ) (Evaluation, error) {
 	pos, err := obj.Position(t)
@@ -202,13 +203,7 @@ func isObservableCtx(
 	}
 
 	for _, c := range constraints {
-		var res Result
-		if cc, ok := c.(ConstraintCtx); ok {
-			res, err = cc.CheckCtx(obj, t, site, ctx)
-		} else {
-			res, err = c.Check(obj, t, site)
-		}
-
+		res, err := checkConstraint(c, obj, t, site, ctx, sky)
 		if err != nil {
 			return Evaluation{}, fmt.Errorf("plan: constraint check: %w", err)
 		}
@@ -468,9 +463,11 @@ type Scorer struct {
 	// zero.
 	Constraints []Constraint
 
-	// moon, when set, holds the Moon's place at each instant one scheduling
-	// run scores; nil uses the process-wide cache. See moonPlaces.
-	moon moonPlaces
+	// sky, when set, is the scheduling run's record of the sky at each
+	// instant it has asked about: the constraints' Sun and Moon, and the
+	// Moon's place the score uses when the run keeps one. nil computes them,
+	// with the score's Moon from the process-wide cache. See runSky.
+	sky *runSky
 }
 
 // moonPlaces is the Moon's apparent geocentric vector at each instant one
@@ -519,7 +516,7 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 		ctx = coord.NewContext(t, s.Site.Location(), s.Site.Refraction())
 	}
 
-	eval, err := isObservableCtx(obj, t, s.Site, ctx, s.Constraints...)
+	eval, err := isObservableCtx(obj, t, s.Site, ctx, s.sky, s.Constraints...)
 	if err != nil {
 		return 0, err
 	}
@@ -589,8 +586,8 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 // moonAt is the Moon's vector at t: from the scheduling run's own record when
 // the Scorer carries one, from the process-wide cache otherwise.
 func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
-	if s.moon != nil {
-		return s.moon.at(t)
+	if s.sky != nil && s.sky.moon != nil {
+		return s.sky.moon.at(t)
 	}
 
 	return getMoonGeocentricVec(t)
@@ -717,7 +714,7 @@ func observableWindows(
 	// boundary, and the caller got a rise or set time that was quietly wrong
 	// rather than absent.
 	checkObs := func(t time.Time) (bool, error) {
-		eval, err := isObservableCtx(obj, t, site, ctxAt(t), constraints...)
+		eval, err := isObservableCtx(obj, t, site, ctxAt(t), nil, constraints...)
 		if err != nil {
 			return false, fmt.Errorf("plan: observability at %s: %w",
 				t.Format(time.RFC3339), err)
@@ -739,7 +736,7 @@ func observableWindows(
 	prevOK := false
 
 	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, step) {
-		eval, err := isObservableCtx(obj, t, site, ctxAt(t), constraints...)
+		eval, err := isObservableCtx(obj, t, site, ctxAt(t), nil, constraints...)
 		if err != nil {
 			return nil, err
 		}

@@ -299,3 +299,54 @@ func BenchmarkObservableWindowsManyTargets(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkScheduleNightChain is twenty targets scheduled into one night under
+// the full chain, by greedy and by swap passes over a priority seed. Greedy
+// tries every candidate at each step and the swap passes return to every
+// placement, so each instant's Sun and Moon were asked for once per target
+// until the run kept them (#913).
+func BenchmarkScheduleNightChain(b *testing.B) {
+	site := benchSite(b)
+	start, end := nightWindow()
+	stars := benchStars(20)
+
+	planner, err := NewPlanner(site, nightChain())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	blocks := make([]*Block, len(stars))
+	for i, star := range stars {
+		blocks[i] = &Block{ID: star.Name(), Target: star, Duration: 20 * time.Minute, Priority: float64(len(stars) - i)}
+	}
+
+	window := Window{Start: start, End: end}
+	transition := &BasicTransitionModel{}
+
+	for _, s := range []struct {
+		name     string
+		strategy Strategy
+	}{
+		{"greedy", &GreedyStrategy{}},
+		{"swap", &SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}},
+	} {
+		b.Run(s.name, func(b *testing.B) {
+			schedule, err := s.strategy.Schedule(planner, window, blocks, transition)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if len(schedule.Blocks) == 0 {
+				b.Fatal("nothing was placed: the benchmark would time a night with no schedule")
+			}
+
+			b.ReportAllocs()
+
+			for b.Loop() {
+				if _, err := s.strategy.Schedule(planner, window, blocks, transition); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

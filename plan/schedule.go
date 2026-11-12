@@ -305,22 +305,14 @@ func checkConstraintsInterval(
 	step time.Duration,
 	site *Site,
 	ctxAt func(time.Time) *coord.Context,
+	sky *runSky,
 	constraints ...Constraint,
 ) (bool, error) {
 	check := func(t time.Time) (bool, error) {
 		ctx := ctxAt(t)
 
 		for _, c := range constraints {
-			var (
-				res Result
-				err error
-			)
-			if cc, ok := c.(ConstraintCtx); ok {
-				res, err = cc.CheckCtx(target, t, site, ctx)
-			} else {
-				res, err = c.Check(target, t, site)
-			}
-
+			res, err := checkConstraint(c, target, t, site, ctx, sky)
 			if err != nil {
 				return false, fmt.Errorf("plan: constraint at %s: %w",
 					t.Format(time.RFC3339), err)
@@ -361,7 +353,8 @@ type GreedyStrategy struct {
 
 // Schedule implements Strategy for GreedyStrategy.
 func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Block, transition TransitionModel) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition, movingContext(planner.Site.Location(), planner.Site.Refraction()))
+	return s.schedule(planner, window, blocks, transition,
+		movingContext(planner.Site.Location(), planner.Site.Refraction()), newRunSky(false))
 }
 
 // schedule is Schedule with the Context for each instant supplied by ctxAt,
@@ -372,6 +365,7 @@ func (s *GreedyStrategy) schedule(
 	blocks []*Block,
 	transition TransitionModel,
 	ctxAt func(time.Time) *coord.Context,
+	sky *runSky,
 ) (*Schedule, error) {
 	step := s.Step
 	if step <= 0 {
@@ -445,7 +439,7 @@ func (s *GreedyStrategy) schedule(
 			allConstraints = append(allConstraints, b.Constraints...)
 
 			// Check observability over the full duration
-			ok, err := checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, ctxAt, allConstraints...)
+			ok, err := checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, ctxAt, sky, allConstraints...)
 			if err != nil {
 				return nil, fmt.Errorf("plan: greedy: block %s: %w", b.ID, err)
 			}
@@ -455,7 +449,7 @@ func (s *GreedyStrategy) schedule(
 				// it, so it keeps no record of the Moon: one would hold only
 				// what is not asked for again, measured at 14% more bytes and
 				// no time saved (#959).
-				score := scoreBlockPlacement(b, startTime, endTime, planner, ctxAt, nil)
+				score := scoreBlockPlacement(b, startTime, endTime, planner, ctxAt, sky)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     b,
 					Window:    Window{Start: startTime, End: endTime},

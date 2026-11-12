@@ -128,15 +128,15 @@ func TestSchedulingWithTheRunsMoonIsBitIdentical(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		run  func(moon moonPlaces) (*Schedule, error)
+		run  func(sky *runSky) (*Schedule, error)
 	}{
-		{"swap, default passes", func(moon moonPlaces) (*Schedule, error) {
+		{"swap, default passes", func(sky *runSky) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{}).schedule(planner, window, makeBlocks(n), transition,
-				movingContext(site.Location(), site.Refraction()), moon)
+				movingContext(site.Location(), site.Refraction()), sky)
 		}},
-		{"swap, three passes over Priority", func(moon moonPlaces) (*Schedule, error) {
+		{"swap, three passes over Priority", func(sky *runSky) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window,
-				makeBlocks(n), transition, movingContext(site.Location(), site.Refraction()), moon)
+				makeBlocks(n), transition, movingContext(site.Location(), site.Refraction()), sky)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestSchedulingWithTheRunsMoonIsBitIdentical(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			got, err := tc.run(moonPlaces{})
+			got, err := tc.run(newRunSky(true))
 			if err != nil {
 				t.Fatal(err)
 			}

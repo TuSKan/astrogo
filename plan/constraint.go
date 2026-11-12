@@ -160,19 +160,23 @@ func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
 // CheckCtx evaluates Sun altitude using a pre-built coord.Context.
 // The obj parameter is ignored — the Sun position is always computed internally.
 func (c Sun) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
-	sun := NewSun(eph.Default())
+	return c.checkSky(obj, t, ctx, nil)
+}
 
+// checkSky is CheckCtx with the Sun's altitude taken from a scheduling run's
+// record, which every target at t shares (#913). A nil sky computes it.
+func (c Sun) checkSky(obj Observable, t time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	// If we are checking the Sun itself against a Sun constraint, don't penalize.
 	if p, ok := obj.(*Planet); ok && p.IsSun() {
 		return Result{Pass: true, Value: 0}, nil
 	}
 
-	aa, err := skyAltAzCtx(sun, t, ctx)
+	alt, err := sky.sunAltitude(t, ctx)
 	if err != nil {
 		return Result{}, err
 	}
 
-	val := aa.Alt().Degrees()
+	val := alt.Degrees()
 	thresh := c.Threshold.Degrees()
 	pass := val <= thresh
 
@@ -203,7 +207,14 @@ func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 // CheckCtx evaluates Moon separation using a pre-built coord.Context. The
 // separation is the one the site sees, from both positions as the observer
 // has them (see topocentricPosition).
-func (c MoonSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c MoonSep) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+	return c.checkSky(obj, t, ctx, nil)
+}
+
+// checkSky is CheckCtx with the Moon's place taken from a scheduling run's
+// record, which every target at the instant shares (#913). A nil sky computes
+// it.
+func (c MoonSep) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 180}, nil
 	}
@@ -213,7 +224,7 @@ func (c MoonSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Conte
 		return Result{}, fmt.Errorf("constraint: moon separation position: %w", err)
 	}
 
-	moonPos, err := topocentricPosition(NewMoon(eph.Default()), ctx.Time(), ctx)
+	moonPos, err := sky.moonTopocentric(ctx.Time(), ctx)
 	if err != nil {
 		return Result{}, fmt.Errorf("constraint: moon separation: %w", err)
 	}
@@ -264,17 +275,30 @@ func (c MoonIllum) Check(obj Observable, t time.Time, site *Site) (Result, error
 }
 
 // CheckCtx evaluates Moon illumination using a pre-built coord.Context.
-func (c MoonIllum) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c MoonIllum) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+	return c.checkSky(obj, t, ctx, nil)
+}
+
+// checkSky is CheckCtx with the illuminated fraction taken from a scheduling
+// run's record, which every target at the instant shares (#913). A nil sky
+// computes it. So does a caller's own Provider, since the record holds the
+// default ephemeris's answer.
+func (c MoonIllum) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 0}, nil
 	}
 
-	prov := c.Provider
-	if prov == nil {
-		prov = eph.Default()
+	var (
+		frac float64
+		err  error
+	)
+
+	if c.Provider != nil {
+		frac, _, err = MoonIllumination(ctx.Time(), c.Provider)
+	} else {
+		frac, err = sky.moonIllumination(ctx.Time())
 	}
 
-	frac, _, err := MoonIllumination(ctx.Time(), prov)
 	if err != nil {
 		return Result{}, fmt.Errorf("constraint: moon illumination: %w", err)
 	}
