@@ -10,7 +10,7 @@ NOTED once it is filed or judged, and a finished sweep is appended to SWEEPS.
 # entry points. Each should carry a fuzz target of its own.
 EXTERNAL = {
     "catalog/fink", "catalog/gaia", "catalog/jpl", "catalog/mast", "catalog/mpcorb", "catalog/norad",
-    "catalog/openngc", "catalog/sbdb", "catalog/simbad", "catalog/vizier", "catalog/xmatch",
+    "catalog/openngc", "catalog/sbdb", "catalog/simbad", "catalog/vizier",
     "ephemeris/jpl/lsk", "ephemeris/jpl/spk", "ephemeris/satellite", "ephemeris/satellite/sgp4",
     "fits", "internal/votable", "time/internal/iers", "plan", "atmosphere/dataset/cams",
     "skybrightness/dataset/airglow", "skybrightness/dataset/crosssection", "skybrightness/dataset/dust",
@@ -26,16 +26,21 @@ NUMERIC = {
 }
 
 # Checked for non-finite inputs and found already guarded.
-SWEPT_CLEAN = {"optics", "unit", "catalog/openngc", "coord"}
+SWEPT_CLEAN = {"optics", "unit", "catalog/openngc", "coord", "vector", "ephemeris/core", "ephemeris/jpl"}
+
+# Audited in depth against an outside reference, beyond the findings already
+# counted, so a low finding density is not a light audit. Each names the check
+# that cleared it.
+AUDITED = {
+    "constellation": "Roman's table over 250,000 points, boundaries, poles and the 0h/24h wrap; astropy compared",
+}
 
 # Seen during an audit run and judged, but not filed.
 NOTED = {
-    "catalog/simbad": "Coordinates and magnitudes parsed as non-finite values are kept in targets (seen, not filed).",
-    "catalog/vizier": "Coordinates and epochs parsed as non-finite values are kept in targets (seen, not filed).",
-    "catalog/gaia": "Optional fields parsed as non-finite values are kept; VOTable may encode nulls that way "
-                    "(seen, not filed).",
     "plan": "Slew time converts a float to time.Duration unguarded; overflow needs a rate below 2e-8 deg/s "
             "(judged unreachable).",
+    "vector": "A magnitude beyond about 1e154 overflows to infinity when squared (judged unreachable: no "
+              "astronomical vector here is near it).",
 }
 
 # The systematic checks of each audit run: one class of defect, across a scope.
@@ -67,4 +72,22 @@ SWEEPS = [
      "outcome": "SIMBAD outage now skips; Horizons CSV recovered; Horizons TDB−UT freeze reported to JPL, "
                 "which fixed it on 11 November",
      "issues": "#1023 #1026 #1045"},
+    {"date": "2026-11-11", "sweep": "SGP4 against an independent implementation",
+     "scope": "ephemeris/satellite/sgp4: python-sgp4's C++ over 5,000 synthetic element sets, and non-finite fields",
+     "outcome": "Propagation agrees; an At hang on resonant orbits and doc drift fixed", "issues": "#1052 #1054"},
+    {"date": "2026-11-11", "sweep": "Constellation boundaries against Roman's table",
+     "scope": "constellation: 250,000 points, boundaries, poles and the 0h/24h wrap; astropy compared",
+     "outcome": "2 points disagree, each within 0.2″ of a boundary; a NaN position fixed", "issues": "#1055"},
+    {"date": "2026-11-11", "sweep": "Non-finite inputs, remaining numeric packages",
+     "scope": "vector, ephemeris/core, ephemeris/jpl, ephemeris/satellite, every catalog parser",
+     "outcome": "3 packages clean; satellite fixed; catalog parsers read a non-finite number as absent",
+     "issues": "#1052 #1080"},
+    {"date": "2026-11-11", "sweep": "Fuzz targets for the remaining parsers of outside data",
+     "scope": "catalog/fink, catalog/mast, catalog/sbdb, skybrightness/dataset/viirs",
+     "outcome": "3 defects fixed, 2 of them panics; xmatch reads no bytes and needs none",
+     "issues": "#1058 #1061 #1062"},
+    {"date": "2026-11-11", "sweep": "Coverage of six packages to 75%",
+     "scope": "skybrightness/dataset, starlight, airglow, logging, catalog/internal/posmatch, catalog/mast",
+     "outcome": "All six at 77% or more; 10 defects found, 9 fixed, 1 awaiting a decision",
+     "issues": "#1066 #1067 #1068 #1069 #1077 #1078 #1079 #1088 #1089 #1090"},
 ]
