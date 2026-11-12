@@ -1,7 +1,7 @@
 ---
-type: Changed
+type: Fixed
 pr: 1096
 ---
-**A failed race shard names what failed and keeps its `race.json`**: the step reports `go test`'s exit status and any
-`jq` failure separately, reads the stream without `--slurp`, and uploads `race.json` when the job fails, after three
-failures in one day left nothing in the log.
+**A failed race shard reports its failing tests and keeps its `race.json`**: GitHub runs the step under `bash -e`, so a
+failing `go test` ended it before the report ran, and every failed shard printed nothing. Each exit status is now
+caught and reported, and `race.json` is uploaded when the job fails.
