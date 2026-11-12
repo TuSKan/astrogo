@@ -21,10 +21,6 @@ import (
 // ErrAPIError indicates a MAST API error response.
 var ErrAPIError = errors.New("mast: API error")
 
-// ErrNotImplemented indicates a capability this provider advertises
-// (resolve.CapConeSearch) but does not yet implement.
-var ErrNotImplemented = errors.New("mast: not implemented")
-
 // Provider implements the resolve.Provider interface for the MAST catalog.
 type Provider struct {
 	client *remote.Client
@@ -46,7 +42,7 @@ func (p *Provider) Name() string { return "mast" }
 
 // Capabilities returns the capabilities of the provider.
 func (p *Provider) Capabilities() []resolve.Capability {
-	return []resolve.Capability{resolve.CapObjectResolution, resolve.CapConeSearch}
+	return []resolve.Capability{resolve.CapObjectResolution}
 }
 
 // Resolve resolves a query to a target.
@@ -215,15 +211,4 @@ func newMASTTarget(canonicalName string, ra, dec *float64) resolve.Target {
 	}
 
 	return t
-}
-
-// ConeSearch is not yet implemented for CAOM spatial search: STScI's
-// Mast.Caom.Cone service has a distinct request/response shape from the
-// name-resolution path ResolveObject already handles, unverified against a
-// live response so far. Callers get an explicit error rather than a
-// fabricated empty-but-successful result.
-func (p *Provider) ConeSearch(_ context.Context, _ resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
-	return func(yield func(resolve.Target, error) bool) {
-		yield(resolve.Target{}, ErrNotImplemented)
-	}
 }

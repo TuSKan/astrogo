@@ -2,7 +2,6 @@ package mast
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -191,8 +190,8 @@ func TestProviderInterface(t *testing.T) {
 	}
 
 	caps := p.Capabilities()
-	if len(caps) != 2 || caps[0] != resolve.CapObjectResolution || caps[1] != resolve.CapConeSearch {
-		t.Errorf("expected CapObjectResolution and CapConeSearch, got %v", caps)
+	if len(caps) != 1 || caps[0] != resolve.CapObjectResolution {
+		t.Errorf("Capabilities() = %v, want object resolution only", caps)
 	}
 
 	// errTransport keeps this default (non-network-tagged) test fully
@@ -203,21 +202,17 @@ func TestProviderInterface(t *testing.T) {
 	_, _ = p.Search(context.Background(), "non_existent_body")
 }
 
-// TestConeSearchNotImplemented confirms ConeSearch surfaces ErrNotImplemented
-// explicitly rather than a fabricated empty-but-successful result — it
-// advertises resolve.CapConeSearch but CAOM spatial search isn't implemented
-// yet (see doc comment on ConeSearch).
-func TestConeSearchNotImplemented(t *testing.T) {
-	p := New()
+// TestMASTIsNotAConeSearcher: MAST resolves names and nothing more, so it
+// neither claims a cone search nor offers one. Until #1088 it did both, with a
+// ConeSearch that could only fail. catalog.NewResolver registers any provider
+// that has the method, so every Resolve and Search through a Resolver holding
+// MAST started a cone search that was bound to fail, and discarded its error.
+func TestMASTIsNotAConeSearcher(t *testing.T) {
+	var p any = New()
 
-	iter := p.ConeSearch(context.Background(), resolve.ConeRequest{})
-	iter(func(_ resolve.Target, err error) bool {
-		if !errors.Is(err, ErrNotImplemented) {
-			t.Errorf("expected ErrNotImplemented, got %v", err)
-		}
-
-		return false
-	})
+	if _, ok := p.(resolve.ConeSearcher); ok {
+		t.Error("mast.Provider implements resolve.ConeSearcher; catalog.NewResolver would register it as one")
+	}
 }
 
 // redirect points endpoint id at a test server for the duration of one
