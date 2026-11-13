@@ -68,6 +68,11 @@ var (
 	// which MeasuredRadialVelocity reports as a value with ok true.
 	ErrNoRadialVelocity = errors.New("target has no radial velocity")
 
+	// ErrSlewTime marks a slew whose time a time.Duration cannot hold: a
+	// NaN slew rate, a NaN slew distance, or a slew longer than about 292
+	// years, which a rate below 2e-8 deg/s makes of a 180° slew (#1121).
+	ErrSlewTime = errors.New("plan: slew time is not a finite time.Duration")
+
 	// ErrStepNotPositive indicates a non-positive time step.
 	ErrStepNotPositive = errors.New("step must be positive")
 	// ErrStepTooLarge indicates a step that risks missing short visibility windows.
