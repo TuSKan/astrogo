@@ -193,7 +193,12 @@ var plutoElements = func() Elements {
 //
 // It lives here rather than in the ephemeris root package, which would
 // cycle: ephemeris imports kepler to re-export Elements and NewFromElements.
-type sofaBase struct{}
+type sofaBase struct {
+	// memo holds the Epv00 evaluations this base has made (see
+	// [epv00Memo]). Every Provider without a base of its own holds the same
+	// base, [sharedSOFA], so they share this memo through it.
+	memo epv00Memo
+}
 
 // epv00At is one Epv00 evaluation: the Earth's heliocentric and barycentric
 // position and velocity at the TDB two-part date d1 + d2.
@@ -320,20 +325,19 @@ func (s *sofaBase) Close() error { return nil }
 // check had just evaluated. A Provider's own state, the elements Register adds,
 // stays its own.
 //
-// What the bases would share is [sharedEpv00], which is already one table for
-// the process, so a base has no state left of its own and this is only the one
-// value every Provider holds.
+// The base owns the memo, so the memo is shared because the base is, and is
+// the one package variable it takes.
 var sharedSOFA = &sofaBase{}
 
-// epv00 is Epv00 at d1 + d2, from the memo every sofaBase shares when it holds
-// that date (see [epv00Memo]).
+// epv00 is Epv00 at d1 + d2, from the base's memo when it holds that date
+// (see [epv00Memo]).
 //
 // The warning for a date outside Epv00's fitted span is given here, from the
 // status the held evaluation carries, and not where the series is evaluated: a
 // date the memo already holds must warn as the first request for it did, or
 // whether a caller was told would depend on who asked first.
-func (*sofaBase) epv00(d1, d2 float64) (epv00At, error) {
-	e, err := sharedEpv00.epv00(d1, d2, gofaext.Epv00)
+func (s *sofaBase) epv00(d1, d2 float64) (epv00At, error) {
+	e, err := s.memo.epv00(d1, d2, gofaext.Epv00)
 	if err != nil {
 		return epv00At{}, err
 	}

@@ -250,28 +250,39 @@ func TestEpv00MemoAllocatesOnDemand(t *testing.T) {
 
 // TestEpv00MemoIsSharedAcrossProviders is why the memo is process-wide. A
 // provider is built per call in places (eph.Default() in a constraint check), so
-// a memo each held would start empty every time; what a first provider
-// evaluated is held in the shared memo for the second.
+// a memo each held would start empty every time. Every Provider built without a
+// base holds sharedSOFA, whose memo it is, so what a first provider evaluated
+// is held for the second.
 func TestEpv00MemoIsSharedAcrossProviders(t *testing.T) {
 	// A date nothing else in this package asks for, since the memo is shared
-	// with every other test that uses a sofaBase.
+	// with every other test that uses the default base.
 	const d1, d2 = 2400000.5, 0.123456789
 
-	if _, held := sharedEpv00.get(d1, d2); held {
+	if _, held := sharedSOFA.memo.get(d1, d2); held {
 		t.Fatal("the shared memo already holds the date this test uses")
 	}
 
-	a, err := (&sofaBase{}).epv00(d1, d2)
+	first, ok := New().base.(*sofaBase)
+	if !ok {
+		t.Fatalf("a Provider built with no base holds %T, not the SOFA base", New().base)
+	}
+
+	second, ok := New().base.(*sofaBase)
+	if !ok {
+		t.Fatalf("a Provider built with no base holds %T, not the SOFA base", New().base)
+	}
+
+	a, err := first.epv00(d1, d2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	held, ok := sharedEpv00.get(d1, d2)
+	held, ok := sharedSOFA.memo.get(d1, d2)
 	if !ok {
 		t.Fatal("what one provider evaluated is not in the shared memo")
 	}
 
-	b, err := (&sofaBase{}).epv00(d1, d2)
+	b, err := second.epv00(d1, d2)
 	if err != nil {
 		t.Fatal(err)
 	}

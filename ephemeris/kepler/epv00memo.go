@@ -58,11 +58,13 @@ type epv00Shard struct {
 //
 // # Why one for the process
 //
-// A [sofaBase] is built per provider, and eph.Default() builds one per call in
-// places, so a memo each held would start empty every time and cost an
-// allocation to do it. Because the function is pure, a date one provider
-// evaluated is the date any other would, and sharing the memo is invisible to
-// every result. The zero value is ready to use.
+// It is a field of the SOFA base, and there is one base for the process,
+// [sharedSOFA], held by every Provider built without a base of its own (#913).
+// A memo per Provider would start empty for each one eph.Default() builds,
+// which is one per check in places, and cost an allocation to do it. Because
+// the function is pure, a date one provider evaluated is the date any other
+// would, and sharing the memo is invisible to every result. The zero value is
+// ready to use.
 //
 // It replaced a memo of the last evaluation alone, which served the Sun and the
 // Earth at one epoch and nothing else. Measured on a year of conjunctions and on
@@ -71,9 +73,6 @@ type epv00Shard struct {
 type epv00Memo struct {
 	shards [epv00Shards]epv00Shard
 }
-
-// sharedEpv00 is the memo every sofaBase uses.
-var sharedEpv00 epv00Memo
 
 // at reports whether e holds the evaluation at d1 + d2.
 func (e *epv00At) at(d1, d2 float64) bool {
