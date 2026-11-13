@@ -41,15 +41,23 @@ func main() {
 
 	prov := eph.Default()
 
-	// ── Find the next New Moon ──────────────────────────────────────────
-	now := time.NowUTC()
+	// ── Find the first New Moon of December 2026 ────────────────────────
+	// A fixed start keeps the output the same on every run; start from
+	// time.NowUTC() to look for the next one from today. Times print in
+	// the zone of the start, here the site's.
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
 
-	newMoon, err := plan.NextNewMoon(now, prov)
+	from := time.Date(2026, 12, 1, 0, 0, 0, 0, tz)
+
+	newMoon, err := plan.NextNewMoon(from, prov)
 	if err != nil {
 		log.Fatalf("NextNewMoon: %v", err)
 	}
 
-	fmt.Printf("  Next New Moon: %s\n\n", newMoon.Time)
+	fmt.Printf("  New Moon: %s\n\n", newMoon.Time)
 
 	// ── Evaluate the first evening after the New Moon ───────────────────
 	// The crescent is typically first visible on the evening following
