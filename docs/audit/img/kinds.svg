@@ -277,7 +277,7 @@
 <text x="696" y="622" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">3</text>
 <rect x="730" y="609" width="60" height="18" rx="3" fill="rgba(9,105,218,0.32)"/>
 <text x="760" y="622" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">4</text>
-<rect x="794" y="609" width="60" height="18" rx="3" fill="rgba(9,105,218,0.42)"/>
+<rect x="794" y="609" width="60" height="18" rx="3" fill="rgba(9,105,218,0.41)"/>
 <text x="824" y="622" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">9</text>
 <text x="888" y="622" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">52</text>
 <text x="0" y="642" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">ephemeris</text>
@@ -373,8 +373,8 @@
 <text x="376" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <rect x="410" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="440" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<rect x="474" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.34)"/>
-<text x="504" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">5</text>
+<rect x="474" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.38)"/>
+<text x="504" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">7</text>
 <rect x="602" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="632" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <rect x="666" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.29)"/>
@@ -383,7 +383,7 @@
 <text x="760" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">5</text>
 <rect x="794" y="749" width="60" height="18" rx="3" fill="rgba(9,105,218,0.36)"/>
 <text x="824" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">6</text>
-<text x="888" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">23</text>
+<text x="888" y="762" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">25</text>
 <text x="0" y="782" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">ephemeris/satellite</text>
 <rect x="282" y="769" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="312" y="782" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
@@ -417,11 +417,11 @@
 <text x="0" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">fits</text>
 <rect x="282" y="809" width="60" height="18" rx="3" fill="rgba(9,105,218,0.32)"/>
 <text x="312" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">4</text>
-<rect x="410" y="809" width="60" height="18" rx="3" fill="rgba(9,105,218,0.45)"/>
-<text x="440" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">11</text>
+<rect x="410" y="809" width="60" height="18" rx="3" fill="rgba(9,105,218,0.46)"/>
+<text x="440" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">12</text>
 <rect x="666" y="809" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="696" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<text x="888" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">16</text>
+<text x="888" y="822" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">17</text>
 <text x="0" y="842" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">magnitude</text>
 <rect x="282" y="829" width="60" height="18" rx="3" fill="rgba(9,105,218,0.32)"/>
 <text x="312" y="842" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">4</text>
@@ -485,7 +485,7 @@
 <rect x="730" y="909" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="760" y="922" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <text x="888" y="922" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">7</text>
-<text x="0" y="942" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/fits</text>
+<text x="0" y="942" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/fitscat</text>
 <rect x="282" y="929" width="60" height="18" rx="3" fill="rgba(9,105,218,0.26)"/>
 <text x="312" y="942" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">2</text>
 <rect x="666" y="929" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
@@ -509,24 +509,24 @@
 <rect x="794" y="949" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="824" y="962" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <text x="888" y="962" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">13</text>
-<text x="0" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/internal/finite</text>
-<rect x="282" y="969" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
-<text x="312" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<text x="888" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">1</text>
-<text x="0" y="1002" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/internal/posmatch</text>
-<rect x="794" y="989" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
-<text x="824" y="1002" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
+<text x="0" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/horizons</text>
+<rect x="474" y="969" width="60" height="18" rx="3" fill="rgba(9,105,218,0.26)"/>
+<text x="504" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">2</text>
+<rect x="666" y="969" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
+<text x="696" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
+<rect x="730" y="969" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
+<text x="760" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
+<rect x="794" y="969" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
+<text x="824" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
+<text x="888" y="982" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">5</text>
+<text x="0" y="1002" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/internal/finite</text>
+<rect x="282" y="989" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
+<text x="312" y="1002" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <text x="888" y="1002" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">1</text>
-<text x="0" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/jpl</text>
-<rect x="474" y="1009" width="60" height="18" rx="3" fill="rgba(9,105,218,0.26)"/>
-<text x="504" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">2</text>
-<rect x="666" y="1009" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
-<text x="696" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<rect x="730" y="1009" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
-<text x="760" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
+<text x="0" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/internal/posmatch</text>
 <rect x="794" y="1009" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="824" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<text x="888" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">5</text>
+<text x="888" y="1022" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">1</text>
 <text x="0" y="1042" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">catalog/mast</text>
 <rect x="282" y="1029" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="312" y="1042" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
@@ -635,31 +635,31 @@
 <rect x="794" y="1189" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="824" y="1202" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <text x="888" y="1202" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">3</text>
-<text x="0" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">fits/plan</text>
-<rect x="410" y="1209" width="60" height="18" rx="3" fill="rgba(9,105,218,0.26)"/>
-<text x="440" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">2</text>
-<text x="888" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">2</text>
+<text x="0" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">fits/fitsplan</text>
+<rect x="410" y="1209" width="60" height="18" rx="3" fill="rgba(9,105,218,0.29)"/>
+<text x="440" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">3</text>
+<text x="888" y="1222" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">3</text>
 <text x="0" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">plan</text>
-<rect x="282" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.38)"/>
-<text x="312" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">7</text>
+<rect x="282" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.40)"/>
+<text x="312" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">8</text>
 <rect x="346" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.38)"/>
 <text x="376" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">7</text>
-<rect x="410" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.42)"/>
+<rect x="410" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.41)"/>
 <text x="440" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">9</text>
 <rect x="474" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.58)"/>
 <text x="504" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">22</text>
 <rect x="538" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.34)"/>
 <text x="568" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">5</text>
-<rect x="602" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.42)"/>
+<rect x="602" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.41)"/>
 <text x="632" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">9</text>
 <rect x="666" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.50)"/>
 <text x="696" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">15</text>
 <rect x="730" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.57)"/>
 <text x="760" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">21</text>
 <rect x="794" y="1229" width="60" height="18" rx="3" fill="rgba(9,105,218,0.82)"/>
-<text x="824" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">50</text>
-<text x="888" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">145</text>
-<text x="0" y="1262" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">skybrightness/plan</text>
+<text x="824" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">51</text>
+<text x="888" y="1242" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">147</text>
+<text x="0" y="1262" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">skybrightness/skyplan</text>
 <rect x="282" y="1249" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="312" y="1262" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <rect x="666" y="1249" width="60" height="18" rx="3" fill="rgba(9,105,218,0.26)"/>
@@ -708,7 +708,7 @@
 <rect x="794" y="1329" width="60" height="18" rx="3" fill="rgba(9,105,218,0.34)"/>
 <text x="824" y="1342" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">5</text>
 <text x="888" y="1342" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">21</text>
-<text x="0" y="1362" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">internal/horizons</text>
+<text x="0" y="1362" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">internal/horizonsfault</text>
 <rect x="474" y="1349" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="504" y="1362" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
 <text x="888" y="1362" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">1</text>
@@ -721,9 +721,9 @@
 <text x="0" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">internal/metrology</text>
 <rect x="666" y="1389" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="696" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<rect x="794" y="1389" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
-<text x="824" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>
-<text x="888" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">2</text>
+<rect x="794" y="1389" width="60" height="18" rx="3" fill="rgba(9,105,218,0.29)"/>
+<text x="824" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">3</text>
+<text x="888" y="1402" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle" font-weight="600">4</text>
 <text x="0" y="1422" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="start">internal/oracle</text>
 <rect x="794" y="1409" width="60" height="18" rx="3" fill="rgba(9,105,218,0.22)"/>
 <text x="824" y="1422" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#1f2328" text-anchor="middle">1</text>

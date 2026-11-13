@@ -81,9 +81,7 @@ OUTSIDE_PACKAGES = {
 
 # Seen during an audit run and judged, but not filed.
 NOTED = {
-    "plan": "Slew time converts a float to time.Duration unguarded; overflow needs a rate below 2e-8 deg/s "
-            "(judged unreachable).",
-    "vector": "A magnitude beyond about 1e154 overflows to infinity when squared (judged unreachable: no "
+    "vector":"A magnitude beyond about 1e154 overflows to infinity when squared (judged unreachable: no "
               "astronomical vector here is near it).",
 }
 
@@ -140,4 +138,9 @@ SWEEPS = [
      "outcome": "4 defects fixed, one of them (a resty buffer race) found along the way; 1 awaiting a decision; "
                 "refraction and oracle clean",
      "issues": "#1099 #1100 #1104 #1107 #1109"},
+    {"date": "2026-11-13", "sweep": "Error paths the package renames brought into a diff",
+     "scope": "fits/fitsplan and skybrightness/skyplan, probed for each uncovered return",
+     "outcome": "1 defect fixed: an unimplemented WCS projection read as linear, a malformed NAXISn skipped, "
+                "NAXIS = 0 refused; 4 returns judged unreachable behind validated inputs",
+     "issues": "#1125"},
 ]
