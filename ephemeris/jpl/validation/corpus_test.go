@@ -1,6 +1,6 @@
 //go:build validation || network
 
-package jpl_test
+package validation_test
 
 import (
 	"encoding/json"

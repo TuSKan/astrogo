@@ -1,4 +1,4 @@
-package jpl_test
+package validation_test
 
 import (
 	"os"

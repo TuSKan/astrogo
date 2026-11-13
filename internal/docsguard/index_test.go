@@ -254,7 +254,7 @@ func receiverName(expr ast.Expr) string {
 //
 // pkgPath may be a bare package name or a module-relative path. The path form
 // is what disambiguates: three directories declare package plan, so `plan.X`
-// is satisfied by any of them while `skybrightness/plan.X` is satisfied only
+// is satisfied by any of them while `skybrightness/skyplan.X` is satisfied only
 // by the one.
 func (idx *symbolIndex) lookup(root, pkgPath, symbol string) (found bool, searched []string) {
 	if strings.Contains(pkgPath, "/") {

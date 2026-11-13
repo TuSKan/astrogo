@@ -11,13 +11,23 @@ without naming it, and into OUTSIDE_PACKAGES when no package's code did.
 # Packages that decode bytes from a server or a file, read from each package's
 # entry points. Each should carry a fuzz target of its own.
 EXTERNAL = {
-    "catalog/fink", "catalog/gaia", "catalog/jpl", "catalog/mast", "catalog/mpcorb", "catalog/norad",
+    "catalog/fink", "catalog/gaia", "catalog/horizons", "catalog/mast", "catalog/mpcorb", "catalog/norad",
     "catalog/openngc", "catalog/sbdb", "catalog/simbad", "catalog/vizier",
     "ephemeris/jpl/lsk", "ephemeris/jpl/spk", "ephemeris/satellite", "ephemeris/satellite/sgp4",
     "fits", "internal/votable", "time/internal/iers", "plan", "atmosphere/dataset/cams",
     "skybrightness/dataset/airglow", "skybrightness/dataset/crosssection", "skybrightness/dataset/dust",
     "skybrightness/dataset/luminosity", "skybrightness/dataset/passband", "skybrightness/dataset/raster",
     "skybrightness/dataset/solar", "skybrightness/dataset/starlight", "skybrightness/dataset/viirs",
+}
+
+# Packages that have moved, old path to new (#115). A commit that fixed a
+# finding names the files as they were then, so collect.py reads each path
+# through this to count the finding for the package as it is now.
+RENAMED = {
+    "catalog/fits": "catalog/fitscat",
+    "catalog/jpl": "catalog/horizons",
+    "fits/plan": "fits/fitsplan",
+    "skybrightness/plan": "skybrightness/skyplan",
 }
 
 # Packages whose API takes floating-point inputs where non-finite values matter.

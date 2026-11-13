@@ -1,4 +1,4 @@
-package plan
+package skyplan
 
 // LimitingMagnitude exposes the electrons-to-magnitude conversion.
 //

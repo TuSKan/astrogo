@@ -1,4 +1,4 @@
-package plan
+package skyplan
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 )
 
 // ErrSpec is returned for a request this package cannot honestly answer.
-var ErrSpec = errors.New("skybrightness/plan: unusable request")
+var ErrSpec = errors.New("skybrightness/skyplan: unusable request")
 
 // Sky is the part of a sky model this package needs: an evaluation in one
 // direction, and the surface brightness that comes out of it.
@@ -208,7 +208,7 @@ func NewImaging(spec Spec) (*Imaging, error) {
 func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error) {
 	scene, err := i.spec.Sky.Scene(i.spec.Site, t.GoTime(), i.spec.Air)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: scene: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: scene: %w", err)
 	}
 
 	// Evaluation does no I/O, so the context only bounds a CPU-bound
@@ -217,23 +217,23 @@ func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64
 	// nothing here to cancel with.
 	est, err := i.spec.Sky.Direction(context.Background(), scene, alt, az)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: estimate: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: estimate: %w", err)
 	}
 
 	surface, err := i.spec.Sky.SurfaceBrightness(est)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: surface brightness: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: surface brightness: %w", err)
 	}
 
 	background, err := est.ElectronRate(i.spec.Instrument)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: background rate: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: background rate: %w", err)
 	}
 
 	signal, err := i.spec.Instrument.LimitingSignal(
 		background, i.spec.Exposure, i.spec.AperturePixels, i.spec.SNR)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: limiting signal: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: limiting signal: %w", err)
 	}
 
 	if background <= 0 || signal <= 0 {
@@ -244,7 +244,7 @@ func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64
 
 	transmitted, err := targetTransmission(scene.Atmosphere, est, i.spec.Instrument, alt)
 	if err != nil {
-		return 0, fmt.Errorf("skybrightness/plan: target extinction: %w", err)
+		return 0, fmt.Errorf("skybrightness/skyplan: target extinction: %w", err)
 	}
 
 	return limitingMagnitude(surface, i.pixelArcsec2,

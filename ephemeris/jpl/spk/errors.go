@@ -51,7 +51,7 @@ var (
 	// the same two requests succeeded again within the hour.
 	//
 	// It is the one value every path to Horizons reports such a fault with,
-	// the name lookup in catalog/jpl included, so errors.Is recognizes the
+	// the name lookup in catalog/horizons included, so errors.Is recognizes the
 	// outage whichever path met it (#858). The phrases it is recognized by,
 	// and why matching a third party's text is safe here, are documented
 	// where they live, in astrogo's internal horizons package.

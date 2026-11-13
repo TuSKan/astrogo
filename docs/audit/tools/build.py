@@ -52,7 +52,7 @@ def layer(p):
         return "Internal support"
     if p.startswith("skybrightness/dataset") or p == "atmosphere/dataset/cams":
         return "Dataset providers (I/O)"
-    if p in ("plan", "fits/plan", "skybrightness/plan") or p.startswith("catalog"):
+    if p in ("plan", "fits/fitsplan", "skybrightness/skyplan") or p.startswith("catalog"):
         return "Orchestration"
     if p.split("/")[0] in ("time", "angle", "vector", "unit", "constants", "remote", "optics", "logging"):
         return "Primitives"

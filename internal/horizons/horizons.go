@@ -4,7 +4,7 @@
 // will not: HTTP 200, a well-formed body, an explanation in the text. One is
 // somebody else's outage, which fixes itself; the other is a fact about the
 // request, which never will. astrogo reaches Horizons through several paths —
-// the name lookup in catalog/jpl, kernel generation in ephemeris/jpl/spk, and
+// the name lookup in catalog/horizons, kernel generation in ephemeris/jpl/spk, and
 // the text tables the validation suites read — and until #858 only the kernel
 // path told the two apart. On 2026-10-26 one fault on JPL's server failed 45
 // live tests through the other three.

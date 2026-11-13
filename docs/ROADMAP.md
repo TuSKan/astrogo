@@ -13,7 +13,7 @@ correctness/robustness/release-readiness audit (see [CHANGELOG.md](../CHANGELOG.
 — rather than commit to the v1.0.0 API-stability promise while two catalog
 providers were still partial:
 
-- `catalog/jpl` — ✅ now resolves both ambiguous (major/small-body match tables) and
+- `catalog/horizons` — ✅ now resolves both ambiguous (major/small-body match tables) and
   unambiguous (single-match header line) Horizons queries into real `resolve.Target`s
 - `catalog/vizier` — ✅ `ConeSearch` now supports any VizieR table registered in
   `tables.go` (2MASS, Hipparcos, Gaia DR3 today), selected via `ConeRequest.Table`
@@ -148,7 +148,7 @@ What ships now:
 - [x] A dataset tier (`skybrightness/dataset`) that is the only part permitted to do I/O
 - [x] **Limiting magnitude has returned, defensibly.** It was removed rather than kept,
       because one derived from a wrong spectrum is a confident number rather than a useful
-      one. `skybrightness/plan.Imaging` now implements `plan.SkyDepth` over the spectral
+      one. `skybrightness/skyplan.Imaging` now implements `plan.SkyDepth` over the spectral
       engine, and needs no photometric zero point: the same estimate yields a surface
       brightness and a detector background from the same stored spectrum through the same
       instrument, and that pair *is* the calibration

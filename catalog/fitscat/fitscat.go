@@ -1,4 +1,4 @@
-package fits
+package fitscat
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
-// Sentinel errors for catalog/fits.
+// Sentinel errors for catalog/fitscat.
 var (
-	ErrNoBintable     = errors.New("catalog/fits: no binary table found")
-	ErrMissingColumns = errors.New("catalog/fits: missing required mapping columns in bintable")
+	ErrNoBintable     = errors.New("catalog/fitscat: no binary table found")
+	ErrMissingColumns = errors.New("catalog/fitscat: missing required mapping columns in bintable")
 )
 
 // Provider loads targets from a FITS binary table file.
@@ -33,7 +33,7 @@ type Provider struct {
 func New(filePath string) (*Provider, error) {
 	f, err := fits.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("catalog/fits: failed to open file: %w", err)
+		return nil, fmt.Errorf("catalog/fitscat: failed to open file: %w", err)
 	}
 
 	var bintable *fits.BintableHDU

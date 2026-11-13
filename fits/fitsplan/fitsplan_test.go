@@ -1,4 +1,4 @@
-package plan
+package fitsplan
 
 import (
 	"errors"

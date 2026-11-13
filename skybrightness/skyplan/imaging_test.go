@@ -1,4 +1,4 @@
-package plan_test
+package skyplan_test
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/optics"
-	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
+	"github.com/TuSKan/astrogo/skybrightness/skyplan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -34,7 +34,7 @@ func TestLimitingMagnitudeAnchorsOnTheSkyItself(t *testing.T) {
 		background   = 12.3 // e/pixel/s
 	)
 
-	got := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
+	got := skyplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
 	want := surface - 2.5*math.Log10(pixelArcsec2)
 
 	if math.Abs(got-want) > 1e-12 {
@@ -64,8 +64,8 @@ func TestLimitingMagnitudeUsesThePogsonRatio(t *testing.T) {
 		background   = 100.0
 	)
 
-	at1 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
-	at100 := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, background/100, 1)
+	at1 := skyplan.LimitingMagnitude(surface, pixelArcsec2, background, background, 1)
+	at100 := skyplan.LimitingMagnitude(surface, pixelArcsec2, background, background/100, 1)
 
 	if diff := at100 - at1; math.Abs(diff-5) > 1e-12 {
 		t.Errorf("a source a hundred times fainter is %.12f mag deeper, want exactly 5", diff)
@@ -79,7 +79,7 @@ func TestLimitingMagnitudeDeepensAsTheThresholdFalls(t *testing.T) {
 	prev := math.Inf(-1)
 
 	for _, signal := range []float64{1000, 100, 10, 1, 0.1} {
-		got := sbplan.LimitingMagnitude(21.5, 4, 50, signal, 1)
+		got := skyplan.LimitingMagnitude(21.5, 4, 50, signal, 1)
 
 		if got <= prev {
 			t.Errorf("a threshold of %g e/s gives %.4f, no deeper than the %.4f of the "+
@@ -107,8 +107,8 @@ func TestLimitingMagnitudeChargesTheAirTowardTheTarget(t *testing.T) {
 		signal       = 2.0
 	)
 
-	ground := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 1)
-	dimmed := sbplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 0.1)
+	ground := skyplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 1)
+	dimmed := skyplan.LimitingMagnitude(surface, pixelArcsec2, background, signal, 0.1)
 
 	if diff := ground - dimmed; math.Abs(diff-2.5) > 1e-12 {
 		t.Errorf("air passing a tenth of the light moves the limit %.12f mag shallower, want exactly 2.5", diff)
@@ -134,7 +134,7 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 		PixelSolidAngle: unit.Steradians(1e-11),
 	}
 
-	base := sbplan.Spec{
+	base := skyplan.Spec{
 		Site:           site,
 		Instrument:     inst,
 		Exposure:       300 * time.Second,
@@ -150,16 +150,16 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 	for _, c := range []struct {
 		name   string
 		want   string
-		mutate func(*sbplan.Spec)
+		mutate func(*skyplan.Spec)
 	}{
-		{"no sky", "dataset.Sky", func(*sbplan.Spec) {}},
-		{"no site", "site", func(s *sbplan.Spec) { s.Site = nil }},
-		{"zero exposure", "exposure", func(s *sbplan.Spec) { s.Exposure = 0 }},
-		{"negative exposure", "exposure", func(s *sbplan.Spec) { s.Exposure = -time.Second }},
-		{"zero aperture", "aperture", func(s *sbplan.Spec) { s.AperturePixels = 0 }},
-		{"zero threshold", "threshold", func(s *sbplan.Spec) { s.SNR = 0 }},
-		{"infinite threshold", "threshold", func(s *sbplan.Spec) { s.SNR = math.Inf(1) }},
-		{"unusable instrument", "collecting area", func(s *sbplan.Spec) {
+		{"no sky", "dataset.Sky", func(*skyplan.Spec) {}},
+		{"no site", "site", func(s *skyplan.Spec) { s.Site = nil }},
+		{"zero exposure", "exposure", func(s *skyplan.Spec) { s.Exposure = 0 }},
+		{"negative exposure", "exposure", func(s *skyplan.Spec) { s.Exposure = -time.Second }},
+		{"zero aperture", "aperture", func(s *skyplan.Spec) { s.AperturePixels = 0 }},
+		{"zero threshold", "threshold", func(s *skyplan.Spec) { s.SNR = 0 }},
+		{"infinite threshold", "threshold", func(s *skyplan.Spec) { s.SNR = math.Inf(1) }},
+		{"unusable instrument", "collecting area", func(s *skyplan.Spec) {
 			s.Instrument = optics.Instrument{PixelSolidAngle: unit.Steradians(1e-11)}
 		}},
 	} {
@@ -169,8 +169,8 @@ func TestNewImagingRefusesAnUnusableSpec(t *testing.T) {
 			spec := base
 			c.mutate(&spec)
 
-			_, err := sbplan.NewImaging(spec)
-			if !errors.Is(err, sbplan.ErrSpec) {
+			_, err := skyplan.NewImaging(spec)
+			if !errors.Is(err, skyplan.ErrSpec) {
 				t.Fatalf("got %v, want ErrSpec", err)
 			}
 

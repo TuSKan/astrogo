@@ -36,7 +36,7 @@ const defaultLimMagRamp = 0.5
 // the detector or the eye, the exposure, the aperture and the observer. An
 // implementation has to decide all of that, and different observers
 // legitimately decide differently.
-// [github.com/TuSKan/astrogo/skybrightness/plan] supplies one for an imaging
+// [github.com/TuSKan/astrogo/skybrightness/skyplan] supplies one for an imaging
 // system; a visual observer's is a different model and is not written yet.
 type SkyDepth interface {
 	// LimitingMagnitudeAt returns the faintest detectable magnitude looking

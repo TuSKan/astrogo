@@ -9,14 +9,14 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// jplTarget is a Target as catalog/jpl builds one from Horizons'
+// jplTarget is a Target as catalog/horizons builds one from Horizons'
 // "Target body name: <name> (<NAIF ID>)" line: no Kind, no coordinates, the
 // NAIF ID as both ID and SPKID.
 func jplTarget(name, naif string) resolve.Target {
 	return resolve.Target{Catalog: "jpl", Name: name, ID: naif, SPKID: naif}
 }
 
-// TestFromCatalogTranslatesJPLMajorBodies: catalog/jpl reports NAIF IDs,
+// TestFromCatalogTranslatesJPLMajorBodies: catalog/horizons reports NAIF IDs,
 // which astrogo numbers differently. Read as an eph.ID, the JPL Sun (NAIF 10)
 // was astrogo's body 10, the Moon, and the Moon (301) and Mars (499) were no
 // body at all (#636).

@@ -1,6 +1,6 @@
 //go:build network
 
-package jpl
+package horizons
 
 import (
 	"context"

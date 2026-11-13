@@ -1,4 +1,4 @@
-package jpl
+package horizons
 
 import (
 	"bufio"

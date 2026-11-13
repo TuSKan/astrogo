@@ -9,8 +9,8 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/gaia"
+	"github.com/TuSKan/astrogo/catalog/horizons"
 	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
-	"github.com/TuSKan/astrogo/catalog/jpl"
 	"github.com/TuSKan/astrogo/catalog/mast"
 	"github.com/TuSKan/astrogo/catalog/norad"
 	"github.com/TuSKan/astrogo/catalog/openngc"
@@ -152,7 +152,7 @@ func NewProvider(source Source) (Provider, error) {
 	case MAST:
 		return mast.New(), nil
 	case JPL:
-		return jpl.New(), nil
+		return horizons.New(), nil
 	case SBDB:
 		return sbdb.New(), nil
 	case Gaia:
