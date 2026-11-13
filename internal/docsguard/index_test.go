@@ -41,9 +41,10 @@ type symbolIndex struct {
 	// its interface.
 	decls map[string]map[string]bool
 
-	// dirsByName maps a package name to the directories declaring it. Three
-	// directories declare package plan, so a citation of `plan.Foo` has to
-	// be resolved against all of them.
+	// dirsByName maps a package name to the directories declaring it. Every
+	// example program is package main, so a name can have many; a library
+	// package has had one since #115 (TestNoTwoPackagesShareAName), but a
+	// citation of `pkg.Foo` is still resolved against all of them.
 	dirsByName map[string][]string
 
 	// varTypes maps a package-level variable to its named type, so that a
@@ -253,9 +254,9 @@ func receiverName(expr ast.Expr) string {
 // searched.
 //
 // pkgPath may be a bare package name or a module-relative path. The path form
-// is what disambiguates: three directories declare package plan, so `plan.X`
-// is satisfied by any of them while `skybrightness/plan.X` is satisfied only
-// by the one.
+// is what disambiguates when directories share a name, as three named plan
+// did until #115: `plan.X` was satisfied by any of them, while
+// `skybrightness/skyplan.X` is satisfied only by the one.
 func (idx *symbolIndex) lookup(root, pkgPath, symbol string) (found bool, searched []string) {
 	if strings.Contains(pkgPath, "/") {
 		dir := filepath.Join(root, filepath.FromSlash(pkgPath))

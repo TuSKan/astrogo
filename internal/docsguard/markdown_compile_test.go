@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -164,10 +166,17 @@ func TestMarkdownCodeBlocksCompile(t *testing.T) {
 // a function that does not exist, through eph., through plan. with its import
 // shown, through jpl. with an import the check made, and an ambiguous plan.
 // with none, each in a document other than the README, each a defect.
+//
+// No two library packages have shared a name since #115, so the ambiguity is
+// planted: the index the check reads gains a second directory declaring plan.
 func TestMarkdownCheckCatchesWhatItMissed(t *testing.T) {
 	root := filepath.Join("..", "..")
-	idx := moduleSymbols(t)
 	dir := scratchPackage(t, root)
+
+	planted := *moduleSymbols(t)
+	planted.dirsByName = maps.Clone(planted.dirsByName)
+	planted.dirsByName["plan"] = append(slices.Clone(planted.dirsByName["plan"]), filepath.Join(root, "planted", "plan"))
+	idx := &planted
 
 	fence := "```"
 

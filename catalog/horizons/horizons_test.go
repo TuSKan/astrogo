@@ -1,4 +1,4 @@
-package jpl
+package horizons
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -246,7 +246,7 @@ func TestJPLErrorResponse(t *testing.T) {
 		}
 
 		// A refusal is about the query, so a live test must fail on it.
-		if errors.Is(err, horizons.ErrServerFault) {
+		if errors.Is(err, horizonsfault.ErrServerFault) {
 			t.Fatalf("a refusal reported as a fault on Horizons' server: %v", err)
 		}
 
@@ -275,8 +275,8 @@ func TestJPLServerFaultIsRecognized(t *testing.T) {
 	redirect(t, server.URL)
 
 	_, err := New().Resolve(context.Background(), "Moon")
-	if !errors.Is(err, ErrAPIError) || !errors.Is(err, horizons.ErrServerFault) {
-		t.Fatalf("Resolve = %v, want ErrAPIError and horizons.ErrServerFault", err)
+	if !errors.Is(err, ErrAPIError) || !errors.Is(err, horizonsfault.ErrServerFault) {
+		t.Fatalf("Resolve = %v, want ErrAPIError and horizonsfault.ErrServerFault", err)
 	}
 
 	if !strings.Contains(err.Error(), "missing required file LTKERNL") {

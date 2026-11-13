@@ -82,7 +82,7 @@ func withoutNonFiniteExtras(c catalog.Target) catalog.Target {
 //   - Star kind → *Star
 //   - Everything else → *DeepSkyObject
 func FromCatalog(c catalog.Target, p eph.Provider) (Observable, error) {
-	// ── A NAIF major body, as catalog/jpl reports one ──
+	// ── A NAIF major body, as catalog/horizons reports one ──
 	//
 	// Its SPK-ID is a NAIF code, as an eph.ID is (#809), and is translated
 	// only to the point plan observes for that body: a planet's system

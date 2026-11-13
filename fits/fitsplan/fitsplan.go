@@ -1,4 +1,4 @@
-package plan
+package fitsplan
 
 import (
 	"errors"
@@ -45,7 +45,7 @@ func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 
 	site, err := plan.NewSite(obsName, geodetic)
 	if err != nil {
-		return nil, fmt.Errorf("fits/plan: new site: %w", err)
+		return nil, fmt.Errorf("fits/fitsplan: new site: %w", err)
 	}
 
 	return site, nil
@@ -221,7 +221,7 @@ func TargetFromFITS(h *fits.Header) (plan.Observable, error) {
 
 // errNoCelestialAxes reports a header whose CTYPEs name no celestial pair,
 // which TargetFromFITS answers from RA_DEG and DEC_DEG instead.
-var errNoCelestialAxes = errors.New("fits/plan: no celestial axes in CTYPE")
+var errNoCelestialAxes = errors.New("fits/fitsplan: no celestial axes in CTYPE")
 
 type celestialKind int
 
@@ -309,7 +309,7 @@ func worldAtCenter(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err 
 
 	w, err := fits.ExtractWCS(h)
 	if err != nil {
-		return 0, 0, fmt.Errorf("fits/plan: WCS: %w", err)
+		return 0, 0, fmt.Errorf("fits/fitsplan: WCS: %w", err)
 	}
 
 	pixel := w.CRPIX()
@@ -322,7 +322,7 @@ func worldAtCenter(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err 
 
 	world, err := w.PixelToWorld(pixel)
 	if err != nil {
-		return 0, 0, fmt.Errorf("fits/plan: WCS at the frame center: %w", err)
+		return 0, 0, fmt.Errorf("fits/fitsplan: WCS at the frame center: %w", err)
 	}
 
 	return world[lonAxis], world[latAxis], nil

@@ -1,6 +1,6 @@
 //go:build network
 
-package jpl_test
+package validation_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -54,8 +54,8 @@ type StateVector struct {
 func noDataBlock(body string) error {
 	head := body[:min(len(body), 500)]
 
-	if horizons.ServerFault(body) {
-		return fmt.Errorf("%w: %s", horizons.ErrServerFault, head)
+	if horizonsfault.ServerFault(body) {
+		return fmt.Errorf("%w: %s", horizonsfault.ErrServerFault, head)
 	}
 
 	return fmt.Errorf("%w: %s", errNoEphemerisData, head)

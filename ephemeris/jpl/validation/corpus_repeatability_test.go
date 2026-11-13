@@ -1,6 +1,6 @@
 //go:build network && validation
 
-package jpl_test
+package validation_test
 
 import (
 	"math"

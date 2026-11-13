@@ -1,6 +1,6 @@
 //go:build network
 
-package plan_test
+package skyplan_test
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
-	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
+	"github.com/TuSKan/astrogo/skybrightness/skyplan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -71,7 +71,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 	inst.ReadNoiseElectrons = 3.0
 	inst.DarkCurrent = 0.01
 
-	depth, err := sbplan.NewImaging(sbplan.Spec{
+	depth, err := skyplan.NewImaging(skyplan.Spec{
 		Sky:            sky,
 		Site:           site,
 		Air:            atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550),
@@ -150,7 +150,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 
 	inst.ReadNoiseElectrons = 3.0
 
-	depth, err := sbplan.NewImaging(sbplan.Spec{
+	depth, err := skyplan.NewImaging(skyplan.Spec{
 		Sky: sky, Site: site, Instrument: inst,
 		Exposure: 300 * time.Second, AperturePixels: 9, SNR: 5,
 	})

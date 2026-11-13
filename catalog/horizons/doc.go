@@ -1,4 +1,4 @@
-// Package jpl provides a resolve.Provider implementation targeting the
+// Package horizons provides a resolve.Provider implementation targeting the
 // NASA JPL Horizons system.
 //
 // # Current status
@@ -36,4 +36,4 @@
 // resolving actual time-dependent position states and astrometric
 // geometries, use the ephemeris/jpl package instead — that path is fully
 // implemented and does not depend on this one.
-package jpl
+package horizons

@@ -50,7 +50,7 @@ const (
 	NAIFPCK EndpointID = "naif.pck"
 
 	// JPLHorizons is the JPL Horizons API used for small-body name
-	// resolution (catalog/jpl) — small text responses only. Kernel
+	// resolution (catalog/horizons) — small text responses only. Kernel
 	// generation is a separate endpoint; see JPLHorizonsSPK.
 	JPLHorizons EndpointID = "jpl.horizons"
 
@@ -498,7 +498,7 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			ID:          JPLHorizons,
 			URL:         horizonsURL,
 			Kind:        KindAPI,
-			Subsystem:   "catalog/jpl",
+			Subsystem:   "catalog/horizons",
 			Description: "JPL Horizons API (small-body name resolution)",
 			ApproxSize:  100_000,
 			Enabled:     true,

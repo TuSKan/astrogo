@@ -335,7 +335,7 @@ flowchart TD
     %% High-level Orchestration
     plan[plan]
     catalog[catalog]
-    fitsplan["fits/plan"]
+    fitsplan["fits/fitsplan"]
 
     %% Scientific Engines
     ephemeris[ephemeris]
@@ -431,12 +431,12 @@ be able to break an API until 1.0 says otherwise.
 | `catalog/resolve` | Provider interface, HTTP client, Arrow cache |
 | `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers |
 | `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) |
-| `catalog/jpl` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches |
+| `catalog/horizons` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches |
 | `magnitude` | Apparent magnitude (planets, asteroids, comets, satellites, stars) |
 | `constellation` | IAU constellation lookup from an ICRS position (official 1930 boundaries), `List`/`Centroid` enumeration |
 | `optics` | Equipment-optics arithmetic (`Telescope`/`Eyepiece`/`Sensor`) — magnification, FOV, exit pupil, Dawes limit, pixel scale |
 | `fits` | FITS **reading and writing**, WCS (TAN projection), mmap, Arrow export. `fits.Write` produces images (every BITPIX, signed and unsigned), binary tables and ASCII tables from Arrow batches, with HIERARCH, CONTINUE long strings, TNULL, vector columns and CHECKSUM/DATASUM |
-| `fits/plan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) |
+| `fits/fitsplan` | FITS↔plan bridge (`SiteFromFITS`, `TargetFromFITS`) |
 | `plan` | Observability, constraints, events, scheduling, satellite passes |
 | `skybrightness` | Spectral all-sky radiance engine (`Scene`/`Component`/`Model`/`Estimate`, all-sky ops, uncertainty, provenance) — seven components, Phases 0–5, natural sky within 0.3 mag of GAMBONS in every altitude band |
 | `skybrightness/dataset` | The only tier that performs I/O: star map, dust map, airglow spectrum, passband, solar spectrum and ground-emitter inventory, assembled by `dataset.Open` into a ready-to-evaluate `Sky` |

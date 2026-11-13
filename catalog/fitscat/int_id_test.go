@@ -1,4 +1,4 @@
-package fits
+package fitscat
 
 import (
 	"bytes"

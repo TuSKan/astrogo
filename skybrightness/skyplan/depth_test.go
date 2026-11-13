@@ -1,4 +1,4 @@
-package plan_test
+package skyplan_test
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/skybrightness"
-	sbplan "github.com/TuSKan/astrogo/skybrightness/plan"
+	"github.com/TuSKan/astrogo/skybrightness/skyplan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -204,7 +204,7 @@ func testBand() magnitude.Passband {
 	}
 }
 
-func testSpec(t *testing.T, sky sbplan.Sky) sbplan.Spec {
+func testSpec(t *testing.T, sky skyplan.Sky) skyplan.Spec {
 	t.Helper()
 
 	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
@@ -212,7 +212,7 @@ func testSpec(t *testing.T, sky sbplan.Sky) sbplan.Spec {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	return sbplan.Spec{
+	return skyplan.Spec{
 		Sky:            sky,
 		Site:           site,
 		Instrument:     testInstrument(),
@@ -234,7 +234,7 @@ func TestLimitingMagnitudeAtCarriesTheRequestThrough(t *testing.T) {
 	spec := testSpec(t, sky)
 	spec.Air = atmosphere.NewBuilder().SurfaceAtAltitude(2635)
 
-	img, err := sbplan.NewImaging(spec)
+	img, err := skyplan.NewImaging(spec)
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestDepthDeepensWithExposure(t *testing.T) {
 		spec := testSpec(t, sky)
 		spec.Exposure = exposure
 
-		img, err := sbplan.NewImaging(spec)
+		img, err := skyplan.NewImaging(spec)
 		if err != nil {
 			t.Fatalf("NewImaging: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestDepthDeepensWithExposure(t *testing.T) {
 func TestDepthFollowsTheSky(t *testing.T) {
 	sky := newLocalSky(t)
 
-	img, err := sbplan.NewImaging(testSpec(t, sky))
+	img, err := skyplan.NewImaging(testSpec(t, sky))
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestDepthFollowsTheSky(t *testing.T) {
 // on the sky's magnitude scale. It returns the scene too, so a test can ask
 // the scene's own air what it takes.
 func groundDepth(
-	t *testing.T, sky *localSky, spec sbplan.Spec, when time.Time, alt, az angle.Angle,
+	t *testing.T, sky *localSky, spec skyplan.Spec, when time.Time, alt, az angle.Angle,
 ) (float64, *skybrightness.Scene) {
 	t.Helper()
 
@@ -385,7 +385,7 @@ func groundDepth(
 
 	pixelArcsec2 := spec.Instrument.PixelSolidAngle.Steradians() / constants.ArcsecondSquaredToSteradian
 
-	return sbplan.LimitingMagnitude(surface, pixelArcsec2, float64(background), float64(signal), 1), scene
+	return skyplan.LimitingMagnitude(surface, pixelArcsec2, float64(background), float64(signal), 1), scene
 }
 
 // TestDepthIsQuotedAboveTheAtmosphere: the depth is compared against catalog
@@ -408,7 +408,7 @@ func TestDepthIsQuotedAboveTheAtmosphere(t *testing.T) {
 		Reference:    "synthetic, for tests",
 	}}
 
-	img, err := sbplan.NewImaging(spec)
+	img, err := skyplan.NewImaging(spec)
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestDepthDimsABandWithinItsEdges(t *testing.T) {
 	spec := testSpec(t, sky)
 	spec.Air = atmosphere.RuralAerosol(2635, atmosphere.CleanMountainAOD550)
 
-	img, err := sbplan.NewImaging(spec)
+	img, err := skyplan.NewImaging(spec)
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
 	}
@@ -503,7 +503,7 @@ func TestLimitingMagnitudeAtReportsWhichStepFailed(t *testing.T) {
 			sky := newLocalSky(t)
 			tc.breakIt(sky)
 
-			img, err := sbplan.NewImaging(testSpec(t, sky))
+			img, err := skyplan.NewImaging(testSpec(t, sky))
 			if err != nil {
 				t.Fatalf("NewImaging: %v", err)
 			}
@@ -529,7 +529,7 @@ func TestBandIsTheSkysOwnBand(t *testing.T) {
 		sky := newLocalSky(t)
 		sky.band.Name = name
 
-		img, err := sbplan.NewImaging(testSpec(t, sky))
+		img, err := skyplan.NewImaging(testSpec(t, sky))
 		if err != nil {
 			t.Fatalf("NewImaging: %v", err)
 		}
@@ -545,7 +545,7 @@ func TestBandIsTheSkysOwnBand(t *testing.T) {
 // check, so the constructor's own arithmetic — a pixel's solid angle in square
 // arcseconds — ran only under a network tag.
 func TestNewImagingAcceptsAWholeSpec(t *testing.T) {
-	img, err := sbplan.NewImaging(testSpec(t, newLocalSky(t)))
+	img, err := skyplan.NewImaging(testSpec(t, newLocalSky(t)))
 	if err != nil {
 		t.Fatalf("NewImaging: %v", err)
 	}

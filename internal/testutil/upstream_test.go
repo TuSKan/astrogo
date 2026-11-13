@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 )
 
 // httpStatusError is any error carrying an HTTP status, matched structurally. Using a
@@ -66,7 +66,7 @@ func TestUpstreamFailureClassification(t *testing.T) {
 		// Horizons reporting a fault on its own server, in the body of a 200,
 		// which every path to it wraps as the same sentinel (#858).
 		{"Horizons server fault", fmt.Errorf("jpl: API error: %w: wldini(): missing required file LTKERNL",
-			horizons.ErrServerFault), true},
+			horizonsfault.ErrServerFault), true},
 
 		// We sent a bad request: exactly what these tests exist to catch.
 		{"400 bad request", &httpStatusError{400}, false},

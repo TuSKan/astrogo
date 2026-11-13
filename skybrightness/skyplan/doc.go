@@ -1,4 +1,4 @@
-// Package plan bridges the sky-brightness engine to astrogo's planning
+// Package skyplan bridges the sky-brightness engine to astrogo's planning
 // types, supplying a [github.com/TuSKan/astrogo/plan.SkyDepth] that an
 // observing plan can score or gate targets against.
 //
@@ -9,7 +9,7 @@
 // more; everything that makes a limiting magnitude — a radiance engine, five
 // downloaded datasets, an instrument, a photometric system — lives on this
 // side of the boundary and is imported only by a caller who wants it. That
-// mirrors [github.com/TuSKan/astrogo/fits/plan], which exists for the same
+// mirrors [github.com/TuSKan/astrogo/fits/fitsplan], which exists for the same
 // reason with Apache Arrow behind it.
 //
 // The previous attempt did the opposite: `plan` imported the sky-brightness
@@ -25,4 +25,4 @@
 // tempting shortcut is the one to refuse: Schaefer's (1990) SQM-to-NELM
 // conversion consumes a single V-band number, so routing a spectrum through
 // it discards the spectrum in the first step. See docs/skybrightness.md §16.
-package plan
+package skyplan

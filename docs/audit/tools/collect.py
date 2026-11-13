@@ -71,8 +71,14 @@ def main():
     dirs = {(p[len(MODULE) + 1:] if p != MODULE else "."): p for p in pkgs}
 
     def pkg_of(path):
-        """The package directory a repository file belongs to, or None."""
+        """The package directory a repository file belongs to, or None.
+
+        A path under a package that has since moved is read as its new path.
+        """
         d = os.path.dirname(path).replace("\\", "/") or "."
+        for old, new in judgments.RENAMED.items():
+            if d == old or d.startswith(old + "/"):
+                d = new + d[len(old):]
         while d not in dirs and d not in (".", ""):
             d = os.path.dirname(d) or "."
         return d if d in dirs else None
