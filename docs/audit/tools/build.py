@@ -130,7 +130,19 @@ def main():
             "external_bytes": p in judgments.EXTERNAL, "gaps": " | ".join(gaps), "gap_count": len(gaps),
         })
 
-    meta = {"head": d["head"], "date": d["date"], "unattributed_closed_bugs": d["unattributed_closed_bugs"],
+    # A judgment that no longer applies is refused rather than shown: a bug
+    # recorded as fixed outside the packages that a commit now attributes, or
+    # that is not a closed bug at all, means the record is out of date.
+    stale = sorted(set(judgments.OUTSIDE_PACKAGES) - set(d["unattributed_closed_bugs"]))
+    if stale:
+        raise SystemExit("judgments.OUTSIDE_PACKAGES names " + ", ".join(f"#{n}" for n in stale) +
+                         ", which collect.py no longer reports as closed bugs it cannot attribute")
+
+    meta = {"head": d["head"], "date": d["date"],
+            "unattributed_closed_bugs": [n for n in d["unattributed_closed_bugs"]
+                                         if n not in judgments.OUTSIDE_PACKAGES],
+            "outside_packages": [{"issue": n, "where": judgments.OUTSIDE_PACKAGES[n]}
+                                 for n in d["unattributed_closed_bugs"] if n in judgments.OUTSIDE_PACKAGES],
             "distinct_findings": len({f["issue"] for f in findings})}
     for name, rows in (("packages", packages), ("findings", findings), ("sweeps", judgments.SWEEPS),
                        ("meta", meta)):

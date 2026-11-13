@@ -78,12 +78,20 @@ def render(work):
     o += picture("summary", f"{meta['distinct_findings']} findings fixed; {tiers['Deep']} packages audited deeply; "
                  f"{len(gapped)} packages with something missing; median coverage {median:.1f}%")
     w("")
+    unattributed, outside = meta["unattributed_closed_bugs"], meta["outside_packages"]
+    if unattributed:
+        attribution = (f"{len(unattributed)} closed bugs are not attributed to a package, because no commit on "
+                       "main that changed Go files closed them with a closing keyword: "
+                       + ", ".join(f"#{n}" for n in unattributed) + ".")
+    else:
+        attribution = "Every closed bug that a package's code fixed is attributed to that package."
+    if outside:
+        attribution += (f" {len(outside)} more were fixed outside any package's code, and are listed under "
+                        "[Closed bugs fixed outside the packages](#closed-bugs-fixed-outside-the-packages).")
     w(f"{meta['distinct_findings']} findings fixed, each a GitHub issue closed by a commit on main, touch "
       f"{touched} of the module's {len(pk)} packages. By depth: "
       + ", ".join(f"{tiers[t]} {t.lower()}" for t in TIERS) + f". Median statement coverage is {median:.1f}% "
-      f"across the {len(covs)} packages with statements. {len(meta['unattributed_closed_bugs'])} closed bugs "
-      "are not attributed to a package, because no commit on main that changed Go files closed them with a "
-      "closing keyword: " + ", ".join(f"#{n}" for n in meta["unattributed_closed_bugs"]) + ".")
+      f"across the {len(covs)} packages with statements. " + attribution)
     w("")
     w("## Package map")
     w("")
@@ -158,11 +166,23 @@ def render(work):
     for s in sweeps:
         w(f"| {s['date']} | {cell(s['sweep'])} | {cell(s['scope'])} | {cell(s['outcome'])} | {s['issues']} |")
     w("")
+    if outside:
+        w("## Closed bugs fixed outside the packages")
+        w("")
+        w("Bugs closed by a change to no package's Go code, so they count as no package's finding. Each is "
+          "recorded in [tools/judgments.py](tools/judgments.py) with where the fix was instead.")
+        w("")
+        w("| Issue | Fixed in |")
+        w("| --- | --- |")
+        for b in outside:
+            w(f"| #{b['issue']} | {cell(b['where'])} |")
+        w("")
     w("## How it is measured")
     w("")
     w("- **Findings** are issues closed by a commit on main whose message says \"Closes #N\". One is counted "
       "for every package whose Go files that commit changed, so a finding that crossed two packages counts in "
-      "both.")
+      "both. A bug whose fixing commit never named it is attributed through the commit recorded for it in "
+      "[tools/judgments.py](tools/judgments.py), its packages still read from git.")
     w("- **Kinds of defect** are read from each issue's title by keyword, the first matching kind winning.")
     w("- **Coverage** is `go test -cover` on the untagged suite.")
     w("- **Gaps** are rules over these numbers plus the judgments in [tools/judgments.py](tools/judgments.py): "

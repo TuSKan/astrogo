@@ -74,13 +74,44 @@ func TestRenderAccuracyReport(t *testing.T) {
 		t.Skipf("pass -args -update-accuracy to rewrite %s; see this test's doc comment", accuracyDoc)
 	}
 
+	results := collectResults(t)
+
+	doc, err := os.ReadFile(accuracyDoc)
+	if err != nil {
+		t.Fatalf("reading %s: %v", accuracyDoc, err)
+	}
+
+	updated, err := metrology.UpdateRegion(string(doc), metrology.RenderMarkdown(results))
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if updated == string(doc) {
+		t.Logf("%s is already current for these %d results", accuracyDoc, len(results))
+
+		return
+	}
+
+	if err := os.WriteFile(accuracyDoc, []byte(updated), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", accuracyDoc, err)
+	}
+
+	t.Logf("wrote %d rows to %s", len(results), accuracyDoc)
+}
+
+// collectResults is every result document the suites wrote to the operator's
+// output directory, sorted by suite and logged. It fails t when the directory
+// is not named, cannot be read, or holds no result.
+func collectResults(t *testing.T) []metrology.Result {
+	t.Helper()
+
 	// The directory comes from ambientOutDir rather than the environment,
 	// which TestMain empties so this package's fixtures cannot write into a
 	// real collection. See main_test.go.
 	dir := ambientOutDir
 	if dir == "" {
 		t.Fatalf("%s is not set; run the suites with it pointing at a directory first — "+
-			"see this test's doc comment", metrology.OutDirEnv)
+			"see TestRenderAccuracyReport's doc comment", metrology.OutDirEnv)
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -123,25 +154,5 @@ func TestRenderAccuracyReport(t *testing.T) {
 		t.Logf("  %-40s %-18s n=%d", r.Suite, r.Status, r.Stats.N)
 	}
 
-	doc, err := os.ReadFile(accuracyDoc)
-	if err != nil {
-		t.Fatalf("reading %s: %v", accuracyDoc, err)
-	}
-
-	updated, err := metrology.UpdateRegion(string(doc), metrology.RenderMarkdown(results))
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	if updated == string(doc) {
-		t.Logf("%s is already current for these %d results", accuracyDoc, len(results))
-
-		return
-	}
-
-	if err := os.WriteFile(accuracyDoc, []byte(updated), 0o600); err != nil {
-		t.Fatalf("writing %s: %v", accuracyDoc, err)
-	}
-
-	t.Logf("wrote %d rows to %s", len(results), accuracyDoc)
+	return results
 }
