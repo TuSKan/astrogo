@@ -102,8 +102,11 @@ These packages decide whether other tests can fail, so each bound they apply is 
 
 ### 7. Close-out
 
-- [ ] Regenerate the map and confirm nothing is missing except recorded waivers.
-- [ ] Cut a release with the audit's last fixes.
+- [x] Regenerate the map and confirm nothing is missing except recorded waivers.
+  - Regenerated on main at 88297392. The one package with an item is `vector`, whose overflow beyond about 1e154 is a recorded waiver: judged unreachable, since no astronomical vector here comes near it.
+  - Every closed bug is attributed to a package or recorded as fixed outside the packages.
+  - The close-out found one more defect on the way: #1125, an unimplemented WCS projection evaluated as linear, fixed in #1126.
+- [ ] Cut a release with the audit's last fixes. The maintainer tags it.
 
 ## Open decisions
 
@@ -113,7 +116,10 @@ To be discussed before the items that depend on them.
   - A non-finite number in a catalog answer is read exactly as an empty or unparseable one, wherever it appears. A position that is non-finite or impossible is no position, and each parser does what it already does with one that will not parse.
   - A non-finite optional field is absent; nothing keeps NaN to mean "absent".
   - `plan.FromCatalog` refuses a non-finite coordinate and ignores non-finite kinematics, as a backstop.
-- **#115**, `plan`'s 356 exported symbols and the three packages named `plan`: an API design question rather than an audit finding. Schedule it before 1.0, or close it.
-- **`plan`'s slew time conversion**: the float-to-Duration conversion overflows only below a slew rate of 2e-8 deg/s. Record it as a waiver, or add the guard.
+- ~~**#115**, `plan`'s exported surface and the three packages named `plan`~~. **Decided 2026-11-13:** rename the collisions and map the package, but do not split it.
+  - Re-measured, none of the proposed subpackages lifts out cleanly. `plan/events` and `plan/sat` cycle with the core, and the scheduler now uses four unexported internals of the run-level performance work.
+  - The renames are #1123: `catalog/fitscat`, `catalog/horizons`, `fits/fitsplan`, `skybrightness/skyplan`, and `internal/horizonsfault`. `TestNoTwoPackagesShareAName` now holds them.
+  - The map is #1124: `plan`'s doc, one heading per task.
+- ~~**`plan`'s slew time conversion**~~. **Decided 2026-11-13:** guarded rather than waived (#1121, #1122). Past a `time.Duration`'s range the conversion gave −292 years on amd64 and +292 on arm64, and it is now refused with `plan.ErrSlewTime`.
 - ~~**#1088**, MAST's cone search~~ (phase 4). **Decided 2026-11-11:** the stub is removed, and `catalog/mast` no longer claims a cone search (#1098).
-- **#1109**, metrology's `Baseline` (phase 5): its regression check exists but nothing records a baseline or calls `Check`. Wire it into the metrology suites, or remove it.
+- ~~**#1109**, metrology's `Baseline`~~ (phase 5). **Decided 2026-11-12:** wired (#1114). `docs/validation-baseline.json` records the accepted runs, and both Validation jobs compare every result with it.
