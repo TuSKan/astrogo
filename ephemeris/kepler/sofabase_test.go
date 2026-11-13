@@ -18,9 +18,10 @@ import (
 // Sun from Plan94, the Moon about the Earth from Moon98 — each to the bit of
 // the series itself, so composing them is the arithmetic State used to do.
 //
-// The base keeps its last Epv00 for the Sun and the Earth at one epoch. Many
-// readers at once, each at its own epoch, must still get their own epoch's
-// series, which is what -race and the bit comparison hold it to.
+// The base keeps the Epv00 evaluations it has made, for the Sun and the Earth,
+// in one memo every reader shares. Many readers at once, each at its own
+// epoch, must still get their own epoch's series, which is what -race and the
+// bit comparison hold it to.
 func TestSOFABaseLocatesAboutItsSeriesCenters(t *testing.T) {
 	t.Parallel()
 

@@ -10,9 +10,9 @@ import (
 )
 
 // TestProvidersShareOneSOFABaseAndNothingElse: every Provider built without a
-// base of its own shares one SOFA base, and with it the memo of the last Epv00
-// evaluation, so a provider built for one check finds the instant the previous
-// check evaluated (#913). What a caller registers stays on its own Provider.
+// base of its own shares one SOFA base, and with it the base's Epv00 memo, so a
+// provider built for one check finds the instants earlier checks evaluated
+// (#913). What a caller registers stays on its own Provider.
 func TestProvidersShareOneSOFABaseAndNothingElse(t *testing.T) {
 	a, b := New(), New()
 
