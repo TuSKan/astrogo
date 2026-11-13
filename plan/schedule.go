@@ -176,7 +176,12 @@ func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
 		total += m.FilterChangePenalty
 	}
 
-	// Slew Time
+	// Slew Time. A NaN rate fails the test below, which would drop the slew
+	// as though none were configured, so it is refused first.
+	if math.IsNaN(float64(m.SlewRate)) {
+		return 0, fmt.Errorf("%w: the slew rate is NaN", ErrSlewTime)
+	}
+
 	if m.SlewRate > 0 {
 		// Calculate separation on Alt and Az independently.
 		// Assuming simultaneous slew on two independent axes, slew time is
@@ -194,8 +199,20 @@ func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
 		maxAngularDist := math.Max(dAlt, dAz)
 		slewSeconds := maxAngularDist / m.SlewRate.DegreesPerSec()
 
-		// Add slew time
-		total += time.Duration(slewSeconds * float64(time.Second))
+		// A time.Duration holds fewer than 2^63 nanoseconds, about 292 years,
+		// and past that converting the float is not defined by the language:
+		// amd64 gives -292 years, which would place the next block before
+		// this one ends, and arm64 saturates at +292 years, so the same model
+		// scheduled differently on each (#1121). A 180° slew gets there below
+		// 2e-8 deg/s, and a NaN distance gets there too. float64(MaxInt64) is
+		// 2^63 exactly, so every product below it converts.
+		ns := slewSeconds * float64(time.Second)
+		if !(ns < float64(math.MaxInt64)) {
+			return 0, fmt.Errorf("%w: a %.6g° slew at %.6g deg/s takes %.6g s",
+				ErrSlewTime, maxAngularDist, m.SlewRate.DegreesPerSec(), slewSeconds)
+		}
+
+		total += time.Duration(ns)
 	}
 
 	return total, nil
