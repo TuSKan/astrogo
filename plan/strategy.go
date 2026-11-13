@@ -56,20 +56,20 @@ func (s *SwapOptimizedStrategy) Schedule(
 	transition TransitionModel,
 ) (*Schedule, error) {
 	return s.schedule(planner, window, blocks, transition,
-		movingContext(planner.Site.Location(), planner.Site.Refraction()), moonPlaces{})
+		movingContext(planner.Site.Location(), planner.Site.Refraction()), newRunSky(true))
 }
 
 // schedule is Schedule with the Context for each instant of the swap and
-// insert passes supplied by ctxAt, and the Moon's place at each instant they
-// score held in moon for the whole run (nil: the process-wide cache); the base
-// strategy builds its own.
+// insert passes supplied by ctxAt, and the sky at each instant they check or
+// score held in sky for the whole run (nil computes it each time; see runSky).
+// The base strategy builds its own.
 func (s *SwapOptimizedStrategy) schedule(
 	planner *Planner,
 	window Window,
 	blocks []*Block,
 	transition TransitionModel,
 	ctxAt func(time.Time) *coord.Context,
-	moon moonPlaces,
+	sky *runSky,
 ) (*Schedule, error) {
 	base := s.Base
 	if base == nil {
@@ -99,12 +99,12 @@ func (s *SwapOptimizedStrategy) schedule(
 	idlePasses := 0
 
 	for pass := range maxPasses {
-		swapped, err := s.swapPass(sched, planner, transition, step, ctxAt, moon, tabu, pass)
+		swapped, err := s.swapPass(sched, planner, transition, step, ctxAt, sky, tabu, pass)
 		if err != nil {
 			return nil, err
 		}
 
-		inserted, err := s.insertPass(sched, planner, window, transition, step, ctxAt, moon)
+		inserted, err := s.insertPass(sched, planner, window, transition, step, ctxAt, sky)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 	transition TransitionModel,
 	step time.Duration,
 	ctxAt func(time.Time) *coord.Context,
-	moon moonPlaces,
+	sky *runSky,
 	tabu *tabuList,
 	passNum int,
 ) (bool, error) {
@@ -178,7 +178,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		newJEnd := newJStart.Add(time.FromGoDuration(bj.Block.Duration))
 
 		// Validate bj's constraints at the new time.
-		okJ, err := checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, ctxAt, mergedC[bj.Block.ID]...)
+		okJ, err := checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, ctxAt, sky, mergedC[bj.Block.ID]...)
 		if err != nil {
 			return false, fmt.Errorf("plan: swap: block %s: %w", bj.Block.ID, err)
 		}
@@ -220,7 +220,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 
 		// Validate bi's constraints at the new time.
-		okI, err := checkConstraintsInterval(bi.Block.Target, newIStart, newIEnd, step, planner.Site, ctxAt, mergedC[bi.Block.ID]...)
+		okI, err := checkConstraintsInterval(bi.Block.Target, newIStart, newIEnd, step, planner.Site, ctxAt, sky, mergedC[bi.Block.ID]...)
 		if err != nil {
 			return false, fmt.Errorf("plan: swap: block %s: %w", bi.Block.ID, err)
 		}
@@ -233,8 +233,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 		// Plateau moves (>=) allow escape from local maxima; oscillation is bounded
 		// by the convergence check in Schedule() which stops after two idle passes.
 		oldScore := bi.Score + bj.Score
-		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner, ctxAt, moon)
-		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner, ctxAt, moon)
+		newJScore := scoreBlockPlacement(bj.Block, newJStart, newJEnd, planner, ctxAt, sky)
+		newIScore := scoreBlockPlacement(bi.Block, newIStart, newIEnd, planner, ctxAt, sky)
 		newScore := newJScore + newIScore
 
 		if newScore >= oldScore {
@@ -284,7 +284,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 	transition TransitionModel,
 	step time.Duration,
 	ctxAt func(time.Time) *coord.Context,
-	moon moonPlaces,
+	sky *runSky,
 ) (bool, error) {
 	if len(sched.Unscheduled) == 0 {
 		return false, nil
@@ -351,7 +351,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 				}
 			}
 
-			ok, err := checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, ctxAt, mergedC[ub.Block.ID]...)
+			ok, err := checkConstraintsInterval(ub.Block.Target, startTime, endTime, step, planner.Site, ctxAt, sky, mergedC[ub.Block.ID]...)
 			if err != nil {
 				return false, fmt.Errorf("plan: insert: block %s: %w", ub.Block.ID, err)
 			}
@@ -361,7 +361,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					sched.Blocks[gap.next].SetupTime = setupNext
 				}
 
-				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, ctxAt, moon)
+				score := scoreBlockPlacement(ub.Block, startTime, endTime, planner, ctxAt, sky)
 				sched.Blocks = append(sched.Blocks, ScheduledBlock{
 					Block:     ub.Block,
 					Window:    Window{Start: startTime, End: endTime},
@@ -417,13 +417,14 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 // 1-minute step that is 30 s away, up to 7.5′ of altitude, and the swap pass
 // compares these scores to decide (#481).
 //
-// The Moon's place there comes from moon, the run's own record of the
-// instants it has scored, so a swap pass returning to a placement does not
-// compute it again (#959); nil uses the process-wide cache.
+// The sky there comes from sky, the run's own record of the instants it has
+// asked about, so a swap pass returning to a placement does not compute the
+// Moon again (#959), nor the Sun and Moon its constraints read (#913). nil
+// computes them, with the score's Moon from the process-wide cache.
 //
 // Falls back to static block priority if scoring fails.
 func scoreBlockPlacement(
-	block *Block, start, end time.Time, planner *Planner, ctxAt func(time.Time) *coord.Context, moon moonPlaces,
+	block *Block, start, end time.Time, planner *Planner, ctxAt func(time.Time) *coord.Context, sky *runSky,
 ) float64 {
 	mid := start.Add(end.Sub(start) / 2)
 
@@ -431,7 +432,7 @@ func scoreBlockPlacement(
 		Site:        planner.Site,
 		Context:     ctxAt(mid),
 		Constraints: planner.Constraints,
-		moon:        moon,
+		sky:         sky,
 	}.Score(block.Target, mid)
 	if err != nil {
 		return block.Priority
