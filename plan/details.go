@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -129,9 +130,11 @@ func (d TargetDetails) String() string {
 			fmt.Fprintf(&b, "NGC/IC number:\t%s\n", v)
 		}
 
-		for k, v := range d.ExtraProps {
+		// The rest in key order. Ranging over the map printed them in Go's
+		// randomized map order, different from one run to the next (#1134).
+		for _, k := range slices.Sorted(maps.Keys(d.ExtraProps)) {
 			if k != "Messier number" && k != "NGC/IC number" {
-				fmt.Fprintf(&b, "%s:\t%s\n", k, v)
+				fmt.Fprintf(&b, "%s:\t%s\n", k, d.ExtraProps[k])
 			}
 		}
 	}
