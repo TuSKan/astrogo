@@ -67,6 +67,16 @@ jobs:
         shell: bash
         run: go test -tags=network -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/network.log"
 
+      # Every result against the accuracy its suite reached at the last
+      # accepted run, docs/validation-baseline.json: a percentile that more
+      # than doubles fails here even inside its contract (#1109). It runs
+      # after a failed suite too, since one suite's regression is news
+      # whatever another did.
+      - name: Compare with the accuracy baseline
+        if: always()
+        shell: bash
+        run: go test -tags=validation -count=1 -v -run '^TestResultsHoldTheBaseline$' ./internal/metrology/ -args -check-baseline
+
       - name: Upload network results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -129,6 +139,13 @@ jobs:
         if: always()
         shell: bash
         run: go test -tags=validation -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/validation.log"
+
+      # As in the network job: the results of both runs above against
+      # docs/validation-baseline.json (#1109).
+      - name: Compare with the accuracy baseline
+        if: always()
+        shell: bash
+        run: go test -tags=validation -count=1 -v -run '^TestResultsHoldTheBaseline$' ./internal/metrology/ -args -check-baseline
 
       # The cache as this run left it, seed and anything newly fetched, so a
       # refreshed seed is one artifact download rather than a hand-run fetch.

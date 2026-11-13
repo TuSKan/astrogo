@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 )
 
@@ -39,23 +40,30 @@ type Baseline struct {
 	Suites        map[string]Stats `json:"suites"`
 }
 
-// NewBaseline collects results into a baseline document.
-func NewBaseline(results ...Result) Baseline {
-	b := Baseline{SchemaVersion: SchemaVersion, Suites: make(map[string]Stats, len(results))}
+// Update is the baseline with each result's statistics recorded for its
+// suite, in place of what it held. From the zero Baseline it makes a new one,
+// and from a checked-in one it records an accepted run. b itself is not
+// changed.
+//
+// A suite that did not run keeps what the baseline held for it. It has no
+// statistics to record, and writing its zeroes would turn "we did not measure"
+// into "we measured zero error", the strongest possible claim, made by
+// accident. Keeping the old entry matters as much: the suites are collected
+// by two jobs, and an endpoint that is down on the day of an update would
+// otherwise drop its suite from the baseline until someone noticed.
+func (b Baseline) Update(results ...Result) Baseline {
+	out := Baseline{SchemaVersion: SchemaVersion, Suites: make(map[string]Stats, len(b.Suites)+len(results))}
+	maps.Copy(out.Suites, b.Suites)
 
 	for _, r := range results {
-		// A suite that did not run has no statistics to record, and
-		// writing its zeroes would turn "we did not measure" into "we
-		// measured zero error" — the strongest possible claim, made by
-		// accident.
 		if r.Status == StatusNotVerified {
 			continue
 		}
 
-		b.Suites[r.Suite] = r.Stats
+		out.Suites[r.Suite] = r.Stats
 	}
 
-	return b
+	return out
 }
 
 // JSON renders the baseline for checking in.
