@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -23,8 +23,8 @@ func TestNoDataBlockTellsAFaultFromAMissingTable(t *testing.T) {
 		"wldini(): missing required file LTKERNL\n\n ERROR in VLRDC: Var not declared: IP_ADDR\n"
 
 	err := noDataBlock(fault)
-	if !errors.Is(err, horizons.ErrServerFault) {
-		t.Errorf("noDataBlock(the 2026-10-26 fault) = %v, want horizons.ErrServerFault", err)
+	if !errors.Is(err, horizonsfault.ErrServerFault) {
+		t.Errorf("noDataBlock(the 2026-10-26 fault) = %v, want horizonsfault.ErrServerFault", err)
 	}
 
 	if _, upstream := testutil.UpstreamFailure(err); !upstream {
@@ -35,7 +35,7 @@ func TestNoDataBlockTellsAFaultFromAMissingTable(t *testing.T) {
 	empty := "API VERSION: 1.2\nAPI SOURCE: NASA/JPL Horizons API\n\nNo ephemeris for target \"Ceres\" prior to A.D. 1600-JAN-01\n"
 
 	err = noDataBlock(empty)
-	if !errors.Is(err, errNoEphemerisData) || errors.Is(err, horizons.ErrServerFault) {
+	if !errors.Is(err, errNoEphemerisData) || errors.Is(err, horizonsfault.ErrServerFault) {
 		t.Errorf("noDataBlock(an answer without a table) = %v, want errNoEphemerisData alone", err)
 	}
 

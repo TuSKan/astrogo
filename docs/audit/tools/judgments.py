@@ -27,6 +27,7 @@ RENAMED = {
     "catalog/fits": "catalog/fitscat",
     "catalog/jpl": "catalog/horizons",
     "fits/plan": "fits/fitsplan",
+    "internal/horizons": "internal/horizonsfault",
     "skybrightness/plan": "skybrightness/skyplan",
 }
 

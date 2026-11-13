@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -61,9 +61,9 @@ func TestMoonAbsoluteMagnitudesAreHorizons(t *testing.T) {
 			// as a result, it was "publishes no V(1,0)" for seven moons on
 			// 2026-10-26 (#858).
 			if payload.Error != "" {
-				if horizons.ServerFault(payload.Error) {
+				if horizonsfault.ServerFault(payload.Error) {
 					testutil.SkipOnUpstreamFailure(t,
-						fmt.Errorf("horizons %d: %w: %s", m.naifID, horizons.ErrServerFault, payload.Error))
+						fmt.Errorf("horizons %d: %w: %s", m.naifID, horizonsfault.ErrServerFault, payload.Error))
 				}
 
 				t.Fatalf("Horizons %d: %s", m.naifID, payload.Error)

@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -174,7 +174,7 @@ func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startT
 		// A fault on Horizons' own server is also a refusal — it wraps both
 		// sentinels — but a caller that can tell them apart can retry one and
 		// not the other. See ErrHorizonsInternalFault.
-		if horizons.ServerFault(explanation) {
+		if horizonsfault.ServerFault(explanation) {
 			return nil, fmt.Errorf("%w: %w: %s (kernel %q)",
 				ErrHorizonsRefused, ErrHorizonsInternalFault, explanation, kernel)
 		}

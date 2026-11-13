@@ -1,9 +1,9 @@
-package horizons_test
+package horizonsfault_test
 
 import (
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 )
 
 // horizonsCIFault is the explanation JPL Horizons returned for both 433 Eros
@@ -72,7 +72,7 @@ func TestServerFaultSeparatesOutageFromRefusal(t *testing.T) {
 			wantFault:   false,
 		},
 	} {
-		if got := horizons.ServerFault(tc.explanation); got != tc.wantFault {
+		if got := horizonsfault.ServerFault(tc.explanation); got != tc.wantFault {
 			t.Errorf("%s: ServerFault(%q) = %v, want %v",
 				tc.name, tc.explanation, got, tc.wantFault)
 		}

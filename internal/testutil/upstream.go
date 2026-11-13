@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 )
 
 // SkipOnUpstreamFailure skips tb when err is somebody else's fault rather than
@@ -112,8 +112,8 @@ func UpstreamFailure(err error) (string, bool) {
 	// A fault Horizons reports about its own server, in the body of a 200,
 	// where no status can show it. Every path to Horizons wraps the same
 	// sentinel, so this one check covers a live test whichever path it took
-	// (#858); see internal/horizons for what counts as one.
-	if errors.Is(err, horizons.ErrServerFault) {
+	// (#858); see internal/horizonsfault for what counts as one.
+	if errors.Is(err, horizonsfault.ErrServerFault) {
 		return "Horizons reported a fault on its own server", true
 	}
 

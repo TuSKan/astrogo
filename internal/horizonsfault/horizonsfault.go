@@ -1,4 +1,4 @@
-// Package horizons recognizes JPL Horizons reporting a fault on its own server.
+// Package horizonsfault recognizes JPL Horizons reporting a fault on its own server.
 //
 // Horizons answers that it cannot do the work the same way it answers that it
 // will not: HTTP 200, a well-formed body, an explanation in the text. One is
@@ -12,7 +12,7 @@
 // So the recognition lives here, once, and every path wraps the same
 // [ErrServerFault]. internal/testutil classifies it as an upstream failure,
 // which is what lets a live test skip on it without knowing which path it took.
-package horizons
+package horizonsfault
 
 import (
 	"errors"

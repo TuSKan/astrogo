@@ -3,7 +3,7 @@ package spk
 import (
 	"errors"
 
-	"github.com/TuSKan/astrogo/internal/horizons"
+	"github.com/TuSKan/astrogo/internal/horizonsfault"
 )
 
 // Sentinel errors for SPK operations.
@@ -55,7 +55,7 @@ var (
 	// outage whichever path met it (#858). The phrases it is recognized by,
 	// and why matching a third party's text is safe here, are documented
 	// where they live, in astrogo's internal horizons package.
-	ErrHorizonsInternalFault = horizons.ErrServerFault
+	ErrHorizonsInternalFault = horizonsfault.ErrServerFault
 
 	// ErrCorruptSPK indicates a malformed SPK binary kernel.
 	ErrCorruptSPK = errors.New("jpl/spk: corrupt file")
