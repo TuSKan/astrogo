@@ -25,6 +25,14 @@ go mod tidy && gofmt -l . && golangci-lint run
 
 - Lint uses **golangci-lint v2** (`default: all` with documented disables in [.golangci.yml](.golangci.yml)). `goimports` local-prefix is `github.com/TuSKan/astrogo`.
 - Benchmarks: `go test -run=^$ -bench=. -benchmem ./coord/... ./plan/... ./magnitude/... ./time/... ./atmosphere/...`
+- **`-race` on Windows** needs cgo, and cgo needs a C compiler that targets MinGW. An MSVC-target clang, which is what LLVM's Windows installer provides, fails in `runtime/cgo` on a missing C header (`'stdlib.h' file not found`, or `errno.h`, or `windows.h`). Install llvm-mingw with `winget install --id MartinStorsjo.LLVM-MinGW.UCRT --exact --source winget` (the Microsoft Store source fails with a certificate error), and give its compilers to the race run alone, by absolute path:
+
+  ```bash
+  MINGW=$(ls -d "$LOCALAPPDATA"/Microsoft/WinGet/Packages/MartinStorsjo.LLVM-MinGW.UCRT_*/llvm-mingw-*-ucrt-x86_64/bin | tail -1)
+  CC="$MINGW/x86_64-w64-mingw32-clang.exe" CXX="$MINGW/x86_64-w64-mingw32-clang++.exe" go test -race -short -count=1 ./...
+  ```
+
+  Set them per command so every other cgo build keeps its own compiler. Use the absolute path because a shell, or an app's terminal, started before the install still has the old `PATH`, and the bare `x86_64-w64-mingw32-clang` is then not found. Keep `-short`, as CI does: without it, `plan`'s year-long sweeps under `-race` run past the timeout (#763).
 
 ## Build tags
 
