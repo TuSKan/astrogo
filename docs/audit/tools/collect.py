@@ -20,7 +20,12 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
+
+sys.dont_write_bytecode = True  # no __pycache__ beside the docs
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import judgments  # noqa: E402
 
 MODULE = "github.com/TuSKan/astrogo"
 REPO = "TuSKan/astrogo"
@@ -96,6 +101,13 @@ def main():
         facts[r] = {"loc": loc, "test_files": tests, "fuzz": sorted(set(fuzz)), "tags": dict(tags),
                     "ref_test_files": refs}
 
+    def touched_by(files):
+        """The packages whose Go files a commit's file list changed."""
+        touched = {pkg_of(f.strip()) for f in files
+                   if f.strip().endswith(".go") and not f.strip().startswith("examples/")}
+        touched.discard(None)
+        return touched
+
     log = run("git", "log", "origin/main", "--no-merges", "--format=%x00%H%x01%B%x02", "--name-only")
     closes = collections.defaultdict(set)
     for chunk in log.split("\x00")[1:]:
@@ -104,11 +116,17 @@ def main():
         nums = {int(n) for n in re.findall(r"(?i)\b(?:closes|fixes|resolves)\s+#(\d+)", body)}
         if not nums:
             continue
-        touched = {pkg_of(f.strip()) for f in files.split("\n")
-                   if f.strip().endswith(".go") and not f.strip().startswith("examples/")}
-        touched.discard(None)
+        touched = touched_by(files.split("\n"))
         for n in nums:
             closes[n] |= touched
+
+    # A bug whose fixing commit never named it: the commit is recorded by hand,
+    # and its packages are still read from git.
+    for n, sha in judgments.FIXED_BY.items():
+        touched = touched_by(run("git", "show", "--name-only", "--format=", sha).split("\n"))
+        if not touched:
+            raise SystemExit(f"judgments.FIXED_BY gives {sha} for #{n}, and it changed no package's Go files")
+        closes[n] |= touched
 
     issues = json.loads(run("gh", "issue", "list", "-R", REPO, "--state", "all", "--limit", "5000",
                             "--json", "number,title,state,labels,closedAt"))

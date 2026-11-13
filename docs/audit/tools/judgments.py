@@ -3,7 +3,9 @@
 Everything here is a reading of the code or a record of what an audit run did,
 written by hand. Edit it when an audit step changes one of them: a sweep that
 finds nothing adds its packages to SWEPT_CLEAN, a "seen, not filed" item leaves
-NOTED once it is filed or judged, and a finished sweep is appended to SWEEPS.
+NOTED once it is filed or judged, and a finished sweep is appended to SWEEPS. A
+closed bug the map cannot attribute goes into FIXED_BY when a commit fixed it
+without naming it, and into OUTSIDE_PACKAGES when no package's code did.
 """
 
 # Packages that decode bytes from a server or a file, read from each package's
@@ -37,6 +39,33 @@ AUDITED = {
                            "to 1.4e-4 µas (#1105)",
     "internal/oracle": "the 6,656 exact Kepler roots of the contract sweep against mpmath at 120 digits, "
                        "to 2⁻²¹⁴ relative",
+}
+
+# Closed bugs whose fixing commit never named them, each with the commit that
+# fixed it, read from the pull request that closed the issue. collect.py
+# attributes each to the packages that commit changed.
+FIXED_BY = {
+    694: "e17454fc",  # #699's body closes #694; the commit names only #696, the ΔT defect behind both
+}
+
+# Closed bugs no package's Go code fixed, each with where the fix was instead.
+# They are not findings about a package, so the map counts them in none.
+OUTSIDE_PACKAGES = {
+    109: "the module's go directive, raised to 1.27 in go.mod by #231",
+    140: "a behavior of go test -fuzz, documented in CLAUDE.md's fuzzing section",
+    660: "CI: the Validation workflow's IRSA dust cache (#662)",
+    680: "a dependency advisory, fixed in go.mod (#682)",
+    685: "validation fixture data, after Horizons changed its answers (#687)",
+    885: "the examples module (#887)",
+    923: "CI: CodeQL as advanced setup (#924)",
+    942: "CI: the changelog check (#949)",
+    943: "Dependabot's configuration",
+    1019: "CI: the changelog check (#1020)",
+    1021: "a dependency advisory, fixed in go.mod (#1022)",
+    1023: "upstream: JPL Horizons served the vectors again",
+    1045: "upstream: fixed at JPL Horizons",
+    1057: "a tracking issue; its four pull requests' findings are attributed",
+    1092: "CI: the race job's report (#1096)",
 }
 
 # Seen during an audit run and judged, but not filed.
