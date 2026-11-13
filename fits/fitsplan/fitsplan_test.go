@@ -192,6 +192,30 @@ func TestTargetFromFITSReadsTheWCS(t *testing.T) {
 	}
 }
 
+// TestTargetFromFITSReportsAWCSItCannotEvaluate: a WCS keyword that is not a
+// number, and a frame whose center lies outside its projection's domain, are
+// errors carrying the WCS's own reason, not a position read around them.
+func TestTargetFromFITSReportsAWCSItCannotEvaluate(t *testing.T) {
+	t.Parallel()
+
+	frame := func(proj, cdelt string) *fits.Header {
+		return header([2]string{"NAXIS", "2"}, [2]string{"NAXIS1", "1000"}, [2]string{"NAXIS2", "1000"},
+			[2]string{"CTYPE1", "'RA---" + proj + "'"}, [2]string{"CTYPE2", "'DEC--" + proj + "'"},
+			[2]string{"CRPIX1", "1"}, [2]string{"CRPIX2", "1"}, [2]string{"CRVAL1", "83"}, [2]string{"CRVAL2", "-5"},
+			[2]string{"CDELT1", cdelt}, [2]string{"CDELT2", "1"})
+	}
+
+	if _, err := TargetFromFITS(frame("TAN", "'abc'")); !errors.Is(err, fits.ErrWCSMalformedKeyword) {
+		t.Errorf("a CDELT1 that is not a number: %v, want %v", err, fits.ErrWCSMalformedKeyword)
+	}
+
+	// One degree a pixel puts the center of a 1000-pixel frame 499.5° from
+	// the reference pixel, where SIN has no point.
+	if _, err := TargetFromFITS(frame("SIN", "1")); !errors.Is(err, fits.ErrWCSOutsideSphere) {
+		t.Errorf("a SIN frame centered outside its projection: %v, want %v", err, fits.ErrWCSOutsideSphere)
+	}
+}
+
 // TestTargetFromFITSRefusesOtherFrames: a frame TargetFromFITS does not
 // convert is an error, not a position in the wrong frame. FK4 B1950 is 0.7°
 // from ICRS, and FITS defaults RADESYS to FK4 for an EQUINOX before 1984.
