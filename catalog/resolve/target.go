@@ -75,7 +75,8 @@ const (
 
 // Target represents an astronomical object in a resolve.
 type Target struct {
-	// Epoch is the epoch of the target.
+	// Epoch is the epoch of the target: when its position held, or, for a
+	// target with orbital elements or a TLE, the epoch of those elements.
 	Epoch time.Time
 	// Catalog is the catalog of the target.
 	Catalog string
@@ -91,7 +92,8 @@ type Target struct {
 	ID string
 	// TLELine2 is the TLE line 2 of the target.
 	TLELine2 string
-	// TLELine1 is the TLE line 1 of the target.
+	// TLELine1 is the TLE line 1 of the target. When the TLE lines are set,
+	// Epoch carries the element set's epoch.
 	TLELine1 string
 	// Aliases are the aliases of the target.
 	Aliases []string

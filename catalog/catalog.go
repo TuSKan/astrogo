@@ -834,6 +834,24 @@ var scalarFieldRules = []fieldRule{
 			setProvenance(dst, "Epoch", provider) // overwrites the astrometric cluster's — this one is authoritative for an elements-bearing Target
 		},
 	},
+	{
+		// A TLE and its epoch, taken as one unit for the same reason as the
+		// elements above: SGP4 propagates from the element set's own epoch,
+		// so the two lines mean nothing without it. The lines used to be
+		// copied here with no epoch, each from whichever candidate had it
+		// first, and NORAD is in no astrometric precedence, so a resolved
+		// satellite came back with the zero Time and was propagated from JD 0
+		// without an error (#1130).
+		precedence: []string{"norad"},
+		hasField:   func(t Target) bool { return t.TLELine1 != "" && t.TLELine2 != "" },
+		take: func(dst *Target, src Target, provider string) {
+			dst.TLELine1, dst.TLELine2 = src.TLELine1, src.TLELine2
+			dst.Epoch = src.Epoch
+			setProvenance(dst, "TLELine1", provider)
+			setProvenance(dst, "TLELine2", provider)
+			setProvenance(dst, "Epoch", provider)
+		},
+	},
 }
 
 // astrometricPrecedence orders providers for Coord/Parallax/PmRA/PmDec/Epoch,
@@ -883,16 +901,6 @@ func mergeGroup(g group) Target {
 		if merged.Kind == "" && t.Kind != "" {
 			merged.Kind = t.Kind
 			setProvenance(&merged, "Kind", c.provider)
-		}
-
-		if merged.TLELine1 == "" && t.TLELine1 != "" {
-			merged.TLELine1 = t.TLELine1
-			setProvenance(&merged, "TLELine1", c.provider)
-		}
-
-		if merged.TLELine2 == "" && t.TLELine2 != "" {
-			merged.TLELine2 = t.TLELine2
-			setProvenance(&merged, "TLELine2", c.provider)
 		}
 	}
 
