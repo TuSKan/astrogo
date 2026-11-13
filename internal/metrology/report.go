@@ -328,7 +328,13 @@ func FileName(suite string) string {
 }
 
 // ReadResult decodes a result document, refusing one written under a
-// different schema rather than reinterpreting it.
+// different schema rather than reinterpreting it, and one whose status is not
+// one of the three outcomes.
+//
+// A status nobody wrote cannot be guessed at. Read as verified, a suite that
+// never ran would be compared with its baseline and recorded in one as having
+// measured zero error (#1115), and the generated table would print whatever
+// string it held.
 func ReadResult(data []byte) (Result, error) {
 	var res Result
 
@@ -339,6 +345,13 @@ func ReadResult(data []byte) (Result, error) {
 	if res.SchemaVersion != SchemaVersion {
 		return Result{}, fmt.Errorf("%w: document is version %d, this build reads version %d",
 			ErrSchemaVersion, res.SchemaVersion, SchemaVersion)
+	}
+
+	switch res.Status {
+	case StatusVerified, StatusViolated, StatusNotVerified:
+	default:
+		return Result{}, fmt.Errorf("%w: status %q is none of %s, %s and %s",
+			ErrDecodeReport, res.Status, StatusVerified, StatusViolated, StatusNotVerified)
 	}
 
 	return res, nil
