@@ -26,6 +26,13 @@ func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That can move the Moon's and Sun's
+	// altitudes by up to 13.5 arcsec, far below the tenths of a degree the
+	// criteria work in. For full accuracy, blank-import remote/eop and
+	// consent to the IERS bulletin, as 05_resolve_name does.
+	time.RegisterModel(time.ZeroModel{})
+
 	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────
 	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {

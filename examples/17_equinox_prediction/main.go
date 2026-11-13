@@ -67,7 +67,9 @@ func main() {
 	fmt.Println()
 	fmt.Println("── Equinoxes & Solstices (2024–2033 BRT) ──────────────────────────")
 	fmt.Println()
-	fmt.Println("  Year │ Vernal Equinox       │ Summer Solstice      │ Autumnal Equinox     │ Winter Solstice")
+	// Named by month, as almanacs do: "summer solstice" is June in the
+	// north and December here in Brazil.
+	fmt.Printf("  Year │ %-15s │ %-15s │ %-15s │ %s\n", "Mar equinox", "Jun solstice", "Sep equinox", "Dec solstice")
 	fmt.Println("  ─────┼──────────────────────┼──────────────────────┼──────────────────────┼──────────────────────")
 
 	for year := 2024; year <= 2033; year++ {
@@ -87,7 +89,7 @@ func main() {
 
 	// ── Part 2: Season durations for 2026 ───────────────────────────────────
 	fmt.Println()
-	fmt.Println("── Season Durations (2026, Northern Hemisphere) ───────────────────")
+	fmt.Println("── Season Durations (2026) ─────────────────────────────────────────")
 	fmt.Println()
 
 	events26, err := plan.Seasons(2026, prov)
@@ -105,10 +107,10 @@ func main() {
 		end   time.Time
 		name  string
 	}{
-		{events26[0].Time, events26[1].Time, "Spring"},
-		{events26[1].Time, events26[2].Time, "Summer"},
-		{events26[2].Time, events26[3].Time, "Autumn"},
-		{events26[3].Time, events27[0].Time, "Winter"},
+		{events26[0].Time, events26[1].Time, "Mar-Jun  (southern autumn, northern spring)"},
+		{events26[1].Time, events26[2].Time, "Jun-Sep  (southern winter, northern summer)"},
+		{events26[2].Time, events26[3].Time, "Sep-Dec  (southern spring, northern autumn)"},
+		{events26[3].Time, events27[0].Time, "Dec-Mar  (southern summer, northern winter)"},
 	}
 
 	totalDays := 0.0
@@ -117,13 +119,14 @@ func main() {
 		days := d.end.Sub(d.start).Days()
 		totalDays += days
 		hours := (days - float64(int(days))) * 24
-		fmt.Printf("  %-8s %6.2f days  (%dd %02dh)\n", d.name, days, int(days), int(hours))
+		fmt.Printf("  %6.2f days  (%dd %02dh)  %s\n", days, int(days), int(hours), d.name)
 	}
 
-	fmt.Printf("  %-8s %6.2f days  (tropical year)\n", "Total", totalDays)
+	fmt.Printf("  %6.2f days  (tropical year)\n", totalDays)
 	fmt.Println()
-	fmt.Println("  Note: Northern summer (93.6d) > winter (89.0d) because Earth is")
-	fmt.Println("  near aphelion in July — Kepler's 2nd law slows orbital speed.")
+	fmt.Println("  June to September is the longest stretch and December to March the")
+	fmt.Println("  shortest: Earth is near aphelion in July, and Kepler's 2nd law")
+	fmt.Println("  slows it there.")
 
 	// ── Part 3: Earth's Apsides for 2026 ────────────────────────────────────
 	fmt.Println()
@@ -204,7 +207,7 @@ func main() {
 
 	// ── Part 6: Topocentric Moon (diurnal parallax) ──────────────────────────
 	fmt.Println()
-	fmt.Println("── Topocentric Moon (Quinta Calixto, Vernal Equinox 2026) ─────────")
+	fmt.Println("── Topocentric Moon (Quinta Calixto, March equinox 2026) ──────────")
 	fmt.Println()
 
 	moonTarget := plan.NewMoon(prov)

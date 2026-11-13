@@ -30,16 +30,25 @@ import (
 )
 
 func main() {
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That changes the observatory's
+	// rotational velocity toward the star by a few centimeters per second,
+	// far below the meters per second printed. For full accuracy,
+	// blank-import remote/eop and consent to the IERS bulletin, as
+	// 05_resolve_name does.
+	time.RegisterModel(time.ZeroModel{})
+
 	// Sirius (α CMa): a well-known bright star with a real published
-	// heliocentric radial velocity — re-verifiable against any modern
-	// stellar catalog (e.g. SIMBAD/Gaia DR3).
+	// radial velocity — re-verifiable against any modern stellar catalog
+	// (here SIMBAD). A catalog RV is already corrected to the barycenter:
+	// it is the star's own motion, the same on every night.
 	const (
-		siriusRAHours  = 6.7524861
-		siriusDecDeg   = -16.7161083
-		siriusMeasured = -5.5 // km/s, published heliocentric RV
+		siriusRADeg      = 101.287155
+		siriusDecDeg     = -16.716116
+		siriusPublishedV = -5.5 // km/s, barycentric, from SIMBAD
 	)
 
-	target := coord.NewICRS(angle.Hour(siriusRAHours), angle.Deg(siriusDecDeg))
+	target := coord.NewICRS(angle.Deg(siriusRADeg), angle.Deg(siriusDecDeg))
 
 	site, err := plan.NewKnownSite("Mauna Kea")
 	if err != nil {
@@ -53,14 +62,18 @@ func main() {
 	fmt.Println()
 	fmt.Printf("  Target             Sirius (α CMa)\n")
 	fmt.Printf("  RA / Dec           %s / %s\n", target.RA().HMSString(2), target.Dec().DMSString(1))
-	fmt.Printf("  Measured RV        %.2f km/s (published, heliocentric)\n", siriusMeasured)
+	fmt.Printf("  Published RV       %.2f km/s (barycentric)\n", siriusPublishedV)
 	fmt.Printf("  Site               %s\n", site.Name())
 
 	fmt.Println()
-	fmt.Println("── Correction across 2026 (Earth's orbital motion drives the swing) ──")
+	fmt.Println("── Across 2026: what Mauna Kea measures, and the correction back ────")
 	fmt.Println()
-	fmt.Println("  Date          Bary. corr.   Helio. corr.   Bary.-corrected RV")
-	fmt.Println("  ──────────    ───────────   ────────────   ───────────────────")
+	fmt.Println("  Earth's orbital motion adds up to ±30 km/s to what a spectrograph")
+	fmt.Println("  reads. The correction removes it, so every row comes back to the")
+	fmt.Println("  star's own -5.50 km/s.")
+	fmt.Println()
+	fmt.Println("  Date          Bary. corr.   Helio. corr.   Measured RV    Corrected RV")
+	fmt.Println("  ──────────    ───────────   ────────────   ───────────    ────────────")
 
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -76,23 +89,31 @@ func main() {
 			log.Fatalf("heliocentric correction: %v", err)
 		}
 
-		// The exact composition, as the note below explains, not
-		// siriusMeasured + baryCorr.
-		corrected, err := ctx.BarycentricRadialVelocity(target, unit.KmPerSec(siriusMeasured))
+		// What a spectrograph at the site reads on this date: the star's
+		// barycentric RV seen from the moving observatory.
+		measured, err := ctx.ObservedRadialVelocity(target, unit.KmPerSec(siriusPublishedV))
+		if err != nil {
+			log.Fatalf("observed radial velocity: %v", err)
+		}
+
+		// And the correction back, by the exact composition the note below
+		// explains, not measured + baryCorr.
+		corrected, err := ctx.BarycentricRadialVelocity(target, measured)
 		if err != nil {
 			log.Fatalf("barycentric radial velocity: %v", err)
 		}
 
 		// unit.Velocity holds m/s; KmPerSec is what the column says.
-		fmt.Printf("  %s    %+8.3f km/s   %+8.3f km/s   %+8.3f km/s\n",
-			t.Format("2006-01-02"), baryCorr.KmPerSec(), helioCorr.KmPerSec(), corrected.KmPerSec())
+		fmt.Printf("  %s    %+8.3f km/s   %+8.3f km/s   %+8.3f km/s  %+8.3f km/s\n",
+			t.Format("2006-01-02"), baryCorr.KmPerSec(), helioCorr.KmPerSec(), measured.KmPerSec(), corrected.KmPerSec())
 	}
 
 	fmt.Println()
 	fmt.Println("  rvBarycentric = ctx.BarycentricRadialVelocity(target, rvMeasured)")
 	fmt.Println("  Not rvMeasured + the correction: redshifts compose by multiplying,")
-	fmt.Println("  so the exact form carries a third term rvMeasured*corr/c. For Sirius")
-	fmt.Println("  that is 0.55 m/s; for a halo star at 300 km/s it is 30 m/s.")
+	fmt.Println("  so the exact form carries a third term rvMeasured*corr/c. With corr")
+	fmt.Println("  at most Earth's 30 km/s, that is up to 0.55 m/s for Sirius and 30 m/s")
+	fmt.Println("  for a halo star at 300 km/s.")
 	fmt.Println("  This carries the observer's own clock as well as their motion: the")
 	fmt.Println("  second-order Doppler shift, the Sun's gravitational potential at the")
 	fmt.Println("  observer and Earth's own, together about 4.65 m/s. Measured against")

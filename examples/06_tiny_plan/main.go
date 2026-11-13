@@ -12,6 +12,13 @@ import (
 )
 
 func main() {
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
+	// to 13.5 arcsec, which shifts no block in a five-minute schedule. For
+	// full accuracy, blank-import remote/eop and consent to the IERS
+	// bulletin, as 05_resolve_name does.
+	time.RegisterModel(time.ZeroModel{})
+
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
 	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
 	if err != nil {
@@ -63,8 +70,7 @@ func main() {
 
 	schedule, err := scheduler.BuildSchedule(window, blocks)
 	if err != nil {
-		fmt.Printf("Failed to generate schedule: %v\n", err)
-		return
+		log.Fatalf("schedule: %v", err)
 	}
 
 	// 5. Print out the generated timeline

@@ -24,6 +24,10 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
+	// The Earth-orientation loader, which step 3 relies on: without this
+	// import no file is ever read, pre-seeded or not, and every epoch uses
+	// zero EOP.
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -93,7 +97,7 @@ func main() {
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
-		state, err := eph.At(p, time.NowUTC()).Geometric(eph.MarsBarycenter, eph.Earth)
+		state, err := eph.At(p, time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC)).Geometric(eph.MarsBarycenter, eph.Earth)
 		if err != nil {
 			fmt.Printf("    Geometric: %v\n", err)
 		} else {
@@ -107,7 +111,9 @@ func main() {
 
 	iersLoc := cacheLocation(ctx, remote.IERSFinals2000A, "finals2000A.data")
 
-	_ = time.NowUTC().EOP() // never errors; triggers the lazy load as a side effect
+	// Never errors; triggers the lazy load as a side effect. Any epoch the
+	// bulletin covers will do.
+	_ = time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC).EOP()
 
 	if lo, hi, ok := time.Coverage(); ok {
 		fmt.Printf("    loaded EOP data automatically: MJD %.0f–%.0f (from %s)\n", lo, hi, iersLoc)
