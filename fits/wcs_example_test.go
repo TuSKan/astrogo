@@ -1,6 +1,7 @@
 package fits_test
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -331,34 +332,16 @@ func TestProjection_AIT_OutOfBounds(t *testing.T) {
 	}
 }
 
-// TestProjection_UnknownFallsBackToLinear verifies unknown projection codes
-// silently fall back to linear mapping (no spherical deprojection).
-func TestProjection_UnknownFallsBackToLinear(t *testing.T) {
+// TestProjection_UnknownIsRefused: a celestial axis whose projection the
+// package does not implement is refused. This test used to assert that it
+// fell back to a linear mapping, which is the defect #1125 fixes: a celestial
+// projection is not linear, and the fallback put a frame's center 7″ off with
+// no error.
+func TestProjection_UnknownIsRefused(t *testing.T) {
 	w := fits.NewWCS(2)
-	mustSet(t,
-		w.SetCTYPE([]string{"RA---ZZZ", "DEC--ZZZ"}),
-		w.SetCRPIX([]float64{50.0, 50.0}),
-		w.SetCRVAL([]float64{10.0, 20.0}),
-		w.SetCDELT([]float64{-0.01, 0.01}),
-	)
 
-	// With unknown projection, celestialAxes returns "" → linear fallback.
-	// 5 pixels offset * 0.01 scale = 0.05 degrees
-	res, err := w.PixelToWorld([]float64{55.0, 55.0})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Linear: CRVAL + offset * CDELT
-	expectedRA := 10.0 + (55.0-50.0)*(-0.01)
-	expectedDec := 20.0 + (55.0-50.0)*0.01
-
-	if math.Abs(res[0]-expectedRA) > 1e-10 {
-		t.Errorf("RA: expected %.4f, got %.4f", expectedRA, res[0])
-	}
-
-	if math.Abs(res[1]-expectedDec) > 1e-10 {
-		t.Errorf("Dec: expected %.4f, got %.4f", expectedDec, res[1])
+	if err := w.SetCTYPE([]string{"RA---ZZZ", "DEC--ZZZ"}); !errors.Is(err, fits.ErrWCSUnsupported) {
+		t.Errorf("SetCTYPE(ZZZ): %v, want %v", err, fits.ErrWCSUnsupported)
 	}
 }
 

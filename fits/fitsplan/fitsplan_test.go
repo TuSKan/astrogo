@@ -214,6 +214,41 @@ func TestTargetFromFITSReportsAWCSItCannotEvaluate(t *testing.T) {
 	if _, err := TargetFromFITS(frame("SIN", "1")); !errors.Is(err, fits.ErrWCSOutsideSphere) {
 		t.Errorf("a SIN frame centered outside its projection: %v, want %v", err, fits.ErrWCSOutsideSphere)
 	}
+
+	// #1125: a projection fits does not implement was evaluated as linear,
+	// and an axis length that is not a number was skipped, each giving a
+	// position with no error.
+	if _, err := TargetFromFITS(frame("ZEA", "0.001")); !errors.Is(err, fits.ErrWCSUnsupported) {
+		t.Errorf("a ZEA frame: %v, want %v", err, fits.ErrWCSUnsupported)
+	}
+
+	malformed := header([2]string{"NAXIS", "2"}, [2]string{"NAXIS1", "'abc'"}, [2]string{"NAXIS2", "1000"},
+		[2]string{"CTYPE1", "'RA---TAN'"}, [2]string{"CTYPE2", "'DEC--TAN'"},
+		[2]string{"CRPIX1", "1"}, [2]string{"CRPIX2", "1"}, [2]string{"CRVAL1", "83"}, [2]string{"CRVAL2", "-5"},
+		[2]string{"CDELT1", "0.001"}, [2]string{"CDELT2", "0.001"})
+	if _, err := TargetFromFITS(malformed); !errors.Is(err, fits.ErrWCSMalformedKeyword) {
+		t.Errorf("an NAXIS1 that is not a number: %v, want %v", err, fits.ErrWCSMalformedKeyword)
+	}
+}
+
+// TestTargetFromFITSTakesCRVALWithNoDataArray: NAXIS = 0 is a header with no
+// data array, so there is no frame to take the center of, as with no NAXIS at
+// all, and the position is CRVAL. It was refused as a zero-dimensional WCS
+// (#1125).
+func TestTargetFromFITSTakesCRVALWithNoDataArray(t *testing.T) {
+	t.Parallel()
+
+	target, err := TargetFromFITS(header([2]string{"NAXIS", "0"},
+		[2]string{"CTYPE1", "'RA---TAN'"}, [2]string{"CTYPE2", "'DEC--TAN'"},
+		[2]string{"CRVAL1", "83.82208"}, [2]string{"CRVAL2", "-5.39111"}))
+	if err != nil {
+		t.Fatalf("NAXIS = 0: %v", err)
+	}
+
+	pos, _ := target.Position(time.Time{})
+	if math.Abs(pos.RA().Degrees()-83.82208) > 2e-6 || math.Abs(pos.Dec().Degrees()+5.39111) > 2e-6 {
+		t.Errorf("NAXIS = 0: (%.7f°, %.7f°), want CRVAL (83.82208°, -5.39111°)", pos.RA().Degrees(), pos.Dec().Degrees())
+	}
 }
 
 // TestTargetFromFITSRefusesOtherFrames: a frame TargetFromFITS does not
