@@ -288,11 +288,12 @@ func celestialAxes(h *fits.Header) (lonAxis, latAxis int, kind celestialKind, er
 	return lonAxis, latAxis, kind, nil
 }
 
-// worldAtCenter evaluates the WCS at the frame's center. With no NAXIS, there
-// is no frame to take the center of, and the reference pixel's world
-// coordinate is CRVAL by definition.
+// worldAtCenter evaluates the WCS at the frame's center. With no NAXIS, or
+// NAXIS = 0, which is a header with no data array, there is no frame to take
+// the center of, and the reference pixel's world coordinate is CRVAL by
+// definition. NAXIS = 0 used to be refused as a zero-dimensional WCS (#1125).
 func worldAtCenter(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err error) {
-	if !has(h, "NAXIS") {
+	if naxis, errN := h.GetInt("NAXIS"); !has(h, "NAXIS") || (errN == nil && naxis == 0) {
 		lon, errLon := h.GetFloat(fmt.Sprintf("CRVAL%d", lonAxis+1))
 		lat, errLat := h.GetFloat(fmt.Sprintf("CRVAL%d", latAxis+1))
 
@@ -314,8 +315,21 @@ func worldAtCenter(h *fits.Header, lonAxis, latAxis int) (lon, lat float64, err 
 
 	pixel := w.CRPIX()
 
+	// An axis length that is there but not a number is refused, as a malformed
+	// CDELT is. Skipped, it left that axis at the reference pixel, and the
+	// answer was the reference pixel's position, not the center's (#1125).
 	for i := range pixel {
-		if n, errN := h.GetInt(fmt.Sprintf("NAXIS%d", i+1)); errN == nil && n > 0 {
+		key := fmt.Sprintf("NAXIS%d", i+1)
+		if !has(h, key) {
+			continue
+		}
+
+		n, errN := h.GetInt(key)
+		if errN != nil {
+			return 0, 0, fmt.Errorf("%w: %s: %w", fits.ErrWCSMalformedKeyword, key, errN)
+		}
+
+		if n > 0 {
 			pixel[i] = (float64(n) + 1) / 2
 		}
 	}

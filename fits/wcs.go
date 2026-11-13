@@ -58,7 +58,8 @@ func NewWCS(naxis int) *WCS {
 		pc:    pc,
 	}
 
-	w.proj, w.lonAxis, w.latAxis = celestialAxes(w.ctype)
+	// Blank axes name no projection, so there is nothing to refuse.
+	w.proj, w.lonAxis, w.latAxis, _ = celestialAxes(w.ctype)
 
 	return w
 }
@@ -124,14 +125,21 @@ func (w *WCS) SetCDELT(cdelt []float64) error {
 
 // SetCTYPE sets the coordinate axis type identifiers (e.g., "RA---TAN", "DEC--TAN").
 //
-// Returns [ErrWCSDimension] unless len(ctype) is the WCS's axis count.
+// Returns [ErrWCSDimension] unless len(ctype) is the WCS's axis count, and
+// [ErrWCSUnsupported] for a celestial axis whose projection this package does
+// not implement; either way the WCS is left as it was.
 func (w *WCS) SetCTYPE(ctype []string) error {
 	if len(ctype) != w.nAxis {
 		return fmt.Errorf("%w: CTYPE has %d values, want %d", ErrWCSDimension, len(ctype), w.nAxis)
 	}
 
+	proj, lon, lat, err := celestialAxes(ctype)
+	if err != nil {
+		return err
+	}
+
 	w.ctype = append([]string(nil), ctype...)
-	w.proj, w.lonAxis, w.latAxis = celestialAxes(w.ctype)
+	w.proj, w.lonAxis, w.latAxis = proj, lon, lat
 
 	return nil
 }
@@ -656,13 +664,16 @@ func (w *WCS) WorldToPixel(world []float64) ([]float64, error) {
 // Swapped layout:  CTYPE1="DEC--TAN", CTYPE2="RA---TAN" → lon=1, lat=0.
 // SIP distortion:  CTYPE1="RA---TAN-SIP" → the "-SIP" suffix is stripped.
 //
-// Returns "", -1, -1 if no recognized celestial projection is found.
+// Returns "", -1, -1 if no celestial projection is found, and
+// [ErrWCSUnsupported] for a celestial axis whose projection this package does
+// not implement. That axis is not linear: evaluated as though it were, it put
+// a frame's center 7″ off on a 1″-per-pixel frame, with no error (#1125).
 //
 // A function of CTYPE alone, so it is computed when CTYPE is set and never by
 // a transform (#797).
-func celestialAxes(ctype []string) (proj string, lon, lat int) {
+func celestialAxes(ctype []string) (proj string, lon, lat int, err error) {
 	if len(ctype) < 2 {
-		return "", -1, -1
+		return "", -1, -1, nil
 	}
 
 	known := map[string]bool{"TAN": true, "SIN": true, "ARC": true, "STG": true, "AIT": true}
@@ -684,6 +695,10 @@ func celestialAxes(ctype []string) (proj string, lon, lat int) {
 
 		code := ct[5:8]
 		if !known[code] {
+			if celestialPrefix(prefix) {
+				return "", -1, -1, fmt.Errorf("%w: CTYPE%d %q", ErrWCSUnsupported, i+1, ctype[i])
+			}
+
 			continue
 		}
 
@@ -705,10 +720,22 @@ func celestialAxes(ctype []string) (proj string, lon, lat int) {
 
 	// Both axes must be identified for a valid celestial WCS.
 	if lon < 0 || lat < 0 {
-		return "", -1, -1
+		return "", -1, -1, nil
 	}
 
-	return proj, lon, lat
+	return proj, lon, lat, nil
+}
+
+// celestialPrefix reports whether a CTYPE's first four characters name a
+// celestial longitude or latitude, the axes celestialAxes assigns.
+func celestialPrefix(prefix string) bool {
+	for _, p := range []string{"RA", "DEC", "GLON", "GLAT", "ELON", "ELAT"} {
+		if strings.HasPrefix(prefix, p) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // sipInverse moves an undistorted pixel offset to its distorted one by the
@@ -1100,11 +1127,12 @@ func ExtractWCS(h *Header) (*WCS, error) {
 
 	w := NewWCS(naxis)
 
-	// Every array above was built at length naxis, so a refusal here means the
-	// construction above disagrees with itself rather than that the header is
-	// odd — the setters are the only thing that would notice. Reported rather
-	// than dropped: the alternative is a WCS silently holding NewWCS's zeros,
-	// which transforms every pixel to the same place.
+	// Every array above was built at length naxis, so a dimension refusal here
+	// means the construction above disagrees with itself; the one the header
+	// can cause is SetCTYPE's, for a celestial projection this package does
+	// not implement (#1125). Reported rather than dropped: the alternative is
+	// a WCS silently holding NewWCS's zeros, which transforms every pixel to
+	// the same place, or one evaluating a projection as linear.
 	for _, err := range []error{
 		w.SetCTYPE(ctype),
 		w.SetCUnit(cunit),
