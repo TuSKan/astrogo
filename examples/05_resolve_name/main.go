@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/TuSKan/astrogo/catalog"
@@ -36,10 +37,21 @@ func main() {
 	// point: an empty result now means the catalogs were asked and matched
 	// nothing, where an error means at least one could not be reached. They
 	// used to be the same answer.
+	//
+	// A catalog that cannot be reached does not cost the others' matches:
+	// Search returns them with an error wrapping catalog.ErrIncomplete, which
+	// names each catalog that failed and why. Only an error without it means
+	// nothing usable came back.
 	results, err := resolver.Search(ctx, query)
-	if err != nil {
+
+	incomplete := errors.Is(err, catalog.ErrIncomplete)
+	if err != nil && !incomplete {
 		fmt.Printf("Search failed: %v\n", err)
 		return
+	}
+
+	if incomplete {
+		fmt.Printf("\nSome catalogs could not answer, so these results may be missing their matches:\n  %v\n", err)
 	}
 
 	if len(results) == 0 {

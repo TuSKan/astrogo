@@ -285,6 +285,15 @@ var (
 	ErrNotFound = errors.New("target not found")
 	// ErrAmbiguous is returned when a query matches multiple targets.
 	ErrAmbiguous = errors.New("ambiguous target name")
+	// ErrIncomplete marks a result that is usable but shorter than it should
+	// be, because part of what was asked could not be answered: a catalog
+	// that could not be reached, an ephemeris that could not be fetched. It
+	// comes back with the result, never instead of it, and the error that
+	// wraps it names each part that failed and why.
+	//
+	// One value for every package that returns partial results, so a caller
+	// writes one check: catalog's and plan's ErrIncomplete are this value.
+	ErrIncomplete = errors.New("result is incomplete")
 	// ErrUnsupported is returned by a provider that does not implement the
 	// requested operation.
 	//
