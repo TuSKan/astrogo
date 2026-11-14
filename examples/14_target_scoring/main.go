@@ -80,7 +80,9 @@ func main() {
 
 	show.Title("Composite target scoring", site.Name()+", "+tm.Format("2006-01-02 15:04 MST"))
 
-	cols := []show.Column{show.Left("Target"), show.Right("Altitude")}
+	cols := make([]show.Column, 0, 2+len(profiles))
+	cols = append(cols, show.Left("Target"), show.Right("Altitude"))
+
 	for _, p := range profiles {
 		cols = append(cols, show.Right(p.name))
 	}
@@ -93,7 +95,8 @@ func main() {
 			log.Fatalf("%s altitude: %v", obj.Name(), err)
 		}
 
-		row := []string{obj.Name(), fmt.Sprintf("%.1f°", alt.Value)}
+		row := make([]string, 0, 2+len(profiles))
+		row = append(row, obj.Name(), fmt.Sprintf("%.1f°", alt.Value))
 
 		for _, p := range profiles {
 			score, err := plan.Scorer{Site: site, Config: p.cfg, Constraints: constraints}.Score(obj, tm)
