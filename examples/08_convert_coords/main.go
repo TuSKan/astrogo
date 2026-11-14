@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/time"
 )
 
@@ -51,16 +52,23 @@ func main() {
 		log.Fatalf("altaz: %v", err)
 	}
 
-	fmt.Println("Coordinate conversions for Sgr A*")
-	fmt.Println("=================================")
-	fmt.Printf("ICRS (J2000)       RA %9.5f°   Dec %9.5f°\n", sgrA.RA().Degrees(), sgrA.Dec().Degrees())
-	fmt.Printf("Galactic           l  %9.5f°   b   %9.5f°\n", galactic.L().Degrees(), galactic.B().Degrees())
-	fmt.Printf("  and back         RA %9.5f°   Dec %9.5f°   (%.1g arcsec off)\n",
-		back.RA().Degrees(), back.Dec().Degrees(), coord.Separation(sgrA, back).Arcseconds())
-	fmt.Printf("Ecliptic of date   λ  %9.5f°   β   %9.5f°\n", ecliptic.Lon().Degrees(), ecliptic.Lat().Degrees())
-	fmt.Printf("AltAz              Alt %8.4f°   Az  %9.4f°\n", altaz.Alt().Degrees(), altaz.Az().Degrees())
-	fmt.Printf("  from Quinta Calixto at %s (%s)\n\n",
-		t.Format("2006-01-02 15:04 MST"), t.In(time.LocationUTC).Format("15:04 MST"))
+	show.Title("Coordinate conversions for Sgr A*",
+		"AltAz from Quinta Calixto at "+t.Format("2006-01-02 15:04 MST")+" ("+t.In(time.LocationUTC).Format("15:04 MST")+")")
+
+	deg := func(a angle.Angle) string { return fmt.Sprintf("%.5f°", a.Degrees()) }
+
+	frames := show.NewTable(show.Left("Frame"), show.Left(""), show.Right("Longitude"), show.Left(""), show.Right("Latitude"))
+	frames.Row("ICRS (J2000)", "RA", deg(sgrA.RA()), "Dec", deg(sgrA.Dec()))
+	frames.Row("Galactic", "l", deg(galactic.L()), "b", deg(galactic.B()))
+	frames.Row("  and back to ICRS", "RA", deg(back.RA()), "Dec", deg(back.Dec()))
+	frames.Row("Ecliptic of date", "λ", deg(ecliptic.Lon()), "β", deg(ecliptic.Lat()))
+	frames.Row("AltAz", "Az", deg(altaz.Az()), "Alt", deg(altaz.Alt()))
+
+	fmt.Println()
+	frames.Print()
+	fmt.Println()
+	show.Note(fmt.Sprintf("The round trip through Galactic lands %.1g arcsec from where it began.",
+		coord.Separation(sgrA, back).Arcseconds()))
 
 	// 5. A batch: many stars through the same Context. The expensive part,
 	// the Earth's orientation at t, was computed once when ctx was built.
@@ -83,10 +91,12 @@ func main() {
 	out := make([]coord.AltAz, len(in))
 	ctx.ICRSBatchToAltAz(in, out)
 
-	fmt.Println("Batch: five stars, one Context")
-	fmt.Println("==============================")
+	show.Section("Batch: five stars, one Context")
 
+	batch := show.NewTable(show.Left("Star"), show.Right("Altitude"), show.Right("Azimuth"))
 	for i, s := range stars {
-		fmt.Printf("%-15s  Alt %6.2f°   Az %6.2f°\n", s.name, out[i].Alt().Degrees(), out[i].Az().Degrees())
+		batch.Row(s.name, fmt.Sprintf("%.2f°", out[i].Alt().Degrees()), fmt.Sprintf("%.2f°", out[i].Az().Degrees()))
 	}
+
+	batch.Print()
 }
