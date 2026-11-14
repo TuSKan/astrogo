@@ -453,7 +453,7 @@ func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSear
 		targets = append(targets, ts...)
 	}
 
-	return targets
+	return mergeByIdentity(targets)
 }
 
 // brightSourceName names a bright-object source in a skip reason: its
@@ -468,6 +468,78 @@ func brightSourceName(src resolve.BrightObjectSearcher) string {
 	}
 
 	return fmt.Sprintf("%T", src)
+}
+
+// mergeByIdentity makes one target of every group the sources describe as the
+// same object, by a shared [resolve.IdentityKeys] key: an ID, designation or
+// alias. Two sources that both carry an object listed it twice,
+// SIMBAD's Alnilam beside OpenNGC's NGC 1990, which OpenNGC catalogs as the
+// star itself (#1136).
+//
+// Identity only, never position: a star and its companion a few arcseconds
+// away are two catalog entries with identifiers of their own, and so is a
+// star and the nebula around it, and nothing short of a shared identifier
+// says they are one thing.
+//
+// The first target of a group, in source order, is kept; the others'
+// identifiers join its aliases, so the merged target answers to every name
+// either source gave it.
+func mergeByIdentity(targets []resolve.Target) []resolve.Target {
+	// parent[i] is i's group, by the lowest index in it, so a group's first
+	// target in source order is its root.
+	parent := make([]int, len(targets))
+	for i := range parent {
+		parent[i] = i
+	}
+
+	find := func(i int) int {
+		for parent[i] != i {
+			parent[i] = parent[parent[i]]
+			i = parent[i]
+		}
+
+		return i
+	}
+
+	owner := make(map[string]int)
+
+	for i, t := range targets {
+		for _, k := range resolve.IdentityKeys(t) {
+			j, ok := owner[k]
+			if !ok {
+				owner[k] = i
+
+				continue
+			}
+
+			if a, b := find(i), find(j); a != b {
+				parent[max(a, b)] = min(a, b)
+			}
+		}
+	}
+
+	merged := make([]resolve.Target, 0, len(targets))
+	at := make(map[int]int, len(targets)) // root -> its index in merged
+
+	for i, t := range targets {
+		root := find(i)
+		if root == i {
+			at[i] = len(merged)
+			merged = append(merged, t)
+
+			continue
+		}
+
+		// The root's index is lower, so it is already in merged.
+		kept := &merged[at[root]]
+		for _, id := range append([]string{t.ID, t.Name, t.Designation}, t.Aliases...) {
+			if id != "" && id != kept.ID && id != kept.Name && !slices.Contains(kept.Aliases, id) {
+				kept.Aliases = append(kept.Aliases, id)
+			}
+		}
+	}
+
+	return merged
 }
 
 // maxConcurrentEphemerisFetches bounds how many asteroid/comet Stage-2
