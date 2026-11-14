@@ -671,7 +671,7 @@ func (ctx *Context) atciq(c Astrometric) (ri, di float64) {
 		c.RA().Radians(), c.Dec().Radians(),
 		// SOFA wants dRA/dt; this package stores the catalog's on-sky
 		// rate. See [dRAdt].
-		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Radians(), c.RV().KmPerSec(),
+		dRAdt(c.PmRA(), c.Dec()), c.PmDec().Radians(), c.Parallax().Arcseconds(), c.RV().KmPerSec(),
 		&ctx.astrom,
 	)
 }
