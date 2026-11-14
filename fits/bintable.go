@@ -360,22 +360,45 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	return hdu, discardPadding(r, consumed)
 }
 
-// GetStringColumn extracts a FITS binary table column and safely converts it to a standard Go string slice.
+// columnIndex returns the index of the column named name, or -1 if there is
+// none.
+//
+// Names compare without regard to case, as the FITS Standard (4.0, §7.3.2)
+// says comparisons with TTYPEn values should: "TIME" and "Time" are one name.
+// Services differ in the case they write: ESO's airglow service writes "lam"
+// where its documentation says "LAM", and the Gaia archive writes its column
+// names in lower case.
+//
+// The standard strongly recommends names that are unique without regard to
+// case, but does not require it, so an exact match is preferred: a table
+// holding both "flux" and "FLUX" still returns the one asked for.
+func (hdu *BintableHDU) columnIndex(name string) int {
+	fields := hdu.Batch.Schema().Fields()
+
+	for i, f := range fields {
+		if f.Name == name {
+			return i
+		}
+	}
+
+	for i, f := range fields {
+		if strings.EqualFold(f.Name, name) {
+			return i
+		}
+	}
+
+	return -1
+}
+
+// GetStringColumn extracts a FITS binary table column and safely converts it
+// to a standard Go string slice. The column's name matches without regard to
+// case, as the FITS Standard says it should.
 func (hdu *BintableHDU) GetStringColumn(colName string) ([]string, error) {
 	if hdu.Batch == nil {
 		return nil, ErrUninitBatch
 	}
 
-	schema := hdu.Batch.Schema()
-	idx := -1
-
-	for i, f := range schema.Fields() {
-		if f.Name == colName {
-			idx = i
-			break
-		}
-	}
-
+	idx := hdu.columnIndex(colName)
 	if idx < 0 {
 		return nil, fmt.Errorf("%w: %s", ErrColumnNotFound, colName)
 	}
@@ -440,22 +463,15 @@ func stringReader(arr arrow.Array) (func(int) string, bool) {
 	}
 }
 
-// GetFloatColumn extracts a FITS binary table column safely into a standard Go float64 slice.
+// GetFloatColumn extracts a FITS binary table column safely into a standard Go
+// float64 slice. The column's name matches without regard to case, as the
+// FITS Standard says it should.
 func (hdu *BintableHDU) GetFloatColumn(colName string) ([]float64, error) {
 	if hdu.Batch == nil {
 		return nil, ErrUninitBatch
 	}
 
-	schema := hdu.Batch.Schema()
-	idx := -1
-
-	for i, f := range schema.Fields() {
-		if f.Name == colName {
-			idx = i
-			break
-		}
-	}
-
+	idx := hdu.columnIndex(colName)
 	if idx < 0 {
 		return nil, fmt.Errorf("%w: %s", ErrColumnNotFound, colName)
 	}

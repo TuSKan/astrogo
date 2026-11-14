@@ -29,7 +29,9 @@ type Provider struct {
 
 // New encapsulates the entire process of opening a FITS file off disk,
 // auto-detecting the first Binary Table HDU, and building a fully loaded resolve.
-// It assumes the table uses standard simplistic column names ("ID", "NAME", "RA", "DEC").
+// It assumes the table uses standard simplistic column names ("ID", "NAME", "RA", "DEC"),
+// matched without regard to case as the FITS Standard says column names are, so
+// "ra" and "dec" serve as well.
 func New(filePath string) (*Provider, error) {
 	f, err := fits.Open(filePath)
 	if err != nil {
@@ -54,8 +56,11 @@ func New(filePath string) (*Provider, error) {
 	ras, errRa := bintable.GetFloatColumn("RA")
 	decs, errDec := bintable.GetFloatColumn("DEC")
 
-	if errID != nil || errName != nil || errRa != nil || errDec != nil {
-		return nil, ErrMissingColumns
+	// Name each column that could not be read, and why: a bare "missing
+	// columns" left a caller to guess which of the four, and whether it was
+	// absent or held the wrong type.
+	if err := errors.Join(errID, errName, errRa, errDec); err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", ErrMissingColumns, filePath, err)
 	}
 
 	// Every column comes back with NumRows entries, so these agree; taking the
