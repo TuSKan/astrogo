@@ -531,8 +531,17 @@ type CrescentResult struct {
 	CaldwellOptical  CrescentVerdict
 }
 
+// crescentCodeWidth is the width of the widest verdict or zone code
+// [CrescentResult.String] prints: Odeh's "Optical/Naked".
+const crescentCodeWidth = len("Optical/Naked")
+
 // String returns a multi-line summary: the evening's instants, then every
 // criterion's answer with the quantities it read.
+//
+// The verdict or zone sits in a column as wide as the widest code a criterion
+// returns, and a zone row names its code once, then its label and value. The
+// column was a character narrower than Odeh's "Optical/Naked", which pushed
+// that row out of line, and a zone row repeated its code (#1167).
 func (r CrescentResult) String() string {
 	var b strings.Builder
 
@@ -545,14 +554,14 @@ func (r CrescentResult) String() string {
 			yn = "visible"
 		}
 
-		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° ARCL %6.2f° DAZ %6.2f° alt %6.2f° W %5.2f′\n",
-			name, yn, v.Params.ArcV.Degrees(), v.Params.ArcL.Degrees(), v.Params.DAZ.Degrees(),
+		fmt.Fprintf(&b, "  %-22s %-*s ARCV %6.2f° ARCL %6.2f° DAZ %6.2f° alt %6.2f° W %5.2f′\n",
+			name, crescentCodeWidth, yn, v.Params.ArcV.Degrees(), v.Params.ArcL.Degrees(), v.Params.DAZ.Degrees(),
 			v.Params.MAlt.Degrees(), v.Params.W.Arcminutes())
 	}
 
 	zone := func(name string, z CrescentZone) {
-		fmt.Fprintf(&b, "  %-22s %-12s ARCV %6.2f° W %5.2f′  %s\n",
-			name, z.Code, z.Params.ArcV.Degrees(), z.Params.W.Arcminutes(), z.String())
+		fmt.Fprintf(&b, "  %-22s %-*s ARCV %6.2f° W %5.2f′  %s (value=%.4f)\n",
+			name, crescentCodeWidth, z.Code, z.Params.ArcV.Degrees(), z.Params.W.Arcminutes(), z.Label, z.Value)
 	}
 
 	verdict("Fotheringham (1910)", r.Fotheringham)
