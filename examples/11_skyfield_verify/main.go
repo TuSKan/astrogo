@@ -11,9 +11,11 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -48,13 +50,14 @@ const (
 	horizonsDistAU = 1.94245684464294
 )
 
-const kmPerAU = 149597870.7
+// kmPerAU is the astronomical unit in kilometers.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 func main() {
-	// Astrometric positions need no Earth orientation: no site, no Earth
-	// rotation. Choosing zero EOP says so, and keeps the run offline until
-	// the kernel below is fetched.
-	time.RegisterModel(time.ZeroModel{})
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. A geocentric astrometric
+	// place does not use it, having no site and no Earth rotation in it.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	t := time.Date(2025, 7, 3, 12, 0, 0, 0, time.LocationUTC)
 	ref := coord.NewICRS(angle.Deg(horizonsRADeg), angle.Deg(horizonsDecDeg))

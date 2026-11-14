@@ -7,6 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 )
 
 func main() {
@@ -17,9 +18,10 @@ func main() {
 	// (content-checked, so a re-run only costs a HEAD probe once cached).
 	// No need to import catalog/openngc directly.
 	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
-	// No Earth orientation: resolving a name involves no site and no
-	// instant, so this example neither imports remote/eop nor fetches the
-	// IERS bulletin.
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. Resolving a name involves
+	// no site and no instant, so nothing here reads it.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()
 
