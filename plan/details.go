@@ -93,7 +93,12 @@ func (d TargetDetails) String() string {
 	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
 	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
 	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
-	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
+	// Zero means nothing supplied a distance: OpenNGC gives none for a
+	// galaxy, and a star without a parallax has none. It used to print as
+	// "0.0000 pc", which reads as a measurement (#1132).
+	if d.Distance != 0 {
+		fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
+	}
 
 	if d.AngularSize != "" {
 		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
