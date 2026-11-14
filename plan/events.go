@@ -314,6 +314,28 @@ func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool
 	return s.Solver.FindExtremum(Evaluator(eval), t1, t3, isMax)
 }
 
+// bracketedExtremum reports whether val, the extremum refined between two
+// samples whose values were lo and hi, lies inside them: a maximum at least
+// as high as both, a minimum at least as low.
+//
+// The samples only suggest an extremum, by their middle one beating its left
+// neighbor and at least matching its right. Where the quantity is still
+// rising, or still falling, at the window's end, two samples can match there
+// by rounding alone: the sweep steps by addition, so its last regular sample
+// can fall nanoseconds before the end, which is then sampled again. The
+// refinement then closes on the bracket's edge, and that edge was reported as
+// a greatest elongation, or an appulse, seconds before the window closed
+// (#1140). Measured from 2026-11-13 11:18 UTC over 365 days, eight of fifteen
+// planet and Moon pairs had such an appulse, one of them 167° wide. An
+// extremum on the edge lies past the window, and the window does not hold it.
+func bracketedExtremum(val, lo, hi float64, isMax bool) bool {
+	if isMax {
+		return val >= lo && val >= hi
+	}
+
+	return val <= lo && val <= hi
+}
+
 func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Event, error) {
 	var events []Event
 
@@ -711,6 +733,10 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 					return nil, err
 				}
 
+				if !bracketedExtremum(val, v0, v2, true) {
+					continue
+				}
+
 				// Validate if it is East or West based on RA difference. A
 				// position that fails here used to be read as the zero one,
 				// and the side decided from it (#437).
@@ -752,6 +778,10 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 				resTime, val, err := s.refineExtremum(evalVal, times[i-1], times[i+1], false)
 				if err != nil {
 					return nil, err
+				}
+
+				if !bracketedExtremum(val, v0, v2, false) {
+					continue
 				}
 
 				events = append(events, Event{

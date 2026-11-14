@@ -22,7 +22,7 @@ func main() {
 	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
 	// to 13.5 arcsec, which changes a slew time here by well under 0.1 s.
 	// For full accuracy, blank-import remote/eop and consent to the IERS
-	// bulletin, as 05_resolve_name does.
+	// bulletin, as 09_geometry_events does.
 	time.RegisterModel(time.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)

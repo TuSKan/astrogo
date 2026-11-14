@@ -15,6 +15,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
@@ -27,12 +28,12 @@ func main() {
 	// point of this example. naif0012.tls (leap seconds) is ~5 KB.
 	remote.EnableDownloads(0, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
-	// No Earth-orientation data exists for the first century: the IERS
-	// bulletin starts in 1973. Choosing zero EOP says so, rather than
-	// warning that a download could help. What sets the accuracy here is
-	// Delta T, the drift of the Earth's rotation, which astrogo takes from
-	// the Espenak & Meeus (2006) model before 1960.
-	time.RegisterModel(time.ZeroModel{})
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. No bulletin covers the
+	// first century, though (it begins in 1973), so astrogo uses zero EOP
+	// here and says so once. What sets the accuracy is Delta T, the drift of
+	// the Earth's rotation, from the Espenak & Meeus (2006) model.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {

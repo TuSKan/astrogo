@@ -35,7 +35,7 @@ func main() {
 	// rotational velocity toward the star by a few centimeters per second,
 	// far below the meters per second printed. For full accuracy,
 	// blank-import remote/eop and consent to the IERS bulletin, as
-	// 05_resolve_name does.
+	// 09_geometry_events does.
 	time.RegisterModel(time.ZeroModel{})
 
 	// Sirius (α CMa): a well-known bright star with a real published

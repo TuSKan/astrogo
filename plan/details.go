@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -68,6 +69,11 @@ type TargetDetails struct {
 	Dec angle.Angle
 }
 
+// detailsTimeLayout is how [TargetDetails.String] prints an event time: in
+// the time's own display zone (the Context's, through [time.Time.In]), with
+// its date and that zone's name, for example "2026-04-25 06:20 -03".
+const detailsTimeLayout = "2006-01-02 15:04 MST"
+
 // String formats the details as a textual summary.
 func (d TargetDetails) String() string {
 	var b strings.Builder
@@ -93,24 +99,32 @@ func (d TargetDetails) String() string {
 	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
 	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
 	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
-	fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
+	// Zero means nothing supplied a distance: OpenNGC gives none for a
+	// galaxy, and a star without a parallax has none. It used to print as
+	// "0.0000 pc", which reads as a measurement (#1132).
+	if d.Distance != 0 {
+		fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
+	}
 
 	if d.AngularSize != "" {
 		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
 	}
 
+	// Each time carries its date and zone: the time of day alone dropped
+	// both, so a UTC context's times read as local ones, and a set after
+	// midnight read as the same day's (#1133).
 	if d.RiseTime != nil {
-		fmt.Fprintf(&b, "Rise time:\t%s\n", d.RiseTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Rise time:\t%s\n", d.RiseTime.Format(detailsTimeLayout))
 		fmt.Fprintf(&b, "Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0))
 	}
 
 	if d.TransitTime != nil {
-		fmt.Fprintf(&b, "Time of maximum elevation:\t%s\n", d.TransitTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Time of maximum elevation:\t%s\n", d.TransitTime.Format(detailsTimeLayout))
 		fmt.Fprintf(&b, "Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees())
 	}
 
 	if d.SetTime != nil {
-		fmt.Fprintf(&b, "Set time:\t%s\n", d.SetTime.ToGo().Format("03:04 pm"))
+		fmt.Fprintf(&b, "Set time:\t%s\n", d.SetTime.Format(detailsTimeLayout))
 		fmt.Fprintf(&b, "Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0))
 	}
 
@@ -129,9 +143,11 @@ func (d TargetDetails) String() string {
 			fmt.Fprintf(&b, "NGC/IC number:\t%s\n", v)
 		}
 
-		for k, v := range d.ExtraProps {
+		// The rest in key order. Ranging over the map printed them in Go's
+		// randomized map order, different from one run to the next (#1134).
+		for _, k := range slices.Sorted(maps.Keys(d.ExtraProps)) {
 			if k != "Messier number" && k != "NGC/IC number" {
-				fmt.Fprintf(&b, "%s:\t%s\n", k, v)
+				fmt.Fprintf(&b, "%s:\t%s\n", k, d.ExtraProps[k])
 			}
 		}
 	}

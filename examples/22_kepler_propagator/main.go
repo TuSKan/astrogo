@@ -45,7 +45,7 @@ func main() {
 	// Earth-orientation data either (UT1 = UTC, no polar motion). That can
 	// move a rise or set by up to about a second, below the minute printed.
 	// For full accuracy, blank-import remote/eop and consent to the IERS
-	// bulletin, as 05_resolve_name does.
+	// bulletin, as 09_geometry_events does.
 	time.RegisterModel(time.ZeroModel{})
 
 	// Resolve 1 Ceres's real, current osculating elements live from JPL

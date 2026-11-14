@@ -24,15 +24,15 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
-	// The Earth-orientation loader, which step 3 relies on: without this
-	// import no file is ever read, pre-seeded or not, and every epoch uses
-	// zero EOP.
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
+	// The Earth-orientation loader, which step 3 relies on: without this
+	// import no file is ever read, pre-seeded or not, and every epoch uses
+	// zero EOP.
+	_ "github.com/TuSKan/astrogo/remote/eop"
 )
 
 // cacheLocation names where an endpoint's files are expected, for display

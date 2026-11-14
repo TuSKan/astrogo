@@ -18,7 +18,7 @@ func main() {
 	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
 	// to 13.5 arcsec, well below the 0.01° printed here. For full accuracy,
 	// blank-import remote/eop and consent to the IERS bulletin, as
-	// 05_resolve_name does.
+	// 09_geometry_events does.
 	time.RegisterModel(time.ZeroModel{})
 
 	// 1. Define the observer's location (Quinta Calixto, Brazil)
