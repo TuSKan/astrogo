@@ -109,7 +109,7 @@ func main() {
 		fmt.Printf("  Maximum (UTC):       %s\n", e.Time.FormatJulian("15:04:05"))
 		fmt.Printf("  Type:                %s (umbral magnitude %.3f)\n", e.Kind, e.Magnitude)
 		fmt.Printf("  Ecliptic latitude:   %.3f°\n", e.EclipticLatitude.Degrees())
-		fmt.Printf("  Gamma (centrality):  %.3f (0=central, 1=penumbral edge)\n", e.Gamma)
+		fmt.Printf("  Gamma:               %+.4f Earth radii from the shadow axis (+ north)\n", e.Gamma)
 	}
 
 	// ── Moon Illumination at moonrise ──
@@ -180,7 +180,7 @@ func main() {
 			passover = "★ Near Passover"
 		}
 
-		fmt.Printf("  %-22s  %-10s  %6.3f   %s\n",
+		fmt.Printf("  %-22s  %-10s  %+7.4f  %s\n",
 			e.Time.FormatJulian("2006-01-02 15:04 MST"),
 			e.Kind,
 			e.Gamma,
