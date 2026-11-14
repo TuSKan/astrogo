@@ -483,20 +483,16 @@ func (uf *unionFind) union(a, b int) {
 // IDs and aliases share one index, so one provider's ID meets another's alias.
 // They used to be keyed apart, an ID only ever meeting other IDs, which made
 // the cross-identifier match this doc describes impossible (#613).
+//
+// The keys are [resolve.IdentityKeys], which plan.VisibleTonight matches by
+// too: the ID, designation and aliases, with SIMBAD's object-type prefixes
+// removed, so SIMBAD's "* eps Ori" meets OpenNGC's "Eps Ori" (#1136).
 func unionByAlias(candidates []candidate, uf *unionFind) {
 	idx := make(map[string][]int)
 
-	add := func(name string, i int) {
-		if key := resolve.Normalize(name); key != "" {
-			idx[key] = append(idx[key], i)
-		}
-	}
-
 	for i, c := range candidates {
-		add(c.target.ID, i)
-
-		for _, a := range c.target.Aliases {
-			add(a, i)
+		for _, key := range resolve.IdentityKeys(c.target) {
+			idx[key] = append(idx[key], i)
 		}
 	}
 
