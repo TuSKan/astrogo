@@ -191,6 +191,12 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 //
 // Objects with no position are left out: a bright-object listing exists to be
 // placed on the sky, and below V 8 SIMBAD holds 29 entries without one.
+//
+// So are transients, by type: a supernova's or a nova's catalog V is its
+// outburst's, and the outburst is over. SN 2009jb carries V 1.07, and
+// plan.VisibleTonight listed it as a naked-eye star in Hercules (#1137).
+// Everything that is still in the sky stays, whatever its type: a galaxy, a
+// nebula, a supernova remnant, a cataclysmic binary. See [transientOtypes].
 func BuildBrightQuery(req resolve.BrightRequest) string {
 	limit := req.Limit
 	if limit <= 0 {
@@ -213,8 +219,16 @@ func BuildBrightQuery(req resolve.BrightRequest) string {
 	JOIN allfluxes ON basic.oid = allfluxes.oidref
 	LEFT JOIN otypedef ON basic.otype = otypedef.otype
 	WHERE allfluxes.V < %f AND basic.ra IS NOT NULL AND basic.dec IS NOT NULL
-	ORDER BY vmag ASC`, limit, req.MaxVMag)
+		AND (basic.otype IS NULL OR basic.otype NOT IN (%s))
+	ORDER BY vmag ASC`, limit, req.MaxVMag, transientOtypes)
 }
+
+// transientOtypes are SIMBAD's object types for an event rather than an
+// object, as its otypedef table names them: SN* supernova, SN? supernova
+// candidate, No* classical nova, No? nova candidate, ev transient event, gB
+// gamma-ray burst, rB radio burst. A remnant (SNR) and a cataclysmic binary
+// (CV*) are not among them; both are still there to be seen.
+const transientOtypes = `'SN*', 'SN?', 'No*', 'No?', 'ev', 'gB', 'rB'`
 
 // brightRowCap is the most objects SearchBright returns for a request that
 // names no limit. It is SIMBAD's own default output limit, as its TAP
