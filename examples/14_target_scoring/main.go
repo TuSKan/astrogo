@@ -15,6 +15,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -54,82 +55,77 @@ func main() {
 	}
 
 	// ── Constraints ──────────────────────────────────────────────────────
-	constraints := []plan.Constraint{
-		plan.Altitude{Threshold: angle.Deg(20)},
-		plan.Airmass{Threshold: 2.5},
-	}
+	// A target failing any of them scores zero, whatever the weights.
+	altitude := plan.Altitude{Threshold: angle.Deg(20)}
+	constraints := []plan.Constraint{altitude, plan.Airmass{Threshold: 2.5}}
 
 	// ── Scoring profiles ─────────────────────────────────────────────────
 	profiles := []struct {
 		cfg  plan.ScoreConfig
 		name string
 	}{
-		{plan.ScoreConfig{}, "Default (balanced)"}, // the zero value means DefaultScoreConfig()
+		{plan.ScoreConfig{}, "Default"}, // the zero value means DefaultScoreConfig()
 		{plan.ScoreConfig{
 			AltitudeWeight: 1.0,
 			UrgencyWeight:  0.0,
 			MoonWeight:     0.0,
-		}, "Altitude-only"},
+		}, "Altitude only"},
 		{plan.ScoreConfig{
 			AltitudeWeight:  0.2,
 			UrgencyWeight:   0.7,
 			MoonWeight:      0.1,
 			MoonFullPenalty: angle.Deg(30),
-		}, "Urgency-heavy"},
+		}, "Urgency heavy"},
 	}
 
-	// ── Header ───────────────────────────────────────────────────────────
-	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Composite Target Scoring — Quinta Calixto")
-	fmt.Printf("  Epoch: %s\n", tm)
-	fmt.Println("══════════════════════════════════════════════════════════════")
+	show.Title("Composite target scoring", site.Name()+", "+tm.Format("2006-01-02 15:04 MST"))
 
-	for _, profile := range profiles {
-		fmt.Printf("\n── %s ", profile.name)
-		fmt.Println("──────────────────────────────────────")
+	cols := make([]show.Column, 0, 2+len(profiles))
+	cols = append(cols, show.Left("Target"), show.Right("Altitude"))
 
-		// Score each target
-		type result struct {
-			name  string
-			score float64
+	for _, p := range profiles {
+		cols = append(cols, show.Right(p.name))
+	}
+
+	tab := show.NewTable(cols...)
+
+	for _, obj := range targets {
+		alt, err := altitude.Check(obj, tm, site)
+		if err != nil {
+			log.Fatalf("%s altitude: %v", obj.Name(), err)
 		}
 
-		var results []result
+		row := make([]string, 0, 2+len(profiles))
+		row = append(row, obj.Name(), fmt.Sprintf("%.1f°", alt.Value))
 
-		for _, obj := range targets {
-			score, err := plan.Scorer{
-				Site:        site,
-				Config:      profile.cfg,
-				Constraints: constraints,
-			}.Score(obj, tm)
+		for _, p := range profiles {
+			score, err := plan.Scorer{Site: site, Config: p.cfg, Constraints: constraints}.Score(obj, tm)
 			if err != nil {
-				fmt.Printf("  %-14s  error: %v\n", obj.Name(), err)
-				continue
+				log.Fatalf("%s %s score: %v", obj.Name(), p.name, err)
 			}
 
-			results = append(results, result{obj.Name(), score})
+			row = append(row, fmt.Sprintf("%.1f", score))
 		}
 
-		// Print ranked
-		fmt.Printf("  %-14s  %8s\n", "Target", "Score")
-		fmt.Printf("  %-14s  %8s\n", "──────────────", "────────")
-
-		for _, r := range results {
-			marker := " "
-			if r.score == 0 {
-				marker = "✗"
-			}
-
-			fmt.Printf("  %-14s  %8.1f  %s\n", r.name, r.score, marker)
-		}
+		tab.Row(row...)
 	}
+
+	fmt.Println()
+	tab.Print()
+	fmt.Println()
+	show.Note("Canopus scores zero under every profile: it is below the",
+		"20° altitude limit, and a target that fails a constraint is out.")
 
 	// ── Explain the default weights ──────────────────────────────────────
-	fmt.Println("\n── Weight Breakdown ──────────────────────────────────────────")
-
 	cfg := plan.DefaultScoreConfig()
-	fmt.Printf("  Altitude:  %.0f%%  (alt/90°, lower airmass = better)\n", cfg.AltitudeWeight*100)
-	fmt.Printf("  Urgency:   %.0f%%  (1/hours_until_set, about-to-set = urgent)\n", cfg.UrgencyWeight*100)
-	fmt.Printf("  Moon sep:  %.0f%%  (sep/%.0f°, farther from Moon = better)\n", cfg.MoonWeight*100, cfg.MoonFullPenalty.Degrees())
-	fmt.Println("\n  Score = (w₁·alt + w₂·urgency + w₃·moon) × 90 × priority")
+
+	show.Section("The default weights")
+	show.Fields(
+		show.KV("Altitude", "%.0f%%  altitude/90°: higher is lower airmass", cfg.AltitudeWeight*100),
+		show.KV("Urgency", "%.0f%%  1/hours until set: about to set is urgent", cfg.UrgencyWeight*100),
+		show.KV("Moon", "%.0f%%  separation/%.0f°: farther from the Moon is better",
+			cfg.MoonWeight*100, cfg.MoonFullPenalty.Degrees()),
+	)
+	fmt.Println()
+	show.Note("Score = (w₁·altitude + w₂·urgency + w₃·moon) × 90 × priority")
 }
