@@ -18,6 +18,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -28,17 +29,17 @@ func main() {
 		log.Fatalf("telescope: %v", err)
 	}
 
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println("  8\" f/10 SCT — OPTICAL SYSTEM FIGURES")
-	fmt.Println("  AstroGo | optics.Telescope/Eyepiece/Sensor")
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println()
-	fmt.Printf("  Aperture           %.0f mm\n", scope.Aperture().Millimeters())
-	fmt.Printf("  Focal length       %.0f mm\n", scope.FocalLength().Millimeters())
-	fmt.Printf("  Focal ratio        f/%.0f\n", scope.FocalRatio())
-	fmt.Printf("  Dawes limit        %.2f\"\n", scope.DawesLimit().Arcseconds())
-	fmt.Printf("  Max useful mag.    %.0fx\n", scope.MaxUsefulMagnification())
-	fmt.Printf("  Limiting mag.      %.1f\n", scope.LimitingMagnitude())
+	show.Title(`Optical system: an 8" f/10 Schmidt-Cassegrain`, "optics.Telescope, Eyepiece and Sensor")
+
+	show.Section("The telescope")
+	show.Fields(
+		show.KV("Aperture", "%.0f mm", scope.Aperture().Millimeters()),
+		show.KV("Focal length", "%.0f mm", scope.FocalLength().Millimeters()),
+		show.KV("Focal ratio", "f/%.0f", scope.FocalRatio()),
+		show.KV("Dawes limit", `%.2f"`, scope.DawesLimit().Arcseconds()),
+		show.KV("Max useful magnification", "%.0fx", scope.MaxUsefulMagnification()),
+		show.KV("Limiting magnitude", "%.1f", scope.LimitingMagnitude()),
+	)
 
 	// ── Wide-field eyepiece, exact TrueFOV via a known field stop ──────────
 	wideField, err := optics.NewEyepiece(unit.Millimeters(32), angle.Deg(52), optics.WithFieldStop(unit.Millimeters(27.4)))
@@ -46,15 +47,11 @@ func main() {
 		log.Fatalf("wide-field eyepiece: %v", err)
 	}
 
-	printEyepiece(scope, "32mm / 52° (27.4mm field stop)", wideField)
-
 	// ── Planetary eyepiece, no field stop → AFOV/magnification fallback ────
 	planetary, err := optics.NewEyepiece(unit.Millimeters(9), angle.Deg(52))
 	if err != nil {
 		log.Fatalf("planetary eyepiece: %v", err)
 	}
-
-	printEyepiece(scope, "9mm / 52° (no field stop — AFOV/mag. approximation)", planetary)
 
 	// ── Same eyepiece behind a 2x Barlow ────────────────────────────────────
 	barlowed, err := scope.WithBarlow(2)
@@ -62,7 +59,31 @@ func main() {
 		log.Fatalf("barlow: %v", err)
 	}
 
-	printEyepiece(barlowed, "9mm / 52°, behind a 2x Barlow", planetary)
+	show.Section("Eyepieces")
+
+	tab := show.NewTable(show.Left("Eyepiece"), show.Right("Magnification"),
+		show.Right("True field"), show.Right("Exit pupil"))
+
+	for _, c := range []struct {
+		label    string
+		scope    optics.Telescope
+		eyepiece optics.Eyepiece
+	}{
+		{"32 mm, 52°, 27.4 mm field stop", scope, wideField},
+		{"9 mm, 52°", scope, planetary},
+		{"9 mm, 52°, 2x Barlow", barlowed, planetary},
+	} {
+		tab.Row(c.label,
+			fmt.Sprintf("%.0fx", c.scope.Magnification(c.eyepiece)),
+			fmt.Sprintf("%.2f°", c.scope.TrueFOV(c.eyepiece).Degrees()),
+			fmt.Sprintf("%.2f mm", c.scope.ExitPupil(c.eyepiece).Millimeters()))
+	}
+
+	tab.Print()
+	fmt.Println()
+	show.Note("A known field stop gives the true field exactly. Without one it",
+		"is the apparent field over the magnification, an approximation",
+		"that drifts on wide-field designs.")
 
 	// ── Imaging: CMOS sensor field of view and plate scale ─────────────────
 	sensor := optics.Sensor{
@@ -73,20 +94,9 @@ func main() {
 
 	w, h := scope.SensorFOV(sensor)
 
-	fmt.Println()
-	fmt.Println("── Imaging: 23.5×15.6mm CMOS sensor, 3.76µm pixels ─────────────────")
-	fmt.Println()
-	fmt.Printf("  Pixel scale        %.2f\"/px\n", scope.PixelScale(sensor).Arcseconds())
-	fmt.Printf("  Sensor field       %.2f' × %.2f'\n", w.Arcminutes(), h.Arcminutes())
-	fmt.Println()
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-}
-
-func printEyepiece(scope optics.Telescope, label string, eyepiece optics.Eyepiece) {
-	fmt.Println()
-	fmt.Printf("── %s ──\n", label)
-	fmt.Println()
-	fmt.Printf("  Magnification      %.0fx\n", scope.Magnification(eyepiece))
-	fmt.Printf("  True field of view %.2f°\n", scope.TrueFOV(eyepiece).Degrees())
-	fmt.Printf("  Exit pupil         %.2f mm\n", scope.ExitPupil(eyepiece).Millimeters())
+	show.Section("Imaging: a 23.5 × 15.6 mm sensor, 3.76 µm pixels")
+	show.Fields(
+		show.KV("Pixel scale", `%.2f"/pixel`, scope.PixelScale(sensor).Arcseconds()),
+		show.KV("Field", "%.2f' × %.2f'", w.Arcminutes(), h.Arcminutes()),
+	)
 }
