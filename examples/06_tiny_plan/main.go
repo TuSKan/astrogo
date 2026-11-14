@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/examples/internal/show"
@@ -82,7 +83,7 @@ func main() {
 
 	for i, b := range schedule.Blocks {
 		tab.Row(
-			fmt.Sprint(i+1),
+			strconv.Itoa(i+1),
 			b.Block.ID,
 			b.Block.Config.Filter,
 			b.Window.Start.In(tz).Format("15:04"),

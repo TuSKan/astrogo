@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
 
@@ -55,6 +56,7 @@ func main() {
 	}
 
 	show.Title("Where is Mars?", "Quinta Calixto, Brazil")
+	fmt.Println()
 	show.Fields(
 		show.KV("Time", "%s", tm.Format("2006-01-02 15:04 MST")),
 		show.KV("Altitude", "%.2f°", skyPos.Alt().Degrees()),

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog"
@@ -60,7 +61,7 @@ func main() {
 			ra, dec = t.Coord.RA().HMSString(1), t.Coord.Dec().DMSString(0)
 		}
 
-		tab.Row(fmt.Sprint(i+1), t.Name, string(t.Kind), t.Catalog, ra, dec)
+		tab.Row(strconv.Itoa(i+1), t.Name, string(t.Kind), t.Catalog, ra, dec)
 	}
 
 	fmt.Println()

@@ -2,6 +2,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/examples/internal/show"
@@ -20,6 +22,7 @@ func main() {
 	sep := coord.Separation(alcor, mizar)
 
 	show.Title("Angular separation", "Mizar and Alcor, in the handle of the Big Dipper")
+	fmt.Println()
 	show.Fields(
 		show.KV("Alcor", "RA %s   Dec %s", alcor.RA().HMSString(1), alcor.Dec().DMSString(0)),
 		show.KV("Mizar", "RA %s   Dec %s", mizar.RA().HMSString(1), mizar.Dec().DMSString(0)),
