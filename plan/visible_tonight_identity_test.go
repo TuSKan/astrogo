@@ -2,6 +2,7 @@ package plan_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -61,7 +62,7 @@ func TestVisibleTonightListsAnObjectOnce(t *testing.T) {
 			t.Errorf("kept %q, want the first source's entry, * eps Ori", a.Target.ID)
 		}
 
-		if !containsString(a.Target.Aliases, "NGC1990") || !containsString(a.Target.Aliases, "HIP 026311") {
+		if !slices.Contains(a.Target.Aliases, "NGC1990") || !slices.Contains(a.Target.Aliases, "HIP 026311") {
 			t.Errorf("the merged Alnilam lost OpenNGC's identifiers: %q", a.Target.Aliases)
 		}
 	}
@@ -71,14 +72,4 @@ func TestVisibleTonightListsAnObjectOnce(t *testing.T) {
 			t.Errorf("%s listed %d times, want once: a system and its component are two entries", name, n)
 		}
 	}
-}
-
-func containsString(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-
-	return false
 }
