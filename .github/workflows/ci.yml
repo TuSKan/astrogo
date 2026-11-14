@@ -134,6 +134,19 @@ jobs:
           go build ./...
           go vet ./...
 
+      # Building the examples was all CI did with them, and 14 panicked on
+      # every run for as long as anyone can tell (#1150). The README's
+      # Network column marks the ones that need no network; the examples
+      # module's tests run each of those against an empty cache, require exit
+      # 0, and hold the column to the code (examples/offline_examples_test.go).
+      # Ubuntu alone: what they exercise is the library, already tested on
+      # every OS above.
+      - name: Run the offline examples
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        working-directory: examples
+        run: go test -count=1 -timeout 20m ./...
+
       - name: Check go mod tidy (examples)
         if: matrix.os == 'ubuntu-latest'
         shell: bash
