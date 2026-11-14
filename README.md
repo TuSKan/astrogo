@@ -774,6 +774,8 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 
 The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the 28th CGPM (2026) makes UTC continuous from 2027-05-20, with |UT1−UTC| allowed to reach an hour, so after that date only EOP data says where UT1 is.
 
+The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
+
 The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
