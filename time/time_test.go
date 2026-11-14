@@ -58,6 +58,28 @@ func TestNowUTC(t *testing.T) {
 	testutil.AssertEqual(t, "Scale", tm.Scale(), time.UTC)
 }
 
+// TestNowUTCDisplaysUTC: NowUTC kept the host's local zone for display, so
+// NowUTC().Format("15:04 UTC") printed the local clock labeled UTC (#1142).
+// Its location is now UTC, and its formatted clock is the UTC one, on a host
+// in any zone.
+func TestNowUTCDisplaysUTC(t *testing.T) {
+	tm := time.NowUTC()
+
+	if loc := tm.Location(); loc != time.LocationUTC {
+		t.Errorf("NowUTC().Location() = %v, want UTC", loc)
+	}
+
+	if got, want := tm.ToGo().Location(), time.LocationUTC; got != want {
+		t.Errorf("NowUTC().ToGo().Location() = %v, want UTC", got)
+	}
+
+	// The clock it formats is the UTC clock of the same instant.
+	goNow := tm.ToGo()
+	if got, want := tm.Format("2006-01-02 15:04"), goNow.UTC().Format("2006-01-02 15:04"); got != want {
+		t.Errorf("NowUTC().Format = %s, want the UTC clock %s", got, want)
+	}
+}
+
 func TestArithmetic(t *testing.T) {
 	tm := time.FromJD(2450000.0, time.TT)
 
