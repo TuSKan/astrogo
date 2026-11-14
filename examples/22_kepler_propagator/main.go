@@ -31,6 +31,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 
@@ -62,22 +63,21 @@ func main() {
 		log.Fatalf("SBDB response for %q carried no orbital elements", target.Name)
 	}
 
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println("  1 CERES — two-body Keplerian propagation from published elements")
-	fmt.Println("  AstroGo | plan.FromCatalog | elements resolved live from JPL SBDB")
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println()
-	fmt.Println("── Osculating elements (JPL SBDB, epoch below) ─────────────────────")
-	fmt.Println()
+	show.Title("1 Ceres: two-body propagation from published elements",
+		"plan.FromCatalog, with the elements resolved live from JPL SBDB")
+
 	// SBDB states the epoch as a TDB Julian Date. Format always prints the
 	// UTC clock, which runs about 69 s behind TDB.
-	fmt.Printf("  Epoch            JD %.1f TDB (%s)\n", target.Epoch.TDB().JD(), target.Epoch.Format("2006-01-02 15:04:05 UTC"))
-	fmt.Printf("  Semi-major axis  %.6f AU\n", target.SemiMajorAxis.AU())
-	fmt.Printf("  Eccentricity     %.6f\n", target.Eccentricity)
-	fmt.Printf("  Inclination      %s\n", target.Inclination.DMSString(1))
-	fmt.Printf("  Ascending node   %s\n", target.AscendingNode.DMSString(1))
-	fmt.Printf("  Arg. periapsis   %s\n", target.ArgPeriapsis.DMSString(1))
-	fmt.Printf("  Mean anomaly     %s (at epoch)\n", target.MeanAnomaly.DMSString(1))
+	show.Section("Osculating elements")
+	show.Fields(
+		show.KV("Epoch", "JD %.1f TDB (%s)", target.Epoch.TDB().JD(), target.Epoch.Format("2006-01-02 15:04:05 UTC")),
+		show.KV("Semi-major axis", "%.6f AU", target.SemiMajorAxis.AU()),
+		show.KV("Eccentricity", "%.6f", target.Eccentricity),
+		show.KV("Inclination", "%s", target.Inclination.DMSString(1)),
+		show.KV("Ascending node", "%s", target.AscendingNode.DMSString(1)),
+		show.KV("Argument of periapsis", "%s", target.ArgPeriapsis.DMSString(1)),
+		show.KV("Mean anomaly", "%s at the epoch", target.MeanAnomaly.DMSString(1)),
+	)
 
 	// Note what does NOT happen here: no remote.EnableDownloads for a
 	// kernel, no de440s (~32 MB) download, no manual eph.NewElements/
@@ -98,11 +98,8 @@ func main() {
 	epoch := target.Epoch
 
 	// ── Part 1: position/magnitude drift across the year ────────────────────
-	fmt.Println()
-	fmt.Println("── Position & magnitude for a year from the epoch (two-body) ──────")
-	fmt.Println()
-	fmt.Println("  Date          RA             Dec           Δ (AU)   Mag")
-	fmt.Println("  ──────────    ───────────    ──────────    ──────   ────")
+	year := show.NewTable(show.Left("Date"), show.Left("RA"), show.Left("Dec"),
+		show.Right("Distance"), show.Right("Magnitude"))
 
 	for m := range 12 {
 		t := epoch.Add(unit.Days(float64(m) * 30))
@@ -122,25 +119,22 @@ func main() {
 			log.Fatalf("apparent magnitude: %v", err)
 		}
 
-		fmt.Printf("  %s    %s    %s    %5.2f   %5.2f\n",
-			t.Format("2006-01-02"), pos.RA().HMSString(1), pos.Dec().DMSString(0), vec.Norm(), mag)
+		year.Row(t.Format("2006-01-02"), pos.RA().HMSString(1), pos.Dec().DMSString(0),
+			fmt.Sprintf("%.2f AU", vec.Norm()), fmt.Sprintf("%.2f", mag))
 	}
 
+	show.Section("A year from the epoch")
+	year.Print()
 	fmt.Println()
-	fmt.Println("  Two-body propagation ignores planetary perturbations by design —")
-	fmt.Println("  accuracy drifts away from Epoch (arcseconds within days, arcminutes")
-	fmt.Println("  within months for a main-belt body). For perturbation-aware")
-	fmt.Println("  accuracy over long spans, pass a real SPK-kernel-backed provider")
-	fmt.Println("  to FromCatalog instead — e.g. eph.NewProvider(ctx, eph.SmallBody,")
-	fmt.Println("  \"1\") — see ephemeris/kepler's package doc for the full")
-	fmt.Println("  scope/accuracy discussion, and plan.WithSmallBodyKernels for the")
-	fmt.Println("  equivalent override inside plan.VisibleTonight.")
+	show.Note("Two-body propagation ignores planetary perturbations by design:",
+		"its accuracy drifts away from the epoch, by arcseconds within days and",
+		"arcminutes within months for a main-belt body. For perturbation-aware",
+		"accuracy over long spans, pass a kernel-backed provider to FromCatalog",
+		`instead, such as eph.NewProvider(ctx, eph.SmallBody, "1"). See`,
+		"ephemeris/kepler's package doc for the whole discussion, and",
+		"plan.WithSmallBodyKernels for the same choice inside VisibleTonight.")
 
 	// ── Part 2: it's a full Observable — rise/transit/set works unchanged ──
-	fmt.Println()
-	fmt.Println("── Rise / Transit / Set at Mauna Kea (epoch night) ─────────────────")
-	fmt.Println()
-
 	site, err := plan.NewKnownSite("Mauna Kea")
 	if err != nil {
 		log.Fatalf("site: %v", err)
@@ -151,19 +145,22 @@ func main() {
 		log.Fatalf("visibility events: %v", err)
 	}
 
-	if len(events) == 0 {
-		fmt.Println("  (not observable above the horizon this night from Mauna Kea)")
-	}
+	show.Section("Rise, transit and set at Mauna Kea, the epoch night")
 
-	for _, e := range events {
-		fmt.Printf("  %-8s  %s   Alt=%s  Az=%s\n",
-			e.Kind, e.Time.Format("2006-01-02 15:04 MST"), e.Altitude.DMSString(0), e.Azimuth.DMSString(0))
+	if len(events) == 0 {
+		show.Note("Not above the horizon this night from Mauna Kea.")
+	} else {
+		tab := show.NewTable(show.Left("Event"), show.Left("Time"), show.Right("Altitude"), show.Right("Azimuth"))
+		for _, e := range events {
+			tab.Row(e.Kind.String(), e.Time.Format("2006-01-02 15:04 MST"),
+				e.Altitude.DMSString(0), e.Azimuth.DMSString(0))
+		}
+
+		tab.Print()
 	}
 
 	fmt.Println()
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println("  A Kepler-propagated body is a plain Observable — VisibilityEvents,")
-	fmt.Println("  ObservableWindows, and GetDetails all work exactly as they would")
-	fmt.Println("  for any SPK-kernel-backed or catalog-resolved target.")
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
+	show.Note("A Kepler-propagated body is a plain Observable: VisibilityEvents,",
+		"ObservableWindows and GetDetails work on it exactly as they would for",
+		"any kernel-backed or catalog-resolved target.")
 }
