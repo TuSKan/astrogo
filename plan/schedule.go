@@ -255,6 +255,14 @@ func NewScheduler(planner *Planner, strategy Strategy, tm TransitionModel) *Sche
 
 // BuildSchedule generates a Schedule for the provided blocks within the given window.
 func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, error) {
+	// A window that ends before it starts, or at a time that is not a number,
+	// is the caller's mistake. Until #1177 it came back as a schedule with
+	// every block unscheduled and a nil error, which reads as a night when
+	// nothing could be observed.
+	if err := checkInterval(window.Start, window.End); err != nil {
+		return nil, fmt.Errorf("scheduler: window: %w", err)
+	}
+
 	if s.Strategy == nil {
 		return &Schedule{
 			Site:   s.Planner.Site,
@@ -384,6 +392,10 @@ func (s *GreedyStrategy) schedule(
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
 ) (*Schedule, error) {
+	if err := checkInterval(window.Start, window.End); err != nil {
+		return nil, fmt.Errorf("scheduler: window: %w", err)
+	}
+
 	step := s.Step
 	if step <= 0 {
 		step = defaultStep

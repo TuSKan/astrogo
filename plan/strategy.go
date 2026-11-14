@@ -71,6 +71,12 @@ func (s *SwapOptimizedStrategy) schedule(
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
 ) (*Schedule, error) {
+	// Checked here as well as in the greedy base, since a caller's own Base
+	// need not check it.
+	if err := checkInterval(window.Start, window.End); err != nil {
+		return nil, fmt.Errorf("strategy: window: %w", err)
+	}
+
 	base := s.Base
 	if base == nil {
 		base = &PriorityStrategy{Step: s.Step}
