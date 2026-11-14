@@ -277,6 +277,19 @@ func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) 
 			fmt.Errorf("%w: the state at tsince %g overflowed", ErrNotFinite, tsince)
 	}
 
+	// SGP4 is a theory of orbits about the Earth, and has nothing to say about
+	// a body the Earth does not hold: past its Hill sphere the Sun governs the
+	// motion. Run thousands of years from its epoch, the secular drag terms
+	// carry an element set out there with none of the checks here firing, and
+	// the ISS evaluated at JD 0 came back 5.9e23 km away with no error
+	// (#1131). Such a state is not one the model represents, so it is refused
+	// and both vectors are zero.
+	if mr > earthHillRadiusKM {
+		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf(
+			"%w: geocentric distance is %g km at tsince %g min, beyond the Earth's Hill sphere of %.4g km",
+			ErrBeyondHillSphere, mr, tsince, earthHillRadiusKM)
+	}
+
 	// Both of the conditions below leave the state populated, because both
 	// describe a result that exists and should not be trusted — which is a
 	// different thing from a computation that could not be performed.
@@ -294,6 +307,12 @@ func (p *Propagator) evaluate(tsince float64) (pos, vel vector.Vec3, err error) 
 
 	return pos, vel, nil
 }
+
+// earthHillRadiusKM is the radius of the Earth's Hill sphere, inside which the
+// Earth's gravity dominates the Sun's: r = a·(m/3M)^(1/3), with a = 1 au
+// (149,597,870.7 km) and m/M = GM⊕/GM☉ = 398600.435436 / 1.32712440041e11
+// km³/s² (DE440), giving 0.0100039 au.
+const earthHillRadiusKM = 1.49656e6
 
 // finiteState reports whether every component of a position and velocity is a
 // finite number.
