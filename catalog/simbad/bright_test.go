@@ -39,6 +39,33 @@ func TestBuildBrightQueryAsksForEveryObject(t *testing.T) {
 	}
 }
 
+// TestBuildBrightQueryLeavesOutTransients: a supernova's or a nova's catalog
+// V is its outburst's, not the brightness of anything in the sky now, and
+// SN 2009jb at V 1.07 was listed as a naked-eye star (#1137). The query
+// leaves out SIMBAD's transient types, and only those: a supernova remnant
+// and a cataclysmic binary are still there to be seen.
+func TestBuildBrightQueryLeavesOutTransients(t *testing.T) {
+	t.Parallel()
+
+	q := BuildBrightQuery(resolve.BrightRequest{MaxVMag: 6})
+
+	if !strings.Contains(q, "basic.otype NOT IN ("+transientOtypes+")") {
+		t.Fatalf("the bright query does not leave out transients: %s", q)
+	}
+
+	for _, transient := range []string{"SN*", "SN?", "No*", "No?", "ev", "gB", "rB"} {
+		if !strings.Contains(transientOtypes, "'"+transient+"'") {
+			t.Errorf("transient type %q is not left out", transient)
+		}
+	}
+
+	for _, persistent := range []string{"SNR", "CV*", "G", "*", "Ev?"} {
+		if strings.Contains(transientOtypes, "'"+persistent+"'") {
+			t.Errorf("type %q, an object still in the sky, is left out", persistent)
+		}
+	}
+}
+
 // brightServer serves rows synthetic objects in the bright query's CSV shape
 // and records each request's MAXREC.
 func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Value) {
