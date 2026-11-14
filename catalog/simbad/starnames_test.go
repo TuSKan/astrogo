@@ -21,8 +21,12 @@ func TestFriendlyName(t *testing.T) {
 		{"* gam02 Vel", "Regor", true},
 		// Unrecognized designations fall back to mainID unchanged.
 		{"* zet Aqr", "* zet Aqr", false},
-		{"NAME LMC", "NAME LMC", false},
 		{"SN 2009jb", "SN 2009jb", false},
+		// A common name drops SIMBAD's NAME marker, which is not part of
+		// the name (#1151). This row read "NAME LMC" until then.
+		{"NAME LMC", "LMC", false},
+		{"NAME Aquarius IV", "Aquarius IV", false},
+		{"NAME CMa Dwarf Galaxy", "CMa Dwarf Galaxy", false},
 	}
 
 	for _, tt := range tests {
