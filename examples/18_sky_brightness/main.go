@@ -20,6 +20,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
@@ -63,7 +64,10 @@ func main() {
 	// the IERS bulletin, which the remote/eop import above fetches.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
-	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
+	show.Title("How dark is the sky?",
+		fmt.Sprintf("%s at Cerro Paranal, %s UTC", preset, when.Format("2006-01-02 15:04")))
+	fmt.Println()
+	show.Note("Fetching reference data (the first run downloads about 145 MB)...")
 
 	sky, err := dataset.Open(ctx, dataset.Spec{Preset: preset})
 	if err != nil {
@@ -89,8 +93,11 @@ func main() {
 		log.Fatalf("scene: %v", err)
 	}
 
-	fmt.Printf("\n%s at Cerro Paranal, %s UTC\n\n", preset, when.Format("2006-01-02 15:04"))
-	fmt.Printf("  %-9s  %s\n", "altitude", "sky brightness")
+	// The sky toward the north, from the zenith down. Azimuth 0 throughout,
+	// so what changes between rows is the altitude and what lies there.
+	byAltitude := show.NewTable(show.Right("Altitude"), show.Right("Sky brightness"))
+
+	var zenith *skybrightness.Estimate
 
 	for _, altDeg := range []float64{90, 60, 30, 15} {
 		est, err := sky.Direction(ctx, scene, angle.Deg(altDeg), angle.Deg(0))
@@ -103,18 +110,23 @@ func main() {
 			log.Fatalf("surface brightness: %v", err)
 		}
 
-		fmt.Printf("  %6.0f°     %6.2f mag/arcsec²\n", altDeg, sb)
+		byAltitude.Row(fmt.Sprintf("%.0f°", altDeg), fmt.Sprintf("%.2f mag/arcsec²", sb))
 
 		if altDeg == 90 {
-			composition(sky, est)
+			zenith = est
 		}
 	}
 
-	fmt.Println("\nThese do not fall off smoothly with altitude, and that is the point:")
-	fmt.Println("the night sky is not a uniform dome. Airmass grows toward the horizon,")
-	fmt.Println("which brightens it, while starlight and zodiacal light depend on where")
-	fmt.Println("this azimuth happens to be pointing. The two compete, and a model that")
-	fmt.Println("only knew about airmass would miss most of what is going on.")
+	show.Section("From the zenith down")
+	byAltitude.Print()
+	fmt.Println()
+	show.Note("These do not fall off smoothly with altitude, and that is the point:",
+		"the night sky is not a uniform dome. Airmass grows toward the horizon,",
+		"which brightens it, while starlight and zodiacal light depend on where",
+		"this azimuth happens to be pointing. The two compete, and a model that",
+		"only knew about airmass would miss most of what is going on.")
+
+	composition(sky, zenith)
 }
 
 // composition prints what the zenith sky is made of.
@@ -128,12 +140,14 @@ func composition(sky *dataset.Sky, est *skybrightness.Estimate) {
 		log.Fatalf("composition: %v", err)
 	}
 
-	fmt.Println()
-
+	tab := show.NewTable(show.Left("Component"), show.Right("mag/arcsec²"), show.Right("Share"))
 	for _, r := range rows {
-		fmt.Printf("      %-20s %6.2f  %5.1f%%\n",
-			r.Component, r.Brightness, 100*r.Fraction)
+		tab.Row(string(r.Component), fmt.Sprintf("%.2f", r.Brightness), fmt.Sprintf("%.1f%%", 100*r.Fraction))
 	}
 
+	show.Section("The zenith, by component")
+	tab.Print()
 	fmt.Println()
+	show.Note("The shares add to 100%; the magnitudes do not add to anything,",
+		"since the components sum in linear radiance.")
 }
