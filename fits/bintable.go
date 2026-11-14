@@ -361,36 +361,6 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	return hdu, discardPadding(r, consumed)
 }
 
-// columnIndex returns the index of the column named name, or -1 if there is
-// none.
-//
-// Names compare without regard to case, as the FITS Standard (4.0, §7.3.2)
-// says comparisons with TTYPEn values should: "TIME" and "Time" are one name.
-// Services differ in the case they write: ESO's airglow service writes "lam"
-// where its documentation says "LAM", and the Gaia archive writes its column
-// names in lower case.
-//
-// The standard strongly recommends names that are unique without regard to
-// case, but does not require it, so an exact match is preferred: a table
-// holding both "flux" and "FLUX" still returns the one asked for.
-func (hdu *BintableHDU) columnIndex(name string) int {
-	fields := hdu.Batch.Schema().Fields()
-
-	for i, f := range fields {
-		if f.Name == name {
-			return i
-		}
-	}
-
-	for i, f := range fields {
-		if strings.EqualFold(f.Name, name) {
-			return i
-		}
-	}
-
-	return -1
-}
-
 // ColumnUnit returns the unit the column named colName declares in its TUNITn
 // keyword, such as "deg" or "h", or "" when it declares none. The name matches
 // as [BintableHDU.GetFloatColumn] matches it.
@@ -575,3 +545,33 @@ func floatReader(arr arrow.Array) (func(int) float64, bool) {
 // Type reports that this is a binary table HDU. See [ImageHDU.Type] for why it
 // is declared here rather than left to the embedded basicHDU.
 func (*BintableHDU) Type() HDUType { return HDUTypeBinary }
+
+// columnIndex returns the index of the column named name, or -1 if there is
+// none.
+//
+// Names compare without regard to case, as the FITS Standard (4.0, §7.3.2)
+// says comparisons with TTYPEn values should: "TIME" and "Time" are one name.
+// Services differ in the case they write: ESO's airglow service writes "lam"
+// where its documentation says "LAM", and the Gaia archive writes its column
+// names in lower case.
+//
+// The standard strongly recommends names that are unique without regard to
+// case, but does not require it, so an exact match is preferred: a table
+// holding both "flux" and "FLUX" still returns the one asked for.
+func (hdu *BintableHDU) columnIndex(name string) int {
+	fields := hdu.Batch.Schema().Fields()
+
+	for i, f := range fields {
+		if f.Name == name {
+			return i
+		}
+	}
+
+	for i, f := range fields {
+		if strings.EqualFold(f.Name, name) {
+			return i
+		}
+	}
+
+	return -1
+}

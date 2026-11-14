@@ -98,12 +98,11 @@ func TestColumnNamesMatchWithoutCase(t *testing.T) {
 		}
 	}
 
-	for _, get := range []func(string) error{
-		func(n string) error { _, err := table.GetFloatColumn(n); return err },
-		func(n string) error { _, err := table.GetStringColumn(n); return err },
-	} {
-		if err := get("dec"); !errors.Is(err, fits.ErrColumnNotFound) {
-			t.Errorf("a column the table lacks: err = %v, want fits.ErrColumnNotFound", err)
-		}
+	if _, err := table.GetFloatColumn("dec"); !errors.Is(err, fits.ErrColumnNotFound) {
+		t.Errorf("GetFloatColumn of a column the table lacks: err = %v, want fits.ErrColumnNotFound", err)
+	}
+
+	if _, err := table.GetStringColumn("dec"); !errors.Is(err, fits.ErrColumnNotFound) {
+		t.Errorf("GetStringColumn of a column the table lacks: err = %v, want fits.ErrColumnNotFound", err)
 	}
 }

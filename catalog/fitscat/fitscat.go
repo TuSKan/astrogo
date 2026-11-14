@@ -123,7 +123,7 @@ func New(filePath string) (*Provider, error) {
 func degreesPer(bintable *fits.BintableHDU, column string, hoursAllowed bool) (float64, error) {
 	unit, err := bintable.ColumnUnit(column)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("catalog/fitscat: %s unit: %w", column, err)
 	}
 
 	switch strings.ToLower(unit) {
