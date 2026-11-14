@@ -196,12 +196,12 @@ func main() {
 	}
 
 	for _, e := range lunarEcl {
-		fmt.Printf("  🌑 Lunar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f  magnitude %.3f\n",
+		fmt.Printf("  🌑 Lunar Eclipse (%s)  %s  |β|=%.3f°  γ=%+.4f  magnitude %.3f\n",
 			e.Kind, e.Time.In(brtz).Format("Jan 02 15:04 MST"), math.Abs(e.EclipticLatitude.Degrees()), e.Gamma, e.Magnitude)
 	}
 
 	for _, e := range solarEcl {
-		fmt.Printf("  🌕 Solar Eclipse (%s)  %s  |β|=%.3f°  γ=%.3f  magnitude %.3f\n",
+		fmt.Printf("  🌕 Solar Eclipse (%s)  %s  |β|=%.3f°  γ=%+.4f  magnitude %.3f\n",
 			e.Kind, e.Time.In(brtz).Format("Jan 02 15:04 MST"), math.Abs(e.EclipticLatitude.Degrees()), e.Gamma, e.Magnitude)
 	}
 

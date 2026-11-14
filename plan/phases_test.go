@@ -220,8 +220,10 @@ func TestEclipses_KnownYear(t *testing.T) {
 					t.Errorf("eclipse %d: Type.String() = %q, want %q", i, e.Type.String(), c.wantString)
 				}
 
-				if e.Gamma < 0 || e.Gamma > 1 {
-					t.Errorf("eclipse %d: Gamma = %.3f, want in [0,1]", i, e.Gamma)
+				// The widest an eclipse can reach: the penumbra's radius plus
+				// the Moon's, or plus the Earth's, at their largest.
+				if math.Abs(e.Gamma) > 1.6 {
+					t.Errorf("eclipse %d: Gamma = %.3f, want within ±1.6 Earth radii", i, e.Gamma)
 				}
 
 				if math.Abs(e.EclipticLatitude.Degrees()) > c.limitDeg {

@@ -290,23 +290,24 @@ Implemented in `plan.Apsides()`.
 
 ### Lunar Eclipses
 
-| Date | Type (NASA) | Detected | β (ecliptic lat) | γ (centrality) |
+| Date | Type (NASA) | Detected | β (ecliptic lat) | γ (Earth radii) |
 |---|---|---|---|---|
-| 2026-03-03 | Total | ✅ | −0.358° | 0.240 |
-| 2026-08-28 | Partial | ✅ | +0.462° | 0.317 |
+| 2026-03-03 | Total | ✅ | −0.358° | −0.3765 |
+| 2026-08-28 | Partial | ✅ | +0.462° | +0.4967 |
 
 ### Solar Eclipses
 
-| Date | Type (NASA) | Detected | β (ecliptic lat) | γ (centrality) |
+| Date | Type (NASA) | Detected | β (ecliptic lat) | γ (Earth radii) |
 |---|---|---|---|---|
-| 2026-02-17 | Annular | ✅ | −0.919° | 0.626 |
-| 2026-08-12 | Total | ✅ | +0.888° | 0.585 |
+| 2026-02-17 | Annular | ✅ | −0.919° | −0.9743 |
+| 2026-08-12 | Total | ✅ | +0.888° | +0.8978 |
 
 Algorithm: at each Full Moon (lunar) or New Moon (solar), find greatest eclipse
 and ask whether the Moon enters Earth's penumbra, or the Moon's penumbra reaches
 Earth, with the shadows sized that month as NASA's Five Millennium Canons size them
-(#401). γ is the closest approach to the shadow axis as a fraction of the grazing
-distance: 0 central, 1 at the limit. β is the Moon's ecliptic latitude at greatest
+(#401). γ is the canon's gamma: the closest approach to the shadow axis in Earth
+equatorial radii, positive north (#1165). The canon gives −0.3765, +0.4964, −0.9743
+and +0.8977 for these four. β is the Moon's ecliptic latitude at greatest
 eclipse. Implemented in `plan.LunarEclipses()` and `plan.SolarEclipses()`.
 
 ---

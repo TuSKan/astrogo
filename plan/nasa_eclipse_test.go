@@ -51,6 +51,9 @@ type nasaEclipseRef struct {
 	// lunar eclipse, the eclipse magnitude at greatest eclipse for a solar
 	// one. PenumbralMagnitude is the lunar penumbral magnitude.
 	Magnitude, PenumbralMagnitude float64
+
+	// Gamma is the canon's gamma, signed, in Earth equatorial radii.
+	Gamma float64
 }
 
 // ── NASA Eclipse Catalog Parser ──────────────────────────────────────────────
@@ -213,6 +216,13 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 			continue
 		}
 
+		gamma, err := strconv.ParseFloat(parts[10], 64)
+		if err != nil {
+			t.Errorf("NASA catalog row %q: %v: gamma %q", trimmed, errCatalogField, parts[10])
+
+			continue
+		}
+
 		// NASA catalog uses Julian calendar before 1582-10-15, times are in TD ≈ TDB
 		isJulianCal := year < 1582 || (year == 1582 && month < 10) || (year == 1582 && month == 10 && day < 15)
 
@@ -231,6 +241,7 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 			JDtd:               jdTD,
 			Magnitude:          magnitude,
 			PenumbralMagnitude: penumbral,
+			Gamma:              gamma,
 		})
 	}
 
@@ -278,8 +289,14 @@ var catalogKinds = map[string]plan.EclipseKind{
 // the 77 hybrids on these pages included.
 const catalogMagnitudeTol = 0.002
 
+// catalogGammaTol bounds astrogo's gamma against the canon's, which prints four
+// decimals. Measured against DE441 over the six centuries this file reads:
+// 0.0002 Earth radii at worst for all 1452 lunar and all 1433 solar eclipses,
+// every sign agreeing, and 0.00004 on average.
+const catalogGammaTol = 0.0005
+
 // checkKindAndMagnitude compares an eclipse astrogo found with the catalog
-// row it matched (#405).
+// row it matched (#405), and its gamma, sign included (#1165).
 func checkKindAndMagnitude(t *testing.T, kind string, ref nasaEclipseRef, e plan.EclipseEvent) {
 	t.Helper()
 
@@ -295,6 +312,10 @@ func checkKindAndMagnitude(t *testing.T, kind string, ref nasaEclipseRef, e plan
 
 	if d := e.PenumbralMagnitude - ref.PenumbralMagnitude; math.Abs(d) > catalogMagnitudeTol {
 		t.Errorf("  MAG %s: penumbral magnitude %.4f, the catalog gives %.4f (%+.4f)", date, e.PenumbralMagnitude, ref.PenumbralMagnitude, d)
+	}
+
+	if d := e.Gamma - ref.Gamma; math.Abs(d) > catalogGammaTol {
+		t.Errorf("  GAMMA %s: gamma %+.4f, the catalog gives %+.4f (%+.4f)", date, e.Gamma, ref.Gamma, d)
 	}
 }
 
