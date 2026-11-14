@@ -65,6 +65,10 @@ var (
 	ErrNotFound = resolve.ErrNotFound
 	// ErrAmbiguous is returned when a query matches multiple targets.
 	ErrAmbiguous = resolve.ErrAmbiguous
+	// ErrIncomplete is returned by [Resolver.Search] together with the matches
+	// it found, when some catalogs could not be asked. See
+	// [resolve.ErrIncomplete].
+	ErrIncomplete = resolve.ErrIncomplete
 )
 
 // Target and related types are re-exported from the resolve package.
@@ -315,10 +319,31 @@ func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 // Search returns all matching, cross-matched-and-merged targets from every
 // provider, ranked by name/alias/ID match quality and capped at Limit's
 // configured limit (default 10).
-// A provider that fails does not suppress the ones that succeed: matches from
-// working providers are returned with a nil error, and the failures are
-// reported only when nothing was found at all. Partial results from a partly
-// degraded set of providers are still useful; silently reporting none is not.
+//
+// # When a catalog cannot be asked
+//
+// A provider that fails does not suppress the ones that succeed. Search
+// returns the matches the working providers found together with an error
+// wrapping [ErrIncomplete], which names how many catalogs could not answer and
+// each one's reason:
+//
+//	results, err := resolver.Search(ctx, "Andromeda")
+//	switch {
+//	case errors.Is(err, catalog.ErrIncomplete):
+//	    // results are valid, and may be missing a failed catalog's matches.
+//	case err != nil:
+//	    // nothing usable came back
+//	}
+//
+// Something is better than nothing, but only when the caller can tell it is
+// not everything. Until #1143 the failures were dropped whenever anything was
+// found, so during the CDS outage of November 2026 a search over SIMBAD and
+// OpenNGC returned OpenNGC's matches with a nil error, and SIMBAD's were
+// missing without a word.
+//
+// When every provider fails, Search returns no results and an error that does
+// not wrap ErrIncomplete: there is nothing usable to be incomplete. An empty
+// result with a nil error means every catalog was asked and none matched.
 func (r *Resolver) Search(ctx context.Context, query string) ([]Target, error) {
 	q := resolve.Normalize(query)
 	if q == "" {
@@ -393,7 +418,19 @@ func (r *Resolver) Search(ctx context.Context, query string) ([]Target, error) {
 		final[i] = scored[i].t
 	}
 
+	if len(failures) > 0 {
+		return final, incompleteSearch(query, len(failures), len(r.providers), failures)
+	}
+
 	return final, nil
+}
+
+// incompleteSearch is the error Search returns beside partial results: it
+// wraps [ErrIncomplete], says how many of the catalogs could not answer, and
+// joins each one's reason, tagged by its provider name.
+func incompleteSearch(query string, failed, asked int, failures []error) error {
+	return fmt.Errorf("catalog: searching %q: %w: %d of %d catalogs could not answer, so their matches are missing: %w",
+		query, ErrIncomplete, failed, asked, errors.Join(failures...))
 }
 
 // ── Cross-match + merge pipeline ─────────────────────────────────────────
