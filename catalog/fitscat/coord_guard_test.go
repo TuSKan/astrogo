@@ -17,9 +17,10 @@ import (
 // row puts a target on the equator at the equinox — a real place in Cetus,
 // which a scheduler will happily slew to.
 //
-// The out-of-range cases are the substitutions a hand-built table makes:
-// right ascension written in hours or in radians rather than degrees, and a
-// declination that is not an angle at all.
+// The out-of-range cases are values no angle in degrees can have: a right
+// ascension past a full turn and a declination past a pole. A right ascension
+// written in hours or in radians lies inside a full turn, so these bounds cannot
+// see it; the column's unit catches it instead (TestCoordinateColumnUnits).
 func TestUsableCoord(t *testing.T) {
 	t.Parallel()
 
@@ -46,7 +47,7 @@ func TestUsableCoord(t *testing.T) {
 		{"declination past the pole", 120, 91, false},
 		{"declination past the other pole", 120, -90.5, false},
 		{"declination as a right ascension", 120, 275, false},
-		{"right ascension in hours", 400, 45, false},
+		{"right ascension past a full turn", 400, 45, false},
 		{"right ascension far out of range", -1000, 45, false},
 	} {
 		if got := usableCoord(c.ra, c.dec); got != c.want {

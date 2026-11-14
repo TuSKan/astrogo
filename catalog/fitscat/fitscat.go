@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 
@@ -19,6 +20,11 @@ import (
 var (
 	ErrNoBintable     = errors.New("catalog/fitscat: no binary table found")
 	ErrMissingColumns = errors.New("catalog/fitscat: missing required mapping columns in bintable")
+
+	// ErrColumnUnit indicates an RA or DEC column whose TUNITn names a unit
+	// that is not an angle this package reads: guessing would place every
+	// row somewhere it is not.
+	ErrColumnUnit = errors.New("catalog/fitscat: coordinate column in a unit that is not an angle")
 )
 
 // Provider loads targets from a FITS binary table file.
@@ -32,6 +38,11 @@ type Provider struct {
 // It assumes the table uses standard simplistic column names ("ID", "NAME", "RA", "DEC"),
 // matched without regard to case as the FITS Standard says column names are, so
 // "ra" and "dec" serve as well.
+//
+// RA and DEC are read in the unit each column's TUNITn keyword declares:
+// degrees, radians, arcminutes, arcseconds or milliarcseconds, and hours for
+// RA. A column that declares no unit is read as degrees. One that declares
+// any other unit is refused with [ErrColumnUnit], as is DEC in hours.
 func New(filePath string) (*Provider, error) {
 	f, err := fits.Open(filePath)
 	if err != nil {
@@ -63,6 +74,13 @@ func New(filePath string) (*Provider, error) {
 		return nil, fmt.Errorf("%w: %s: %w", ErrMissingColumns, filePath, err)
 	}
 
+	raScale, errRaUnit := degreesPer(bintable, "RA", true)
+	decScale, errDecUnit := degreesPer(bintable, "DEC", false)
+
+	if err := errors.Join(errRaUnit, errDecUnit); err != nil {
+		return nil, fmt.Errorf("%s: %w", filePath, err)
+	}
+
 	// Every column comes back with NumRows entries, so these agree; taking the
 	// shortest costs nothing and means a change in the reader cannot turn into
 	// an out-of-range panic on a user-supplied file.
@@ -77,8 +95,8 @@ func New(filePath string) (*Provider, error) {
 			Catalog: "FITS",
 		}
 
-		if usableCoord(ras[i], decs[i]) {
-			target.Coord = coord.NewICRS(angle.Deg(ras[i]), angle.Deg(decs[i]))
+		if ra, dec := ras[i]*raScale, decs[i]*decScale; usableCoord(ra, dec) {
+			target.Coord = coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
 			target.HasCoord = true
 		}
 
@@ -93,6 +111,41 @@ func New(filePath string) (*Provider, error) {
 	}, nil
 }
 
+// degreesPer returns how many degrees one unit of the named coordinate column
+// is, from the unit its TUNITn keyword declares (FITS Standard 4.0, section
+// 4.3). A column declaring none is taken to be in degrees, which is what this
+// package has always read. Hours are a right ascension's unit and nothing
+// else's, so hoursAllowed is false for DEC.
+//
+// The value alone cannot tell: Betelgeuse's right ascension is 5.92 in hours
+// and 88.8 in degrees, and 5.92 degrees is as plausible a right ascension as
+// any other.
+func degreesPer(bintable *fits.BintableHDU, column string, hoursAllowed bool) (float64, error) {
+	unit, err := bintable.ColumnUnit(column)
+	if err != nil {
+		return 0, err
+	}
+
+	switch strings.ToLower(unit) {
+	case "", "deg", "degree", "degrees":
+		return 1, nil
+	case "rad", "radian", "radians":
+		return 180 / math.Pi, nil
+	case "arcmin":
+		return 1.0 / 60, nil
+	case "arcsec":
+		return 1.0 / 3600, nil
+	case "mas":
+		return 1.0 / 3.6e6, nil
+	case "h", "hour", "hours", "hourangle":
+		if hoursAllowed {
+			return 15, nil
+		}
+	}
+
+	return 0, fmt.Errorf("%w: %s in %q", ErrColumnUnit, column, unit)
+}
+
 // usableCoord reports whether a row's right ascension and declination are a
 // position rather than an artifact of reading one that was not there.
 //
@@ -104,11 +157,12 @@ func New(filePath string) (*Provider, error) {
 // catalog.trustworthyCoord describes as having been observed in more than one
 // provider; the fix belongs at the source, which is here.
 //
-// The bounds also catch the two substitutions a hand-built FITS table
-// actually makes: a declination outside a right angle is not a declination,
-// and a right ascension outside a full turn is one written in hours or in
-// radians. Neither is repairable by guessing, so the row keeps its name and
-// loses its claim to a position.
+// The bounds also catch a value that cannot be an angle in degrees: a
+// declination beyond a right angle, or a right ascension beyond a full turn.
+// They cannot catch one written in hours or in radians, which lies inside a
+// full turn either way; New reads each column's unit for that before the
+// value gets here. A row that fails keeps its name and loses its claim to a
+// position.
 func usableCoord(ra, dec float64) bool {
 	// Finite, and in range in both conventions for right ascension, 0 to 360
 	// and -180 to 180, which NewICRS wraps: the rule every catalog parser

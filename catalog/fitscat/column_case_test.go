@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,6 +20,27 @@ import (
 // float64, and returns its path. Two rows: Betelgeuse and Rigel.
 func catalogFile(t *testing.T, names ...string) string {
 	t.Helper()
+
+	return catalogFileIn(t, nil, names...)
+}
+
+// catalogFileIn is catalogFile with a TUNITn for each column units names. RA
+// and DEC are written in that unit: hours, radians, arcseconds or degrees.
+func catalogFileIn(t *testing.T, units map[string]string, names ...string) string {
+	t.Helper()
+
+	in := func(column string, degrees float64) float64 {
+		switch units[column] {
+		case "h", "hourangle":
+			return degrees / 15
+		case "rad":
+			return degrees * math.Pi / 180
+		case "arcsec":
+			return degrees * 3600
+		default:
+			return degrees
+		}
+	}
 
 	primary := fitsCard("SIMPLE", "T") + fitsCard("BITPIX", "8") + fitsCard("NAXIS", "0") +
 		fitsCard("EXTEND", "T") + "END"
@@ -42,6 +64,10 @@ func catalogFile(t *testing.T, names ...string) string {
 		n := strconv.Itoa(i + 1)
 		columns.WriteString(fitsCard("TTYPE"+n, "'"+name+"'"))
 		columns.WriteString(fitsCard("TFORM"+n, form))
+
+		if u, ok := units[name]; ok {
+			columns.WriteString(fitsCard("TUNIT"+n, "'"+u+"'"))
+		}
 	}
 
 	header := fitsCard("XTENSION", "'BINTABLE'") + fitsCard("BITPIX", "8") + fitsCard("NAXIS", "2") +
@@ -67,9 +93,9 @@ func catalogFile(t *testing.T, names ...string) string {
 			case "NAME":
 				payload.WriteString(row.name)
 			case "RA":
-				_ = binary.Write(&payload, binary.BigEndian, row.ra)
+				_ = binary.Write(&payload, binary.BigEndian, in(name, row.ra))
 			default:
-				_ = binary.Write(&payload, binary.BigEndian, row.dec)
+				_ = binary.Write(&payload, binary.BigEndian, in(name, row.dec))
 			}
 		}
 	}
@@ -132,5 +158,56 @@ func TestMissingColumnIsNamed(t *testing.T) {
 
 	if !errors.Is(err, fits.ErrColumnNotFound) || !strings.Contains(err.Error(), "DEC") {
 		t.Errorf("New without DEC: err = %v, want it to name the DEC column as not found", err)
+	}
+}
+
+// TestCoordinateColumnUnits: RA and DEC are read in the unit their TUNITn
+// declares. Every column was read as degrees, so a right ascension stored in
+// hours put Rigel's 5.24 h at 5.24 degrees, 73 degrees of right ascension
+// from Rigel, and no range check can see it: hours and radians both lie
+// inside a full turn.
+func TestCoordinateColumnUnits(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"ID", "NAME", "RA", "DEC"}
+
+	for _, units := range []map[string]string{
+		nil,
+		{"RA": "deg", "DEC": "deg"},
+		{"RA": "h", "DEC": "deg"},
+		{"RA": "hourangle", "DEC": "deg"},
+		{"RA": "rad", "DEC": "rad"},
+		{"RA": "arcsec", "DEC": "arcsec"},
+	} {
+		p, err := New(catalogFileIn(t, units, names...))
+		if err != nil {
+			t.Errorf("units %v: New: %v", units, err)
+
+			continue
+		}
+
+		got, err := p.Resolve(context.Background(), "Rigel")
+		if err != nil {
+			t.Errorf("units %v: Resolve: %v", units, err)
+
+			continue
+		}
+
+		ra, dec := got.Coord.RA().Degrees(), got.Coord.Dec().Degrees()
+		if !got.HasCoord || math.Abs(ra-78.63) > 1e-9 || math.Abs(dec-(-8.20)) > 1e-9 {
+			t.Errorf("units %v: Rigel at RA %.9g, Dec %.9g (HasCoord %v), want 78.63, -8.2",
+				units, ra, dec, got.HasCoord)
+		}
+	}
+
+	// A unit that is not an angle, and a declination in hours, are refused:
+	// there is no right reading of either.
+	for _, units := range []map[string]string{
+		{"RA": "m", "DEC": "deg"},
+		{"RA": "deg", "DEC": "h"},
+	} {
+		if _, err := New(catalogFileIn(t, units, names...)); !errors.Is(err, ErrColumnUnit) {
+			t.Errorf("units %v: err = %v, want ErrColumnUnit", units, err)
+		}
 	}
 }
