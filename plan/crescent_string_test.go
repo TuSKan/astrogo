@@ -25,13 +25,13 @@ func TestCrescentStringAlignsEveryCode(t *testing.T) {
 		col := -1
 
 		for line := range strings.SplitSeq(r.String(), "\n") {
-			i := strings.Index(line, "ARCV")
-			if i < 0 {
+			before, _, found := strings.Cut(line, "ARCV")
+			if !found {
 				continue
 			}
 
 			// Columns, not bytes: the rows hold degree and prime signs.
-			at := utf8.RuneCountInString(line[:i])
+			at := utf8.RuneCountInString(before)
 			if col < 0 {
 				col = at
 			} else if at != col {
