@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
@@ -62,16 +63,21 @@ func main() {
 	t := time.Date(2025, 7, 3, 12, 0, 0, 0, time.LocationUTC)
 	ref := coord.NewICRS(angle.Deg(horizonsRADeg), angle.Deg(horizonsDecDeg))
 
-	fmt.Println("Mars, geocentric astrometric place: astrogo against JPL Horizons")
-	fmt.Println("================================================================")
-	fmt.Printf("Epoch      %s  (TDB JD %.6f)\n", t.Format("2006-01-02 15:04:05 MST"), t.TDB().JD())
-	fmt.Printf("Horizons   RA %s   Dec %s   %.9f AU  (DE441)\n\n",
-		ref.RA().HMSString(4), ref.Dec().DMSString(3), horizonsDistAU)
+	show.Title("Mars, geocentric astrometric place", "astrogo against JPL Horizons")
+	fmt.Println()
+	show.Fields(
+		show.KV("Epoch", "%s  (TDB JD %.6f)", t.Format("2006-01-02 15:04:05 MST"), t.TDB().JD()),
+		show.KV("Horizons", "RA %s  Dec %s  %.9f AU  (DE441)",
+			ref.RA().HMSString(4), ref.Dec().DMSString(3), horizonsDistAU),
+	)
+
+	places := show.NewTable(show.Left("Source"), show.Left("RA"), show.Left("Dec"), show.Right("Distance"))
+	offsets := show.NewTable(show.Left("Source"), show.Right("Off"), show.Right("Range"), show.Right("Documented"))
 
 	// 1. The built-in provider: SOFA's Plan94 analytical series, no kernel.
 	// Its documented worst case for Mars over 1800-2100 is 25,000 km
 	// (docs/VALIDATION.md), 17.7 arcsec at this distance.
-	compare("Built-in (Plan94)", eph.Default(), t, ref, 17.7)
+	compare(places, offsets, "Built-in (Plan94)", eph.Default(), t, ref, 17.7)
 
 	// 2. The JPL DE440 kernel. Downloads are opt-in, see README "Data
 	// downloads & offline usage": de440 is ~114 MB; naif0012.tls (leap
@@ -82,7 +88,10 @@ func main() {
 
 	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de440")
 	if err != nil {
-		fmt.Printf("JPL DE440          unavailable, skipped: %v\n", err)
+		printResults(places, offsets)
+		fmt.Println()
+		show.Note(fmt.Sprintf("JPL DE440 unavailable, skipped: %v", err))
+
 		return
 	}
 	defer func() {
@@ -91,13 +100,28 @@ func main() {
 		}
 	}()
 
-	compare("JPL DE440", jplProv, t, ref, 0.01)
+	compare(places, offsets, "JPL DE440", jplProv, t, ref, 0.01)
+
+	printResults(places, offsets)
+	fmt.Println()
+	show.Note("Off is the separation from Horizons on the sky, Range the",
+		"difference in distance, and Documented the provider's own stated",
+		"accuracy (docs/VALIDATION.md). A * marks an offset outside it.")
 }
 
-// compare prints prov's astrometric place of the Mars barycenter at t, its
-// offset from the Horizons reference, and whether its offset on the sky is
-// inside the provider's documented accuracy, maxArcsec.
-func compare(name string, prov eph.Provider, t time.Time, ref coord.ICRS, maxArcsec float64) {
+// printResults prints the two tables compare fills.
+func printResults(places, offsets *show.Table) {
+	show.Section("Astrometric place")
+	places.Print()
+	show.Section("Against Horizons")
+	offsets.Print()
+}
+
+// compare adds a row to each table for prov's astrometric place of the Mars
+// barycenter at t: the place to places, and to offsets its offset from the
+// Horizons reference beside the provider's documented accuracy, maxArcsec,
+// starred if the offset on the sky is outside it.
+func compare(places, offsets *show.Table, name string, prov eph.Provider, t time.Time, ref coord.ICRS, maxArcsec float64) {
 	// The astrometric place: light time applied, no aberration or light
 	// deflection, which is what Horizons and Skyfield's radec() report.
 	st, err := eph.At(prov, t).Astrometric(eph.MarsBarycenter, eph.Geocenter())
@@ -114,12 +138,11 @@ func compare(name string, prov eph.Provider, t time.Time, ref coord.ICRS, maxArc
 	sep := coord.Separation(icrs, ref).Arcseconds()
 	dKm := math.Abs(dist-horizonsDistAU) * kmPerAU
 
-	verdict := "within its documented accuracy"
+	limit := fmt.Sprintf(`%g"`, maxArcsec)
 	if sep > maxArcsec {
-		verdict = "OUTSIDE its documented accuracy"
+		limit += " *"
 	}
 
-	fmt.Printf("%-18s RA %s   Dec %s   %.9f AU\n", name, icrs.RA().HMSString(4), icrs.Dec().DMSString(3), dist)
-	fmt.Printf("%-18s off by %.4f arcsec (%s, %g arcsec), %.3f km in range\n\n",
-		"", sep, verdict, maxArcsec, dKm)
+	places.Row(name, icrs.RA().HMSString(4), icrs.Dec().DMSString(3), fmt.Sprintf("%.9f AU", dist))
+	offsets.Row(name, fmt.Sprintf(`%.4f"`, sep), fmt.Sprintf("%.3f km", dKm), limit)
 }
