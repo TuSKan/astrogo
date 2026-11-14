@@ -25,12 +25,12 @@ func main() {
 		log.Fatalf("failed to create location: %v", err)
 	}
 
-	tz, err := time.LoadLocation("UTC")
+	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
 	}
 
-	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
+	t := time.Date(2026, 4, 25, 17, 0, 0, 0, tz) // 20:00 UTC
 	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 
 	// JPL kernel downloads are opt-in — see README "Data downloads &

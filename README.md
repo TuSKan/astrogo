@@ -130,37 +130,40 @@ go get github.com/TuSKan/astrogo
 
 ## Examples
 
-Every one is a runnable `main` package. `go -C examples run ./<name>` — the ones marked
-offline need no network and no downloads.
+Every one is a runnable `main` package. `go -C examples run ./<name>` — the Network
+column says what each one fetches. A kernel or catalog fetched once is cached, so a
+second run needs no network; "live" means every run asks the service. Most examples
+that use the network also fetch the IERS Earth-orientation bulletin (3.8 MB) once; the
+rest choose zero Earth orientation, and say in a comment what that costs them.
 
 `examples/` is [its own module](examples/go.mod), which is why the command carries
 `-C examples` rather than a path. It keeps 32 demo programs out of the library's
 package listing while still building against the working tree, so an API change that
 breaks an example fails CI.
 
-| | What it answers | Offline |
-| :--- | :--- | :---: |
-| [`01_where_is_mars`](examples/01_where_is_mars/) | Where is a planet right now, in alt/az from my site? | ✓ |
-| [`02_target_visibility`](examples/02_target_visibility/) | Is this target observable tonight, and how well? | ✓ |
-| [`03_rise_transit_set`](examples/03_rise_transit_set/) | When does it rise, transit and set? | ✓ |
-| [`04_angular_separation`](examples/04_angular_separation/) | How far apart are two objects on the sky? | ✓ |
-| [`05_resolve_name`](examples/05_resolve_name/) | Turn "M31" or "Betelgeuse" into coordinates | |
-| [`06_tiny_plan`](examples/06_tiny_plan/) | The smallest end-to-end planning workflow | ✓ |
-| [`07_slew_time`](examples/07_slew_time/) | How long does the mount take to get there? | ✓ |
-| [`08_convert_coords`](examples/08_convert_coords/) | ICRS ↔ Galactic ↔ Ecliptic ↔ AltAz, and batch transforms | ✓ |
-| [`09_geometry_events`](examples/09_geometry_events/) | Moon phases, eclipses, conjunctions, apsides, seasons | ✓ |
-| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against Skyfield | |
-| [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | |
-| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | ✓ |
-| [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | ✓ |
-| [`15_target_details`](examples/15_target_details/) | Everything the engine knows about one target at one instant | ✓ |
-| [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | |
-| [`19_offline_setup`](examples/19_offline_setup/) | Pre-seeding data for an air-gapped deployment | ✓ |
-| [`20_whats_visible_tonight`](examples/20_whats_visible_tonight/) | What can I see tonight brighter than magnitude X? | |
-| [`22_kepler_propagator`](examples/22_kepler_propagator/) | Six orbital elements and an epoch, no kernel, no network | ✓ |
-| [`23_radial_velocity_correction`](examples/23_radial_velocity_correction/) | Remove Earth's own orbital motion from a measured RV | ✓ |
-| [`24_optics`](examples/24_optics/) | Magnification, field of view, exit pupil, plate scale | ✓ |
-| [`25_sky_brightness_compare`](examples/25_sky_brightness_compare/) | Does the model matter? Does the air? | |
+| | What it answers | Network |
+| :--- | :--- | :--- |
+| [`01_where_is_mars`](examples/01_where_is_mars/) | Where is a planet at a given moment, in alt/az from my site? | none |
+| [`02_target_visibility`](examples/02_target_visibility/) | Is this target observable tonight, and if not, why not? | none |
+| [`03_rise_transit_set`](examples/03_rise_transit_set/) | When does it rise, transit and set? | none |
+| [`04_angular_separation`](examples/04_angular_separation/) | How far apart are two objects on the sky? | none |
+| [`05_resolve_name`](examples/05_resolve_name/) | Turn "M31" or "Betelgeuse" into coordinates | SIMBAD and MAST, live; OpenNGC, once |
+| [`06_tiny_plan`](examples/06_tiny_plan/) | The smallest end-to-end planning workflow | none |
+| [`07_slew_time`](examples/07_slew_time/) | How long does the mount take to get there? | none |
+| [`08_convert_coords`](examples/08_convert_coords/) | ICRS ↔ Galactic ↔ Ecliptic ↔ AltAz, and batch transforms | none |
+| [`09_geometry_events`](examples/09_geometry_events/) | Conjunctions, greatest elongations, eclipses and apsides over a year | DE442 kernel (115 MB), once |
+| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against JPL Horizons, as Skyfield's `observe()` does | DE440 kernel (114 MB), once |
+| [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | CelesTrak, live |
+| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | none |
+| [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | none |
+| [`15_target_details`](examples/15_target_details/) | Everything the engine knows about one target at one instant | DE442 kernel and OpenNGC, once; SIMBAD and CelesTrak, live |
+| [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | sky-brightness datasets, once |
+| [`19_offline_setup`](examples/19_offline_setup/) | Pre-seeding data for an air-gapped deployment | none |
+| [`20_whats_visible_tonight`](examples/20_whats_visible_tonight/) | What can I see tonight brighter than magnitude X? | catalogs, live; kernels, once |
+| [`22_kepler_propagator`](examples/22_kepler_propagator/) | Six orbital elements from JPL SBDB, propagated with no kernel | JPL SBDB, live |
+| [`23_radial_velocity_correction`](examples/23_radial_velocity_correction/) | Remove Earth's own orbital motion from a measured RV | none |
+| [`24_optics`](examples/24_optics/) | Magnification, field of view, exit pupil, plate scale | none |
+| [`25_sky_brightness_compare`](examples/25_sky_brightness_compare/) | Does the model matter? Does the air? | sky-brightness datasets, once |
 
 The [Showcases](#showcases) above are the long-form versions: narrative write-ups with
 tables you can check against published references.

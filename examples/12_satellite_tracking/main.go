@@ -14,6 +14,8 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/remote"
+	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -29,6 +31,10 @@ import (
 // CelestTrak API: https://celestrak.org/NORAD/elements/gp.php
 
 func main() {
+	// Earth orientation, for where the site is on the turning Earth: the
+	// IERS bulletin, which the remote/eop import above fetches.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
+
 	// ═══════════════════════════════════════════════════════════════════════
 	// 1. Resolve ISS (Zarya) from NORAD Catalog
 	// ═══════════════════════════════════════════════════════════════════════
@@ -44,7 +50,12 @@ func main() {
 	fmt.Printf("  Name:     %s\n", target.Name)
 	fmt.Printf("  NORAD ID: %s\n", target.ID)
 	fmt.Printf("  Intl Des: %s\n", target.Designation)
-	fmt.Printf("  Epoch:    %s\n", target.Epoch)
+	// A TLE describes an orbit well for a few days either side of its
+	// epoch, and CelesTrak serves the current one, so this example works
+	// from the present moment rather than a fixed date.
+	now := time.NowUTC()
+
+	fmt.Printf("  Epoch:    %s (%.1f days ago)\n", target.Epoch.Format("2006-01-02 15:04:05 UTC"), now.Sub(target.Epoch).Days())
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 2. Create Provider from Target TLE
@@ -73,9 +84,7 @@ func main() {
 
 	// The same composition as for JPL planets: the satellite about the Earth,
 	// at one instant.
-	epoch := target.Epoch
-
-	state, err := eph.At(prov, epoch).Geometric(sat.ID(), eph.Earth)
+	state, err := eph.At(prov, now).Geometric(sat.ID(), eph.Earth)
 	if err != nil {
 		log.Fatalf("Geometric failed: %v", err)
 	}
@@ -86,6 +95,7 @@ func main() {
 		log.Fatalf("icrs: %v", err)
 	}
 
+	fmt.Printf("  At:       %s\n", now.Format("2006-01-02 15:04:05 UTC"))
 	fmt.Printf("  RA:       %s\n", icrs.RA())
 	fmt.Printf("  Dec:      %s\n", icrs.Dec())
 	fmt.Printf("  Distance: %.1f km\n", state.DistanceKm())
@@ -97,7 +107,7 @@ func main() {
 
 	// The *satellite.Satellite knows the ellipsoid; a generic Provider only
 	// knows a geocentric distance.
-	alt, err := sat.Altitude(epoch)
+	alt, err := sat.Altitude(now)
 	if err != nil {
 		log.Fatalf("Altitude failed: %v", err)
 	}
@@ -116,7 +126,7 @@ func main() {
 	}
 
 	// Build the observation context (caches SOFA matrices for this time+site).
-	ctx := coord.NewContext(epoch, observer, atmosphere.Refraction{})
+	ctx := coord.NewContext(now, observer, atmosphere.Refraction{})
 
 	altaz, err := plan.LookAngle(prov, sat.ID(), ctx)
 	if err != nil {
@@ -136,8 +146,8 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// 5. Pass Prediction
 	// ═══════════════════════════════════════════════════════════════════════
-	start := epoch
-	end := epoch.Add(unit.Days(1.0))
+	start := now
+	end := now.Add(unit.Days(1.0))
 	minEl := angle.Deg(20.0)
 
 	loc, err := time.LoadLocation("America/Sao_Paulo")

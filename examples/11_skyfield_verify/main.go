@@ -1,4 +1,7 @@
-// Package main cross-validates astrogo ephemeris output against Skyfield.
+// Package main cross-checks astrogo's planetary ephemeris against JPL
+// Horizons: the geocentric astrometric position of Mars, the computation
+// Skyfield's observe() performs, from the built-in analytical series and
+// from the JPL DE440 kernel.
 package main
 
 import (
@@ -8,6 +11,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/remote"
@@ -19,157 +23,103 @@ import (
 	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
-// This example verifies astrogo's planetary ephemeris against the JPL Horizons
-// reference service, replicating a Skyfield-style "Where is Mars?" computation.
-//
-// Python equivalent (Skyfield):
+// The same computation in Python, with Skyfield:
 //
 //	from skyfield.api import load
 //
-//	planets = load('de421.bsp')
-//	earth, mars = planets['earth'], planets['mars']
+//	planets = load('de440.bsp')
+//	earth, mars = planets['earth'], planets['mars barycenter']
 //
 //	ts = load.timescale()
 //	t = ts.utc(2025, 7, 3, 12, 0)
-//	position = earth.at(t).observe(mars)
-//	ra, dec, distance = position.radec()
-//	print(ra, dec, distance)
+//	ra, dec, distance = earth.at(t).observe(mars).radec()
 //
-// JPL Horizons (DE441) reference for the same epoch:
+// The reference is JPL Horizons' astrometric place for the same instant,
+// retrieved through the Horizons API with:
 //
-//	Target: Mars (499), Center: Earth (399), ICRF/J2000
-//	2025-Jul-03 12:00 UTC
-//	RA:  10h 43m 22.70s
-//	Dec: +09° 09' 12.8"
-//	Dist: 1.94246 AU
+//	COMMAND='4' CENTER='500@399' EPHEM_TYPE='OBSERVER'
+//	TLIST='2025-07-03 12:00' TIME_TYPE='UT' QUANTITIES='1,20'
+//	ANG_FORMAT='DEG' EXTRA_PREC='YES'
+//
+// Target 4 is the Mars system barycenter, which a DE kernel and the
+// analytical series both hold. Horizons puts Mars's own center, 499, at the
+// same RA and Dec to all nine decimals and 15 cm farther.
+const (
+	horizonsRADeg  = 160.844581525
+	horizonsDecDeg = 9.153567896
+	horizonsDistAU = 1.94245684464294
+)
+
+// kmPerAU is the astronomical unit in kilometers.
+var kmPerAU = constants.IAU.AstronomicalUnit.Value / 1e3
 
 func main() {
-	// ═══════════════════════════════════════════════════════════════════════
-	// Epoch: 2025-Jul-03 12:00:00 UTC
-	// ═══════════════════════════════════════════════════════════════════════
-	utc, err := time.LoadLocation("UTC")
-	if err != nil {
-		log.Fatalf("utc: %v", err)
-	}
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. A geocentric astrometric
+	// place does not use it, having no site and no Earth rotation in it.
+	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
-	t := time.Date(2025, 7, 3, 12, 0, 0, 0, utc)
+	t := time.Date(2025, 7, 3, 12, 0, 0, 0, time.LocationUTC)
+	ref := coord.NewICRS(angle.Deg(horizonsRADeg), angle.Deg(horizonsDecDeg))
 
-	// JPL Horizons reference (DE441, geocentric, ICRF, astrometric)
-	horizonsRA := angle.Hour(10 + 43.0/60 + 22.70/3600)
-	horizonsDec := angle.Deg(9 + 9.0/60 + 12.8/3600)
-	horizonsDist := 1.94246 // AU
+	fmt.Println("Mars, geocentric astrometric place: astrogo against JPL Horizons")
+	fmt.Println("================================================================")
+	fmt.Printf("Epoch      %s  (TDB JD %.6f)\n", t.Format("2006-01-02 15:04:05 MST"), t.TDB().JD())
+	fmt.Printf("Horizons   RA %s   Dec %s   %.9f AU  (DE441)\n\n",
+		ref.RA().HMSString(4), ref.Dec().DMSString(3), horizonsDistAU)
 
-	fmt.Println("╔══════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║  Astrogo vs JPL Horizons — Mars Geocentric Astrometric Position ║")
-	fmt.Println("╚══════════════════════════════════════════════════════════════════╝")
-	fmt.Println()
-	fmt.Printf("  Epoch: %s  (TDB JD = %.6f)\n\n", t, t.TDB().JD())
+	// 1. The built-in provider: SOFA's Plan94 analytical series, no kernel.
+	// Its documented worst case for Mars over 1800-2100 is 25,000 km
+	// (docs/VALIDATION.md), 17.7 arcsec at this distance.
+	compare("Built-in (Plan94)", eph.Default(), t, ref, 17.7)
 
-	// ── JPL Horizons reference ─────────────────────────────────────────────
-	fmt.Println("┌─ JPL Horizons Reference (DE441) ────────────────────────────────┐")
-	fmt.Printf("│  RA:       %s\n", horizonsRA.HMSString(2))
-	fmt.Printf("│  Dec:      %s\n", horizonsDec.DMSString(1))
-	fmt.Printf("│  Distance: %.5f AU\n", horizonsDist)
-	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
-	fmt.Println()
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Method 1: Built-in SOFA Provider (Plan94 analytical series)
-	// ═══════════════════════════════════════════════════════════════════════
-	fmt.Println("┌─ Method 1: Built-in SOFA Provider (Plan94) ─────────────────────┐")
-
-	sofaProv := eph.Default()
-	// Plan94 places the Mars system barycenter, NAIF 4, centimeters from the
-	// planet, as a DE kernel does; neither holds Mars's own center, 499.
-	computeAndPrint(sofaProv, eph.MarsBarycenter, t, horizonsRA, horizonsDec, horizonsDist)
-	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
-	fmt.Println()
-
-	// ═══════════════════════════════════════════════════════════════════════
-	// Method 2: JPL DE440 Provider (numerical integration)
-	// ═══════════════════════════════════════════════════════════════════════
-	fmt.Println("┌─ Method 2: JPL DE440 Provider ──────────────────────────────────┐")
-
-	// JPL kernel downloads are opt-in — see README "Data downloads &
-	// offline usage". de440 is ~114 MB; naif0012.tls (leap seconds) ~5 KB.
+	// 2. The JPL DE440 kernel. Downloads are opt-in, see README "Data
+	// downloads & offline usage": de440 is ~114 MB; naif0012.tls (leap
+	// seconds) ~5 KB. Its astrometric place is contracted at 0.01 arcsec
+	// against Horizons (docs/VALIDATION.md).
 	remote.EnableDownloads(200<<20, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	jplProv, err := eph.NewProvider(context.Background(), eph.Planets, "de440")
 	if err != nil {
-		log.Printf("│  ⚠ JPL provider unavailable: %v\n", err)
-		fmt.Println("│  Skipping JPL comparison.")
-	} else {
-		defer func() {
-			err := jplProv.Close()
-			if err != nil {
-				log.Printf("failed to close JPL provider: %v", err)
-			}
-		}()
-
-		computeAndPrint(jplProv, eph.MarsBarycenter, t, horizonsRA, horizonsDec, horizonsDist)
+		fmt.Printf("JPL DE440          unavailable, skipped: %v\n", err)
+		return
 	}
+	defer func() {
+		if err := jplProv.Close(); err != nil {
+			log.Printf("failed to close JPL provider: %v", err)
+		}
+	}()
 
-	fmt.Println("└──────────────────────────────────────────────────────────────────┘")
-	fmt.Println()
-
-	// ── Interpretation Guide ───────────────────────────────────────────────
-	fmt.Println("Interpretation:")
-	fmt.Println("  • SOFA Plan94 is an analytical series (~10\" accuracy for outer planets)")
-	fmt.Println("  • JPL DE440 is high-precision numerical integration (~0.001\" accuracy)")
-	fmt.Println("  • Horizons uses DE441 (latest); DE440/DE441 differ by < 0.001\"")
-	fmt.Println("  • Horizons targets Mars body center (499); astrogo targets Mars")
-	fmt.Println("    barycenter (4), accounting for ~0.03\" of the offset")
-	fmt.Println("  • Key: SOFA and DE440 agree within ~3\" → astrogo pipeline is correct ✓")
+	compare("JPL DE440", jplProv, t, ref, 0.01)
 }
 
-// computeAndPrint computes Mars position using the given provider and prints
-// the results alongside the Horizons reference.
-func computeAndPrint(prov eph.Provider, body eph.ID, t time.Time,
-	refRA, refDec angle.Angle, refDist float64,
-) {
-	// The apparent place applies the light-time correction (iterative retardation),
-	// matching Skyfield's observe() and Horizons' astrometric coordinates.
-	st, err := eph.At(prov, t).Apparent(body, eph.Geocenter())
+// compare prints prov's astrometric place of the Mars barycenter at t, its
+// offset from the Horizons reference, and whether its offset on the sky is
+// inside the provider's documented accuracy, maxArcsec.
+func compare(name string, prov eph.Provider, t time.Time, ref coord.ICRS, maxArcsec float64) {
+	// The astrometric place: light time applied, no aberration or light
+	// deflection, which is what Horizons and Skyfield's radec() report.
+	st, err := eph.At(prov, t).Astrometric(eph.MarsBarycenter, eph.Geocenter())
 	if err != nil {
-		log.Printf("│  ✗ Error: %v\n", err)
-		return
+		log.Fatalf("%s: %v", name, err)
 	}
 
-	// Convert Cartesian (AU) → spherical ICRS
 	icrs, err := eph.ToICRS(st.Pos)
 	if err != nil {
-		log.Printf("│  ✗ Error: %v\n", err)
-		return
+		log.Fatalf("%s: %v", name, err)
 	}
 
-	// Distance = vector magnitude (AU)
 	dist := st.Pos.Norm()
+	sep := coord.Separation(icrs, ref).Arcseconds()
+	dKm := math.Abs(dist-horizonsDistAU) * kmPerAU
 
-	// Compute residuals
-	dRA := coord.Separation(
-		coord.NewICRS(icrs.RA(), angle.Zero()),
-		coord.NewICRS(refRA, angle.Zero()),
-	)
-	dDec := icrs.Dec().Sub(refDec).Abs()
-	dDist := math.Abs(dist - refDist)
-
-	// Print results
-	fmt.Printf("│  RA:       %s\n", icrs.RA().HMSString(2))
-	fmt.Printf("│  Dec:      %s\n", icrs.Dec().DMSString(1))
-	fmt.Printf("│  Distance: %.5f AU\n", dist)
-	fmt.Println("│  ─────────────────────────────")
-	fmt.Printf("│  ΔRA:      %.2f arcsec\n", dRA.Arcseconds())
-	fmt.Printf("│  ΔDec:     %.2f arcsec\n", dDec.Arcseconds())
-	fmt.Printf("│  ΔDist:    %.6f AU\n", dDist)
-
-	// Verdict (Plan94 is ~10" for Mars; DE440 vs DE441 ≈ sub-arcsec)
-	if dRA.Arcseconds() < 15 && dDec.Arcseconds() < 15 && dDist < 0.001 {
-		fmt.Println("│  ✓ PASS — within expected tolerances")
-	} else {
-		fmt.Println("│  ⚠ REVIEW — residuals larger than expected")
+	verdict := "within its documented accuracy"
+	if sep > maxArcsec {
+		verdict = "OUTSIDE its documented accuracy"
 	}
+
+	fmt.Printf("%-18s RA %s   Dec %s   %.9f AU\n", name, icrs.RA().HMSString(4), icrs.Dec().DMSString(3), dist)
+	fmt.Printf("%-18s off by %.4f arcsec (%s, %g arcsec), %.3f km in range\n\n",
+		"", sep, verdict, maxArcsec, dKm)
 }

@@ -18,8 +18,9 @@ func main() {
 	// (content-checked, so a re-run only costs a HEAD probe once cached).
 	// No need to import catalog/openngc directly.
 	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. Resolving a name involves
+	// no site and no instant, so nothing here reads it.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()

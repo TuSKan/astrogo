@@ -13,19 +13,28 @@ import (
 )
 
 func main() {
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
+	// to 13.5 arcsec, well below the 0.01° printed here. For full accuracy,
+	// blank-import remote/eop and consent to the IERS bulletin, as
+	// 09_geometry_events does.
+	time.RegisterModel(time.ZeroModel{})
+
 	// 1. Define the observer's location (Quinta Calixto, Brazil)
 	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// 2. Set the time to 'tonight at 7 PM' in local timezone (UTC-3)
+	// 2. Set the time: 10 PM local time (UTC-3) on 2027-02-19, the night of
+	// Mars's opposition, when it is up all night. A fixed instant keeps the
+	// output the same on every run; time.NowUTC() asks about right now.
 	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
 	}
 
-	tm := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
+	tm := time.Date(2027, 2, 19, 22, 0, 0, 0, tz)
 
 	// 3. Create a moving target for Mars using the built-in default ephemeris
 	mars := plan.NewMars(eph.Default())

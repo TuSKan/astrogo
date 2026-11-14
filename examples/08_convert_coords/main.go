@@ -1,4 +1,6 @@
-// Package main demonstrates coordinate system conversions.
+// Package main demonstrates coordinate system conversions: ICRS to Galactic
+// and back, ICRS to the ecliptic of date, ICRS to a site's alt/az, and a
+// batch of stars converted through one cached Context.
 package main
 
 import (
@@ -12,31 +14,79 @@ import (
 )
 
 func main() {
-	// 1. Start with an ICRS coordinate (e.g., The Galactic Center - Sgr A*)
-	icrs := coord.NewICRS(angle.Hour(17.7611), angle.Deg(-28.9856))
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
+	// to 13.5 arcsec, 0.004°. For full accuracy, blank-import remote/eop and
+	// consent to the IERS bulletin, as 09_geometry_events does.
+	time.RegisterModel(time.ZeroModel{})
 
-	// 2. Convert ICRS -> Galactic
-	galactic := coord.ICRSToGalactic(icrs)
+	// 1. Start with an ICRS coordinate: Sgr A*, the Galactic center
+	// (J2000 position from SIMBAD).
+	sgrA := coord.NewICRS(angle.Deg(266.416817), angle.Deg(-29.007825))
 
-	// 3. Convert ICRS -> AltAz (requires Site details and Time)
+	// 2. ICRS -> Galactic, and back. The Galactic center sits near l = 0, b = 0.
+	galactic := coord.ICRSToGalactic(sgrA)
+	back := coord.GalacticToICRS(galactic)
+
+	// 3. ICRS -> the ecliptic of date, which moves with the equinox.
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
+	t := time.Date(2026, 7, 15, 22, 0, 0, 0, tz)
+	ecliptic := coord.ICRSToEcliptic(sgrA, t)
+
+	// 4. ICRS -> AltAz, which needs a site and an instant. One Context holds
+	// everything that depends on them, so build it once and reuse it.
 	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05) // Quinta Calixto
 	if err != nil {
 		log.Fatalf("loc: %v", err)
 	}
 
-	now := time.NowUTC()
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 
-	ctx := coord.NewContext(now, loc, atmosphere.StandardRefraction())
-
-	altaz, err := ctx.ICRSToAltAz(icrs)
+	altaz, err := ctx.ICRSToAltAz(sgrA)
 	if err != nil {
-		fmt.Printf("Error converting to AltAz: %v\n", err)
+		log.Fatalf("altaz: %v", err)
 	}
 
-	// 4. Print outputs!
-	fmt.Println("Coordinate Framework Conversion")
-	fmt.Println("===============================")
-	fmt.Printf("Object:   %s\n", icrs)
-	fmt.Printf("Galactic: l=%.4f° b=%.4f° \n", galactic.L().Degrees(), galactic.B().Degrees())
-	fmt.Printf("AltAz:    Alt=%.4f° Az=%.4f° (from Quinta Calixto at %v)\n", altaz.Alt().Degrees(), altaz.Az().Degrees(), now.ToGo().Format("15:04 UTC"))
+	fmt.Println("Coordinate conversions for Sgr A*")
+	fmt.Println("=================================")
+	fmt.Printf("ICRS (J2000)       RA %9.5f°   Dec %9.5f°\n", sgrA.RA().Degrees(), sgrA.Dec().Degrees())
+	fmt.Printf("Galactic           l  %9.5f°   b   %9.5f°\n", galactic.L().Degrees(), galactic.B().Degrees())
+	fmt.Printf("  and back         RA %9.5f°   Dec %9.5f°   (%.1g arcsec off)\n",
+		back.RA().Degrees(), back.Dec().Degrees(), coord.Separation(sgrA, back).Arcseconds())
+	fmt.Printf("Ecliptic of date   λ  %9.5f°   β   %9.5f°\n", ecliptic.Lon().Degrees(), ecliptic.Lat().Degrees())
+	fmt.Printf("AltAz              Alt %8.4f°   Az  %9.4f°\n", altaz.Alt().Degrees(), altaz.Az().Degrees())
+	fmt.Printf("  from Quinta Calixto at %s (%s)\n\n",
+		t.Format("2006-01-02 15:04 MST"), t.In(time.LocationUTC).Format("15:04 MST"))
+
+	// 5. A batch: many stars through the same Context. The expensive part,
+	// the Earth's orientation at t, was computed once when ctx was built.
+	stars := []struct {
+		name    string
+		ra, dec float64 // degrees, J2000, from SIMBAD
+	}{
+		{"Antares", 247.351915, -26.432003},
+		{"Vega", 279.234735, 38.783689},
+		{"Altair", 297.695827, 8.868321},
+		{"Arcturus", 213.915300, 19.182409},
+		{"Alpha Centauri", 219.902058, -60.833993},
+	}
+
+	in := make([]coord.ICRS, len(stars))
+	for i, s := range stars {
+		in[i] = coord.NewICRS(angle.Deg(s.ra), angle.Deg(s.dec))
+	}
+
+	out := make([]coord.AltAz, len(in))
+	ctx.ICRSBatchToAltAz(in, out)
+
+	fmt.Println("Batch: five stars, one Context")
+	fmt.Println("==============================")
+
+	for i, s := range stars {
+		fmt.Printf("%-15s  Alt %6.2f°   Az %6.2f°\n", s.name, out[i].Alt().Degrees(), out[i].Az().Degrees())
+	}
 }

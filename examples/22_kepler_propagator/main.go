@@ -32,6 +32,7 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/plan"
+	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -40,6 +41,13 @@ import (
 )
 
 func main() {
+	// Past the SBDB query this example downloads nothing, so it uses no
+	// Earth-orientation data either (UT1 = UTC, no polar motion). That can
+	// move a rise or set by up to about a second, below the minute printed.
+	// For full accuracy, blank-import remote/eop and consent to the IERS
+	// bulletin, as 09_geometry_events does.
+	time.RegisterModel(time.ZeroModel{})
+
 	// Resolve 1 Ceres's real, current osculating elements live from JPL
 	// SBDB — catalog/sbdb decodes orbit.elements (e, a, i, om, w, ma) and
 	// orbit.epoch directly, natively in AU/degrees, no unit conversion.
@@ -61,7 +69,9 @@ func main() {
 	fmt.Println()
 	fmt.Println("── Osculating elements (JPL SBDB, epoch below) ─────────────────────")
 	fmt.Println()
-	fmt.Printf("  Epoch            %s TDB\n", target.Epoch.Format("2006-01-02 15:04:05"))
+	// SBDB states the epoch as a TDB Julian Date. Format always prints the
+	// UTC clock, which runs about 69 s behind TDB.
+	fmt.Printf("  Epoch            JD %.1f TDB (%s)\n", target.Epoch.TDB().JD(), target.Epoch.Format("2006-01-02 15:04:05 UTC"))
 	fmt.Printf("  Semi-major axis  %.6f AU\n", target.SemiMajorAxis.AU())
 	fmt.Printf("  Eccentricity     %.6f\n", target.Eccentricity)
 	fmt.Printf("  Inclination      %s\n", target.Inclination.DMSString(1))
@@ -89,7 +99,7 @@ func main() {
 
 	// ── Part 1: position/magnitude drift across the year ────────────────────
 	fmt.Println()
-	fmt.Println("── Position & magnitude across 2026 (two-body propagation) ────────")
+	fmt.Println("── Position & magnitude for a year from the epoch (two-body) ──────")
 	fmt.Println()
 	fmt.Println("  Date          RA             Dec           Δ (AU)   Mag")
 	fmt.Println("  ──────────    ───────────    ──────────    ──────   ────")

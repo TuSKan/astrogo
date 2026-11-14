@@ -32,8 +32,11 @@ func main() {
 	// point of this example. See README "Data downloads & offline usage".
 	remote.EnableDownloads(0, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. No bulletin covers the
+	// first century, though (it begins in 1973), so astrogo uses zero EOP
+	// here and says so once. What sets the accuracy is Delta T, the drift of
+	// the Earth's rotation, from the Espenak & Meeus (2006) model.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
