@@ -19,10 +19,9 @@ func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
 	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
 	testutil.AssertNoError(t, err)
 
-	saoPaulo, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		t.Skipf("time zone database lacks America/Sao_Paulo: %v", err)
-	}
+	// São Paulo's offset as a fixed zone, so the test needs no time zone
+	// database; Brazil has kept -03 without daylight saving since 2019.
+	saoPaulo := time.FixedZone("-03", -3*60*60)
 
 	star := NewStar("Sirius", angle.Deg(101.287155), angle.Deg(-16.716116))
 
