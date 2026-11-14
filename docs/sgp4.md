@@ -316,6 +316,7 @@ conditions:
 | `ErrDecayed` | error 6 | **yes** |
 | `ErrKeplerNotConverged` | — (new) | **yes** |
 | `ErrNotFinite` | — (new) | no |
+| `ErrBeyondHillSphere` | — (new) | no |
 
 Error 5, a sub-orbital element set, has no sentinel because the reference no
 longer raises it. Vallado's `sgp4init` carries that check commented out ("sgp4fix
@@ -334,6 +335,14 @@ That state is always finite. A NaN or infinite time is refused with
 integrator steps toward it and never arrives. A state the arithmetic overflowed
 to compute, from a time or an element set far outside the model's range, is
 refused the same way rather than returned as a convergence failure (#1052).
+
+A finite state can still be outside the model. Run thousands of years from its
+epoch, an element set's drag terms carry the orbit outward without bound, and no
+check above fires: the ISS evaluated at JD 0 came back 5.9e23 km away (#1131). A
+position beyond the Earth's Hill sphere, about 1.5 million km, where the Sun
+rather than the Earth governs the motion, is refused with `ErrBeyondHillSphere`.
+That does not catch a position that is merely stale, a plausible orbit a year
+from its epoch, which only a validity window could.
 
 `ErrKeplerNotConverged` has no counterpart in the reference, which silently
 stops after ten iterations and uses whatever it has. That silence *is* the 23333
