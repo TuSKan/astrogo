@@ -435,7 +435,7 @@ func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSear
 			if err != nil {
 				// One bad row does not end the source, but the caller is told
 				// their list is short by however many of these there were.
-				dropped.add("bright source", fmt.Sprintf("%T", src), err)
+				dropped.add("bright source", brightSourceName(src), err)
 
 				return true
 			}
@@ -454,6 +454,20 @@ func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSear
 	}
 
 	return targets
+}
+
+// brightSourceName names a bright-object source in a skip reason: its
+// provider name when it has one, as every catalog provider does, and its Go
+// type only when it has none. The reason used to give the type alone, so a
+// SIMBAD outage read `bright source "*simbad.Provider"` (#1138).
+func brightSourceName(src resolve.BrightObjectSearcher) string {
+	if named, ok := src.(interface{ Name() string }); ok {
+		if name := named.Name(); name != "" {
+			return name
+		}
+	}
+
+	return fmt.Sprintf("%T", src)
 }
 
 // maxConcurrentEphemerisFetches bounds how many asteroid/comet Stage-2
