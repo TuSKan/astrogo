@@ -45,6 +45,55 @@ func TestMatch_AliasByAliasesEntry(t *testing.T) {
 	}
 }
 
+// TestMatchByIdentityKeys holds Match to the identity rule catalog.Resolver
+// uses, resolve.IdentityKeys: a designation counts, SIMBAD's object-type
+// prefixes do not, and the display name is not an identifier. None of these
+// targets has a position, so only identity can pair them.
+func TestMatchByIdentityKeys(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		a, b resolve.Target
+		want int
+	}{
+		{
+			name: "SIMBAD star prefix against a designation",
+			a:    resolve.Target{ID: "* alf Ori", Name: "Betelgeuse"},
+			b:    resolve.Target{ID: "IC 999", Designation: "alf Ori"},
+			want: 1,
+		},
+		{
+			name: "SIMBAD NAME identifier against an alias",
+			a:    resolve.Target{ID: "SIMBAD-LMC", Aliases: []string{"NAME LMC"}},
+			b:    resolve.Target{ID: "openngc-lmc", Aliases: []string{"LMC"}},
+			want: 1,
+		},
+		{
+			name: "designation against an ID",
+			a:    resolve.Target{ID: "x-1", Designation: "M 42"},
+			b:    resolve.Target{ID: "M42"},
+			want: 1,
+		},
+		{
+			name: "a shared display name alone",
+			a:    resolve.Target{ID: "A1", Name: "Polaris"},
+			b:    resolve.Target{ID: "B1", Name: "Polaris"},
+			want: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := Match([]resolve.Target{tc.a}, []resolve.Target{tc.b}); len(got) != tc.want {
+				t.Errorf("Match(%+v, %+v) gave %d pairs, want %d", tc.a, tc.b, len(got), tc.want)
+			}
+		})
+	}
+}
+
 func TestMatch_NoSharedAliasOrPosition_NoMatch(t *testing.T) {
 	a := []resolve.Target{star("A1", "Alpha", nil, 10, 20, true)}
 	b := []resolve.Target{star("B1", "Beta", nil, 200, -50, true)} // far away, no shared alias
