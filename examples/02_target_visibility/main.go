@@ -3,10 +3,10 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -41,6 +41,8 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
+	show.Title("Is it observable?", target.Name()+" from "+site.Name()+", above 30° altitude")
+
 	for _, tm := range []time.Time{
 		time.Date(2026, 4, 6, 19, 0, 0, 0, tz),
 		time.Date(2026, 4, 6, 23, 0, 0, 0, tz),
@@ -53,18 +55,24 @@ func main() {
 			log.Fatalf("visibility: %v", err)
 		}
 
-		verdict := "not observable"
+		verdict := "no"
 		if eval.Observable {
-			verdict = "observable"
+			verdict = "yes"
 		}
 
-		fmt.Printf("%s from %s at %s: %s\n", target.Name(), site.Name(), tm.Format("2006-01-02 15:04 -0700"), verdict)
-		fmt.Printf("  altitude %.1f°, azimuth %.1f°\n", eval.AltAz.Alt().Degrees(), eval.AltAz.Az().Degrees())
+		show.Section(tm.Format("2006-01-02 15:04 MST"))
+		show.Fields(
+			show.KV("Observable", "%s", verdict),
+			show.KV("Altitude", "%.1f°", eval.AltAz.Alt().Degrees()),
+			show.KV("Azimuth", "%.1f°", eval.AltAz.Az().Degrees()),
+		)
 
 		for _, r := range eval.Results {
-			fmt.Printf("  %s\n", r)
+			if r.Pass {
+				show.Note("✓ constraint met")
+			} else {
+				show.Note("✗ " + r.Reason)
+			}
 		}
-
-		fmt.Println()
 	}
 }
