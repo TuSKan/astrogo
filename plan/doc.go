@@ -17,8 +17,14 @@
 // [KnownSiteNames] and [NewKnownSite], and the Minor Planet Center's
 // observatory codes from [MPCObservatories] and [NewMPCSite]. A [SiteOption]
 // adds a local horizon ([WithHorizon], [WithHorizonProfile] and a
-// [HorizonProfile], [WithHorizonRefraction]), a time zone ([WithTimeZone]),
-// an MPC code ([WithMPCCode]) or aliases ([WithSiteAliases]).
+// [HorizonProfile], [WithHorizonRefraction], and [WithHorizonHeight] for a
+// site that looks down on its horizon), a time zone ([WithTimeZone]), an MPC
+// code ([WithMPCCode]) or aliases ([WithSiteAliases]).
+//
+// Rise and set use the almanacs' horizon: the geometric one, lowered by 34′
+// of refraction, at any height above the ellipsoid. The dip of a horizon
+// below the observer is added only where WithHorizonHeight says there is one,
+// a summit over the sea, since a city on a plateau looks out on the plateau.
 //
 // # Targets
 //

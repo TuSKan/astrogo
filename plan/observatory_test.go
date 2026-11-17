@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
+	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -560,9 +561,11 @@ func TestNewKnownSiteReturnsSharedInstanceWithoutOpts(t *testing.T) {
 }
 
 // TestSiteHorizonDipIsTheApparentDip pins Site.HorizonDip to its doc (#566):
-// 1.76′·√h, the dip with terrestrial refraction, which is smaller than the
-// geometric dip. The doc called it geometric and quoted the geometric 0.90°
-// at 786 m for a function returning 0.82°.
+// 1.76′·√h for h above the visible horizon, the dip with terrestrial
+// refraction, which is smaller than the geometric dip. The doc called it
+// geometric and quoted the geometric 0.90° at 786 m for a function returning
+// 0.82°. The site is entered at sea level, since the dip follows the height
+// above the horizon (WithHorizonHeight), not above the ellipsoid (#1185).
 func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
 	t.Parallel()
 
@@ -573,7 +576,7 @@ func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
 		{786, 0.822, 0.899},
 		{8849, 2.759, 3.016},
 	} {
-		site, err := NewSiteEarthLocation("dip", 0, 0, c.height)
+		site, err := NewSiteEarthLocation("dip", 0, 0, 0, WithHorizonHeight(unit.Meters(c.height)))
 		if err != nil {
 			t.Fatalf("NewSiteEarthLocation: %v", err)
 		}

@@ -66,10 +66,10 @@ func main() {
 ```
 
 ```
-Mars right now: altitude -30.4°, observable above 30°: false
-  Rise     2026-04-16 07:46 UTC
+Mars right now: altitude -30.5°, observable above 30°: false
+  Rise     2026-04-16 07:47 UTC
   Transit  2026-04-16 13:47 UTC
-  Set      2026-04-16 19:49 UTC
+  Set      2026-04-16 19:47 UTC
 ```
 
 No API keys, no downloads, no Python underneath for this example — every number above came from SOFA-derived algorithms running in pure Go. (Higher-precision JPL ephemerides are available too, opt-in — see [Data downloads & offline usage](#data-downloads--offline-usage).) Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
@@ -309,6 +309,7 @@ Every component traces to primary literature: artificial skyglow follows Kocifaj
 - **Moon Phase Events**: `NextNewMoon`, `NextFullMoon`, `MoonPhases` via `EventFamilyIllumination`
 - **Earth's Seasons**: Equinoxes and Solstices — ≤0.74 min vs USNO over 2020–2035 (held to 1 min, USNO printing to the minute)
 - **Visibility Events**: Rise/Set ≤0.6 min vs USNO, Transit ≤0.5 min — 41/41 edge cases passing (polar, equatorial, 8849m altitude)
+- **Horizon dip**: none by default, at any height, as USNO and the almanacs assume; `plan.WithHorizonHeight` lowers the horizon by 1.76′·√h for a site that looks down on it, a summit over the sea
 - **Horizon refraction**: the almanacs' 34′ by default, so rises and sets agree with USNO's; `plan.WithHorizonRefraction` sets the air the horizon refracts through instead. Against the real sky, refraction near the horizon limits any rise or set to about 2 minutes, whatever the model (Wilson 2018)
 - **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
 - **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition (Ecliptic Longitude), Greatest Elongation, Quadrature
