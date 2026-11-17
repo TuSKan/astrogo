@@ -6,8 +6,10 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"fmt"
+	"html"
 	"io"
 	"net/url"
+	"strings"
 	"sync"
 
 	"resty.dev/v3"
@@ -417,20 +419,120 @@ func (c *Client) body(resp *resty.Response, err error) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-// maxErrorBody bounds how much of a failed response is captured for the
-// error message.
-const maxErrorBody = 4096
+// maxErrorBody bounds how much of a failed response is captured in
+// [HTTPError.Body]. It bounds memory, not the message: [HTTPError.Error]
+// prints an excerpt. It was 4096 bytes, which during the CDS outage of
+// 2026-11-13 ended inside the 404 page's style block, before the sentence
+// that said why (#1135).
+const maxErrorBody = 64 << 10
+
+// maxExcerpt is the most characters of the body [HTTPError.Error] prints,
+// keeping the message to one readable line.
+const maxExcerpt = 300
 
 // HTTPError is a non-2xx response from an API endpoint. The body is
 // captured because these services put the actual reason in it — a bad ADQL
 // query, an unknown designation, a rate-limit notice.
 type HTTPError struct {
+	// Body is the response as it arrived, up to 64 KiB.
 	Body       string
 	StatusCode int
 }
 
+// Error is one line: the status and an excerpt of the body. An HTML page's
+// excerpt is its visible text, without the markup, scripts or styles around
+// it; any body has its whitespace collapsed and is cut at 300 characters.
+//
+// It used to print the raw body. For a TAP or plain-text answer that was the
+// reason, but for an HTML page it was 4 KB of markup over about 150 lines,
+// and the reason was not among them (#1135).
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("remote/api: http %d - %s", e.StatusCode, e.Body)
+	return fmt.Sprintf("remote/api: http %d - %s", e.StatusCode, excerpt(e.Body))
+}
+
+// excerpt is the part of a response body an error message shows: its
+// visible text if it is an HTML page, with whitespace collapsed, cut at
+// maxExcerpt characters.
+func excerpt(body string) string {
+	text := body
+	if looksLikeHTML(body) {
+		text = htmlText(body)
+	}
+
+	text = strings.Join(strings.Fields(text), " ")
+
+	if r := []rune(text); len(r) > maxExcerpt {
+		text = string(r[:maxExcerpt]) + "…"
+	}
+
+	return text
+}
+
+// looksLikeHTML reports whether body is an HTML document rather than the
+// plain text, JSON or VOTable these services answer with otherwise.
+func looksLikeHTML(body string) bool {
+	head := strings.ToLower(strings.TrimSpace(body))
+
+	return strings.HasPrefix(head, "<!doctype html") || strings.HasPrefix(head, "<html")
+}
+
+// htmlText is an HTML document's visible text: the content of script and
+// style elements removed, then every tag, then entities decoded. An element
+// left open, as a body cut short leaves one, is removed to the end.
+func htmlText(doc string) string {
+	for _, element := range []string{"script", "style"} {
+		doc = removeElements(doc, element)
+	}
+
+	var b strings.Builder
+
+	for {
+		open := strings.IndexByte(doc, '<')
+		if open < 0 {
+			b.WriteString(doc)
+
+			break
+		}
+
+		b.WriteString(doc[:open])
+		b.WriteByte(' ')
+
+		closing := strings.IndexByte(doc[open:], '>')
+		if closing < 0 {
+			break
+		}
+
+		doc = doc[open+closing+1:]
+	}
+
+	return html.UnescapeString(b.String())
+}
+
+// removeElements removes every element named name, with its content, from
+// doc, matching the tag case-insensitively.
+func removeElements(doc, name string) string {
+	lower := strings.ToLower(doc)
+
+	var b strings.Builder
+
+	for {
+		start := strings.Index(lower, "<"+name)
+		if start < 0 {
+			b.WriteString(doc)
+
+			return b.String()
+		}
+
+		b.WriteString(doc[:start])
+
+		end := strings.Index(lower[start:], "</"+name+">")
+		if end < 0 {
+			return b.String()
+		}
+
+		cut := start + end + len("</"+name+">")
+		doc, lower = doc[cut:], lower[cut:]
+	}
 }
 
 // HTTPStatus returns the status code of the response that produced this error.

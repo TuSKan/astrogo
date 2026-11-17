@@ -121,10 +121,8 @@ func main() {
 
 	// ----------------------------------------------------
 	// Lunar eclipses, and whether the Moon is up at Quinta Calixto at maximum.
-	// Centrality is plan's Gamma: how close the eclipse comes to central, as
-	// a fraction of the distance at which it would only graze, 0 central and
-	// 1 grazing. It is not the signed gamma, in Earth radii, that NASA's
-	// eclipse canons publish.
+	// Gamma is the canon's: the Moon's distance from the axis of Earth's
+	// shadow at maximum, in Earth radii, positive when it passes north of it.
 	fmt.Printf("\nLunar eclipses (visibility from %s):\n", site.Name())
 
 	lunarEclipses, err := plan.LunarEclipses(start, end, prov)
@@ -147,7 +145,7 @@ func main() {
 			visibility = "Moon up at maximum"
 		}
 
-		fmt.Printf("  [%d] %s at %s  centrality %.2f  (%s)\n",
+		fmt.Printf("  [%d] %s at %s  gamma %+.4f  (%s)\n",
 			i+1, ecl.Type, ecl.Time.Format("2006-01-02 15:04 MST"), ecl.Gamma, visibility)
 	}
 
@@ -167,7 +165,7 @@ func main() {
 	}
 
 	for i, ecl := range solarEclipses {
-		fmt.Printf("  [%d] %s at %s  centrality %.2f\n",
+		fmt.Printf("  [%d] %s at %s  gamma %+.4f\n",
 			i+1, ecl.Type, ecl.Time.Format("2006-01-02 15:04 MST"), ecl.Gamma)
 	}
 

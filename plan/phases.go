@@ -581,7 +581,15 @@ type EclipseEvent struct {
 	Time             time.Time
 	Type             EclipseType
 	EclipticLatitude angle.Angle
-	Gamma            float64
+
+	// Gamma is the canon's gamma at greatest eclipse, in Earth equatorial
+	// radii: for the Sun, the shadow axis's distance from Earth's center; for
+	// the Moon, the distance of the Moon's center from the axis of Earth's
+	// shadow. It is positive when the axis passes north of Earth's center, or
+	// the Moon north of the axis, and negative south. Until #1165 it was that
+	// distance as a fraction of the one at which the eclipse would just graze,
+	// with no sign: a different number under the canon's name.
+	Gamma float64
 
 	// Kind is the eclipse's kind, decided as the canon decides it: for the
 	// Moon by the umbral magnitude, for the Sun by whether the umbra or the
@@ -633,9 +641,8 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 // sizes it, by Danjon's rule, from that month's distances to the Moon and the
 // Sun, so an eclipse here is an eclipse there; against six centuries of the
 // canon the two agree on every one. Time is greatest eclipse, when the Moon's
-// center passes closest to the shadow axis. Gamma is that closest distance as
-// a fraction of the distance at which the Moon would just graze the penumbra:
-// 0 central, 1 grazing. EclipticLatitude is the Moon's, at greatest eclipse.
+// center passes closest to the shadow axis, and Gamma is that closest distance
+// as the canon gives it. EclipticLatitude is the Moon's, at greatest eclipse.
 //
 // Until #401 an eclipse was any Full Moon within a fixed 1.58° of ecliptic
 // latitude, which is not a property of the shadow: it reported eclipses that
@@ -685,7 +692,7 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			return nil, fmt.Errorf("lunar eclipses: %w", err)
 		}
 
-		penumbral, umbral, gamma := g.lunarMagnitudes()
+		penumbral, umbral := g.lunarMagnitudes()
 		if penumbral <= 0 {
 			continue
 		}
@@ -699,7 +706,7 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			Type:               EclipseLunar,
 			Time:               eclTime,
 			EclipticLatitude:   eclLat,
-			Gamma:              gamma,
+			Gamma:              g.lunarGamma(eclTime),
 			Kind:               lunarKind(umbral),
 			Magnitude:          umbral,
 			PenumbralMagnitude: penumbral,
@@ -715,9 +722,8 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 // The penumbra is sized, and the Earth shaped, as NASA's Five Millennium Canon
 // of Solar Eclipses has them, so an eclipse here is an eclipse there; against
 // six centuries of the canon the two agree on every one. Time is greatest
-// eclipse, when the shadow's axis passes closest to Earth's center. Gamma is
-// that closest distance as a fraction of the distance at which the penumbra
-// would just graze Earth's limb: 0 central, 1 grazing. EclipticLatitude is the
+// eclipse, when the shadow's axis passes closest to Earth's center, and Gamma
+// is that closest distance as the canon gives it. EclipticLatitude is the
 // Moon's, at greatest eclipse.
 //
 // Until #401 an eclipse was any New Moon within a fixed 1.58° of ecliptic
@@ -769,8 +775,7 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 
 		shadow := g.solarShadow(eclTime)
 
-		margin, gamma := shadow.margin()
-		if margin <= 0 {
+		if shadow.margin() <= 0 {
 			continue
 		}
 
@@ -788,7 +793,7 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			Type:             EclipseSolar,
 			Time:             eclTime,
 			EclipticLatitude: eclLat,
-			Gamma:            gamma,
+			Gamma:            shadow.gamma(),
 			Kind:             kind,
 			Magnitude:        magnitude,
 		})

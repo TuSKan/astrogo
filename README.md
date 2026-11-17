@@ -139,7 +139,8 @@ rest choose zero Earth orientation, and say in a comment what that costs them.
 `examples/` is [its own module](examples/go.mod), which is why the command carries
 `-C examples` rather than a path. It keeps 32 demo programs out of the library's
 package listing while still building against the working tree, so an API change that
-breaks an example fails CI.
+breaks an example fails CI. CI also runs every example whose Network column says
+none, so a crash, or a "none" that reaches the network, fails it too.
 
 | | What it answers | Network |
 | :--- | :--- | :--- |
@@ -179,7 +180,7 @@ tables you can check against published references.
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — planets and comets held to JPL Horizons (0.02 and 0.001 mag), sHG1G2 to the FINK/ZTF production pipeline (every one of 186 observations within 0.025 mag); see [`docs/VALIDATION.md`](docs/VALIDATION.md) for each |
-| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
+| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, an in-memory answer cache per provider, retry/backoff |
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
 | **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky within **0.3 mag** of GAMBONS in every altitude band, and moonlight within 0.13 mag of Krisciunas & Schaefer (1991)'s measured moonlit sky |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
@@ -253,7 +254,7 @@ tables you can check against published references.
 ### Catalogs & Data Services (`catalog/resolve`)
 - Unified `resolve.Provider` interfaces (`ObjectResolver`, `ConeSearcher`, `BrightObjectSearcher` — bulk-list every object a provider knows brighter than a magnitude bound; implemented by SIMBAD, OpenNGC, and SBDB)
 - `resolve.KindInterstellar` — classification for bodies confidently on a hyperbolic/parabolic orbit (1I/'Oumuamua, 2I/Borisov, ...), decoded from `catalog/sbdb`'s orbit-classification data with an eccentricity margin that excludes near-parabolic long-period comets from false-positiving as interstellar
-- Hardware-optimized native caching via **Apache Arrow** columnar batches
+- Each provider caches its answers in memory (`resolve.MapCache`), so a repeated query is not sent to the service again
 - Modern Go 1.23 streaming `iter.Seq2` iteration for memory-safe big data fetching
 - Resilient network layers with exponential backoff retry
 - Production-grade bindings:
@@ -431,7 +432,7 @@ be able to break an API until 1.0 says otherwise.
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
 | `ephemeris/satellite/sgp4` | The SGP4/SDP4 model itself — element sets, TLE parsing, TEME states |
-| `catalog/resolve` | Provider interface, HTTP client, Arrow cache |
+| `catalog/resolve` | Provider interfaces, query types, the in-memory answer cache |
 | `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers |
 | `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) |
 | `catalog/horizons` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches |
@@ -776,6 +777,8 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
 The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the 28th CGPM (2026) makes UTC continuous from 2027-05-20, with |UT1−UTC| allowed to reach an hour, so after that date only EOP data says where UT1 is.
+
+The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
 The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
