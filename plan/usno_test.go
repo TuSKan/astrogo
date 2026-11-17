@@ -457,9 +457,24 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				// #532 it was skipped as "handled separately" and nothing else
 				// compared it, so astrogo's twilight times had no external
 				// reference at all.
-				civilDawn, civilDusk, err := plan.CivilDawnDusk(start, end, site, prov)
+				// USNO prints the date's own morning dawn and evening dusk,
+				// which belong to two nights, so they are the date's
+				// crossings rather than one NightOf.
+				civilNights, err := plan.TwilightEvents(start, end, site, prov, plan.CivilTwilight)
 				if err != nil {
-					t.Fatalf("CivilDawnDusk failed: %v", err)
+					t.Fatalf("TwilightEvents failed: %v", err)
+				}
+
+				var civilDawn, civilDusk *plan.Event
+
+				for _, n := range civilNights {
+					if civilDawn == nil {
+						civilDawn = n.Dawn
+					}
+
+					if civilDusk == nil {
+						civilDusk = n.Dusk
+					}
 				}
 
 				for _, sp := range resp.Properties.Data.SunData {

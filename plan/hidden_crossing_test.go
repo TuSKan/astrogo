@@ -59,9 +59,14 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	// Paris in June: ten minutes of astronomical night, 0.009° deep.
 	start = time.Date(2026, 6, 11, 10, 0, 0, 0, time.LocationUTC)
 
-	dawn, dusk, err := AstronomicalDawnDusk(start, start.Add(unit.Days(1)), site("Paris", 48.8566, 2.3522), prov)
+	nights, err := TwilightEvents(start, start.Add(unit.Days(1)), site("Paris", 48.8566, 2.3522), prov, AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	var dusk, dawn *Event
+	if len(nights) == 1 {
+		dusk, dawn = nights[0].Dusk, nights[0].Dawn
 	}
 
 	cases = append(cases, pair{"Paris astronomical dusk and dawn", dusk, dawn, [2]time.Time{

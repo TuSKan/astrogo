@@ -3,7 +3,6 @@ package plan
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -19,11 +18,6 @@ import (
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
-
-// ErrNoTwilight is returned when site/night never reaches astronomical
-// twilight within a 24-hour span (e.g. high-latitude summer) — "tonight"
-// as this function defines it doesn't exist for that combination.
-var ErrNoTwilight = errors.New("plan: no astronomical twilight found in the given night")
 
 // VisibleObject is one object confirmed visible tonight, fully described.
 // Target is reused wholesale (ID, Name, Kind, Catalog, Coord, VMag, H/G/M1/K1
@@ -219,12 +213,10 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // clears the horizon at some point tonight (astronomical dusk to the
 // following astronomical dawn) from site.
 //
-// night should be an instant earlier in the same calendar day than dusk
-// (local noon or midnight both work) — VisibleTonight searches
-// [night, night+24h] for tonight's dusk, then independently searches
-// starting at that dusk for the following dawn (not the same window both
-// searches share), so the result is always correctly ordered regardless of
-// whether night falls before or after that morning's own dawn.
+// The night searched is the one [NightOf] returns for the instant night and
+// astronomical twilight: the night under way at that instant, or the coming
+// one when it falls in daylight. Local noon names that date's evening; local
+// midnight is in the night before it.
 //
 // Stars and deep-sky objects come from brightSources — any
 // resolve.BrightObjectSearcher (catalog/simbad, catalog/openngc, and
@@ -319,37 +311,12 @@ func VisibleTonight(
 
 	cfg.air = air
 
-	// AstronomicalDawnDusk finds the first dawn and first dusk independently
-	// within [start, end) — not "tonight's dusk paired with the dawn that
-	// follows it". Searching [night, night+24h) directly for both, as an
-	// earlier version of this function did, breaks the moment night is
-	// midnight (a documented valid choice): the first dawn in that window
-	// is that same morning's, which is BEFORE dusk, not after it — an
-	// inverted [start, end) that silently makes every candidate evaluate
-	// as never visible (confirmed via live testing: every one of ~150 real
-	// candidates, including Sirius, was rejected). Two searches fix this
-	// structurally regardless of which instant night is: first find dusk
-	// anywhere in the caller's 24h window, then search for dawn starting
-	// exactly at dusk.Time — guaranteeing dawn is always after dusk.
-	_, dusk, err := AstronomicalDawnDusk(night, night.AddDate(0, 0, 1), site, planetProvider)
+	nightSpan, err := NightOf(night, site, planetProvider, AstronomicalTwilight)
 	if err != nil {
-		return nil, fmt.Errorf("plan: visible tonight: twilight: %w", err)
+		return nil, fmt.Errorf("plan: visible tonight: %w", err)
 	}
 
-	if dusk == nil {
-		return nil, ErrNoTwilight
-	}
-
-	dawn, _, err := AstronomicalDawnDusk(dusk.Time, dusk.Time.AddDate(0, 0, 1), site, planetProvider)
-	if err != nil {
-		return nil, fmt.Errorf("plan: visible tonight: twilight: %w", err)
-	}
-
-	if dawn == nil {
-		return nil, ErrNoTwilight
-	}
-
-	start, end := dusk.Time, dawn.Time
+	start, end := nightSpan.Dusk, nightSpan.Dawn
 	mid := start.Add(end.Sub(start) / 2)
 
 	// Everything dropped because it could not be evaluated, rather than because

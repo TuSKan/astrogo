@@ -578,8 +578,16 @@ func (k EclipseKind) String() string {
 // EclipseEvent records an eclipse: when it is greatest, what kind it is, and
 // how deep.
 type EclipseEvent struct {
-	Time             time.Time
-	Type             EclipseType
+	// Time is greatest eclipse.
+	Time time.Time
+	// Type says whether the eclipse is of the Sun or of the Moon.
+	Type EclipseType
+
+	// EclipticLatitude is the Moon's geocentric ecliptic latitude at Time,
+	// on the IAU 2006 mean ecliptic of date: positive north of the ecliptic,
+	// negative south, for a solar eclipse as for a lunar one. It is where the
+	// Moon is, not how deep the eclipse is; Gamma, Kind and the magnitudes
+	// say that.
 	EclipticLatitude angle.Angle
 
 	// Gamma is the canon's gamma at greatest eclipse, in Earth equatorial
