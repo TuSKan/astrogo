@@ -133,6 +133,7 @@ func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Va
 		}
 
 		maxrec.Store(r.PostForm.Get("MAXREC"))
+
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)

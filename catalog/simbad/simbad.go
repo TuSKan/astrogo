@@ -209,58 +209,6 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 	}
 }
 
-// addIdentifiers sets each target's Aliases to the identifiers SIMBAD lists for
-// the object with the matching oid, asking about identifierBatch objects at a
-// time. A target whose oid is 0 has none to ask about and is left as it is.
-//
-// A batch that fails ends the fetch: the targets already given identifiers
-// keep them, and the error, wrapping errIdentifiersUnavailable, counts the
-// ones that have none.
-func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target, oids []int64) error {
-	at := make(map[int64]int, len(oids))
-	ask := make([]int64, 0, len(oids))
-
-	for i, oid := range oids {
-		if oid > 0 {
-			at[oid] = i
-			ask = append(ask, oid)
-		}
-	}
-
-	for start := 0; start < len(ask); start += identifierBatch {
-		batch := ask[start:min(start+identifierBatch, len(ask))]
-
-		ids, err := p.fetchIdentifiers(ctx, batch)
-		if err != nil {
-			return fmt.Errorf("%w for %d of %d objects, so another catalog may list one of them a second time: %w",
-				errIdentifiersUnavailable, len(ask)-start, len(ask), err)
-		}
-
-		for oid, list := range ids {
-			if i, ok := at[oid]; ok {
-				targets[i].Aliases = list
-			}
-		}
-	}
-
-	return nil
-}
-
-// fetchIdentifiers asks SIMBAD for the identifiers of one batch of objects.
-func (p *Provider) fetchIdentifiers(ctx context.Context, oids []int64) (map[int64][]string, error) {
-	body, err := p.client.PostForm(ctx, remote.SIMBAD, "", TAPRequest(buildIdentifierQuery(oids)))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = body.Close() }()
-
-	return parseIdentifiers(body)
-}
-
-// errIdentifiersUnavailable marks a bright-object list whose objects came
-// without the identifiers that match them to other catalogs.
-var errIdentifiersUnavailable = errors.New("simbad: identifiers unavailable")
-
 // ResolveObject provides an async streaming mechanism using ADQL.
 func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {
 	// 1. Check Cache First (Maintain case to prevent ADQL case-sensitive collisions)
@@ -322,3 +270,55 @@ func (p *Provider) stream(ctx context.Context, cacheKey, adql string) resolve.Se
 		}
 	}
 }
+
+// addIdentifiers sets each target's Aliases to the identifiers SIMBAD lists for
+// the object with the matching oid, asking about identifierBatch objects at a
+// time. A target whose oid is 0 has none to ask about and is left as it is.
+//
+// A batch that fails ends the fetch: the targets already given identifiers
+// keep them, and the error, wrapping errIdentifiersUnavailable, counts the
+// ones that have none.
+func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target, oids []int64) error {
+	at := make(map[int64]int, len(oids))
+	ask := make([]int64, 0, len(oids))
+
+	for i, oid := range oids {
+		if oid > 0 {
+			at[oid] = i
+			ask = append(ask, oid)
+		}
+	}
+
+	for start := 0; start < len(ask); start += identifierBatch {
+		batch := ask[start:min(start+identifierBatch, len(ask))]
+
+		ids, err := p.fetchIdentifiers(ctx, batch)
+		if err != nil {
+			return fmt.Errorf("%w for %d of %d objects, so another catalog may list one of them a second time: %w",
+				errIdentifiersUnavailable, len(ask)-start, len(ask), err)
+		}
+
+		for oid, list := range ids {
+			if i, ok := at[oid]; ok {
+				targets[i].Aliases = list
+			}
+		}
+	}
+
+	return nil
+}
+
+// fetchIdentifiers asks SIMBAD for the identifiers of one batch of objects.
+func (p *Provider) fetchIdentifiers(ctx context.Context, oids []int64) (map[int64][]string, error) {
+	body, err := p.client.PostForm(ctx, remote.SIMBAD, "", TAPRequest(buildIdentifierQuery(oids)))
+	if err != nil {
+		return nil, fmt.Errorf("asking about %d objects: %w", len(oids), err)
+	}
+	defer func() { _ = body.Close() }()
+
+	return parseIdentifiers(body)
+}
+
+// errIdentifiersUnavailable marks a bright-object list whose objects came
+// without the identifiers that match them to other catalogs.
+var errIdentifiersUnavailable = errors.New("simbad: identifiers unavailable")

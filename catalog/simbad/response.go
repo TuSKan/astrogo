@@ -363,7 +363,7 @@ func parseIdentifiers(r io.Reader) (map[int64][]string, error) {
 	header, err := reader.Read()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, nil
+			return map[int64][]string{}, nil
 		}
 
 		return nil, fmt.Errorf("simbad: failed to read CSV header: %w", err)
