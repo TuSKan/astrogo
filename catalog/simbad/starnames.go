@@ -240,5 +240,9 @@ func friendlyName(mainID string) (name string, ok bool) {
 		}
 	}
 
-	return mainID, false
+	// A common name SIMBAD writes as "NAME LMC" is displayed as "LMC": the
+	// prefix is SIMBAD's marker for an identifier that is a name, not part of
+	// the name. Rows used to be listed as "NAME LMC" (#1151). The ID keeps
+	// SIMBAD's form, which is what a later query takes.
+	return strings.TrimPrefix(mainID, "NAME "), false
 }

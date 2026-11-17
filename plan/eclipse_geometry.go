@@ -107,10 +107,8 @@ func (g eclipseGeometry) lunarAxisDistance() float64 {
 // penumbra and umbra, each negative when the Moon is outside that shadow by
 // that fraction, with the shadows enlarged by Danjon's rule: the canon's
 // penumbral and umbral magnitudes. A positive penumbral magnitude is an
-// eclipse; the umbral one decides its kind. Also returned is the Moon's
-// distance from the shadow axis as a fraction of the distance at which it
-// would just graze the penumbra.
-func (g eclipseGeometry) lunarMagnitudes() (penumbral, umbral, gamma float64) {
+// eclipse; the umbral one decides its kind.
+func (g eclipseGeometry) lunarMagnitudes() (penumbral, umbral float64) {
 	moonDist := g.moon.Norm()
 	sunDist := g.sun.Norm()
 
@@ -124,7 +122,28 @@ func (g eclipseGeometry) lunarMagnitudes() (penumbral, umbral, gamma float64) {
 	limit := penumbraRadius + moonSemiDiameter
 	d := g.lunarAxisDistance()
 
-	return (limit - d) / (2 * moonSemiDiameter), (umbraRadius + moonSemiDiameter - d) / (2 * moonSemiDiameter), d / limit
+	return (limit - d) / (2 * moonSemiDiameter), (umbraRadius + moonSemiDiameter - d) / (2 * moonSemiDiameter)
+}
+
+// lunarGamma is the canon's gamma for a lunar eclipse: the distance of the
+// Moon's center from the axis of Earth's shadow, in Earth equatorial radii,
+// measured in the plane through the Moon perpendicular to the axis. It is
+// positive when the Moon is north of the axis, toward Earth's true pole of
+// date, as the canon's "+" for a central total eclipse is.
+func (g eclipseGeometry) lunarGamma(t time.Time) float64 {
+	axis := g.sun.MulScalar(-1).Unit()
+	offset := g.moon.Sub(axis.MulScalar(g.moon.Dot(axis)))
+
+	return math.Copysign(offset.Norm()/earthEquatorialRadiusKm, offset.Dot(truePole(t)))
+}
+
+// truePole is the direction of Earth's true pole of date in GCRS: the third
+// row of the bias-precession-nutation matrix.
+func truePole(t time.Time) vector.Vec3 {
+	tt1, tt2 := t.TT().JDParts()
+	bpn := gofaext.Pnm06a(tt1, tt2)
+
+	return vector.Vec3{X: bpn[2][0], Y: bpn[2][1], Z: bpn[2][2]}
 }
 
 // lunarKind classifies a lunar eclipse by its umbral magnitude: total when
@@ -174,9 +193,9 @@ type solarShadow struct {
 	// eclipse is total, and where it is positive, annular.
 	l1, l2, tanF1, tanF2 float64
 
-	// r is the axis's distance from Earth's center; limb is the radius of
-	// Earth's outline in the same direction.
-	r, limb float64
+	// r is the axis's distance from Earth's center and y the northward part
+	// of it; limb is the radius of Earth's outline in the same direction.
+	r, y, limb float64
 }
 
 // solarShadow computes the shadow at t.
@@ -207,11 +226,7 @@ func (g eclipseGeometry) solarShadow(t time.Time) solarShadow {
 	tanF1 := math.Tan(math.Asin(sinF1))
 	tanF2 := math.Tan(math.Asin(sinF2))
 
-	// The true pole of date in GCRS is the third row of the bias-precession-
-	// nutation matrix.
-	tt1, tt2 := t.TT().JDParts()
-	bpn := gofaext.Pnm06a(tt1, tt2)
-	pole := vector.Vec3{X: bpn[2][0], Y: bpn[2][1], Z: bpn[2][2]}
+	pole := truePole(t)
 
 	// The outline has semi-axes 1 and rho, rho along the pole's projection;
 	// d is the axis's declination of date.
@@ -238,22 +253,27 @@ func (g eclipseGeometry) solarShadow(t time.Time) solarShadow {
 		axis: axis, pole: pole, crossing: crossing.MulScalar(1 / earthEquatorialRadiusKm),
 		l1: (z + moonRadiusRatio/sinF1) * tanF1, l2: (z - moonRadiusRatioUmbral/sinF2) * tanF2,
 		tanF1: tanF1, tanF2: tanF2,
-		r: r, limb: limb,
+		r: r, y: y, limb: limb,
 	}
 }
 
 // solarPenumbraMargin is how far, in Earth equatorial radii, the Moon's
 // penumbra reaches past Earth's limb as seen along the shadow axis: positive
-// when it falls on the Earth, which is an eclipse. Also returned is the axis's
-// distance from Earth's center as a fraction of the distance at which the
-// penumbra would just graze the limb.
-func (g eclipseGeometry) solarPenumbraMargin(t time.Time) (margin, gamma float64) {
+// when it falls on the Earth, which is an eclipse.
+func (g eclipseGeometry) solarPenumbraMargin(t time.Time) float64 {
 	return g.solarShadow(t).margin()
 }
 
 // margin is solarPenumbraMargin for a shadow already computed.
-func (s solarShadow) margin() (margin, gamma float64) {
-	return s.limb + s.l1 - s.r, s.r / (s.limb + s.l1)
+func (s solarShadow) margin() float64 {
+	return s.limb + s.l1 - s.r
+}
+
+// gamma is the canon's gamma for a solar eclipse: the shadow axis's distance
+// from Earth's center in the fundamental plane, in Earth equatorial radii,
+// positive when the axis passes north of the center.
+func (s solarShadow) gamma() float64 {
+	return math.Copysign(s.r, s.y)
 }
 
 // central reports whether the shadow axis meets the Earth.

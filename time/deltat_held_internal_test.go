@@ -29,7 +29,9 @@ func TestDeltaTHeldIsItsOwnNotice(t *testing.T) {
 	held := &deltaTHeldError{lastMJD: 61400, deltaT: 69.123, sigma: 1.6}
 
 	warnEOPUnavailable(65000, held)
-	warnEOPUnavailable(30000, errNothingLoaded)
+	// An epoch in the bulletin's years: before 1960 the unavailable warning
+	// is a different notice (#1141).
+	warnEOPUnavailable(58849, errNothingLoaded)
 
 	out := buf.String()
 
