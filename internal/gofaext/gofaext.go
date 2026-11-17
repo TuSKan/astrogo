@@ -422,6 +422,15 @@ func Ae2hd(az, el, phi float64) (ha, dec float64) {
 	return ha, dec
 }
 
+// Hd2pa returns the parallactic angle of a direction at hour angle ha and
+// declination dec, for an observer at latitude phi, in radians: SOFA's
+// iauHd2pa. It is the angle at the object between the directions to the
+// celestial pole and to the zenith, positive when the object is west of the
+// meridian.
+func Hd2pa(ha, dec, phi float64) float64 {
+	return gofa.Hd2pa(ha, dec, phi)
+}
+
 // Dtdb returns TDB−TT in seconds: Fairhead & Bretagnon (1990) in full, plus
 // the topocentric term for a site at ut (UT1 day fraction), east longitude
 // elong (radians), distance u from the Earth's spin axis and v north of the
