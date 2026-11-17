@@ -67,6 +67,33 @@ jobs:
         shell: bash
         run: go test -tags=network -v -count=1 -timeout=15m ./... 2>&1 | tee "$ASTROGO_METROLOGY_OUT/network.log"
 
+      # The README's network examples (#1188). The offline ones run on every
+      # commit (ci.yml); these reach SIMBAD, MAST, CelesTrak, SBDB and the
+      # kernel and dataset hosts, and were found broken at the release commit
+      # only by running them by hand. TestNetworkExamplesRun skips an example
+      # whose hosts cannot be reached, as the network tests do, and fails one
+      # that reaches them and still exits non-zero.
+      #
+      # They download about half a gigabyte, two JPL kernels and two sky
+      # datasets, all immutable. The cache keeps them between nights, so JPL
+      # and the dataset hosts are asked once rather than nightly; the key is
+      # fixed because nothing in it goes stale, and the IERS bulletin, which
+      # does, is checked against its source on every run anyway.
+      - name: Restore the examples' downloads
+        if: always()
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/astrogo-examples-cache
+          key: astrogo-examples-downloads-v1
+
+      - name: Run the network examples
+        if: always()
+        shell: bash
+        working-directory: examples
+        env:
+          ASTROGO_CACHE_DIR: file://${{ runner.temp }}/astrogo-examples-cache
+        run: go test -tags=network -v -count=1 -timeout=90m -run '^TestNetworkExamplesRun$' . 2>&1 | tee "$ASTROGO_METROLOGY_OUT/network-examples.log"
+
       # Every result against the accuracy its suite reached at the last
       # accepted run, docs/validation-baseline.json: a percentile that more
       # than doubles fails here even inside its contract (#1109). It runs

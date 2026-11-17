@@ -1,6 +1,6 @@
 // examples is a separate module on purpose.
 //
-// Its 32 main packages are demos, not API. Inside the root module they were
+// Its 33 main packages are demos, not API. Inside the root module they were
 // 32 of the 84 rows in astrogo's pkg.go.dev directory listing — 38% of the
 // front door pointing at programs nobody imports (#124).
 //
