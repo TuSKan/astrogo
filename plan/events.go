@@ -1118,9 +1118,9 @@ func NightOf(t time.Time, site *Site, prov eph.Provider, kind TwilightKind) (Nig
 			return Night{}, err
 		}
 
-		for i := len(behind) - 1; i >= 0; i-- {
-			if behind[i].Kind == EventSet {
-				return Night{Dusk: behind[i].Time, Dawn: first.Time, Kind: kind}, nil
+		for _, e := range slices.Backward(behind) {
+			if e.Kind == EventSet {
+				return Night{Dusk: e.Time, Dawn: first.Time, Kind: kind}, nil
 			}
 		}
 
