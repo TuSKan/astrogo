@@ -65,6 +65,8 @@ func utcComponents(year int, month time.Month, day, hour, minute int, loc *time.
 // that rations it — split out for the same reason as [logEOPUnavailable], so a
 // test can assert on the message and its level without depending on which test
 // happened to spend the Once first.
+//
+//nolint:contextcheck,nolintlint // contextcheck reads this from the declaration, so nolintlint sees it unused; a Time method's notice, with no context to pass (#1187)
 func logSecondOutOfRange(y, m, d, hour, minute, second int) {
 	// Warn, not Info, and so still emitted by the default logger. Date has no
 	// error return, and this is the only notice a caller gets that the instant
@@ -169,6 +171,8 @@ func warnIfSecondRemoved(year int, month time.Month, day, hour, minute int, loc 
 
 // logSecondRemoved writes the warning, split from its [sync.Once] for the same
 // reason as [logLeapSecondAliased].
+//
+//nolint:contextcheck,nolintlint // contextcheck reads this from the declaration, so nolintlint sees it unused; a Time method's notice, with no context to pass (#1187)
 func logSecondRemoved(y, m, d, hour, minute int) {
 	logging.Warn("second removed by a negative leap second, instant did not occur",
 		"utc", isoSecond(y, m, d, hour, minute, 59),

@@ -198,6 +198,8 @@ func warnEOPUnavailable(mjd float64, cause error) {
 
 // logDeltaTHeld writes the notice for an epoch past the bulletin's end, apart
 // from its Once for the reason [logEOPUnavailable] gives.
+//
+//nolint:contextcheck,nolintlint // contextcheck reads this from the declaration, so nolintlint sees it unused; a Time method's notice, with no context to pass (#1187)
 func logDeltaTHeld(mjd float64, held *deltaTHeldError) {
 	logging.Warn("EOP bulletin ends before this epoch, holding ΔT at its last value",
 		"mjd", mjd,
@@ -216,6 +218,8 @@ func logDeltaTHeld(mjd float64, held *deltaTHeldError) {
 // fires exactly once per process, and whichever test happened to run first
 // would spend it — so a test asserting the warning reaches an installed logger
 // would pass or fail on test ordering rather than on the code.
+//
+//nolint:contextcheck,nolintlint // contextcheck reads this from the declaration, so nolintlint sees it unused; a Time method's notice, with no context to pass (#1187)
 func logEOPUnavailable(mjd float64, cause error) {
 	// Warn, not Info, and so still emitted by the default logger: this is the
 	// only notice a caller gets that the numbers changed. Time.EOP has no
@@ -304,6 +308,8 @@ const (
 // The warning this replaced said the error was "up to 0.9 s, the bound leap
 // seconds kept |UT1-UTC| inside" and advised a download, for an epoch two
 // thousand years before either (#1141).
+//
+//nolint:contextcheck,nolintlint // contextcheck reads this from the declaration, so nolintlint sees it unused; a Time method's notice, with no context to pass (#1187)
 func logBeforeUTC(mjd float64) {
 	year := 2000 + (mjd-51544.5)/365.25 // decimal year, from J2000
 
@@ -333,7 +339,7 @@ func logBeforeUTC(mjd float64) {
 //     case looked like success and no caller warned. A caller that registers
 //     ZeroModel deliberately is not defaulted: its source is "explicit".
 //
-//nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
+//nolint:wrapcheck,contextcheck,nolintlint // delegation to time/internal/iers; its lazy load serves Time methods, with no context to pass, and LoadEOP is the path that takes one; contextcheck reads this from the declaration (#1187)
 func lookupEOP(mjd float64) (eop EOP, defaulted, err error) {
 	// A non-finite MJD is a broken epoch, not an uncovered one: every range
 	// comparison on the paths below is false for a NaN, so one used to slip
