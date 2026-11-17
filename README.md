@@ -143,7 +143,7 @@ that use the network also fetch the IERS Earth-orientation bulletin (3.8 MB) onc
 rest choose zero Earth orientation, and say in a comment what that costs them.
 
 `examples/` is [its own module](examples/go.mod), which is why the command carries
-`-C examples` rather than a path. It keeps 32 demo programs out of the library's
+`-C examples` rather than a path. It keeps 33 demo programs out of the library's
 package listing while still building against the working tree, so an API change that
 breaks an example fails CI. CI also runs every example whose Network column says
 none, so a crash, or a "none" that reaches the network, fails it too.
