@@ -43,23 +43,18 @@ func TestVisibleTonightDatesItsSearchWithinTheNight(t *testing.T) {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
 
-	_, dusk, err := plan.AstronomicalDawnDusk(testNight, testNight.AddDate(0, 0, 1), site, ephemeris.Default())
-	if err != nil || dusk == nil {
-		t.Fatalf("dusk: %v", err)
-	}
-
-	dawn, _, err := plan.AstronomicalDawnDusk(dusk.Time, dusk.Time.AddDate(0, 0, 1), site, ephemeris.Default())
-	if err != nil || dawn == nil {
-		t.Fatalf("dawn: %v", err)
+	night, err := plan.NightOf(testNight, site, ephemeris.Default(), plan.AstronomicalTwilight)
+	if err != nil {
+		t.Fatalf("NightOf: %v", err)
 	}
 
 	src.mu.Lock()
 	at, maxV := src.req.At, src.req.MaxVMag
 	src.mu.Unlock()
 
-	if at.IsZero() || !at.After(dusk.Time) || !at.Before(dawn.Time) {
+	if at.IsZero() || !at.After(night.Dusk) || !at.Before(night.Dawn) {
 		t.Errorf("the search is dated %v, want an instant between dusk %v and dawn %v",
-			at.Format(time.RFC3339), dusk.Time.Format(time.RFC3339), dawn.Time.Format(time.RFC3339))
+			at.Format(time.RFC3339), night.Dusk.Format(time.RFC3339), night.Dawn.Format(time.RFC3339))
 	}
 
 	if maxV != 2 {

@@ -136,9 +136,9 @@ func main() {
 
 	// A fixed date keeps this example's output reproducible run to run —
 	// August 1, 2026, a clear midwinter night from Quinta Calixto's southern
-	// hemisphere. night should be an instant earlier in the same calendar
-	// day as dusk; local midnight is the natural choice.
-	night := time.Date(2026, time.August, 1, 0, 0, 0, 0, brtz)
+	// hemisphere. VisibleTonight plans the night under way at night, or the
+	// coming one, so local noon names that date's evening.
+	night := time.Date(2026, time.August, 1, 12, 0, 0, 0, brtz)
 
 	fmt.Printf("\nSite: %s (%.4f, %.4f)\n", site.Name(), -22.528478, -46.473002)
 	fmt.Printf("Night of: %s\n", night.Format("2006-01-02"))

@@ -68,7 +68,7 @@ These packages carry targets, and `TestEveryFuzzTargetIsDocumented` holds this t
 | `catalog/horizons` | `FuzzParseHorizons` | Horizons text tables, cut at column offsets |
 | `catalog/openngc` | `FuzzParseOpenNGC` | the OpenNGC repository's CSVs |
 | `ephemeris/jpl/lsk` | `FuzzNewReader` | NAIF's leap-second kernel |
-| `plan` | `FuzzParseMPCObsCodes` | the MPC's observatory-code list |
+| `plan` | `FuzzParseMPCObsCodes`, `FuzzParseHorizonProfile` | the MPC's observatory-code list, and a caller's horizon table |
 | `skybrightness/dataset/raster` | `FuzzOpen` | GeoTIFFs from a third-party mirror (VIIRS), or any file a caller opens |
 | `skybrightness/dataset/viirs` | `FuzzOpen` | the VIIRS annual archive, a ZIP holding the composite GeoTIFF, through extraction, decoding and emitter building |
 | `atmosphere/dataset/cams` | `FuzzOpen` | CAMS NetCDF-4 files, through scigolib/hdf5, which sizes allocations from what a file declares (#794) |

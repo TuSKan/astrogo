@@ -57,9 +57,6 @@ func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error 
 		"TwilightEvents": func(s, e time.Time) error {
 			return errOf(plan.TwilightEvents(s, e, site, prov, plan.CivilTwilight))
 		},
-		"CivilDawnDusk":        func(s, e time.Time) error { return errOf2(plan.CivilDawnDusk(s, e, site, prov)) },
-		"NauticalDawnDusk":     func(s, e time.Time) error { return errOf2(plan.NauticalDawnDusk(s, e, site, prov)) },
-		"AstronomicalDawnDusk": func(s, e time.Time) error { return errOf2(plan.AstronomicalDawnDusk(s, e, site, prov)) },
 		"Conjunctions":         func(s, e time.Time) error { return errOf(plan.Conjunctions(s, e, mars, sun)) },
 		"ConjunctionsEcliptic": func(s, e time.Time) error { return errOf(plan.ConjunctionsEcliptic(s, e, mars, sun)) },
 		"Appulses":             func(s, e time.Time) error { return errOf(plan.Appulses(s, e, moon, mars)) },

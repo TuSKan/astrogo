@@ -412,57 +412,72 @@ func TestGroupTwilightEvents(t *testing.T) {
 	})
 }
 
+// TestTwilight_Sequence: through one night at 40°N the Sun sets, then
+// passes 6°, 12° and 18° down, and comes back through 18°, 12° and 6° before
+// it rises. Each kind's NightOf, from the same noon, is that one night.
 func TestTwilight_Sequence(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
 	site, _ := NewSite("Test", loc)
 	eph := eph.Default()
 
-	start := time.FromJD(2451544.5, time.UTC)
-	end := start.Add(unit.Hours(24))
+	noon := time.FromJD(2451545.0, time.UTC) // 2000-01-01 12:00 UTC, midday at 0° longitude
 
-	aDawn, aDusk, _ := AstronomicalDawnDusk(start, end, site, eph)
-	nDawn, nDusk, _ := NauticalDawnDusk(start, end, site, eph)
-	cDawn, cDusk, _ := CivilDawnDusk(start, end, site, eph)
-	rise, set, _ := SunriseSunset(start, end, site, eph)
+	nights := map[TwilightKind]Night{}
 
-	if !aDawn.Time.Before(nDawn.Time) {
-		t.Errorf("Astro dawn should be before Nautical dawn: %v vs %v", aDawn.Time, nDawn.Time)
+	for _, kind := range []TwilightKind{CivilTwilight, NauticalTwilight, AstronomicalTwilight} {
+		n, err := NightOf(noon, site, eph, kind)
+		if err != nil {
+			t.Fatalf("NightOf %s: %v", kind, err)
+		}
+
+		if n.Kind != kind {
+			t.Errorf("NightOf %s: Kind %s", kind, n.Kind)
+		}
+
+		nights[kind] = n
 	}
 
-	if !nDawn.Time.Before(cDawn.Time) {
-		t.Errorf("Nautical dawn should be before Civil dawn: %v vs %v", nDawn.Time, cDawn.Time)
+	rise, set, err := SunriseSunset(noon, noon.Add(unit.Hours(24)), site, eph)
+	if err != nil || rise == nil || set == nil {
+		t.Fatalf("SunriseSunset: %v, %v, %v", rise, set, err)
 	}
 
-	if !cDawn.Time.Before(rise.Time) {
-		t.Errorf("Civil dawn should be before Sunrise: %v vs %v", cDawn.Time, rise.Time)
+	sequence := []struct {
+		name string
+		at   time.Time
+	}{
+		{"sunset", set.Time},
+		{"civil dusk", nights[CivilTwilight].Dusk},
+		{"nautical dusk", nights[NauticalTwilight].Dusk},
+		{"astronomical dusk", nights[AstronomicalTwilight].Dusk},
+		{"astronomical dawn", nights[AstronomicalTwilight].Dawn},
+		{"nautical dawn", nights[NauticalTwilight].Dawn},
+		{"civil dawn", nights[CivilTwilight].Dawn},
+		{"sunrise", rise.Time},
 	}
 
-	if !set.Time.Before(cDusk.Time) {
-		t.Errorf("Sunset should be before Civil dusk: %v vs %v", set.Time, cDusk.Time)
-	}
-
-	if !cDusk.Time.Before(nDusk.Time) {
-		t.Errorf("Civil dusk should be before Nautical dusk: %v vs %v", cDusk.Time, nDusk.Time)
-	}
-
-	if !nDusk.Time.Before(aDusk.Time) {
-		t.Errorf("Nautical dusk should be before Astro dusk: %v vs %v", nDusk.Time, aDusk.Time)
+	for i := 1; i < len(sequence); i++ {
+		if prev, cur := sequence[i-1], sequence[i]; !prev.at.Before(cur.at) {
+			t.Errorf("%s at %v is not before %s at %v", prev.name, prev.at, cur.name, cur.at)
+		}
 	}
 }
 
+// TestTwilight_HighLat: in early July London has no astronomical night, the
+// Sun going at most 15.5° down, so NightOf finds none. It has a nautical one.
 func TestTwilight_HighLat(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
 	site, _ := NewSite("London", loc)
 	eph := eph.Default()
 
-	start := time.FromJD(2451727.5, time.UTC)
-	end := start.Add(unit.Hours(24))
+	noon := time.FromJD(2451728.0, time.UTC) // 2000-07-02 12:00 UTC
 
-	aDawn, aDusk, err := AstronomicalDawnDusk(start, end, site, eph)
-	testutil.AssertNoError(t, err)
+	if n, err := NightOf(noon, site, eph, AstronomicalTwilight); !errors.Is(err, ErrNoTwilight) {
+		t.Errorf("NightOf in a London summer = %+v, %v, want ErrNoTwilight", n, err)
+	}
 
-	if aDawn != nil || aDusk != nil {
-		t.Errorf("expected no astronomical twilight in London summer, got dawn=%v dusk=%v", aDawn, aDusk)
+	if _, err := NightOf(noon, site, eph, NauticalTwilight); err != nil {
+		t.Errorf("NightOf nautical in a London summer: %v", err)
 	}
 }
 

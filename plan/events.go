@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -1030,8 +1031,7 @@ func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise,
 // kind and interval: each result pairs a dusk (EventSet, Sun descending
 // through the threshold) with the chronologically next dawn (EventRise,
 // Sun ascending back through it) — the twilight/darkness span between
-// them, matching how AstronomicalDawnDusk and friends already frame "the
-// night" elsewhere in this package.
+// them, as [Night] frames one night.
 //
 // An event with no partner within [start, end] is still returned, with
 // the missing side left nil rather than dropped: a leading Dawn-only
@@ -1048,22 +1048,113 @@ func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind Tw
 		return nil, nil
 	}
 
-	sun := NewSun(prov)
-	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
-	spec := EventSpec{
-		Family:    EventFamilyVisibility,
-		Kind:      EventAnyVisibility,
-		Target:    sun,
-		Observer:  site,
-		Threshold: angle.Deg(threshold),
-	}
-
-	events, err := solver.Find(spec, start, end)
+	events, err := twilightCrossings(start, end, site, prov, threshold)
 	if err != nil {
 		return nil, err
 	}
 
 	return groupTwilightEvents(events, kind), nil
+}
+
+// twilightCrossings returns every instant in [start, end] the Sun crosses
+// threshold, in degrees, at site: an EventSet descending, an EventRise
+// climbing.
+func twilightCrossings(start, end time.Time, site *Site, prov eph.Provider, threshold float64) ([]Event, error) {
+	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
+
+	return solver.Find(EventSpec{
+		Family:    EventFamilyVisibility,
+		Kind:      EventAnyVisibility,
+		Target:    NewSun(prov),
+		Observer:  site,
+		Threshold: angle.Deg(threshold),
+	}, start, end)
+}
+
+// Night is one night at a site for a kind of twilight: from its dusk, the
+// Sun descending through the kind's threshold, to the dawn that ends it, the
+// Sun climbing back through it. Dusk is before Dawn, and both belong to the
+// same night.
+type Night struct {
+	Dusk, Dawn time.Time
+	Kind       TwilightKind
+}
+
+// NightOf returns the night of kind at site that t falls in, or the night
+// that follows t when t is not in one: at 02:00, the night under way; at
+// noon, the coming one. For the night of a calendar date, pass a daytime
+// instant of that date, such as local noon, since local midnight is in the
+// night before.
+//
+// A night is in progress at t when the Sun's first crossing of the threshold
+// after t is a dawn; its dusk is then the last crossing in the day before t.
+// Otherwise that first crossing is the dusk, and the night ends at the next
+// dawn within a day of it. Where the Sun does not cross the threshold for a
+// day, NightOf returns [ErrNoTwilight]: astronomical twilight never ends on a
+// summer night at 51°N, and a polar day or night lasts weeks. A kind
+// [TwilightThreshold] does not know is [ErrUnknownTwilightKind].
+func NightOf(t time.Time, site *Site, prov eph.Provider, kind TwilightKind) (Night, error) {
+	threshold, ok := TwilightThreshold(kind)
+	if !ok {
+		return Night{}, fmt.Errorf("%w: %d", ErrUnknownTwilightKind, int(kind))
+	}
+
+	day := unit.Days(1)
+
+	ahead, err := twilightCrossings(t, t.Add(day), site, prov, threshold)
+	if err != nil {
+		return Night{}, err
+	}
+
+	first := firstCrossing(ahead, EventRise, EventSet)
+	if first == nil {
+		return Night{}, fmt.Errorf("%w: %s twilight, within a day after %v", ErrNoTwilight, kind, t)
+	}
+
+	if first.Kind == EventRise {
+		// t is in the night that this dawn ends.
+		behind, err := twilightCrossings(t.Add(-day), t, site, prov, threshold)
+		if err != nil {
+			return Night{}, err
+		}
+
+		for _, e := range slices.Backward(behind) {
+			if e.Kind == EventSet {
+				return Night{Dusk: e.Time, Dawn: first.Time, Kind: kind}, nil
+			}
+		}
+
+		return Night{}, fmt.Errorf("%w: %s twilight, within a day before %v", ErrNoTwilight, kind, t)
+	}
+
+	// t is before the night this dusk begins.
+	dusk := *first
+
+	dawn := firstCrossing(ahead, EventRise)
+	if dawn == nil || !dawn.Time.After(dusk.Time) {
+		later, err := twilightCrossings(t.Add(day), dusk.Time.Add(day), site, prov, threshold)
+		if err != nil {
+			return Night{}, err
+		}
+
+		if dawn = firstCrossing(later, EventRise); dawn == nil {
+			return Night{}, fmt.Errorf("%w: %s twilight, within a day after the dusk at %v", ErrNoTwilight, kind, dusk.Time)
+		}
+	}
+
+	return Night{Dusk: dusk.Time, Dawn: dawn.Time, Kind: kind}, nil
+}
+
+// firstCrossing returns the first of events whose kind is one of kinds, or
+// nil.
+func firstCrossing(events []Event, kinds ...EventKind) *Event {
+	for i := range events {
+		if slices.Contains(kinds, events[i].Kind) {
+			return &events[i]
+		}
+	}
+
+	return nil
 }
 
 // groupTwilightEvents pairs a flat, chronologically-sorted event sequence
@@ -1105,53 +1196,6 @@ func groupTwilightEvents(events []Event, kind TwilightKind) []TwilightEvent {
 	}
 
 	return twilightEvents
-}
-
-// CivilDawnDusk returns the first civil dawn and first civil dusk found in the interval.
-func CivilDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, prov, CivilTwilight)
-}
-
-// NauticalDawnDusk returns the first nautical dawn and first nautical dusk found in the interval.
-func NauticalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, prov, NauticalTwilight)
-}
-
-// AstronomicalDawnDusk returns the first astronomical dawn and first astronomical dusk found in the interval.
-func AstronomicalDawnDusk(start, end time.Time, site *Site, prov eph.Provider) (dawn, dusk *Event, err error) {
-	return getTwilightPair(start, end, site, prov, AstronomicalTwilight)
-}
-
-func getTwilightPair(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) (dawn, dusk *Event, err error) {
-	threshold, _ := TwilightThreshold(kind)
-	sun := NewSun(prov)
-	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
-	spec := EventSpec{
-		Family:    EventFamilyVisibility,
-		Kind:      EventAnyVisibility,
-		Target:    sun,
-		Observer:  site,
-		Threshold: angle.Deg(threshold),
-	}
-
-	events, err := solver.Find(spec, start, end)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	for _, e := range events {
-		if e.Kind == EventRise && dawn == nil {
-			ec := e
-			dawn = &ec
-		}
-
-		if e.Kind == EventSet && dusk == nil {
-			ec := e
-			dusk = &ec
-		}
-	}
-
-	return dawn, dusk, nil
 }
 
 // ── Geometry Helpers ──────────────────────────────────────────────────────────
