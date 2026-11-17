@@ -258,16 +258,11 @@ func BenchmarkFortnightEvents(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			if _, _, err := CivilDawnDusk(day, next, site, provider); err != nil {
-				b.Fatal(err)
-			}
-
-			if _, _, err := NauticalDawnDusk(day, next, site, provider); err != nil {
-				b.Fatal(err)
-			}
-
-			if _, _, err := AstronomicalDawnDusk(day, next, site, provider); err != nil {
-				b.Fatal(err)
+			// That evening's night, from local noon.
+			for _, kind := range []TwilightKind{CivilTwilight, NauticalTwilight, AstronomicalTwilight} {
+				if _, err := NightOf(day.Add(unit.Hours(12)), site, provider, kind); err != nil {
+					b.Fatal(err)
+				}
 			}
 
 			if _, err := MoonEvents(day, next, site, provider); err != nil {

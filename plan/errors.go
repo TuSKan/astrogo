@@ -114,6 +114,15 @@ var (
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")
 
+	// ErrNoTwilight indicates the Sun does not cross a twilight threshold
+	// within a day, so there is no night of that kind to return: astronomical
+	// twilight never ends on a summer night at 51°N, and a polar day or night
+	// lasts weeks. NightOf and VisibleTonight return it.
+	ErrNoTwilight = errors.New("plan: the Sun does not cross the twilight threshold within a day")
+	// ErrUnknownTwilightKind indicates a TwilightKind that TwilightThreshold
+	// does not know.
+	ErrUnknownTwilightKind = errors.New("plan: unknown twilight kind")
+
 	// ErrUnknownSite indicates NewKnownSite found no entry matching the
 	// requested name (checked against every known site's name and
 	// aliases, case- and space-insensitive — see KnownSiteNames).

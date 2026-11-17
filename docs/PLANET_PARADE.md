@@ -127,9 +127,13 @@ day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
 next := day.Add(unit.Days(1))
 
 _, sunset, _ := plan.SunriseSunset(day, next, site, prov)
-_, civilDusk, _ := plan.CivilDawnDusk(day, next, site, prov)
-_, nautDusk, _ := plan.NauticalDawnDusk(day, next, site, prov)
-_, astroDusk, _ := plan.AstronomicalDawnDusk(day, next, site, prov)
+
+// The night of February 28, from local noon.
+noon := day.Add(unit.Hours(12))
+civil, _ := plan.NightOf(noon, site, prov, plan.CivilTwilight)
+nautical, _ := plan.NightOf(noon, site, prov, plan.NauticalTwilight)
+astronomical, _ := plan.NightOf(noon, site, prov, plan.AstronomicalTwilight)
+// civil.Dusk, nautical.Dusk and astronomical.Dusk are the three dusks.
 ```
 
 ### The Altitude Timeline
@@ -273,7 +277,7 @@ go -C examples run ./16_planet_parade/
 ### What the program computes:
 
 1. **Solar events** — Sunset, civil/nautical/astronomical dusk via `plan.SunriseSunset()`
-   and `plan.CivilDawnDusk()` (validated to ≤0.6 min vs USNO)
+   and `plan.NightOf()`, whose twilight crossings are validated to ≤0.6 min vs USNO
 2. **Planetary positions** — Altitude, azimuth, ecliptic longitude for all 7 planets at
    15-minute intervals using `plan.NewMercury(prov)` etc. with JPL DE442
 3. **Conjunctions** — Closest pairings via `plan.Appulses()` with Chandrupatla root-finding
