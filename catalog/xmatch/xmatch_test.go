@@ -46,9 +46,10 @@ func TestMatch_AliasByAliasesEntry(t *testing.T) {
 }
 
 // TestMatchByIdentityKeys holds Match to the identity rule catalog.Resolver
-// uses, resolve.IdentityKeys: a designation counts, SIMBAD's object-type
-// prefixes do not, and the display name is not an identifier. None of these
-// targets has a position, so only identity can pair them.
+// uses, resolve.IdentityKeys: a designation counts, read in its naming
+// scheme; a SIMBAD common name matches only another common name; and the
+// display name is not an identifier. None of these targets has a position,
+// so only identity can pair them.
 func TestMatchByIdentityKeys(t *testing.T) {
 	t.Parallel()
 
@@ -64,10 +65,22 @@ func TestMatchByIdentityKeys(t *testing.T) {
 			want: 1,
 		},
 		{
-			name: "SIMBAD NAME identifier against an alias",
+			name: "SIMBAD's padded designation against OpenNGC's",
+			a:    resolve.Target{ID: "* eps Ori", Aliases: []string{"HD  37128"}},
+			b:    resolve.Target{ID: "NGC1990", Aliases: []string{"HD 037128"}},
+			want: 1,
+		},
+		{
+			name: "SIMBAD common names, spelled apart",
+			a:    resolve.Target{ID: "SIMBAD-LMC", Aliases: []string{"NAME Large Magellanic Cloud"}},
+			b:    resolve.Target{ID: "other-lmc", Aliases: []string{"NAME large magellanic  cloud"}},
+			want: 1,
+		},
+		{
+			name: "a SIMBAD common name against an alias in no namespace",
 			a:    resolve.Target{ID: "SIMBAD-LMC", Aliases: []string{"NAME LMC"}},
 			b:    resolve.Target{ID: "openngc-lmc", Aliases: []string{"LMC"}},
-			want: 1,
+			want: 0,
 		},
 		{
 			name: "designation against an ID",
@@ -157,7 +170,7 @@ func TestMatch_AliasGroupProducesOnePairPerCrossCombination(t *testing.T) {
 		star("DUP", "Alpha (row 1)", nil, 0, 0, false),
 		star("DUP", "Alpha (row 2)", nil, 0, 0, false),
 	}
-	b := []resolve.Target{star("dup", "Alpha (catalog B)", nil, 0, 0, false)}
+	b := []resolve.Target{star("DUP", "Alpha (catalog B)", nil, 0, 0, false)}
 
 	pairs := Match(a, b)
 	if len(pairs) != 2 {

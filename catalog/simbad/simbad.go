@@ -2,6 +2,7 @@ package simbad
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -131,7 +132,15 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // every object, up to 50,000, SIMBAD's own default output limit; a bound
 // faint enough to pass that (about V 8.1) gets the 50,000 brightest followed
 // by an error wrapping [resolve.ErrTruncated], never a short list that looks
-// complete. Only a complete list is cached.
+// complete.
+//
+// Each object's Aliases are every identifier SIMBAD lists for it, in SIMBAD's
+// spelling, fetched once the objects are known with one further request per
+// 1,000 of them: they are what matches an object to another catalog's record
+// of it. If they cannot be fetched, the objects still come, those without
+// identifiers followed by an error saying how many lack them and why.
+//
+// Only a complete list, every object with its identifiers, is cached.
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -162,7 +171,7 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 			return
 		}
 
-		targets, err := ParseBrightCSV(strings.NewReader(string(data)))
+		targets, oids, err := parseBright(strings.NewReader(string(data)))
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -170,10 +179,15 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 
 		truncated := req.Limit <= 0 && len(targets) > brightRowCap
 		if truncated {
-			targets = targets[:brightRowCap]
-		} else if err := p.cache.Set(cacheKey, targets); err != nil {
-			yield(resolve.Target{}, err)
-			return
+			targets, oids = targets[:brightRowCap], oids[:brightRowCap]
+		}
+
+		idErr := p.addIdentifiers(ctx, targets, oids)
+		if !truncated && idErr == nil {
+			if err := p.cache.Set(cacheKey, targets); err != nil {
+				yield(resolve.Target{}, err)
+				return
+			}
 		}
 
 		for _, t := range targets {
@@ -182,12 +196,68 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 			}
 		}
 
+		if idErr != nil && !yield(resolve.Target{}, idErr) {
+			return
+		}
+
 		if truncated {
 			yield(resolve.Target{}, fmt.Errorf("%w: SIMBAD has more than %d objects brighter than V %g",
 				resolve.ErrTruncated, brightRowCap, req.MaxVMag))
 		}
 	}
 }
+
+// addIdentifiers sets each target's Aliases to the identifiers SIMBAD lists for
+// the object with the matching oid, asking about identifierBatch objects at a
+// time. A target whose oid is 0 has none to ask about and is left as it is.
+//
+// A batch that fails ends the fetch: the targets already given identifiers
+// keep them, and the error, wrapping errIdentifiersUnavailable, counts the
+// ones that have none.
+func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target, oids []int64) error {
+	at := make(map[int64]int, len(oids))
+	ask := make([]int64, 0, len(oids))
+
+	for i, oid := range oids {
+		if oid > 0 {
+			at[oid] = i
+			ask = append(ask, oid)
+		}
+	}
+
+	for start := 0; start < len(ask); start += identifierBatch {
+		batch := ask[start:min(start+identifierBatch, len(ask))]
+
+		ids, err := p.fetchIdentifiers(ctx, batch)
+		if err != nil {
+			return fmt.Errorf("%w for %d of %d objects, so another catalog may list one of them a second time: %w",
+				errIdentifiersUnavailable, len(ask)-start, len(ask), err)
+		}
+
+		for oid, list := range ids {
+			if i, ok := at[oid]; ok {
+				targets[i].Aliases = list
+			}
+		}
+	}
+
+	return nil
+}
+
+// fetchIdentifiers asks SIMBAD for the identifiers of one batch of objects.
+func (p *Provider) fetchIdentifiers(ctx context.Context, oids []int64) (map[int64][]string, error) {
+	body, err := p.client.PostForm(ctx, remote.SIMBAD, "", TAPRequest(buildIdentifierQuery(oids)))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = body.Close() }()
+
+	return parseIdentifiers(body)
+}
+
+// errIdentifiersUnavailable marks a bright-object list whose objects came
+// without the identifiers that match them to other catalogs.
+var errIdentifiersUnavailable = errors.New("simbad: identifiers unavailable")
 
 // ResolveObject provides an async streaming mechanism using ADQL.
 func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest) resolve.SeqIterator[resolve.Target] {

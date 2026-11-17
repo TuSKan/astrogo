@@ -39,8 +39,42 @@ func TestBuildBrightQueryAsksForEveryObject(t *testing.T) {
 	}
 }
 
-// brightServer serves rows synthetic objects in the bright query's CSV shape
-// and records each request's MAXREC.
+// identifierAnswer answers an identifier query, buildIdentifierQuery's, with
+// ids(oid) for each object it asks about, in the ids table's CSV shape.
+func identifierAnswer(t *testing.T, query string, ids func(oid int64) string) string {
+	t.Helper()
+
+	_, list, ok := strings.Cut(query, "IN (")
+	if !ok {
+		t.Errorf("identifier query names no objects: %s", query)
+		return "oidref,ids\n"
+	}
+
+	var b strings.Builder
+
+	b.WriteString("oidref,ids\n")
+
+	for f := range strings.SplitSeq(strings.TrimSuffix(list, ")"), ",") {
+		oid, err := strconv.ParseInt(f, 10, 64)
+		if err != nil {
+			t.Errorf("identifier query asks about %q: %v", f, err)
+			continue
+		}
+
+		fmt.Fprintf(&b, "%d,%q\n", oid, ids(oid))
+	}
+
+	return b.String()
+}
+
+// isIdentifierQuery reports whether a request is buildIdentifierQuery's.
+func isIdentifierQuery(query string) bool {
+	return strings.Contains(query, "FROM ids")
+}
+
+// brightServer serves rows synthetic objects in the bright query's CSV shape,
+// and their identifiers ("* s1|HD 1" for oid 1) to an identifier query. It
+// counts every request, and records the bright query's MAXREC.
 func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Value) {
 	t.Helper()
 
@@ -64,8 +98,14 @@ func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Va
 			return
 		}
 
-		maxrec.Store(r.PostForm.Get("MAXREC"))
 		w.Header().Set("Content-Type", "text/csv")
+
+		if q := r.PostForm.Get("QUERY"); isIdentifierQuery(q) {
+			_, _ = w.Write([]byte(identifierAnswer(t, q, func(oid int64) string { return fmt.Sprintf("* s%d|HD %d", oid, oid) })))
+			return
+		}
+
+		maxrec.Store(r.PostForm.Get("MAXREC"))
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)

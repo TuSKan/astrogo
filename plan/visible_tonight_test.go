@@ -20,7 +20,12 @@ import (
 // trusting whatever a source happens to return.
 type mockBrightSource struct {
 	targets []resolve.Target
+	// name, when set, is the source's provider name, which ranks its records
+	// in the merge of two sources' records: "simbad", "openngc".
+	name string
 }
+
+func (m *mockBrightSource) Name() string { return m.name }
 
 func (m *mockBrightSource) Capabilities() []resolve.Capability {
 	return []resolve.Capability{resolve.CapMagnitudeBrowse}
