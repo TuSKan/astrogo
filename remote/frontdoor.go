@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"slices"
 
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/remote/file"
 	"github.com/TuSKan/astrogo/time"
@@ -196,19 +198,69 @@ func Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.
 // Get issues a GET against endpoint id and returns the response body, which
 // the caller closes.
 func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.Values) (io.ReadCloser, error) {
+	var body io.ReadCloser
+
+	err := c.call(ctx, id, func(inner *api.Client, base string) (err error) {
+		body, err = inner.Get(ctx, base, path, query)
+
+		return err //nolint:wrapcheck // remote/api is remote's own transport, and call passes this through heard
+	})
+
+	return body, err
+}
+
+// call sends one request to endpoint id through do, which is handed the
+// transport and a base URL: the endpoint's own, and then, while each host in
+// turn is not serving the API, each of its [Endpoint.Mirrors]. Not serving is
+// no answer ([ErrUnreachable]), a 404, or a 5xx once the retries are spent;
+// any other answer ends the search. When no host serves it, the error carries
+// each one's failure.
+//
+// A host remembered as unreachable is passed over without being asked, so
+// after one silent request to SIMBAD's primary the next goes straight to a
+// mirror (#1214).
+func (c *Client) call(ctx context.Context, id EndpointID, do func(inner *api.Client, base string) error) error {
 	inner, base, err := c.transportFor(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	host := hostOf(base)
-	if err := c.answering(host); err != nil {
-		return nil, err
+	ep, _ := c.Lookup(id)
+	bases := append([]string{base}, ep.Mirrors...)
+	silent := make([]error, 0, len(bases))
+
+	for i, b := range bases {
+		host := hostOf(b)
+
+		err := c.answering(host)
+		if err == nil {
+			err = c.heard(ctx, host, do(inner, b))
+		}
+
+		if !notServing(err) || ctx.Err() != nil {
+			if err == nil && i > 0 {
+				logging.InfoContext(ctx, "endpoint answered by a mirror", "endpoint", id, "mirror", host)
+			}
+
+			return err
+		}
+
+		silent = append(silent, err)
 	}
 
-	body, err := inner.Get(ctx, base, path, query)
+	return errors.Join(silent...)
+}
 
-	return body, c.heard(ctx, host, err)
+// notServing reports whether err says the host is not serving the API, so a
+// mirror may answer: no answer, a 404, or a 5xx.
+func notServing(err error) bool {
+	if errors.Is(err, ErrUnreachable) {
+		return true
+	}
+
+	var status *HTTPError
+
+	return errors.As(err, &status) && (status.StatusCode == http.StatusNotFound || status.StatusCode >= http.StatusInternalServerError)
 }
 
 // GetJSON issues a GET against endpoint id and decodes the response into out.
@@ -218,17 +270,9 @@ func GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, 
 
 // GetJSON issues a GET against endpoint id and decodes the response into out.
 func (c *Client) GetJSON(ctx context.Context, id EndpointID, path string, query url.Values, out any) error {
-	inner, base, err := c.transportFor(id)
-	if err != nil {
-		return err
-	}
-
-	host := hostOf(base)
-	if err := c.answering(host); err != nil {
-		return err
-	}
-
-	return c.heard(ctx, host, inner.GetJSON(ctx, base, path, query, out))
+	return c.call(ctx, id, func(inner *api.Client, base string) error {
+		return inner.GetJSON(ctx, base, path, query, out)
+	})
 }
 
 // PostForm posts form to endpoint id and returns the response body, which the
@@ -240,19 +284,15 @@ func PostForm(ctx context.Context, id EndpointID, path string, form url.Values) 
 // PostForm posts form to endpoint id and returns the response body, which the
 // caller closes.
 func (c *Client) PostForm(ctx context.Context, id EndpointID, path string, form url.Values) (io.ReadCloser, error) {
-	inner, base, err := c.transportFor(id)
-	if err != nil {
-		return nil, err
-	}
+	var body io.ReadCloser
 
-	host := hostOf(base)
-	if err := c.answering(host); err != nil {
-		return nil, err
-	}
+	err := c.call(ctx, id, func(inner *api.Client, base string) (err error) {
+		body, err = inner.PostForm(ctx, base, path, form)
 
-	body, err := inner.PostForm(ctx, base, path, form)
+		return err //nolint:wrapcheck // remote/api is remote's own transport, and call passes this through heard
+	})
 
-	return body, c.heard(ctx, host, err)
+	return body, err
 }
 
 // PostJSON posts payload as JSON to endpoint id and returns the response body,
@@ -264,19 +304,15 @@ func PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.
 // PostJSON posts payload as JSON to endpoint id and returns the response body,
 // which the caller closes.
 func (c *Client) PostJSON(ctx context.Context, id EndpointID, path string, payload any) (io.ReadCloser, error) {
-	inner, base, err := c.transportFor(id)
-	if err != nil {
-		return nil, err
-	}
+	var body io.ReadCloser
 
-	host := hostOf(base)
-	if err := c.answering(host); err != nil {
-		return nil, err
-	}
+	err := c.call(ctx, id, func(inner *api.Client, base string) (err error) {
+		body, err = inner.PostJSON(ctx, base, path, payload)
 
-	body, err := inner.PostJSON(ctx, base, path, payload)
+		return err //nolint:wrapcheck // remote/api is remote's own transport, and call passes this through heard
+	})
 
-	return body, c.heard(ctx, host, err)
+	return body, err
 }
 
 // Close releases the idle connections of every transport this client opened.

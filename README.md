@@ -641,6 +641,12 @@ remote.SetURL(remote.SIMBAD, "https://mirror.example/tap") // point at a mirror/
 remote.SetOffline(true)                      // global kill switch, all network access
 ```
 
+An endpoint can carry mirrors (`Endpoint.Mirrors`), asked in turn when its own host is not
+serving: no answer, a 404, or a 5xx after its retries. Any other answer, a query refused as
+malformed among them, is the answer. SIMBAD has two, the Harvard CfA and IDIA copies, so the
+CDS outage of November 2026 needs no `SetURL` from a caller. `SetURL` clears an endpoint's
+mirrors, since a URL you chose is the one you want.
+
 `remote.Capture(ids...)` snapshots endpoint config, download consent, offline mode, and
 the data directory; `(Scope).Restore()` (or `WithScope`) puts it all back — useful in
 tests (`t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)`) without the over-broad
