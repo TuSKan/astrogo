@@ -153,7 +153,7 @@ none, so a crash, or a "none" that reaches the network, fails it too.
 | [`07_slew_time`](examples/07_slew_time/) | How long does the mount take to get there? | none |
 | [`08_convert_coords`](examples/08_convert_coords/) | ICRS ↔ Galactic ↔ Ecliptic ↔ AltAz, and batch transforms | none |
 | [`09_geometry_events`](examples/09_geometry_events/) | Conjunctions, greatest elongations, eclipses and apsides over a year | DE442 kernel (115 MB), once |
-| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against JPL Horizons, as Skyfield's `observe()` does | DE440 kernel (114 MB), once |
+| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against JPL Horizons and Skyfield's `observe()` | DE440 kernel (114 MB), once |
 | [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | CelesTrak, live |
 | [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | none |
 | [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | none |
