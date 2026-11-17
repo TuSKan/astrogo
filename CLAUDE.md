@@ -34,7 +34,7 @@ Tests are partitioned by build tag — the default `go test ./...` runs only fas
 - `validation` — numerical comparisons against published references: JPL Horizons and SOFA fixtures under [ephemeris/jpl/validation/](ephemeris/jpl/validation/), and the sky-brightness components against their papers' measurements in `skybrightness/` (the `gambons_*` files and `cloudy_validation_test.go`).
 - `integration` — cross-provider tests over offline caches, and `plan`'s comparisons against live USNO, NASA eclipse-catalog and AstroPixels data in `plan/{usno,nasa_eclipse,astropixels}_test.go` (`go test -tags integration -run TestUSNO ./plan/`).
 
-A pull request vets all three tags and runs `integration` in a non-blocking job. Beyond that, the Validation workflow (`pre-release.yml`) runs `network` nightly and `validation` and `integration` weekly.
+A pull request vets all three tags and runs `integration` in a non-blocking job. Beyond that, the Validation workflow (`pre-release.yml`) runs `network` nightly and `validation` and `integration` weekly. The nightly run includes the README's network examples (`examples/network_examples_run_test.go`, whose `networkExamples` table `TestNetworkExamplesAreListed` holds to the README's Network column); the offline ones, and the README's first program against its printed output (`examples/00_readme`), run on every commit (#1188).
 
 ## Fuzzing
 

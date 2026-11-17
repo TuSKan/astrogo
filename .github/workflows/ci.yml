@@ -119,7 +119,7 @@ jobs:
 
       # examples/ is its own module (#124), so nothing above compiles it:
       # `go build ./...`, `go vet ./...` and golangci-lint all stop at the
-      # module boundary. Without these steps the 32 example programs would
+      # module boundary. Without these steps the 33 example programs would
       # build only when someone ran them by hand, and the README's claim that
       # every sample in it was actually compiled would decay silently.
       #
@@ -139,6 +139,9 @@ jobs:
       # Network column marks the ones that need no network; the examples
       # module's tests run each of those against an empty cache, require exit
       # 0, and hold the column to the code (examples/offline_examples_test.go).
+      # They also run the README's first program, examples/00_readme, and
+      # require it to print what the README shows (examples/readme_test.go,
+      # #1188); the network examples run nightly (pre-release.yml).
       # Ubuntu alone: what they exercise is the library, already tested on
       # every OS above.
       - name: Run the offline examples

@@ -27,6 +27,8 @@ Fifteen lines: where's Mars right now, and when does it rise, transit, and set f
 > astrogo's, so it imports it plain.
 
 ```go
+// Package main is the README's first example: where Mars is tonight from
+// a site in Brazil, and when it rises, transits and sets.
 package main
 
 import (
@@ -45,13 +47,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}
+
 	mars := plan.NewMars(ephemeris.Default())
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+
 	eval, err := plan.IsObservable(mars, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
 	if err != nil {
 		log.Fatalf("eval: %v", err)
 	}
+
 	events, err := plan.VisibilityEvents(tonight, tonight.Add(unit.Days(1)), mars, site)
 	if err != nil {
 		log.Fatalf("events: %v", err)
@@ -59,6 +64,7 @@ func main() {
 
 	fmt.Printf("Mars right now: altitude %.1f°, observable above 30°: %v\n",
 		eval.AltAz.Alt().Degrees(), eval.Observable)
+
 	for _, e := range events {
 		fmt.Printf("  %-8s %s\n", e.Kind, e.Time.Format("2006-01-02 15:04 MST"))
 	}
@@ -72,7 +78,7 @@ Mars right now: altitude -30.5°, observable above 30°: false
   Set      2026-04-16 19:47 UTC
 ```
 
-No API keys, no downloads, no Python underneath for this example — every number above came from SOFA-derived algorithms running in pure Go. (Higher-precision JPL ephemerides are available too, opt-in — see [Data downloads & offline usage](#data-downloads--offline-usage).) Every code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
+No API keys, no downloads, no Python underneath for this example — every number above came from SOFA-derived algorithms running in pure Go. (Higher-precision JPL ephemerides are available too, opt-in — see [Data downloads & offline usage](#data-downloads--offline-usage).) This program is [`examples/00_readme`](examples/00_readme/main.go), and CI runs it on every commit and fails if what it prints is not the output above. Every other code sample in this README is copy-pasted from a program that was actually compiled and run; none of it is aspirational.
 
 ---
 
