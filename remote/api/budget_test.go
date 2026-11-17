@@ -92,12 +92,21 @@ func TestTheTimeoutBoundsTheWholeCall(t *testing.T) {
 }
 
 // TestABodyIsReadAfterTheCallReturns: the budget bounds reading the body
-// too, so it has to outlive the call that returned it. A body read after Get
-// returns is whole, and closing it releases the budget.
+// too, so it has to outlive the call that returned it. The server sends its
+// headers, which is when Get returns, and the body only afterwards, so the
+// body is read while the call's context must still be alive. It is whole, and
+// closing it releases the budget.
 func TestABodyIsReadAfterTheCallReturns(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+
+		time.Sleep(100 * time.Millisecond)
 		_, _ = w.Write([]byte("the whole answer"))
 	}))
 	t.Cleanup(srv.Close)
