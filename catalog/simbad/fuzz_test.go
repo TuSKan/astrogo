@@ -34,5 +34,6 @@ func FuzzParseCSV(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, b []byte) {
 		_, _ = ParseCSV(bytes.NewReader(b))
 		_, _ = ParseBrightCSV(bytes.NewReader(b))
+		_, _ = parseIdentifiers(bytes.NewReader(b))
 	})
 }

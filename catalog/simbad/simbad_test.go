@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -447,13 +448,21 @@ func TestSearchBrightMock(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 
+		w.Header().Set("Content-Type", "text/csv")
+
+		if err := r.ParseForm(); err == nil && isIdentifierQuery(r.PostForm.Get("QUERY")) {
+			_, _ = w.Write([]byte(identifierAnswer(t, r.PostForm.Get("QUERY"), func(oid int64) string {
+				return map[int64]string{1: "* alf CMa|NAME Sirius|HD  48915", 2: "* alf Car|NAME Canopus", 3: "* bet Ori|NAME Rigel"}[oid]
+			})))
+
+			return
+		}
+
 		data, err := os.ReadFile("testdata/bright.csv")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		w.Header().Set("Content-Type", "text/csv")
 
 		if _, err := w.Write(data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -485,6 +494,10 @@ func TestSearchBrightMock(t *testing.T) {
 
 	if got[0].ID != "* alf CMa" {
 		t.Errorf("expected Sirius first, got %q", got[0].ID)
+	}
+
+	if want := []string{"* alf CMa", "NAME Sirius", "HD  48915"}; !slices.Equal(got[0].Aliases, want) {
+		t.Errorf("Sirius's aliases = %q, want SIMBAD's identifiers as it spells them, %q", got[0].Aliases, want)
 	}
 }
 

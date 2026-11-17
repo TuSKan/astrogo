@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -235,6 +236,36 @@ const transientOtypes = `'SN*', 'SN?', 'No*', 'No?', 'ev', 'gB', 'rB'`
 // capabilities declare it (50,000 rows by default, 2,000,000 at most), and it
 // lies past V 8, where SIMBAD holds 45,457 objects.
 const brightRowCap = 50000
+
+// identifierBatch is how many objects one identifier query asks about. SIMBAD's
+// ids table holds one row per object, so an answer is at most this many rows,
+// far below the service's row limit, and the query stays a few kilobytes.
+const identifierBatch = 1000
+
+// buildIdentifierQuery asks SIMBAD's ids table for the identifiers of the
+// objects with the given oids, as the bright query returns them: one row per
+// object, its identifiers joined by "|".
+//
+// It reads the ids table rather than joining ident, which holds one row per
+// identifier: in a join, an object's identifiers would be rows a row limit
+// could cut, taking the objects after them or the end of one object's list.
+func buildIdentifierQuery(oids []int64) string {
+	var b strings.Builder
+
+	b.WriteString("SELECT oidref, ids FROM ids WHERE oidref IN (")
+
+	for i, oid := range oids {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+
+		b.WriteString(strconv.FormatInt(oid, 10))
+	}
+
+	b.WriteByte(')')
+
+	return b.String()
+}
 
 // TAPRequest builds the form values for a POST TAP query.
 func TAPRequest(adql string) url.Values {

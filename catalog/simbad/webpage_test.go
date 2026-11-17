@@ -57,6 +57,11 @@ func TestAWebPageIsReportedAsDowntime(t *testing.T) {
 	}{
 		{"ParseCSV", ParseCSV},
 		{"ParseBrightCSV", ParseBrightCSV},
+		{"parseIdentifiers", func(r io.Reader) ([]resolve.Target, error) {
+			_, err := parseIdentifiers(r)
+
+			return nil, err
+		}},
 	} {
 		_, err := tc.parse(strings.NewReader(maintenancePage))
 		if err == nil {

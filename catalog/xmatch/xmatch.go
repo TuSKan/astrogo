@@ -80,8 +80,10 @@ type item struct {
 // Targets. Matching runs in two passes, mirroring catalog.Resolver's own
 // two-signal design:
 //
-//  1. Alias-graph: any Target in a and any Target in b sharing a
-//     resolve.Normalize-d ID or Aliases entry are matched.
+//  1. Alias-graph: any Target in a and any Target in b sharing an identity
+//     key are matched: an ID, Designation or Aliases entry, compared as
+//     resolve.IdentityKeys compares them, so SIMBAD's "* alf Ori" meets
+//     another catalog's "alf Ori".
 //  2. Positional fallback: any Target whose group has no member in the
 //     other slice after pass 1 (skipped entirely for a Target with
 //     !HasCoord or an all-zero Coord) is compared with every such
@@ -118,25 +120,17 @@ func Match(a, b []resolve.Target, opts ...Option) []Pair {
 
 // ── Alias-graph cross-match (primary signal) ──────────────────────────────
 
-// unionByAlias indexes every item's resolve.Normalize-d ID and Aliases
-// entries, then unions every pair of items sharing a bucket — the direct
-// generalization of "join on shared catalog ID" to an arbitrary alias list.
+// unionByAlias indexes every item's identity keys, then unions every pair of
+// items sharing a bucket — the direct generalization of "join on shared
+// catalog ID" to an arbitrary alias list. The keys are resolve.IdentityKeys,
+// the rule catalog.Resolver matches its providers' entries by, so the two
+// cannot disagree about whether two entries name one object.
 func unionByAlias(items []item, uf *unionFind) {
 	buckets := make(map[string][]int)
 
-	add := func(key string, idx int) {
-		if key == "" {
-			return
-		}
-
-		buckets[key] = append(buckets[key], idx)
-	}
-
 	for i, it := range items {
-		add(resolve.Normalize(it.target.ID), i)
-
-		for _, alias := range it.target.Aliases {
-			add(resolve.Normalize(alias), i)
+		for _, key := range resolve.IdentityKeys(it.target) {
+			buckets[key] = append(buckets[key], i)
 		}
 	}
 

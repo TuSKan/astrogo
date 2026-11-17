@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -207,9 +208,17 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 // result slice rather than through a map (whose iteration order is
 // unspecified).
 func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
+	targets, _, err := parseBright(r)
+
+	return targets, err
+}
+
+// parseBright is ParseBrightCSV, also returning each row's SIMBAD oid, or 0
+// for a row without one.
+func parseBright(r io.Reader) ([]resolve.Target, []int64, error) {
 	body, err := csvBody(r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	reader := csv.NewReader(body)
@@ -217,10 +226,10 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 	header, err := reader.Read()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, nil
+			return nil, nil, nil
 		}
 
-		return nil, fmt.Errorf("simbad: failed to read CSV header: %w", err)
+		return nil, nil, fmt.Errorf("simbad: failed to read CSV header: %w", err)
 	}
 
 	colIdx := make(map[string]int)
@@ -231,11 +240,14 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 	required := []string{"main_id", "ra", "dec"}
 	for _, req := range required {
 		if _, ok := colIdx[req]; !ok {
-			return nil, fmt.Errorf("%w: %q", ErrMissingColumn, req)
+			return nil, nil, fmt.Errorf("%w: %q", ErrMissingColumn, req)
 		}
 	}
 
-	var results []resolve.Target
+	var (
+		results []resolve.Target
+		oids    []int64
+	)
 
 	for {
 		row, err := reader.Read()
@@ -244,7 +256,7 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("simbad: failed to read CSV row: %w", err)
+			return nil, nil, fmt.Errorf("simbad: failed to read CSV row: %w", err)
 		}
 
 		mainID := row[colIdx["main_id"]]
@@ -322,11 +334,85 @@ func ParseBrightCSV(r io.Reader) ([]resolve.Target, error) {
 			}
 		}
 
+		// The oid is what the identifier query asks about. A row without a
+		// usable one keeps its place, with no identifiers to come.
+		var oid int64
+		if i, ok := colIdx["oid"]; ok {
+			oid, _ = strconv.ParseInt(row[i], 10, 64)
+		}
+
 		results = append(results, t)
+		oids = append(oids, oid)
 	}
 
-	return results, nil
+	return results, oids, nil
 }
+
+// parseIdentifiers parses the answer to buildIdentifierQuery: each object's
+// oid and the identifiers SIMBAD lists for it, which the ids table joins by
+// "|". An identifier keeps SIMBAD's spelling, padding included, since that
+// is the designation as SIMBAD writes it.
+func parseIdentifiers(r io.Reader) (map[int64][]string, error) {
+	body, err := csvBody(r)
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(body)
+
+	header, err := reader.Read()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return map[int64][]string{}, nil
+		}
+
+		return nil, fmt.Errorf("simbad: failed to read CSV header: %w", err)
+	}
+
+	colIdx := make(map[string]int)
+	for i, h := range header {
+		colIdx[h] = i
+	}
+
+	for _, req := range []string{"oidref", "ids"} {
+		if _, ok := colIdx[req]; !ok {
+			return nil, fmt.Errorf("%w: %q", ErrMissingColumn, req)
+		}
+	}
+
+	out := make(map[int64][]string)
+
+	for {
+		row, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("simbad: failed to read CSV row: %w", err)
+		}
+
+		oid, err := strconv.ParseInt(row[colIdx["oidref"]], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("%w: oidref %q", errBadIdentifierRow, row[colIdx["oidref"]])
+		}
+
+		var ids []string
+
+		for id := range strings.SplitSeq(row[colIdx["ids"]], "|") {
+			if id = strings.TrimSpace(id); id != "" {
+				ids = append(ids, id)
+			}
+		}
+
+		out[oid] = ids
+	}
+
+	return out, nil
+}
+
+// errBadIdentifierRow marks an identifier answer whose row names no object.
+var errBadIdentifierRow = errors.New("simbad: identifier row without an object")
 
 // rowKind classifies a row by its otype and, when the query joined it, the
 // otype's place in SIMBAD's hierarchy (otype_path).

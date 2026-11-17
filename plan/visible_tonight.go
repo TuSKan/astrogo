@@ -9,6 +9,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
@@ -424,36 +425,44 @@ func VisibleTonight(
 // at, the middle of the night, goes out as the request's date, so a source
 // that can tell where a body is then leaves out what cannot be bright
 // tonight: SBDB's comets that are nowhere near perihelion (#779).
+//
+// The sources' records then go through [catalog.Consolidate], so an object
+// two sources both carry is one target, SIMBAD's Alnilam with OpenNGC's
+// NGC 1990, which OpenNGC catalogs as the star (#1136). That is identity
+// only: a star system and its components are separate objects with
+// identifiers of their own, and stay separate here.
 func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, at time.Time, dropped *skips) []resolve.Target {
 	// A source's own query error is handled per-item below (skipped, not
 	// propagated), so parallel.Map's own error return is never non-nil.
-	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]resolve.Target, error) {
-		var targets []resolve.Target
+	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]catalog.Record, error) {
+		var records []catalog.Record
+
+		name := brightSourceName(src)
 
 		iter := src.SearchBright(ctx, resolve.BrightRequest{MaxVMag: magLimit, At: at})
 		iter(func(tgt resolve.Target, err error) bool {
 			if err != nil {
 				// One bad row does not end the source, but the caller is told
 				// their list is short by however many of these there were.
-				dropped.add("bright source", brightSourceName(src), err)
+				dropped.add("bright source", name, err)
 
 				return true
 			}
 
-			targets = append(targets, tgt)
+			records = append(records, catalog.Record{Provider: name, Target: tgt})
 
 			return true
 		})
 
-		return targets, nil
+		return records, nil
 	})
 
-	var targets []resolve.Target
-	for _, ts := range perSource {
-		targets = append(targets, ts...)
+	var records []catalog.Record
+	for _, rs := range perSource {
+		records = append(records, rs...)
 	}
 
-	return targets
+	return catalog.Consolidate(records)
 }
 
 // brightSourceName names a bright-object source in a skip reason: its

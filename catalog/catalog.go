@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -520,20 +522,17 @@ func (uf *unionFind) union(a, b int) {
 // IDs and aliases share one index, so one provider's ID meets another's alias.
 // They used to be keyed apart, an ID only ever meeting other IDs, which made
 // the cross-identifier match this doc describes impossible (#613).
+//
+// The keys are [resolve.IdentityKeys], which Consolidate and catalog/xmatch
+// match by too: the ID, designation and aliases, each read in its naming
+// scheme, so SIMBAD's "* eps Ori" meets OpenNGC's "Eps Ori" and SIMBAD's
+// "HD  37128" meets OpenNGC's "HD 037128" (#1136).
 func unionByAlias(candidates []candidate, uf *unionFind) {
 	idx := make(map[string][]int)
 
-	add := func(name string, i int) {
-		if key := resolve.Normalize(name); key != "" {
-			idx[key] = append(idx[key], i)
-		}
-	}
-
 	for i, c := range candidates {
-		add(c.target.ID, i)
-
-		for _, a := range c.target.Aliases {
-			add(a, i)
+		for _, key := range resolve.IdentityKeys(c.target) {
+			idx[key] = append(idx[key], i)
 		}
 	}
 
@@ -903,7 +902,8 @@ var astrometricPrecedence = []string{"gaia", "simbad", "openngc", "mast", "vizie
 // fields take the first group member (registration order) with a value;
 // Aliases is always a union; Coord/Parallax/PmRA/PmDec/Epoch come from the
 // highest-precedence trustworthy-coord member; every other field follows
-// scalarFieldRules.
+// scalarFieldRules. A provider no precedence names ranks after those it does,
+// in g's order (see ranking).
 func mergeGroup(g group) Target {
 	var merged Target
 
@@ -944,7 +944,7 @@ func mergeGroup(g group) Target {
 	merged.Aliases = collectAliases(g)
 
 astrometry:
-	for _, provider := range astrometricPrecedence {
+	for _, provider := range ranking(astrometricPrecedence, g) {
 		for _, c := range g.candidates {
 			if c.provider != provider || !trustworthyCoord(c.target, c.provider) {
 				continue
@@ -983,7 +983,7 @@ astrometry:
 	}
 
 	for _, rule := range scalarFieldRules {
-		for _, provider := range rule.precedence {
+		for _, provider := range ranking(rule.precedence, g) {
 			for _, c := range g.candidates {
 				if c.provider != provider || !rule.hasField(c.target) {
 					continue
@@ -1001,25 +1001,44 @@ astrometry:
 	return merged
 }
 
+// ranking returns precedence followed by each other provider in g, in the
+// order g first names it. The precedences rank the providers whose data they
+// know; one they do not name still supplies a field none of those has,
+// rather than having it dropped. Every source Resolver builds is named
+// where it supplies data, so this decides only for Consolidate, whose
+// records can come from any provider.
+func ranking(precedence []string, g group) []string {
+	out := slices.Clone(precedence)
+
+	for _, c := range g.candidates {
+		if !slices.Contains(out, c.provider) {
+			out = append(out, c.provider)
+		}
+	}
+
+	return out
+}
+
 // collectAliases unions every group member's own ID and Aliases list —
 // never precedence-picked, since more cross-IDs only helps a future
 // alias-graph pass, and this is exactly what feeds it.
+//
+// Duplicates are dropped by exact spelling. Folding them with
+// resolve.Normalize, the search normalization, dropped identifiers that
+// identity tells apart, a star's "B" component against a planet's "b", and
+// with them the keys a later match needs.
 func collectAliases(g group) []string {
 	seen := make(map[string]bool)
 
 	var out []string
 
 	add := func(v string) {
-		if v == "" {
+		v = strings.TrimSpace(v)
+		if v == "" || seen[v] {
 			return
 		}
 
-		key := resolve.Normalize(v)
-		if seen[key] {
-			return
-		}
-
-		seen[key] = true
+		seen[v] = true
 
 		out = append(out, v)
 	}

@@ -45,6 +45,68 @@ func TestMatch_AliasByAliasesEntry(t *testing.T) {
 	}
 }
 
+// TestMatchByIdentityKeys holds Match to the identity rule catalog.Resolver
+// uses, resolve.IdentityKeys: a designation counts, read in its naming
+// scheme; a SIMBAD common name matches only another common name; and the
+// display name is not an identifier. None of these targets has a position,
+// so only identity can pair them.
+func TestMatchByIdentityKeys(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		a, b resolve.Target
+		want int
+	}{
+		{
+			name: "SIMBAD star prefix against a designation",
+			a:    resolve.Target{ID: "* alf Ori", Name: "Betelgeuse"},
+			b:    resolve.Target{ID: "IC 999", Designation: "alf Ori"},
+			want: 1,
+		},
+		{
+			name: "SIMBAD's padded designation against OpenNGC's",
+			a:    resolve.Target{ID: "* eps Ori", Aliases: []string{"HD  37128"}},
+			b:    resolve.Target{ID: "NGC1990", Aliases: []string{"HD 037128"}},
+			want: 1,
+		},
+		{
+			name: "SIMBAD common names, spelled apart",
+			a:    resolve.Target{ID: "SIMBAD-LMC", Aliases: []string{"NAME Large Magellanic Cloud"}},
+			b:    resolve.Target{ID: "other-lmc", Aliases: []string{"NAME large magellanic  cloud"}},
+			want: 1,
+		},
+		{
+			name: "a SIMBAD common name against an alias in no namespace",
+			a:    resolve.Target{ID: "SIMBAD-LMC", Aliases: []string{"NAME LMC"}},
+			b:    resolve.Target{ID: "openngc-lmc", Aliases: []string{"LMC"}},
+			want: 0,
+		},
+		{
+			name: "designation against an ID",
+			a:    resolve.Target{ID: "x-1", Designation: "M 42"},
+			b:    resolve.Target{ID: "M42"},
+			want: 1,
+		},
+		{
+			name: "a shared display name alone",
+			a:    resolve.Target{ID: "A1", Name: "Polaris"},
+			b:    resolve.Target{ID: "B1", Name: "Polaris"},
+			want: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := Match([]resolve.Target{tc.a}, []resolve.Target{tc.b}); len(got) != tc.want {
+				t.Errorf("Match(%+v, %+v) gave %d pairs, want %d", tc.a, tc.b, len(got), tc.want)
+			}
+		})
+	}
+}
+
 func TestMatch_NoSharedAliasOrPosition_NoMatch(t *testing.T) {
 	a := []resolve.Target{star("A1", "Alpha", nil, 10, 20, true)}
 	b := []resolve.Target{star("B1", "Beta", nil, 200, -50, true)} // far away, no shared alias
@@ -108,7 +170,7 @@ func TestMatch_AliasGroupProducesOnePairPerCrossCombination(t *testing.T) {
 		star("DUP", "Alpha (row 1)", nil, 0, 0, false),
 		star("DUP", "Alpha (row 2)", nil, 0, 0, false),
 	}
-	b := []resolve.Target{star("dup", "Alpha (catalog B)", nil, 0, 0, false)}
+	b := []resolve.Target{star("DUP", "Alpha (catalog B)", nil, 0, 0, false)}
 
 	pairs := Match(a, b)
 	if len(pairs) != 2 {
