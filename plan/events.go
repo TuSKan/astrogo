@@ -1470,7 +1470,7 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 	at := func(atm atmosphere.Refraction) (coord.AltAz, error) {
 		ctx, err := coord.NewContext(t, spec.Observer.Location(), atm)
 		if err != nil {
-			return coord.AltAz{}, err
+			return coord.AltAz{}, fmt.Errorf("events: context: %w", err)
 		}
 
 		if mb, isMoving := spec.Target.(MovingBody); isMoving {

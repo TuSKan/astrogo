@@ -15,6 +15,8 @@ import (
 // a full coord.NewContext at every instant. Each is held to its own algorithm
 // run on these.
 func fullContexts(tb testing.TB, site *Site) func(time.Time) *coord.Context {
+	tb.Helper()
+
 	return func(t time.Time) *coord.Context {
 		return mustContext(tb, t, site.Location(), site.Refraction())
 	}

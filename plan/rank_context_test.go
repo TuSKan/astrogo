@@ -64,7 +64,7 @@ type contextRecorder struct {
 func (r *contextRecorder) Check(obj Observable, t time.Time, site *Site) (Result, error) {
 	ctx, err := coord.NewContext(t, site.Location(), site.Refraction())
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("context: %w", err)
 	}
 
 	return r.CheckCtx(obj, t, site, ctx)

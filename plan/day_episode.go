@@ -121,7 +121,7 @@ func isAboveHorizon(target Observable, site *Site, t time.Time) (bool, error) {
 
 	ctx, err := coord.NewContext(t, site.Location(), atmosphere.Refraction{Pressure: 0})
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("plan: context: %w", err)
 	}
 
 	altaz, err := observedAltAz(target, t, ctx, pos)

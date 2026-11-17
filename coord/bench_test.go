@@ -222,11 +222,8 @@ func BenchmarkReducer_Cached(b *testing.B) {
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
 	r, err := coord.NewReducer(loc, t, atm)
-
 	if err != nil {
-
 		b.Fatal(err)
-
 	}
 
 	_ = r.Reduce(v) // warm up the cache

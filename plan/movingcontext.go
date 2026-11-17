@@ -1,6 +1,8 @@
 package plan
 
 import (
+	"fmt"
+
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
@@ -14,7 +16,12 @@ func siteContext(t time.Time, site *Site) (*coord.Context, error) {
 		return nil, ErrNilSite
 	}
 
-	return coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := coord.NewContext(t, site.Location(), site.Refraction())
+	if err != nil {
+		return nil, fmt.Errorf("plan: context: %w", err)
+	}
+
+	return ctx, nil
 }
 
 // siteContexts is movingContext for site, from start, after the checks every
@@ -58,7 +65,7 @@ func siteContexts(start, end time.Time, site *Site) (func(time.Time) *coord.Cont
 func movingContext(start time.Time, site *coord.Geodetic, atm atmosphere.Refraction) (func(time.Time) *coord.Context, error) {
 	ctx, err := coord.NewContext(start, site, atm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("plan: context: %w", err)
 	}
 
 	return func(t time.Time) *coord.Context {

@@ -14,6 +14,8 @@ import (
 
 // Helper to provide a target at a specific geometric altitude
 func getTargetAtAltitude(tb testing.TB, site *coord.Geodetic, obsTime time.Time, minAlt, maxAlt float64) vector.Vec3 {
+	tb.Helper()
+
 	reducer := mustReducer(tb, site, obsTime, atmosphere.Refraction{Pressure: 0})
 
 	for i := 0; i < 360; i += 5 {

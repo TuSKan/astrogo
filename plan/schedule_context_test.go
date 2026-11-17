@@ -21,6 +21,8 @@ func plannerContexts(tb testing.TB, planner *Planner, start time.Time) func(time
 // everyInstantContexts is the Context source the scheduler used before #481:
 // a full coord.NewContext at every instant.
 func everyInstantContexts(tb testing.TB, planner *Planner) func(time.Time) *coord.Context {
+	tb.Helper()
+
 	return func(t time.Time) *coord.Context {
 		return mustContext(tb, t, planner.Site.Location(), planner.Site.Refraction())
 	}

@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -22,7 +23,7 @@ func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geo
 	sample := func(t time.Time) error {
 		ctx, err := coord.NewContext(t, observer, defaultAtm)
 		if err != nil {
-			return err
+			return fmt.Errorf("context: %w", err)
 		}
 
 		altaz, err := LookAngle(prov, id, ctx)
@@ -61,7 +62,7 @@ func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geo
 
 	ctx, err := coord.NewContext(bestTime, observer, defaultAtm)
 	if err != nil {
-		return PassEvent{}, err
+		return PassEvent{}, fmt.Errorf("context: %w", err)
 	}
 
 	altaz, err := LookAngle(prov, id, ctx)

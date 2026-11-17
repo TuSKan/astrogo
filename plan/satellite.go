@@ -535,7 +535,7 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 
 	ctx, err := coord.NewContext(bestTime, observer, defaultAtm)
 	if err != nil {
-		return PassEvent{}, err
+		return PassEvent{}, fmt.Errorf("plan: culmination: %w", err)
 	}
 
 	altaz, err := LookAngle(prov, id, ctx)

@@ -309,7 +309,7 @@ func table2Epochs(
 			// multiplication is a scaling and not a duration times a duration.
 			when := day.Add(time.Duration(step*30) * time.Minute)
 
-			cc := coord.NewContext(time.FromGo(when), site, atm.Refraction())
+			cc := mustContext(t, time.FromGo(when), site, atm.Refraction())
 
 			sunSt, err := eph.At(provider, time.FromGo(when)).Geometric(eph.Sun, eph.Earth)
 			if err != nil {

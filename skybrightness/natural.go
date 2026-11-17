@@ -125,7 +125,7 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 
 	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("skybrightness: scene: %w", err)
 	}
 
 	frame := &sceneFrame{
