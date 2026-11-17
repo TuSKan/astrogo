@@ -840,7 +840,9 @@ func (e Event) String() string {
 
 // ── Twilight ──────────────────────────────────────────────────────────────────
 
-// TwilightKind represents the level of agricultural/nautical/astronomical twilight.
+// TwilightKind is the solar altitude a twilight or a day/night boundary is
+// defined by: civil, nautical and astronomical twilight, and the geometric
+// and apparent horizons.
 type TwilightKind int
 
 const (

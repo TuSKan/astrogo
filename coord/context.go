@@ -387,14 +387,24 @@ func (ctx *Context) ObsVel() vector.Vec3 {
 
 // AstrometricToCIRS computes the Celestial Intermediate Reference System (CIRS) apparent
 // position of an object from its Astrometric (catalog ICRS) coordinates.
+//
+// The place is topocentric: as seen from this Context's site, with the site's
+// parallax and its diurnal aberration in it, which is what SOFA's iauAtciq
+// gives from astrometry built for an observer (iauApco). It is the place
+// [Context.CIRSToObserved] takes. A geocentric CIRS place, from astrometry
+// built for the Earth's center, differs from it by the diurnal aberration,
+// up to 0.32″, and for a nearby body by its parallax as well.
 func (ctx *Context) AstrometricToCIRS(c Astrometric) CIRS {
 	ri, di := ctx.atciq(c)
 
 	return NewCIRS(angle.Rad(ri).Wrap360(), angle.Rad(di))
 }
 
-// CIRSToObserved converts geocentric CIRS coordinates to local Observed AltAz
-// taking into account Earth rotation, polar motion, and atmospheric refraction.
+// CIRSToObserved converts this Context's topocentric CIRS coordinates, as
+// [Context.AstrometricToCIRS] gives them, to local Observed AltAz taking into
+// account Earth rotation, polar motion, and atmospheric refraction. It does
+// not add the diurnal aberration or the parallax a topocentric place already
+// carries, so a geocentric CIRS place passed here comes out without them.
 func (ctx *Context) CIRSToObserved(c CIRS) AltAz {
 	alt, az, _ := ctx.observed(c.RA().Radians(), c.Dec().Radians())
 
