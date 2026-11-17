@@ -14,11 +14,13 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// eblScene builds a scene the component can be evaluated in.
+// eblScene builds a scene the component can be evaluated in, at Barcelona.
+// NewGeodetic takes the longitude first; this scene had Barcelona's two
+// coordinates the other way round, which put it off Somalia (#1232).
 func eblScene(t *testing.T) *Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(41.38), angle.Deg(2.11), 0)
+	loc, err := coord.NewGeodetic(angle.Deg(2.11), angle.Deg(41.38), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -35,6 +37,20 @@ func eblScene(t *testing.T) *Scene {
 		Observer:   loc,
 		Time:       time.GoDate(2026, 8, 20, 23, 16, 0, 0, time.LocationUTC),
 		Atmosphere: atm,
+	}
+}
+
+// TestEBLSceneIsAtBarcelona: the scene's observer is where its comment says,
+// latitude 41.38° N and longitude 2.11° E. The component's verdicts depend on
+// altitude alone, so no other test would notice the two swapped, and they
+// were (#1232).
+func TestEBLSceneIsAtBarcelona(t *testing.T) {
+	t.Parallel()
+
+	loc := eblScene(t).Observer
+	if math.Abs(loc.Lat().Degrees()-41.38) > 1e-9 || math.Abs(loc.Lon().Degrees()-2.11) > 1e-9 {
+		t.Errorf("the scene is at latitude %v, longitude %v; want Barcelona, 41.38 and 2.11",
+			loc.Lat().Degrees(), loc.Lon().Degrees())
 	}
 }
 
