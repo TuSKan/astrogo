@@ -1,6 +1,7 @@
 package time
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -80,6 +81,32 @@ var (
 // unregisters. Blank-importing [github.com/TuSKan/astrogo/remote/eop] calls
 // this for you.
 func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
+
+// LoadEOP loads Earth orientation now, under ctx, through the registered
+// [EOPLoader], and says whether it could: the network step first, which
+// remote/eop's loader gates on remote.EnableDownloads(0,
+// remote.IERSFinals2000A), then a cached bulletin. Blank-importing
+// [github.com/TuSKan/astrogo/remote/eop] registers that loader.
+//
+//	import _ "github.com/TuSKan/astrogo/remote/eop"
+//
+//	remote.EnableDownloads(0, remote.IERSFinals2000A) // or pre-seed the cache
+//	if err := time.LoadEOP(ctx); err != nil {
+//		return err
+//	}
+//
+// The bulletin it loads is the model from then on, as RegisterModel would make
+// it: the lazy load does not replace it, and [EOPSource] reports "network" or
+// "cache". With no loader registered it returns [ErrNoEOPLoader]; when neither
+// step gives a bulletin, both steps' errors, and the model is left as it was.
+//
+// The lazy load is still there for a program that does not call this: the
+// first [Time.EOP], [Time.UTC] or [Time.UT1] that needs a bulletin tries the
+// same two steps, but with context.Background(), and on failure degrades to
+// zero EOP with one logged warning rather than an error (#1187).
+//
+//nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
+func LoadEOP(ctx context.Context) error { return iers.Load(ctx) }
 
 // ParseFinals2000A parses a finals2000A-format IERS bulletin into a Table.
 //

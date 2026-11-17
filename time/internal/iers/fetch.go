@@ -173,6 +173,70 @@ func EnsureLoaded(mjd float64) error {
 	return settle()
 }
 
+// Load loads EOP data now, under ctx, through the registered Loader: the
+// network step first, which the loader gates on download consent, then what
+// is cached. The first bulletin that parses is installed as the model and
+// marked explicit, since loading it was the caller's own choice, so the lazy
+// load in EnsureLoaded leaves it alone; its source is recorded as
+// SourceNetwork or SourceCache. A model registered before, ZeroModel
+// included, is replaced.
+//
+// With no loader it returns [ErrNoLoader]. When neither step gives a bulletin
+// that parses, it returns both steps' errors and leaves the model as it was.
+func Load(ctx context.Context) error {
+	l := GetLoader()
+	if l == nil {
+		return ErrNoLoader
+	}
+
+	fetchMu.Lock()
+	defer fetchMu.Unlock()
+
+	steps := []struct {
+		name   string
+		source string
+		get    func(context.Context) (Data, error)
+	}{
+		{"fetch", SourceNetwork, l.Fetch},
+		{"read cached", SourceCache, l.Cached},
+	}
+
+	errs := make([]error, 0, len(steps))
+
+	for _, step := range steps {
+		data, err := step.get(ctx)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("iers: %s EOP data: %w", step.name, err))
+
+			continue
+		}
+
+		table, err := ParseFinals2000A(bytes.NewReader(data.Raw))
+		if err != nil {
+			errs = append(errs, fmt.Errorf("iers: parse %s EOP data: %w", step.source, err))
+
+			continue
+		}
+
+		registerLoaded(table, step.source)
+
+		// The lazy load's throttle and its remembered failures describe a
+		// state this replaces.
+		now := time.Now()
+		lastCacheRead, lastAttempt = now, now
+		errLastCache, errLastFetch = nil, nil
+
+		settled.Store(nil)
+
+		lo, hi := table.Coverage()
+		logging.InfoContext(ctx, "loaded EOP data", "source", step.source, "mjd_lo", lo, "mjd_hi", hi, "records", len(table.records))
+
+		return nil
+	}
+
+	return errors.Join(errs...)
+}
+
 // settle returns the joined errors of the last cached read and fetch, nil if
 // neither failed, and records it as the answer until the first of the two
 // cooldown windows reopens. Called with fetchMu held.

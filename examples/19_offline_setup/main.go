@@ -111,25 +111,27 @@ func main() {
 		}
 	}
 
-	// ── 3. Time.EOP() — local Earth-orientation data, loaded automatically ──
-	show.Section("3. Earth orientation, loaded by the first Time.EOP()")
+	// ── 3. time.LoadEOP — local Earth-orientation data, loaded explicitly ──
+	show.Section("3. Earth orientation, loaded by time.LoadEOP")
 
 	iersLoc := cacheLocation(ctx, remote.IERSFinals2000A, "finals2000A.data")
 
-	// Never errors; triggers the lazy load as a side effect. Any epoch the
-	// bulletin covers will do.
-	_ = time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC).EOP()
-
-	if lo, hi, ok := time.Coverage(); ok {
-		show.Fields(
-			show.KV("Coverage", "MJD %.0f–%.0f", lo, hi),
-			show.KV("Bulletin", "%s", iersLoc),
-		)
-	} else {
+	// No consent was granted for the bulletin, so LoadEOP's network step is
+	// refused before any request and it reads the cache. Unlike the lazy load
+	// a Time.EOP() triggers, it says when there is nothing to read.
+	if err := time.LoadEOP(ctx); err != nil {
 		show.Note(fmt.Sprintf("No local EOP cache at %s.", iersLoc),
 			"Call remote.EnableDownloads(0, remote.IERSFinals2000A) once, with",
 			"network access, to populate it, or ship finals2000A.data with your",
-			"deployment.")
+			"deployment.",
+			fmt.Sprintf("time.LoadEOP: %v", err))
+	} else {
+		lo, hi, _ := time.Coverage()
+		show.Fields(
+			show.KV("Coverage", "MJD %.0f–%.0f", lo, hi),
+			show.KV("Bulletin", "%s", iersLoc),
+			show.KV("Source", "%s", time.EOPSource()),
+		)
 	}
 
 	// Earth-orientation data works exactly like the kernel above: pre-seed

@@ -117,6 +117,16 @@ func registerModelInternal(m Model, source string) {
 	current.Store(&modelState{model: m, source: source})
 }
 
+// registerLoaded installs a table Load loaded, as the caller's own choice:
+// explicit, so the lazy load does not replace it, with source recording where
+// it came from (SourceNetwork or SourceCache) for EOPSource.
+func registerLoaded(m Model, source string) {
+	modelMu.Lock()
+	defer modelMu.Unlock()
+
+	current.Store(&modelState{model: m, source: source, explicit: true})
+}
+
 // Reset restores the model to its pristine default state — ZeroModel, not
 // explicit, source SourceZero — discarding whatever was previously
 // registered or lazily loaded. Unlike RegisterModel(ZeroModel{}), this does
