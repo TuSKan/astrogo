@@ -66,11 +66,11 @@
 // # Rise, set and twilight
 //
 // [SunEvents] and [SunriseSunset], [MoonEvents] and [MoonriseMoonset], and
-// [TwilightEvents] for each [TwilightKind]; [CivilDawnDusk],
-// [NauticalDawnDusk] and [AstronomicalDawnDusk] answer the common case
-// directly. [DayEvents] gives a target's rise, set and transit within one
-// local calendar day, and [Episode] the whole continuous span it is up
-// around an interval.
+// [TwilightEvents] for each [TwilightKind]; [NightOf] answers the common
+// case directly, the one [Night] an instant is in or comes before.
+// [DayEvents] gives a target's rise, set and transit within one local
+// calendar day, and [Episode] the whole continuous span it is up around an
+// interval.
 //
 // # Geometric events
 //

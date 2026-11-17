@@ -143,8 +143,9 @@ Supplement convention:
 ### Civil twilight (Sun's center at −6°)
 
 The same responses carry USNO's Begin and End Civil Twilight. They were
-discarded until #532. `plan.CivilDawnDusk` is now held to them at 1 min, which
-is USNO's minute rounding plus half a minute of margin. Twilight is a
+discarded until #532. `plan.TwilightEvents`' civil dawn and dusk, the
+crossings `plan.NightOf` pairs, are now held to them at 1 min, which is USNO's
+minute rounding plus half a minute of margin. Twilight is a
 geometric threshold, with no refraction or horizon dip, so it does not need
 rise and set's 2 min. As a canary, a −5.5° threshold misses all 18 events by
 1.8–5.3 min.

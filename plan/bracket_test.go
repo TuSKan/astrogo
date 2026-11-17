@@ -43,7 +43,7 @@ func TestARefinementStartsFromTheSampledBracket(t *testing.T) {
 
 // TestTwilightNearASampleOnTheThreshold is #425's scan. It finds the latitude
 // at which the Sun is exactly 18° down at 22:15 UTC on 2026-06-11, a sample of
-// AstronomicalDawnDusk's 15-minute sweep, and calls AstronomicalDawnDusk for
+// TwilightEvents' 15-minute sweep from 20:00, and calls TwilightEvents for
 // 201 latitudes within ±2e-6° of it. Each must find both events: astronomical
 // night there runs from 22:15 to 01:44 UTC, and the Sun goes 22° down, so
 // nothing about the twilight is marginal. Before the fix the sweep's sample,
@@ -103,10 +103,10 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		dawn, dusk, err := AstronomicalDawnDusk(start, end, site, prov)
-		if err != nil || dawn == nil || dusk == nil {
+		nights, err := TwilightEvents(start, end, site, prov, AstronomicalTwilight)
+		if err != nil || len(nights) != 1 || nights[0].Dusk == nil || nights[0].Dawn == nil {
 			if failed++; failed <= 3 {
-				t.Errorf("latitude %.10f: dawn %v, dusk %v, err %v", lat, dawn, dusk, err)
+				t.Errorf("latitude %.10f: %d nights %v, err %v, want one with a dusk and a dawn", lat, len(nights), nights, err)
 			}
 		}
 	}

@@ -26,7 +26,7 @@ type Planet struct {
 // use. Every convenience constructor below (NewSun, NewMoon, NewMercury
 // ... NewPluto) delegates through here, so this one guard covers all of
 // them, plus every plan/events.go function that builds a Sun/Moon via
-// NewSun/NewMoon (SunEvents, MoonEvents, CivilDawnDusk and friends,
+// NewSun/NewMoon (SunEvents, MoonEvents, TwilightEvents, NightOf,
 // FullMoonOppositions, NextNewMoon, NextFullMoon, ...).
 func NewPlanet(name string, id eph.ID, provider eph.Provider) *Planet {
 	if provider == nil {
