@@ -93,37 +93,41 @@ func main() {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
 
-	_, civilDusk, err := plan.CivilDawnDusk(day, next, site, prov)
+	// The night of February 28, from local noon: the Sun 6°, 12° and 18°
+	// below the horizon.
+	noon := day.Add(unit.Hours(12))
+
+	civil, err := plan.NightOf(noon, site, prov, plan.CivilTwilight)
 	if err != nil {
-		log.Fatalf("CivilDawnDusk: %v", err)
+		log.Fatalf("NightOf civil: %v", err)
 	}
 
-	_, nautDusk, err := plan.NauticalDawnDusk(day, next, site, prov)
+	nautical, err := plan.NightOf(noon, site, prov, plan.NauticalTwilight)
 	if err != nil {
-		log.Fatalf("NauticalDawnDusk: %v", err)
+		log.Fatalf("NightOf nautical: %v", err)
 	}
 
-	_, astroDusk, err := plan.AstronomicalDawnDusk(day, next, site, prov)
+	astronomical, err := plan.NightOf(noon, site, prov, plan.AstronomicalTwilight)
 	if err != nil {
-		log.Fatalf("AstronomicalDawnDusk: %v", err)
+		log.Fatalf("NightOf astronomical: %v", err)
 	}
 
 	show.Section("Dusk, February 28, 2025")
 	show.Fields(
 		show.KV("Sunset", "%s", sunset.Time.In(brtz).Format("15:04:05 MST")),
-		show.KV("Civil dusk", "%s  Sun 6° down", civilDusk.Time.In(brtz).Format("15:04:05 MST")),
-		show.KV("Nautical dusk", "%s  Sun 12° down", nautDusk.Time.In(brtz).Format("15:04:05 MST")),
-		show.KV("Astronomical dusk", "%s  Sun 18° down", astroDusk.Time.In(brtz).Format("15:04:05 MST")),
+		show.KV("Civil dusk", "%s  Sun 6° down", civil.Dusk.In(brtz).Format("15:04:05 MST")),
+		show.KV("Nautical dusk", "%s  Sun 12° down", nautical.Dusk.In(brtz).Format("15:04:05 MST")),
+		show.KV("Astronomical dusk", "%s  Sun 18° down", astronomical.Dusk.In(brtz).Format("15:04:05 MST")),
 	)
 
 	// ── Part 2: Planetary Positions at Civil Dusk ──────────────────────
-	ctx := coord.NewContext(civilDusk.Time, loc, atm)
+	ctx := coord.NewContext(civil.Dusk, loc, atm)
 
 	positions := show.NewTable(show.Left("Planet"), show.Right("Ecliptic λ"),
 		show.Right("Altitude"), show.Right("Azimuth"), show.Right("Airmass"))
 
 	for _, p := range planets {
-		icrs, err := p.Target.Position(civilDusk.Time)
+		icrs, err := p.Target.Position(civil.Dusk)
 		if err != nil {
 			log.Fatalf("%s position: %v", p.Name, err)
 		}
@@ -133,7 +137,7 @@ func main() {
 			log.Fatalf("altaz: %v", err)
 		}
 
-		ecl := coord.ICRSToEcliptic(icrs, civilDusk.Time)
+		ecl := coord.ICRSToEcliptic(icrs, civil.Dusk)
 
 		alt := altaz.Alt().Degrees()
 		amStr := "below"
@@ -151,7 +155,7 @@ func main() {
 			fmt.Sprintf("%+.1f°", alt), fmt.Sprintf("%.1f°", altaz.Az().Degrees()), amStr)
 	}
 
-	show.Section("The planets at civil dusk, " + civilDusk.Time.In(brtz).Format("15:04 MST"))
+	show.Section("The planets at civil dusk, " + civil.Dusk.In(brtz).Format("15:04 MST"))
 	positions.Print()
 
 	// ── Part 3: Altitude Timeline ────────────────────────────────────
@@ -200,12 +204,12 @@ func main() {
 	lons := make([]float64, 0, len(planets))
 
 	for _, p := range planets {
-		icrs, err := p.Target.Position(civilDusk.Time)
+		icrs, err := p.Target.Position(civil.Dusk)
 		if err != nil {
 			log.Fatalf("icrs: %v", err)
 		}
 
-		ecl := coord.ICRSToEcliptic(icrs, civilDusk.Time)
+		ecl := coord.ICRSToEcliptic(icrs, civil.Dusk)
 		lons = append(lons, ecl.Lon().Degrees())
 	}
 
