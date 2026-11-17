@@ -386,7 +386,11 @@ func BenchmarkSkyFromSite(b *testing.B) {
 		b.Helper()
 
 		cp := &countingProvider{Provider: p}
-		ctx := coord.NewContext(epoch, barcelona(b), atmosphere.AtAltitude(0))
+
+		ctx, err := coord.NewContext(epoch, barcelona(b), atmosphere.AtAltitude(0))
+		if err != nil {
+			b.Fatal(err)
+		}
 
 		bodies := make([]*plan.Planet, len(sky))
 		for i, id := range sky {
@@ -526,7 +530,10 @@ func BenchmarkSatellite(b *testing.B) {
 	}
 
 	b.Run("state-ctx", func(b *testing.B) {
-		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+		ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+		if err != nil {
+			b.Fatal(err)
+		}
 
 		measure(b, nil, nil, func() error {
 			_, err := sat.LocateCtx(sat.ID(), ctx)
@@ -537,7 +544,10 @@ func BenchmarkSatellite(b *testing.B) {
 
 	b.Run("pass-6h-1min-ctx", func(b *testing.B) {
 		measure(b, nil, nil, func() error {
-			ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+			ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+			if err != nil {
+				b.Fatal(err)
+			}
 
 			for i := range 360 {
 				ctx.SetTime(at.Add(unit.Minutes(float64(i))))
