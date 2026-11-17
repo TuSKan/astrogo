@@ -249,17 +249,6 @@ func (c *Client) Get(ctx context.Context, baseURL string, path string, query url
 	return c.body(resp, err, cancel)
 }
 
-// budget bounds one call by the client's timeout: every attempt and every
-// wait between them comes out of it, so a retry happens only while time is
-// left. The returned cancel releases it, which [Client.body] does once the
-// caller is done with the response.
-//
-// Pacing waits before it starts. That wait is spent being polite to the
-// service, not waiting for its answer.
-func (c *Client) budget(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, c.timeout)
-}
-
 // GetJSON issues a GET and decodes the JSON response into out, closing the
 // body. For endpoints that always answer JSON; a provider that must sniff
 // the format from raw bytes uses Get instead.
@@ -316,6 +305,17 @@ func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payl
 	defer release()
 
 	return c.post(ctx, full, "application/json", encoded)
+}
+
+// budget bounds one call by the client's timeout: every attempt and every
+// wait between them comes out of it, so a retry happens only while time is
+// left. The returned cancel releases it, which [Client.body] does once the
+// caller is done with the response.
+//
+// Pacing waits before it starts. That wait is spent being polite to the
+// service, not waiting for its answer.
+func (c *Client) budget(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, c.timeout)
 }
 
 // post sends body to full, from a reader of its own on every attempt.

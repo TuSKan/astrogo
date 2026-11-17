@@ -15,6 +15,9 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
+// errEarlier stands in for the failure a client remembers about a host.
+var errEarlier = errors.New("an earlier request got no answer")
+
 // silentHost is a TCP listener that accepts every connection and never
 // answers: a host that is up enough to connect to and gives no answer, as
 // SIMBAD's did during the CDS outage of 2026-11-13. It counts the
@@ -23,7 +26,7 @@ import (
 func silentHost(t *testing.T) (base string, accepted *atomic.Int32) {
 	t.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -43,9 +46,13 @@ func silentHost(t *testing.T) (base string, accepted *atomic.Int32) {
 			}
 
 			accepted.Add(1)
-			mu.Lock()
-			conns = append(conns, conn)
-			mu.Unlock()
+
+			func() {
+				mu.Lock()
+				defer mu.Unlock()
+
+				conns = append(conns, conn)
+			}()
 		}
 	}()
 
@@ -164,8 +171,9 @@ func TestAnAnswerIsNeverNoAnswer(t *testing.T) {
 	// An answer clears what was remembered, as when one request gets an
 	// answer while another, sent beside it, got none.
 	host := hostOf(srv.URL)
+
 	c.noAnswerMu.Lock()
-	c.noAnswer[host] = noAnswer{at: time.Now(), err: errors.New("earlier")}
+	c.noAnswer[host] = noAnswer{at: time.Now(), err: errEarlier}
 	c.noAnswerMu.Unlock()
 
 	if err := c.heard(t.Context(), host, &HTTPError{StatusCode: http.StatusNotFound}); errors.Is(err, ErrUnreachable) {
@@ -191,7 +199,7 @@ func TestTheCallersOwnCancellationIsNotTheHosts(t *testing.T) {
 	defer cancel()
 
 	if _, err := c.Get(ctx, SIMBAD, "", nil); err == nil || errors.Is(err, ErrUnreachable) {
-		t.Fatalf("a request the caller cancelled: err = %v, want the cancellation and not ErrUnreachable", err)
+		t.Fatalf("a request the caller canceled: err = %v, want the cancellation and not ErrUnreachable", err)
 	}
 
 	asked := accepted.Load()

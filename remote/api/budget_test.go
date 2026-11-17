@@ -21,7 +21,7 @@ import (
 func TestTheTimeoutBoundsTheWholeCall(t *testing.T) {
 	t.Parallel()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
@@ -40,9 +40,13 @@ func TestTheTimeoutBoundsTheWholeCall(t *testing.T) {
 			}
 
 			accepted.Add(1)
-			mu.Lock()
-			conns = append(conns, conn)
-			mu.Unlock()
+
+			func() {
+				mu.Lock()
+				defer mu.Unlock()
+
+				conns = append(conns, conn)
+			}()
 		}
 	}()
 
@@ -107,6 +111,7 @@ func TestABodyIsReadAfterTheCallReturns(t *testing.T) {
 		}
 
 		time.Sleep(100 * time.Millisecond)
+
 		_, _ = w.Write([]byte("the whole answer"))
 	}))
 	t.Cleanup(srv.Close)
