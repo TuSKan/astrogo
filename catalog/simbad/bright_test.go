@@ -72,6 +72,15 @@ func isIdentifierQuery(query string) bool {
 	return strings.Contains(query, "FROM ids")
 }
 
+// isMembershipQuery reports whether a request is buildMembershipQuery's.
+func isMembershipQuery(query string) bool {
+	return strings.Contains(query, "FROM h_link")
+}
+
+// noMemberships answers a membership query about objects that are members of
+// nothing.
+const noMemberships = "oidref,parent\n"
+
 // TestBuildBrightQueryLeavesOutTransients: a supernova's or a nova's catalog
 // V is its outburst's, not the brightness of anything in the sky now, and
 // SN 2009jb at V 1.07 was listed as a naked-eye star (#1137). The query
@@ -129,6 +138,9 @@ func brightServer(t *testing.T, rows int) (hits *atomic.Int32, maxrec *atomic.Va
 
 		if q := r.PostForm.Get("QUERY"); isIdentifierQuery(q) {
 			_, _ = w.Write([]byte(identifierAnswer(t, q, func(oid int64) string { return fmt.Sprintf("* s%d|HD %d", oid, oid) })))
+			return
+		} else if isMembershipQuery(q) {
+			_, _ = w.Write([]byte(noMemberships))
 			return
 		}
 

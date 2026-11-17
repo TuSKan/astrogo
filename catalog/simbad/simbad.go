@@ -137,12 +137,16 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // complete.
 //
 // Each object's Aliases are every identifier SIMBAD lists for it, in SIMBAD's
-// spelling, fetched once the objects are known with one further request per
-// 1,000 of them: they are what matches an object to another catalog's record
-// of it. If they cannot be fetched, the objects still come, those without
-// identifiers followed by an error saying how many lack them and why.
+// spelling, and its MemberOf the main identifier of each object SIMBAD's
+// hierarchy makes it a member of: a star system, a cluster. Both are fetched
+// once the objects are known, with two further requests per 1,000 of them.
+// The identifiers are what matches an object to another catalog's record of
+// it, and the memberships what tells a star system's record from its
+// components'. If either cannot be fetched, the objects still come, followed
+// by an error saying how many lack them and why.
 //
-// Only a complete list, every object with its identifiers, is cached.
+// Only a complete list, every object with its identifiers and memberships, is
+// cached.
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
 	if seq, ok := p.cache.Get(cacheKey); ok {
@@ -272,12 +276,19 @@ func (p *Provider) stream(ctx context.Context, cacheKey, adql string) resolve.Se
 }
 
 // addIdentifiers sets each target's Aliases to the identifiers SIMBAD lists for
-// the object with the matching oid, asking about identifierBatch objects at a
+// the object with the matching oid, and its MemberOf to what SIMBAD's
+// hierarchy makes it a member of, asking about identifierBatch objects at a
 // time. A target whose oid is 0 has none to ask about and is left as it is.
 //
-// A batch that fails ends the fetch: the targets already given identifiers
-// keep them, and the error, wrapping errIdentifiersUnavailable, counts the
-// ones that have none.
+// The memberships are what tell a star system's record from its components'
+// (#1182): SIMBAD keeps alf Cen, at V -0.1, as the parent of alf Cen A and
+// alf Cen B, and that V is theirs together.
+//
+// Identifiers and memberships are asked in two passes, so one failing does not
+// cost the other. A batch that fails ends its pass: the targets already given
+// that pass's lists keep them, and the error, wrapping
+// errIdentifiersUnavailable or errMembershipsUnavailable, counts the ones left
+// without.
 func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target, oids []int64) error {
 	at := make(map[int64]int, len(oids))
 	ask := make([]int64, 0, len(oids))
@@ -289,18 +300,46 @@ func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target,
 		}
 	}
 
+	idErr := p.addLists(ctx, ask, buildIdentifierQuery, parseIdentifiers, func(oid int64, list []string) {
+		targets[at[oid]].Aliases = list
+	})
+	if idErr != nil {
+		idErr = fmt.Errorf("%w %w, so another catalog may list one of them a second time", errIdentifiersUnavailable, idErr)
+	}
+
+	memberErr := p.addLists(ctx, ask, buildMembershipQuery, parseMemberships, func(oid int64, list []string) {
+		targets[at[oid]].MemberOf = list
+	})
+	if memberErr != nil {
+		memberErr = fmt.Errorf("%w %w, so a star system may be counted with its own components", errMembershipsUnavailable, memberErr)
+	}
+
+	return errors.Join(idErr, memberErr)
+}
+
+// addLists asks SIMBAD the query build makes about the objects ask names,
+// identifierBatch of them at a time, and hands set each object's list from the
+// answer parse reads. A batch that fails ends it, with an error counting the
+// objects left without.
+func (p *Provider) addLists(ctx context.Context, ask []int64, build func([]int64) string,
+	parse func(io.Reader) (map[int64][]string, error), set func(oid int64, list []string),
+) error {
+	asked := make(map[int64]bool, len(ask))
+	for _, oid := range ask {
+		asked[oid] = true
+	}
+
 	for start := 0; start < len(ask); start += identifierBatch {
 		batch := ask[start:min(start+identifierBatch, len(ask))]
 
-		ids, err := p.fetchIdentifiers(ctx, batch)
+		lists, err := p.fetchLists(ctx, build(batch), parse)
 		if err != nil {
-			return fmt.Errorf("%w for %d of %d objects, so another catalog may list one of them a second time: %w",
-				errIdentifiersUnavailable, len(ask)-start, len(ask), err)
+			return fmt.Errorf("for %d of %d objects: %w", len(ask)-start, len(ask), err)
 		}
 
-		for oid, list := range ids {
-			if i, ok := at[oid]; ok {
-				targets[i].Aliases = list
+		for oid, list := range lists {
+			if asked[oid] {
+				set(oid, list)
 			}
 		}
 	}
@@ -308,17 +347,25 @@ func (p *Provider) addIdentifiers(ctx context.Context, targets []resolve.Target,
 	return nil
 }
 
-// fetchIdentifiers asks SIMBAD for the identifiers of one batch of objects.
-func (p *Provider) fetchIdentifiers(ctx context.Context, oids []int64) (map[int64][]string, error) {
-	body, err := p.client.PostForm(ctx, remote.SIMBAD, "", TAPRequest(buildIdentifierQuery(oids)))
+// fetchLists asks SIMBAD one query about a batch of objects and parses its
+// answer with parse.
+func (p *Provider) fetchLists(ctx context.Context, adql string,
+	parse func(io.Reader) (map[int64][]string, error),
+) (map[int64][]string, error) {
+	body, err := p.client.PostForm(ctx, remote.SIMBAD, "", TAPRequest(adql))
 	if err != nil {
-		return nil, fmt.Errorf("asking about %d objects: %w", len(oids), err)
+		return nil, fmt.Errorf("asking about a batch of objects: %w", err)
 	}
 	defer func() { _ = body.Close() }()
 
-	return parseIdentifiers(body)
+	return parse(body)
 }
 
 // errIdentifiersUnavailable marks a bright-object list whose objects came
 // without the identifiers that match them to other catalogs.
 var errIdentifiersUnavailable = errors.New("simbad: identifiers unavailable")
+
+// errMembershipsUnavailable marks a bright-object list whose objects came
+// without what they are members of, the hierarchy that tells a star system's
+// record from its components'.
+var errMembershipsUnavailable = errors.New("simbad: memberships unavailable")

@@ -97,6 +97,13 @@ type Target struct {
 	TLELine1 string
 	// Aliases are the aliases of the target.
 	Aliases []string
+	// MemberOf names what the target is a member of, as its catalog's
+	// hierarchy records it: the system a star system's component belongs to,
+	// the cluster a cluster star belongs to. Each entry is the parent's
+	// identifier in that catalog, so it matches the parent's own record
+	// through [IdentityKeys]. SIMBAD's bright results carry it, from SIMBAD's
+	// h_link table, and a catalog that records no hierarchy leaves it nil.
+	MemberOf []string
 	// Coord is the coordinate of the target.
 	Coord coord.ICRS
 	// VMag is the V magnitude of the target.

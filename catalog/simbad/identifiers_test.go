@@ -59,6 +59,11 @@ func TestSearchBrightAddsEachObjectsIdentifiers(t *testing.T) {
 		w.Header().Set("Content-Type", "text/csv")
 
 		q := r.PostForm.Get("QUERY")
+		if isMembershipQuery(q) {
+			_, _ = w.Write([]byte(noMemberships))
+			return
+		}
+
 		if !isIdentifierQuery(q) {
 			_, _ = w.Write([]byte(b.String()))
 			return
@@ -124,6 +129,9 @@ func TestSearchBrightListsObjectsWithoutTheirIdentifiers(t *testing.T) {
 		q := r.PostForm.Get("QUERY")
 
 		switch {
+		case isMembershipQuery(q):
+			w.Header().Set("Content-Type", "text/csv")
+			_, _ = w.Write([]byte(noMemberships))
 		case !isIdentifierQuery(q):
 			brightRequests.Add(1)
 			w.Header().Set("Content-Type", "text/csv")
@@ -185,7 +193,7 @@ func TestParseIdentifiers(t *testing.T) {
 		t.Errorf("an answer without oidref and ids: err = %v, want ErrMissingColumn", err)
 	}
 
-	if _, err := parseIdentifiers(strings.NewReader("oidref,ids\nabc,\"x\"\n")); !errors.Is(err, errBadIdentifierRow) {
-		t.Errorf("a row naming no object: err = %v, want errBadIdentifierRow", err)
+	if _, err := parseIdentifiers(strings.NewReader("oidref,ids\nabc,\"x\"\n")); !errors.Is(err, errRowWithoutObject) {
+		t.Errorf("a row naming no object: err = %v, want errRowWithoutObject", err)
 	}
 }

@@ -353,6 +353,21 @@ func parseBright(r io.Reader) ([]resolve.Target, []int64, error) {
 // "|". An identifier keeps SIMBAD's spelling, padding included, since that
 // is the designation as SIMBAD writes it.
 func parseIdentifiers(r io.Reader) (map[int64][]string, error) {
+	return parseObjectLists(r, "ids")
+}
+
+// parseMemberships parses the answer to buildMembershipQuery: each object's
+// oid and the main identifier of what it is a member of, one row per link, so
+// an object in a system and a cluster comes on two rows.
+func parseMemberships(r io.Reader) (map[int64][]string, error) {
+	return parseObjectLists(r, "parent")
+}
+
+// parseObjectLists parses an answer whose rows each name an object by its oid,
+// in the oidref column, and give strings about it in the list column, joined
+// by "|". An object on two rows has both rows' strings, and one whose list is
+// empty is still listed, with none. Each string keeps SIMBAD's spelling.
+func parseObjectLists(r io.Reader, list string) (map[int64][]string, error) {
 	body, err := csvBody(r)
 	if err != nil {
 		return nil, err
@@ -374,7 +389,7 @@ func parseIdentifiers(r io.Reader) (map[int64][]string, error) {
 		colIdx[h] = i
 	}
 
-	for _, req := range []string{"oidref", "ids"} {
+	for _, req := range []string{"oidref", list} {
 		if _, ok := colIdx[req]; !ok {
 			return nil, fmt.Errorf("%w: %q", ErrMissingColumn, req)
 		}
@@ -394,25 +409,26 @@ func parseIdentifiers(r io.Reader) (map[int64][]string, error) {
 
 		oid, err := strconv.ParseInt(row[colIdx["oidref"]], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("%w: oidref %q", errBadIdentifierRow, row[colIdx["oidref"]])
+			return nil, fmt.Errorf("%w: oidref %q", errRowWithoutObject, row[colIdx["oidref"]])
 		}
 
-		var ids []string
+		var values []string
 
-		for id := range strings.SplitSeq(row[colIdx["ids"]], "|") {
-			if id = strings.TrimSpace(id); id != "" {
-				ids = append(ids, id)
+		for v := range strings.SplitSeq(row[colIdx[list]], "|") {
+			if v = strings.TrimSpace(v); v != "" {
+				values = append(values, v)
 			}
 		}
 
-		out[oid] = ids
+		out[oid] = append(out[oid], values...)
 	}
 
 	return out, nil
 }
 
-// errBadIdentifierRow marks an identifier answer whose row names no object.
-var errBadIdentifierRow = errors.New("simbad: identifier row without an object")
+// errRowWithoutObject marks an identifier or membership answer whose row names
+// no object.
+var errRowWithoutObject = errors.New("simbad: row names no object")
 
 // rowKind classifies a row by its otype and, when the query joined it, the
 // otype's place in SIMBAD's hierarchy (otype_path).

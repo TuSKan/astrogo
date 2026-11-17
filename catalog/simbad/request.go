@@ -250,9 +250,23 @@ const identifierBatch = 1000
 // identifier: in a join, an object's identifiers would be rows a row limit
 // could cut, taking the objects after them or the end of one object's list.
 func buildIdentifierQuery(oids []int64) string {
-	var b strings.Builder
+	return "SELECT oidref, ids FROM ids WHERE oidref IN (" + oidList(oids) + ")"
+}
 
-	b.WriteString("SELECT oidref, ids FROM ids WHERE oidref IN (")
+// buildMembershipQuery asks SIMBAD's h_link table what each of the objects
+// with the given oids is a member of: the system a star system's component
+// belongs to, the cluster a cluster star does. One row per link, the parent
+// named by its main identifier. h_link records a link once for each paper
+// that states it, so the query asks for distinct rows: a Pleiades star's
+// membership is otherwise six rows.
+func buildMembershipQuery(oids []int64) string {
+	return "SELECT DISTINCT h_link.child AS oidref, basic.main_id AS parent " +
+		"FROM h_link JOIN basic ON basic.oid = h_link.parent WHERE h_link.child IN (" + oidList(oids) + ")"
+}
+
+// oidList writes oids as an ADQL IN list's contents.
+func oidList(oids []int64) string {
+	var b strings.Builder
 
 	for i, oid := range oids {
 		if i > 0 {
@@ -261,8 +275,6 @@ func buildIdentifierQuery(oids []int64) string {
 
 		b.WriteString(strconv.FormatInt(oid, 10))
 	}
-
-	b.WriteByte(')')
 
 	return b.String()
 }
