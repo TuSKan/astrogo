@@ -80,7 +80,11 @@ type Altitude struct {
 
 // Check evaluates whether the target's altitude meets the threshold.
 func (c Altitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -114,7 +118,11 @@ type Airmass struct {
 
 // Check evaluates whether the target's airmass is within the threshold.
 func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -153,7 +161,11 @@ type Sun struct {
 
 // Check evaluates whether the Sun's altitude meets the threshold.
 func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(nil, t, site, ctx)
 }
 
@@ -200,7 +212,11 @@ type MoonSep struct {
 
 // Check evaluates Moon separation for a given target and time.
 func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -215,6 +231,10 @@ func (c MoonSep) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Conte
 // record, which every target at the instant shares (#913). A nil sky computes
 // it.
 func (c MoonSep) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
+	if obj == nil {
+		return Result{}, ErrNilTarget
+	}
+
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 180}, nil
 	}
@@ -270,7 +290,11 @@ type MoonIllum struct {
 
 // Check evaluates Moon illumination for a given target and time.
 func (c MoonIllum) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -413,6 +437,10 @@ func topocentricDirection(v vector.Vec3, ctx *coord.Context) coord.ICRS {
 
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.
 func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+	if obj == nil {
+		return coord.AltAz{}, ErrNilTarget
+	}
+
 	pos, err := obj.Position(t)
 	if err != nil {
 		return coord.AltAz{}, fmt.Errorf("constraint: position: %w", err)

@@ -72,7 +72,7 @@ func TestParallacticAngleIsSOFAs(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		ctx := coord.NewContext(epoch, site, atm)
+		ctx := mustContext(t, epoch, site, atm)
 
 		for _, st := range stars {
 			ra, dec := angle.Deg(st.raDeg), angle.Deg(st.decDeg)
@@ -147,7 +147,7 @@ func TestParallacticAngleOnTheMeridian(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := coord.NewContext(time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
+	ctx := mustContext(t, time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
 
 	for _, c := range []struct {
 		name    string

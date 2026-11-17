@@ -38,7 +38,7 @@ func TestBasicTransitionModel(t *testing.T) {
 	// common case per Transition.ToTime's doc comment ("approximate, often
 	// FromTime").
 	now := fixedEpoch()
-	ctxAt := movingContext(site.Location(), site.Refraction())
+	ctxAt := mustMoving(t, now, site.Location(), site.Refraction())
 
 	tr, err := newTransition(nil, block1, now, now, site, ctxAt)
 	if err != nil {
@@ -98,7 +98,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 	now := fixedEpoch()
 	later := now.Add(unit.Minutes(5))
 
-	ctxAt := movingContext(site.Location(), site.Refraction())
+	ctxAt := mustMoving(t, now, site.Location(), site.Refraction())
 
 	sameEpoch, err := newTransition(block1, block2, now, now, site, ctxAt)
 	if err != nil {

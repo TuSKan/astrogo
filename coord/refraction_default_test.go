@@ -1,6 +1,7 @@
 package coord_test
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -59,8 +60,9 @@ func TestNilModelMatchesExplicitSOFAModel(t *testing.T) {
 	explicit := nilEnv
 	explicit.Model = atmosphere.RefractionSOFA{}
 
-	ctxNil := coord.NewContext(when, site, nilEnv)
-	ctxExplicit := coord.NewContext(when, site, explicit)
+	ctxNil := mustContext(t, when, site, nilEnv)
+
+	ctxExplicit := mustContext(t, when, site, explicit)
 
 	// Contract per altitude floor, in arcseconds.
 	bounds := []struct {
@@ -149,8 +151,9 @@ func TestContextRefractsAZeroWavelengthAtTheVisualDefault(t *testing.T) {
 	zero := air
 	zero.Wavelength = 0
 
-	ctxAir := coord.NewContext(when, site, air)
-	ctxZero := coord.NewContext(when, site, zero)
+	ctxAir := mustContext(t, when, site, air)
+
+	ctxZero := mustContext(t, when, site, zero)
 
 	above := 0
 
@@ -199,7 +202,7 @@ func TestDisperseReportsDispersionWhereReduceAppliedRefraction(t *testing.T) {
 		t.Fatal("precondition: this test is about the nil-Model path")
 	}
 
-	r := coord.NewReducer(site, when, env)
+	r := mustReducer(t, site, when, env)
 
 	// A direction well above the horizon, so refraction is real but modest.
 	var target vector.Vec3
@@ -261,7 +264,7 @@ func TestDisperseStillReportsNoDispersionInAVacuum(t *testing.T) {
 	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
 	site := paranalSite(t)
 
-	r := coord.NewReducer(site, when, atmosphere.Refraction{})
+	r := mustReducer(t, site, when, atmosphere.Refraction{})
 
 	v := vector.Vec3{X: 0.3, Y: 0.5, Z: 0.81}.MulScalar(1e10)
 	res := r.Disperse(v, []float64{0.40, 0.70})
@@ -278,12 +281,11 @@ func TestDisperseStillReportsNoDispersionInAVacuum(t *testing.T) {
 	}
 }
 
-// TestContextRefusesAirThatIsNot: a Context built from a Refraction that
-// fails Validate gives NaN altitudes rather than SOFA's clamp of its inputs
-// (#903). NewContext takes its refraction constants from its own Refco call,
-// which clamped a NaN temperature to −150 °C and refracted 2.35 times too
-// much, and its stellar path reaches SOFA's Atioq with those constants
-// directly. So both paths are checked, the vector one and the stellar one.
+// TestContextRefusesAirThatIsNot: NewContext refuses a Refraction that fails
+// Validate, with its ErrRefraction (#1186). Before NewContext could return an
+// error, such air built a Context whose every altitude was NaN (#903); before
+// that, it refracted through SOFA's clamp of the inputs, since Refco took a
+// NaN temperature as −150 °C and refracted 2.35 times too much.
 func TestContextRefusesAirThatIsNot(t *testing.T) {
 	t.Parallel()
 
@@ -305,22 +307,14 @@ func TestContextRefusesAirThatIsNot(t *testing.T) {
 		air := good
 		c.spoil(&air)
 
-		ctx := coord.NewContext(when, site, air)
-
-		v := vector.Vec3{X: 0.3, Y: -0.4, Z: 0.866}.MulScalar(1e10)
-		if alt := ctx.GeocentricToObserved(v).Alt(); !math.IsNaN(alt.Radians()) {
-			t.Errorf("%s: the vector path gives an altitude of %.4f°, want NaN", c.name, alt.Degrees())
-		}
-
-		aa, err := ctx.ICRSToAltAz(star)
-		if err == nil && !math.IsNaN(aa.Alt().Radians()) {
-			t.Errorf("%s: the stellar path gives an altitude of %.4f°, want NaN", c.name, aa.Alt().Degrees())
+		if ctx, err := coord.NewContext(when, site, air); !errors.Is(err, atmosphere.ErrRefraction) {
+			t.Errorf("%s: NewContext = %v, %v, want ErrRefraction", c.name, ctx, err)
 		}
 	}
 
-	// The same star through good air is a number, so the NaN above is the
-	// air's and not the geometry's.
-	aa, err := coord.NewContext(when, site, good).ICRSToAltAz(star)
+	// The same star through good air is a number, so the refusals above are
+	// the air's and not the geometry's.
+	aa, err := mustContext(t, when, site, good).ICRSToAltAz(star)
 	if err != nil || math.IsNaN(aa.Alt().Radians()) {
 		t.Fatalf("through good air: %v, %v", aa.Alt(), err)
 	}

@@ -130,7 +130,7 @@ func TestInsertPassLeavesTimeForTheNextSlew(t *testing.T) {
 		}},
 	}
 
-	inserted, err := (&SwapOptimizedStrategy{}).insertPass(sched, planner, window, model, time.Minute, plannerContexts(planner), nil)
+	inserted, err := (&SwapOptimizedStrategy{}).insertPass(sched, planner, window, model, time.Minute, plannerContexts(t, planner, window.Start), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

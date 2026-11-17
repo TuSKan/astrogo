@@ -12,11 +12,16 @@ import (
 // Two systems both called "apparent", twenty arcminutes apart. The pipeline
 // produces the CIRS one; an almanac prints the other.
 func ExampleContext_CIRSToTETE() {
-	ctx := coord.NewContext(
+	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
 		atmosphere.Refraction{},
 	)
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
 
 	// Where the pipeline leaves a target: a CIRS place.
 	cirs := ctx.AstrometricToCIRS(

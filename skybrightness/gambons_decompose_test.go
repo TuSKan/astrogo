@@ -44,7 +44,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	zenith := coord.NewAltAz(angle.Deg(89.9), angle.Deg(0))
 
 	// ── where the zenith is pointing ────────────────────────────────────────
-	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
+	cc := mustContext(t, time.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	icrs, err := cc.AltAzToICRS(zenith)

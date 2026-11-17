@@ -80,7 +80,10 @@ func TestUSNO_CelNav(t *testing.T) {
 				t.Fatalf("NewGeodetic: %v", err)
 			}
 
-			ctx := coord.NewContext(epoch, site, atmosphere.Refraction{})
+			ctx, err := coord.NewContext(epoch, site, atmosphere.Refraction{})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			var alt, az float64
 

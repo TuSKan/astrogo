@@ -108,7 +108,7 @@ func TestMoonJustBelowTheSitesHorizonLightsNothing(t *testing.T) {
 		t.Fatalf("ToICRS: %v", err)
 	}
 
-	geocentric, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()).ICRSToAltAz(icrs)
+	geocentric, err := mustContext(t, at, scene.Observer, scene.Atmosphere.Refraction()).ICRSToAltAz(icrs)
 	if err != nil {
 		t.Fatalf("ICRSToAltAz: %v", err)
 	}

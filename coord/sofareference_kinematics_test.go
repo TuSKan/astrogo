@@ -81,7 +81,11 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 		}
 
 		for _, epoch := range epochs {
-			ctx := coord.NewContext(epoch, site, atm)
+			ctx, err := coord.NewContext(epoch, site, atm)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			utc1, utc2 := epoch.UTC().JDParts()
 
 			for _, st := range stars {

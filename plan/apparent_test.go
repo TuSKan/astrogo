@@ -116,7 +116,10 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 	for step := range 365 * 4 {
 		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(step) * 0.25))
 
-		ctx := coord.NewContext(tm, loc, site.Refraction())
+		ctx, err := coord.NewContext(tm, loc, site.Refraction())
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		eval, err := IsObservable(mars, tm, site)
 		testutil.AssertNoError(t, err)

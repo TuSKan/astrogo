@@ -163,7 +163,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(-30))}
 
 	altAt := func(tm time.Time) float64 {
-		aa, err := observedAltAz(obj, tm, coord.NewContext(tm, site.Location(), site.Refraction()), obj.pos)
+		aa, err := observedAltAz(obj, tm, mustContext(t, tm, site.Location(), site.Refraction()), obj.pos)
 		if err != nil {
 			t.Fatalf("altitude at %v: %v", tm, err)
 		}

@@ -81,7 +81,10 @@ func main() {
 	for m := range 12 {
 		t := epoch.Add(unit.Days(float64(m) * 30))
 
-		ctx := coord.NewContext(t, site.Location(), atmosphere.StandardRefraction())
+		ctx, err := coord.NewContext(t, site.Location(), atmosphere.StandardRefraction())
+		if err != nil {
+			log.Fatalf("NewContext: %v", err)
+		}
 
 		baryCorr := ctx.BarycentricRVCorrection(target)
 

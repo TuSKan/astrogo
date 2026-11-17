@@ -181,13 +181,22 @@ func isObservableCtx(
 	sky *runSky,
 	constraints ...Constraint,
 ) (Evaluation, error) {
+	switch {
+	case obj == nil:
+		return Evaluation{}, ErrNilTarget
+	case site == nil:
+		return Evaluation{}, ErrNilSite
+	}
+
 	pos, err := obj.Position(t)
 	if err != nil {
 		return Evaluation{}, fmt.Errorf("plan: evaluate position: %w", err)
 	}
 
 	if ctx == nil {
-		ctx = coord.NewContext(t, site.Location(), site.Refraction())
+		if ctx, err = siteContext(t, site); err != nil {
+			return Evaluation{}, fmt.Errorf("plan: evaluate: %w", err)
+		}
 	}
 
 	altAz, err := observedAltAz(obj, t, ctx, pos)
@@ -513,7 +522,10 @@ func (m moonPlaces) at(t time.Time) (vector.Vec3, error) {
 func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 	ctx := s.Context
 	if ctx == nil {
-		ctx = coord.NewContext(t, s.Site.Location(), s.Site.Refraction())
+		var err error
+		if ctx, err = siteContext(t, s.Site); err != nil {
+			return 0, err
+		}
 	}
 
 	eval, err := isObservableCtx(obj, t, s.Site, ctx, s.sky, s.Constraints...)
@@ -613,7 +625,10 @@ func RankObservables(
 		return nil, nil
 	}
 
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return nil, err
+	}
 
 	// Each target's urgency moves a copy of ctx as far as the farthest probe.
 	// A new Context holds the series at t alone, so every copy evaluated them
@@ -681,7 +696,12 @@ func ObservableWindows(
 	site *Site,
 	constraints ...Constraint,
 ) ([]Window, error) {
-	return observableWindows(obj, start, end, step, site, movingContext(site.Location(), site.Refraction()), constraints...)
+	ctxAt, err := siteContexts(start, end, site)
+	if err != nil {
+		return nil, err
+	}
+
+	return observableWindows(obj, start, end, step, site, ctxAt, constraints...)
 }
 
 // observableWindows is ObservableWindows with the Context for each instant

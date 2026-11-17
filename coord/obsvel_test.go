@@ -42,7 +42,10 @@ func TestObsVelIsTheVelocityApcoAberratesWith(t *testing.T) {
 			time.Date(2026, time.June, 21, 15, 17, 0, 0, time.LocationUTC),
 			time.Date(2031, time.December, 1, 6, 0, 0, 0, time.LocationUTC),
 		} {
-			ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+			ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			d1, d2 := at.TT().JDParts()
 
@@ -87,7 +90,10 @@ func TestObsVelIsPerpendicularToTheAxis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := coord.NewContext(time.Date(2026, time.June, 21, 3, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
+	ctx, err := coord.NewContext(time.Date(2026, time.June, 21, 3, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	v, r := ctx.ObsVel(), ctx.ObsVec()
 

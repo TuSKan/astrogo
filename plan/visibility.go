@@ -24,7 +24,10 @@ func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (b
 		return false, fmt.Errorf("visibility: ICRS: %w", err)
 	}
 
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return false, fmt.Errorf("visibility: %w", err)
+	}
 
 	aa, err := observedAltAz(obj, t, ctx, pos)
 	if err != nil {
@@ -119,7 +122,12 @@ func VisibleIntervals(
 	step time.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
-	return visibleIntervals(obj, movingContext(site.Location(), site.Refraction()), start, end, step, minAlt)
+	ctxAt, err := siteContexts(start, end, site)
+	if err != nil {
+		return nil, err
+	}
+
+	return visibleIntervals(obj, ctxAt, start, end, step, minAlt)
 }
 
 // nextSample returns the sample after t on a scan ending at end, in steps of
@@ -235,7 +243,12 @@ func visibleIntervals(
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
 func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
-	return transitEstimate(obj, site, movingContext(site.Location(), site.Refraction()), start, end)
+	ctxAt, err := siteContexts(start, end, site)
+	if err != nil {
+		return time.Time{}, angle.Deg(0), err
+	}
+
+	return transitEstimate(obj, site, ctxAt, start, end)
 }
 
 // transitEstimate is TransitEstimate with the Context for each scan sample and
@@ -334,7 +347,12 @@ func transitEstimate(
 			return angle.Deg(0), err
 		}
 
-		aa, err := observedAltAz(obj, t, coord.NewContext(t, site.Location(), site.Refraction()), pos)
+		ctx, err := siteContext(t, site)
+		if err != nil {
+			return angle.Deg(0), err
+		}
+
+		aa, err := observedAltAz(obj, t, ctx, pos)
 		if err != nil {
 			return angle.Deg(0), err
 		}
@@ -397,7 +415,12 @@ func Find(
 	start, end time.Time,
 	step time.Duration,
 ) ([]Interval, error) {
-	return find(obj, site, movingContext(site.Location(), site.Refraction()), constraints, start, end, step)
+	ctxAt, err := siteContexts(start, end, site)
+	if err != nil {
+		return nil, err
+	}
+
+	return find(obj, site, ctxAt, constraints, start, end, step)
 }
 
 // find is Find with the Context for each instant supplied by ctxAt, for the

@@ -89,7 +89,11 @@ func TestPropagationFailureIsTypedAsSuch(t *testing.T) {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+		ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		if _, err := sat.LocateCtx(sat.ID(), ctx); !errors.Is(err, satellite.ErrPropagation) {
 			t.Errorf("LocateCtx returned %v, want one wrapping ErrPropagation", err)
 		}

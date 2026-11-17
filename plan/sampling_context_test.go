@@ -14,9 +14,11 @@ import (
 // fullContexts is the Context source the sampling functions used before #480:
 // a full coord.NewContext at every instant. Each is held to its own algorithm
 // run on these.
-func fullContexts(site *Site) func(time.Time) *coord.Context {
+func fullContexts(tb testing.TB, site *Site) func(time.Time) *coord.Context {
+	tb.Helper()
+
 	return func(t time.Time) *coord.Context {
-		return coord.NewContext(t, site.Location(), site.Refraction())
+		return mustContext(tb, t, site.Location(), site.Refraction())
 	}
 }
 
@@ -87,7 +89,7 @@ func TestVisibleIntervalsThroughTheContextCache(t *testing.T) {
 			t.Fatalf("%s: VisibleIntervals: %v", c.name, err)
 		}
 
-		want, err := visibleIntervals(c.obj, fullContexts(c.site), c.start, end, 10*time.Minute, angle.Deg(15))
+		want, err := visibleIntervals(c.obj, fullContexts(t, c.site), c.start, end, 10*time.Minute, angle.Deg(15))
 		if err != nil {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
@@ -112,7 +114,7 @@ func TestFindThroughTheContextCache(t *testing.T) {
 			t.Fatalf("%s: Find: %v", c.name, err)
 		}
 
-		want, err := find(c.obj, c.site, fullContexts(c.site), constraints, c.start, end, 10*time.Minute)
+		want, err := find(c.obj, c.site, fullContexts(t, c.site), constraints, c.start, end, 10*time.Minute)
 		if err != nil {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
@@ -136,7 +138,7 @@ func TestObservableWindowsThroughTheContextCache(t *testing.T) {
 			t.Fatalf("%s: ObservableWindows: %v", c.name, err)
 		}
 
-		want, err := observableWindows(c.observable, c.start, end, unit.Minutes(10), c.site, fullContexts(c.site), constraints...)
+		want, err := observableWindows(c.observable, c.start, end, unit.Minutes(10), c.site, fullContexts(t, c.site), constraints...)
 		if err != nil {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
@@ -169,7 +171,7 @@ func TestTransitEstimateThroughTheContextCache(t *testing.T) {
 				t.Fatalf("%s: TransitEstimate: %v", c.name, err)
 			}
 
-			wantT, wantAlt, err := transitEstimate(c.obj, c.site, fullContexts(c.site), day, day.Add(unit.Days(1)))
+			wantT, wantAlt, err := transitEstimate(c.obj, c.site, fullContexts(t, c.site), day, day.Add(unit.Days(1)))
 			if err != nil {
 				t.Fatalf("%s: reference: %v", c.name, err)
 			}

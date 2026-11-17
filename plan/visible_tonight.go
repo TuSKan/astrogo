@@ -814,7 +814,10 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		return skipped("position at peak", err)
 	}
 
-	astroCtx := coord.NewContext(peakTime, site.Location(), site.Refraction())
+	astroCtx, err := siteContext(peakTime, site)
+	if err != nil {
+		return skipped("context at peak", err)
+	}
 
 	aa, err := observedAltAz(obj, peakTime, astroCtx, pos)
 	if err != nil {

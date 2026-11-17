@@ -122,7 +122,8 @@ var ErrRefraction = errors.New("atmosphere: refraction needs a finite pressure o
 // finite, plausible, wrong number (#903). Refraction's own methods and the
 // models here now return NaN for air that fails Validate, so a bad input
 // cannot pass for a real one; a constructor that can return an error, such as
-// plan.NewSite for its horizon air or [Builder.Build], refuses it instead.
+// coord.NewContext, plan.NewSite for its horizon air or [Builder.Build],
+// refuses it instead.
 // Finite values inside these bounds but outside SOFA's domain, such as
 // −200 °C, are still clamped as SOFA documents.
 func (r Refraction) Validate() error {

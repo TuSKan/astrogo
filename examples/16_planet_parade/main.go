@@ -121,7 +121,10 @@ func main() {
 	)
 
 	// ── Part 2: Planetary Positions at Civil Dusk ──────────────────────
-	ctx := coord.NewContext(civil.Dusk, loc, atm)
+	ctx, err := coord.NewContext(civil.Dusk, loc, atm)
+	if err != nil {
+		log.Fatalf("NewContext: %v", err)
+	}
 
 	positions := show.NewTable(show.Left("Planet"), show.Right("Ecliptic λ"),
 		show.Right("Altitude"), show.Right("Azimuth"), show.Right("Airmass"))
@@ -171,7 +174,11 @@ func main() {
 	tStart := sunset.Time
 	for minutes := 0; minutes <= 75; minutes += 5 {
 		t := tStart.Add(unit.Minutes(float64(minutes)))
-		c := coord.NewContext(t, loc, atm)
+
+		c, err := coord.NewContext(t, loc, atm)
+		if err != nil {
+			log.Fatalf("NewContext: %v", err)
+		}
 
 		row := make([]string, 0, 1+len(planets))
 		row = append(row, t.In(brtz).Format("15:04"))

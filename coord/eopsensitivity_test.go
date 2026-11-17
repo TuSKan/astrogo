@@ -103,7 +103,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 
 		time.RegisterModel(dut1Override{base: base, dut1: dut1})
 
-		ha, err := coord.NewContext(epoch, site, atm).ICRSToHourAngle(star)
+		ha, err := mustContext(t, epoch, site, atm).ICRSToHourAngle(star)
 		if err != nil {
 			t.Fatalf("ICRSToHourAngle at DUT1=%v: %v", dut1, err)
 		}
@@ -178,7 +178,7 @@ func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
 			yp: angle.Arcsec(ypArcsec).Radians(),
 		})
 
-		aa, err := coord.NewContext(epoch, site, atm).ICRSToAltAz(star)
+		aa, err := mustContext(t, epoch, site, atm).ICRSToAltAz(star)
 		if err != nil {
 			t.Fatalf("ICRSToAltAz: %v", err)
 		}
@@ -302,7 +302,7 @@ func TestObserverVectorRotatesWithUT1(t *testing.T) {
 
 		time.RegisterModel(fixedEOP{dut1: dut1})
 
-		v := coord.NewContext(epoch, site, atm).ObsVec()
+		v := mustContext(t, epoch, site, atm).ObsVec()
 
 		return math.Atan2(v.Y, v.X) / math.Pi * 180 * 3600
 	}
@@ -392,7 +392,7 @@ func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
 			yp: angle.Arcsec(ypArcsec).Radians(),
 		})
 
-		return coord.NewContext(epoch, site, atm).ObsVec()
+		return mustContext(t, epoch, site, atm).ObsVec()
 	}
 
 	const (

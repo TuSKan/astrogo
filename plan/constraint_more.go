@@ -50,12 +50,20 @@ type SunSep struct {
 
 // Check evaluates Sun separation for a given target and time.
 func (c SunSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
 // CheckCtx evaluates Sun separation using a pre-built coord.Context.
 func (c SunSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+	if obj == nil {
+		return Result{}, ErrNilTarget
+	}
+
 	if p, ok := obj.(*Planet); ok && p.EphID() == eph.Sun {
 		return Result{Pass: true, Value: 180}, nil
 	}
@@ -100,7 +108,11 @@ type GalacticLatitude struct {
 
 // Check evaluates Galactic latitude for a given target and time.
 func (c GalacticLatitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -113,6 +125,10 @@ func (c GalacticLatitude) Check(obj Observable, t time.Time, site *Site) (Result
 func (c GalacticLatitude) CheckCtx(
 	obj Observable, _ time.Time, _ *Site, ctx *coord.Context,
 ) (Result, error) {
+	if obj == nil {
+		return Result{}, ErrNilTarget
+	}
+
 	pos, err := obj.Position(ctx.Time())
 	if err != nil {
 		return Result{}, fmt.Errorf("constraint: galactic latitude position: %w", err)
@@ -153,7 +169,11 @@ type TimeWindow struct {
 
 // Check evaluates the window for a given time.
 func (c TimeWindow) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -227,7 +247,11 @@ type Horizon struct {
 
 // Check evaluates the terrain horizon for a given target and time.
 func (c Horizon) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
+
 	return c.CheckCtx(obj, t, site, ctx)
 }
 
@@ -239,6 +263,10 @@ func (c Horizon) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 func (c Horizon) CheckCtx(
 	obj Observable, t time.Time, site *Site, ctx *coord.Context,
 ) (Result, error) {
+	if site == nil {
+		return Result{}, ErrNilSite
+	}
+
 	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return Result{}, err

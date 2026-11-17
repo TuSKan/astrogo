@@ -40,7 +40,11 @@ func BenchmarkLookAngle(b *testing.B) {
 	sat, site := benchISS(b)
 
 	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(when, site, defaultAtm)
+
+	ctx, err := coord.NewContext(when, site, defaultAtm)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 

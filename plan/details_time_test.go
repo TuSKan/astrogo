@@ -32,7 +32,11 @@ func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
 		{saoPaulo, "-03"},
 	} {
 		tm := time.Date(2026, time.April, 25, 20, 0, 0, 0, time.LocationUTC).In(c.zone)
-		ctx := coord.NewContext(tm, loc, atmosphere.Refraction{})
+
+		ctx, err := coord.NewContext(tm, loc, atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		d, err := star.GetDetails(ctx, DetailOverrides{})
 		testutil.AssertNoError(t, err)

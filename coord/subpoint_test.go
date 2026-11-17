@@ -65,7 +65,11 @@ func TestSubPointIsOverhead(t *testing.T) {
 			// geocenter subtends nothing: the direction is all that matters.
 			far := dir.MulScalar(1e9 / dir.Norm())
 
-			ctx := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			ctx, err := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			zd := 90*3600 - ctx.GeocentricToObserved(far).Alt().Degrees()*3600
 			worst = max(worst, zd)
 
@@ -123,7 +127,10 @@ func TestSubPointPutsANearBodyAtTheZenith(t *testing.T) {
 				t.Fatalf("%s: SubPoint: %v", c.name, err)
 			}
 
-			ctx := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			ctx, err := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if zd := 90*3600 - ctx.GeocentricToObserved(pos).Alt().Degrees()*3600; zd > tolArcsec {
 				t.Errorf("%s in direction %v: seen from the sub-point (lat %.6f°, lon %.6f°) it is "+
@@ -161,7 +168,10 @@ func TestSubPoint_PoleIsLongitudeIndependent(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site, atmosphere.Refraction{Pressure: 0})
+	ctx, err := coord.NewContext(tm, site, atmosphere.Refraction{Pressure: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, tc := range []struct {
 		name    string

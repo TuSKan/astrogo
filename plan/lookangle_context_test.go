@@ -40,7 +40,9 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 
 	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
 		at := base.Add(dt)
-		derived := coord.NewContext(base, site, defaultAtm)
+
+		derived := mustContext(t, base, site, defaultAtm)
+
 		derived.SetTime(at)
 
 		st, err := sat.LocateCtx(sat.ID(), derived)
@@ -99,7 +101,9 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 
 	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
 		at := base.Add(dt)
-		derived := coord.NewContext(base, site, defaultAtm)
+
+		derived := mustContext(t, base, site, defaultAtm)
+
 		derived.SetTime(at)
 
 		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
@@ -112,7 +116,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		// The probe works only while the moved answer differs from a fresh
 		// one; a SetTime that rebuilt inside the hour would leave it unable to
 		// fail.
-		fresh := coord.NewContext(at, site, defaultAtm).GeocentricToObserved(st.Pos)
+		fresh := mustContext(t, at, site, defaultAtm).GeocentricToObserved(st.Pos)
 		if fresh.Alt() == want.Alt() && fresh.Az() == want.Az() {
 			t.Fatalf("dt=%v: the moved Context answers exactly as a fresh one, so this probe cannot tell them apart", dt)
 		}
@@ -170,14 +174,20 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 
 	for _, hour := range []int{0, 3, 9, 15, 21} {
 		at := time.Date(2026, time.April, 20, hour, 0, 0, 0, time.LocationUTC)
-		ctx := coord.NewContext(at, site, defaultAtm)
+
+		ctx := mustContext(t, at, site, defaultAtm)
 
 		st, err := eph.At(sat, at).Geometric(sat.ID(), eph.Earth)
 		if err != nil {
 			t.Fatalf("Geometric: %v", err)
 		}
 
-		reduction := coord.NewReducer(site, at, defaultAtm).Reduce(st.Pos)
+		reducer, err := coord.NewReducer(site, at, defaultAtm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		reduction := reducer.Reduce(st.Pos)
 		reduction.Observed.SetDist(unit.Km(reduction.Topocentric.Norm() * kmPerAU))
 
 		got, err := LookAngle(stateOnly{sat}, sat.ID(), ctx)

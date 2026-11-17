@@ -55,7 +55,11 @@ func TestTEMEToGCRSIsTheEquinoxRoute(t *testing.T) {
 
 	for _, jd := range []float64{2447892.5, 2461000.0, 2470000.25} { // 1990, 2025, 2050
 		at := time.FromJD(jd, time.UTC)
-		ctx := coord.NewContext(at, site, atm)
+
+		ctx, err := coord.NewContext(at, site, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		for _, v := range temeVectors {
 			if d := turnedBy(ctx.TEMEToGCRS(v), equinoxRoute(at, v)); d > tol {
@@ -81,11 +85,18 @@ func TestTEMEToGCRSIsTheEquinoxRoute(t *testing.T) {
 func TestTEMELookAngleIgnoresTheContextWindow(t *testing.T) {
 	site, atm, base, _ := setTimeFixture(t)
 
-	moved := coord.NewContext(base, site, atm)
+	moved, err := coord.NewContext(base, site, atm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	at := base.Add(unit.Hours(12)) // mid-bracket
 	moved.SetTime(at)
 
-	fresh := coord.NewContext(at, site, atm)
+	fresh, err := coord.NewContext(at, site, atm)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	const kmPerAU = 149597870.7
 

@@ -77,8 +77,12 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		ctx := coord.NewContext(epoch, site, atm)
-		reducer := coord.NewReducer(site, epoch, atm)
+		ctx, err := coord.NewContext(epoch, site, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		reducer := mustReducer(t, site, epoch, atm)
 		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height().Meters())
 
 		var worst float64
@@ -170,8 +174,13 @@ func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 	}
 
 	epoch := diurnalEpoch
-	ctx := coord.NewContext(epoch, site, atm)
-	red := coord.NewReducer(site, epoch, atm).Reduce(vector.V3(0.5, 0.3, 0.1))
+
+	ctx, err := coord.NewContext(epoch, site, atm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	red := mustReducer(t, site, epoch, atm).Reduce(vector.V3(0.5, 0.3, 0.1))
 
 	want := vector.V3(0.5, 0.3, 0.1).Sub(ctx.ObsVec())
 

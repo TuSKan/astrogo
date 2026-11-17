@@ -94,7 +94,11 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 			// rather than one lucky geometry.
 			for hour := range 24 {
 				when := time.Date(2026, time.March, 20, hour, 0, 0, 0, time.LocationUTC)
-				ctx := coord.NewContext(when, site.Location(), site.Refraction())
+
+				ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				eval, err := plan.IsObservable(b.obj, when, site, plan.Altitude{Threshold: angle.Deg(0)})
 				if err != nil {
@@ -155,7 +159,10 @@ func TestMoonParallaxIsActuallyApplied(t *testing.T) {
 		// altitudes that differ by the parallax itself. Keeping the
 		// atmosphere out removes even that, so a future refraction change
 		// cannot move this test.
-		ctx := coord.NewContext(when, site.Location(), atmosphere.Refraction{})
+		ctx, err := coord.NewContext(when, site.Location(), atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		pos, err := moon.Position(when)
 		if err != nil {

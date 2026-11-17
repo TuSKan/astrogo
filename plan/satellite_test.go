@@ -77,7 +77,10 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
+	ctx, err := coord.NewContext(tm, site.Location(), site.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	d, err := sat.GetDetails(ctx, DetailOverrides{})
 	if err != nil {
@@ -106,7 +109,10 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}
 
-	ctx := coord.NewContext(tm, site.Location(), site.Refraction())
+	ctx, err := coord.NewContext(tm, site.Location(), site.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	m, err := sat.ApparentMagnitudeCtx(tm, ctx)
 	if err != nil {
@@ -130,7 +136,11 @@ func TestLookAngle_ISS(t *testing.T) {
 	}
 
 	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, loc, defaultAtm)
+
+	ctx, err := coord.NewContext(tm, loc, defaultAtm)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	altaz, err := LookAngle(prov, prov.ID(), ctx)
 	if err != nil {

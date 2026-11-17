@@ -220,7 +220,11 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 			t.Fatalf("%s: parsing %q: %v", tc.Name, tc.EpochUTC, err)
 		}
 
-		ctx := coord.NewContext(time.FromGo(parsed), site, atm)
+		ctx, err := coord.NewContext(time.FromGo(parsed), site, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		target := coord.NewICRS(angle.Deg(tc.Target.RA), angle.Deg(tc.Target.Dec))
 
 		gotHelio, err := ctx.HeliocentricRVCorrection(target)

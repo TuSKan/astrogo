@@ -12,15 +12,19 @@ import (
 )
 
 // plannerContexts is the Context source a strategy builds for one Schedule.
-func plannerContexts(planner *Planner) func(time.Time) *coord.Context {
-	return movingContext(planner.Site.Location(), planner.Site.Refraction())
+func plannerContexts(tb testing.TB, planner *Planner, start time.Time) func(time.Time) *coord.Context {
+	tb.Helper()
+
+	return mustMoving(tb, start, planner.Site.Location(), planner.Site.Refraction())
 }
 
 // everyInstantContexts is the Context source the scheduler used before #481:
 // a full coord.NewContext at every instant.
-func everyInstantContexts(planner *Planner) func(time.Time) *coord.Context {
+func everyInstantContexts(tb testing.TB, planner *Planner) func(time.Time) *coord.Context {
+	tb.Helper()
+
 	return func(t time.Time) *coord.Context {
-		return coord.NewContext(t, planner.Site.Location(), planner.Site.Refraction())
+		return mustContext(tb, t, planner.Site.Location(), planner.Site.Refraction())
 	}
 }
 
@@ -89,12 +93,12 @@ func TestScheduleThroughTheContextCache(t *testing.T) {
 			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window, blocks, transition, ctxAt, nil)
 		}},
 	} {
-		got, err := run.schedule(plannerContexts(planner))
+		got, err := run.schedule(plannerContexts(t, planner, window.Start))
 		if err != nil {
 			t.Fatalf("%s: %v", run.name, err)
 		}
 
-		want, err := run.schedule(everyInstantContexts(planner))
+		want, err := run.schedule(everyInstantContexts(t, planner))
 		if err != nil {
 			t.Fatalf("%s: reference: %v", run.name, err)
 		}
@@ -195,7 +199,7 @@ func TestHoursUntilSetProbesMoveACopy(t *testing.T) {
 				t.Fatalf("reference probe: Position: %v", err)
 			}
 
-			aa, err := observedAltAz(obj, ft, everyInstantContexts(planner)(ft), pos)
+			aa, err := observedAltAz(obj, ft, everyInstantContexts(t, planner)(ft), pos)
 			if err != nil {
 				t.Fatalf("reference probe: observedAltAz: %v", err)
 			}
@@ -215,7 +219,7 @@ func TestHoursUntilSetProbesMoveACopy(t *testing.T) {
 
 	for _, b := range blocks {
 		for at := window.Start; at.Before(window.End); at = at.Add(unit.Hours(1.5)) {
-			ctx := coord.NewContext(at, planner.Site.Location(), planner.Site.Refraction())
+			ctx := mustContext(t, at, planner.Site.Location(), planner.Site.Refraction())
 
 			pos, err := b.Target.Position(at)
 			if err != nil {

@@ -252,6 +252,9 @@ func (c ICRS) Astrometric() Astrometric {
 	}
 }
 
+// finite reports whether x is neither NaN nor infinite.
+func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
+
 // Alt returns the altitude of the AltAz coordinate.
 func (c AltAz) Alt() angle.Angle { return c.alt }
 
@@ -607,6 +610,13 @@ func (c ObserversLocation) Equal(other ObserversLocation) bool {
 
 func (c Astrometric) String() string {
 	return fmt.Sprintf("Astrometric RA=%s Dec=%s", c.ra.Wrap360().HMSString(2), c.dec.DMSString(2))
+}
+
+// finite reports whether every component c hands SOFA is finite.
+func (c Astrometric) finite() bool {
+	return finite(c.ra.Radians()) && finite(c.dec.Radians()) &&
+		finite(c.pmRA.Radians()) && finite(c.pmDec.Radians()) &&
+		finite(c.parallax.Radians()) && finite(c.rv.MetersPerSec())
 }
 
 func (c CIRS) String() string {

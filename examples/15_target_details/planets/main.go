@@ -43,7 +43,11 @@ func main() {
 	}
 
 	t := time.Date(2026, 4, 25, 17, 0, 0, 0, tz) // 20:00 UTC
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+
+	ctx, err := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+	if err != nil {
+		log.Fatalf("NewContext: %v", err)
+	}
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {

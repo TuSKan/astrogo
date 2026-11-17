@@ -64,7 +64,7 @@ func TestDetailsRiseAndSetAreTheEventAPIs(t *testing.T) {
 		}
 
 		for at := start; at.Before(end); at = at.Add(unit.Minutes(247)) {
-			d, err := c.target.GetDetails(coord.NewContext(at, loc, atmosphere.Refraction{}), plan.DetailOverrides{})
+			d, err := c.target.GetDetails(mustContext(t, at, loc, atmosphere.Refraction{}), plan.DetailOverrides{})
 			if err != nil {
 				t.Fatalf("%s at %v: GetDetails: %v", c.name, at, err)
 			}

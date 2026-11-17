@@ -22,7 +22,10 @@ func TestSatelliteDetailsDistanceIsTheRange(t *testing.T) {
 		time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC),
 		time.Date(2026, time.April, 17, 6, 0, 0, 0, time.LocationUTC),
 	} {
-		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+		ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		d, err := sat.GetDetails(ctx, DetailOverrides{})
 		if err != nil {

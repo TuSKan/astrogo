@@ -144,7 +144,11 @@ func BenchmarkRankObservables(b *testing.B) {
 func BenchmarkScorerScore(b *testing.B) {
 	site := benchSite(b)
 	t := benchEpoch()
-	shared := coord.NewContext(t, site.Location(), site.Refraction())
+
+	shared, err := coord.NewContext(t, site.Location(), site.Refraction())
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	prov := eph.Default()
 	targets := []struct {

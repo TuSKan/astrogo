@@ -50,7 +50,10 @@ func TestHoursUntilSetInterpolatesBetweenProbes(t *testing.T) {
 	for _, after := range []float64{0.25, 0.5, 1, 2, 3, 5} {
 		tm := w.Start.Add(unit.Hours(after))
 
-		ctx := coord.NewContext(tm, site.Location(), site.Refraction())
+		ctx, err := coord.NewContext(tm, site.Location(), site.Refraction())
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		pos, err := star.Position(tm)
 		if err != nil {

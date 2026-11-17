@@ -738,7 +738,10 @@ Built-in constraints (`Altitude`, `Airmass`) implement `ConstraintCtx` automatic
 
 **For batch transforms outside the scheduler**, create one `Context` per epoch and reuse it:
 ```go
-ctx := coord.NewContext(epoch, site.Location(), site.Refraction())
+ctx, err := coord.NewContext(epoch, site.Location(), site.Refraction())
+if err != nil {
+    log.Fatal(err) // a nil site, a time that is not finite, or air that is not air
+}
 for _, star := range targets {
     altaz, err := ctx.ICRSToAltAz(star.ICRS) // ~325 ns, not ~91 µs
     if err != nil {

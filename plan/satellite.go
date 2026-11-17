@@ -353,7 +353,10 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 	// The satellite is asked for by its own NAIF code. It used to be asked
 	// for as 0, which a satellite provider answered and which is the Solar
 	// System barycenter's code now that an ID is a NAIF code (#809).
-	ctxAt := movingContext(observer, defaultAtm)
+	ctxAt, err := movingContext(start, observer, defaultAtm)
+	if err != nil {
+		return nil, err
+	}
 
 	lookAt := func(t time.Time) (coord.AltAz, error) {
 		return LookAngle(prov, id, ctxAt(t))
@@ -415,7 +418,7 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 	// between two samples that are both below it. Until #897 it was not
 	// found at all, or was, depending on where the window started. Its peak
 	// now joins the samples.
-	times, vals, err := withSteppedOverPeaks(times, vals, evalEl, func(from, to time.Time) (time.Time, error) {
+	times, vals, err = withSteppedOverPeaks(times, vals, evalEl, func(from, to time.Time) (time.Time, error) {
 		return peakTime(prov, id, ctxAt, from, to)
 	})
 	if err != nil {
@@ -530,7 +533,10 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 		return PassEvent{}, err
 	}
 
-	ctx := coord.NewContext(bestTime, observer, defaultAtm)
+	ctx, err := coord.NewContext(bestTime, observer, defaultAtm)
+	if err != nil {
+		return PassEvent{}, fmt.Errorf("plan: culmination: %w", err)
+	}
 
 	altaz, err := LookAngle(prov, id, ctx)
 	if err != nil {

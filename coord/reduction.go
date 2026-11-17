@@ -2,7 +2,6 @@ package coord
 
 import (
 	"math"
-	"sync"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -71,35 +70,31 @@ type Reduction struct {
 // Reducer defines the explicit apparent-place reduction pipeline, converting
 // geocentric positions to topocentric observed geometries.
 //
-// The first call to Reduce lazily builds and caches a [Context], so subsequent
-// calls for the same (site, time, atmosphere) avoid rebuilding the SOFA C2t06a
-// matrix and IERS EOP lookup (~91 µs each). This makes Reducer suitable for
-// batch reduction of many targets at the same epoch.
+// It holds one [Context], so every call for its (site, time, atmosphere)
+// shares the SOFA C2t06a matrix and IERS EOP lookup (~91 µs each). This makes
+// Reducer suitable for batch reduction of many targets at the same epoch.
 type Reducer struct {
 	atmos atmosphere.Refraction
-	time  time.Time
-	site  *Geodetic
 	ctx   *Context
-	once  sync.Once
 }
 
-// NewReducer creates a new apparent-place reduction pipeline.
-func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Refraction) *Reducer {
-	return &Reducer{
-		site:  site,
-		time:  t,
-		atmos: atmos,
+// NewReducer creates a new apparent-place reduction pipeline, building its
+// [Context]: what [NewContext] refuses, it refuses. It used to build the
+// Context on the first Reduce, which had no error to return (#1186).
+func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Refraction) (*Reducer, error) {
+	ctx, err := NewContext(t, site, atmos)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Reducer{atmos: atmos, ctx: ctx}, nil
 }
 
 // Reduce translates a geocentric inertial vector into topocentric coordinates,
 // explicitly modeling Earth orientation, topological observer displacement,
 // and applying the environmental refraction model.
-//
-// The expensive SOFA matrix computation is performed lazily on the first call
-// and cached for all subsequent calls via the underlying Context.
 func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
-	ctx := r.context()
+	ctx := r.ctx
 
 	// Topocentric vector in ICRS frame (for the Reduction struct).
 	topoVec := v.Sub(ctx.obsVec)
@@ -174,13 +169,4 @@ func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 	}
 
 	return res
-}
-
-// context returns the lazily-initialized Context, building it on first access.
-func (r *Reducer) context() *Context {
-	r.once.Do(func() {
-		r.ctx = NewContext(r.time, r.site, r.atmos)
-	})
-
-	return r.ctx
 }

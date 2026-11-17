@@ -99,7 +99,10 @@ func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (Cresc
 
 	sunset := sunEvent.Time
 
-	ctx := coord.NewContext(sunset, site.Location(), atmosphere.Refraction{})
+	ctx, err := coord.NewContext(sunset, site.Location(), atmosphere.Refraction{})
+	if err != nil {
+		return CrescentResult{}, fmt.Errorf("plan: crescent: %w", err)
+	}
 
 	geometric, err := geometricSunset(ctx, sunset, site, prov)
 	if err != nil {

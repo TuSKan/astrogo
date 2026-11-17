@@ -99,7 +99,10 @@ var _ ConstraintCtx = LimitingMagnitudeConstraint{}
 
 // Check evaluates the constraint, building a coord.Context for (t, site).
 func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Site) (Result, error) {
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return Result{}, err
+	}
 
 	return c.CheckCtx(obj, t, site, ctx)
 }
@@ -108,6 +111,10 @@ func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Si
 func (c LimitingMagnitudeConstraint) CheckCtx(
 	obj Observable, _ time.Time, _ *Site, ctx *coord.Context,
 ) (Result, error) {
+	if obj == nil {
+		return Result{}, ErrNilTarget
+	}
+
 	limMag, required, err := c.evaluate(obj, ctx)
 	if err != nil {
 		return Result{}, err

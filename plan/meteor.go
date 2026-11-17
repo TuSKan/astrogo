@@ -404,7 +404,10 @@ func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, l
 		return 0, fmt.Errorf("meteor: observed rate: %w", err)
 	}
 
-	ctx := coord.NewContext(t, site.Location(), site.Refraction())
+	ctx, err := siteContext(t, site)
+	if err != nil {
+		return 0, fmt.Errorf("meteor: observed rate: %w", err)
+	}
 
 	aa, err := ctx.ICRSToAltAz(coord.NewICRS(ra, dec))
 	if err != nil {
