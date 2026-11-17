@@ -301,12 +301,28 @@ type SatellitePass struct {
 	SetCutOff bool
 }
 
-// PassEvent captures a time + topocentric coordinates for pass events.
+// PassEvent captures a time + topocentric coordinates for pass events, and
+// the light the satellite is in.
+//
+// Seen by eye, a satellite is a point of reflected sunlight against a dark
+// sky: it is visible where Sunlit is true while the Sun is below the
+// horizon, best past civil twilight, SunAltitude below −6°. A pass can be
+// visible at one event and not another, entering Earth's shadow before it
+// sets (#1195).
 type PassEvent struct {
 	Time      time.Time
 	Azimuth   angle.Angle
 	Elevation angle.Angle
 	Range     unit.Length
+
+	// Sunlit reports whether the satellite is in sunlight at Time, by
+	// Skyfield's is_sunlit definition: the Sun's center, a spherical Earth of
+	// the WGS 84 equatorial radius, no penumbra.
+	Sunlit bool
+
+	// SunAltitude is the Sun's geometric altitude at the site at Time, its
+	// center with no refraction.
+	SunAltitude angle.Angle
 }
 
 // SatellitePasses computes all passes of a satellite over an observer site
@@ -379,11 +395,18 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 			return PassEvent{}, err
 		}
 
+		sunlit, sunAlt, err := sunlight(prov, id, t, ctxAt(t))
+		if err != nil {
+			return PassEvent{}, err
+		}
+
 		return PassEvent{
-			Time:      t,
-			Azimuth:   altaz.Az(),
-			Elevation: altaz.Alt(),
-			Range:     altaz.Dist(),
+			Time:        t,
+			Azimuth:     altaz.Az(),
+			Elevation:   altaz.Alt(),
+			Range:       altaz.Dist(),
+			Sunlit:      sunlit,
+			SunAltitude: sunAlt,
 		}, nil
 	}
 
@@ -543,12 +566,38 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 		return PassEvent{}, err
 	}
 
+	sunlit, sunAlt, err := sunlight(prov, id, bestTime, ctx)
+	if err != nil {
+		return PassEvent{}, err
+	}
+
 	return PassEvent{
-		Time:      bestTime,
-		Azimuth:   altaz.Az(),
-		Elevation: altaz.Alt(),
-		Range:     altaz.Dist(),
+		Time:        bestTime,
+		Azimuth:     altaz.Az(),
+		Elevation:   altaz.Alt(),
+		Range:       altaz.Dist(),
+		Sunlit:      sunlit,
+		SunAltitude: sunAlt,
 	}, nil
+}
+
+// sunlight returns whether the satellite id is in sunlight at t, by
+// satelliteEclipsed, and the Sun's geometric altitude from ctx's site, which
+// ctx must be at t. The Sun comes from the analytic SOFA provider rather than
+// prov, for the reason ApparentMagnitudeCtx gives: a satellite provider
+// tracks one body and answers every ID with it.
+func sunlight(prov eph.Provider, id eph.ID, t time.Time, ctx *coord.Context) (sunlit bool, sunAlt angle.Angle, err error) {
+	sunSt, err := eph.At(eph.Default(), t).Geometric(eph.Sun, eph.Earth)
+	if err != nil {
+		return false, 0, fmt.Errorf("satellite pass: sun state: %w", err)
+	}
+
+	satSt, err := eph.At(prov, t).Geometric(id, eph.Earth)
+	if err != nil {
+		return false, 0, fmt.Errorf("satellite pass: satellite state: %w", err)
+	}
+
+	return !satelliteEclipsed(satSt.Pos, sunSt.Pos), ctx.GeocentricToObserved(sunSt.Pos).Alt(), nil
 }
 
 // peakTime is the instant of highest elevation between start and end, by
