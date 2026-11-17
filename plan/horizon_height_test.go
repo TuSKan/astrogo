@@ -135,4 +135,15 @@ func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 	if got := site.HorizonDip().Degrees() * 60; math.Abs(got-1.76*math.Sqrt(4145)) > 1e-9 {
 		t.Errorf("dip from 4145 m above the sea = %.4f′, want 1.76′·√4145", got)
 	}
+
+	// Two sites that differ only in the height above their horizon rise and
+	// set things at different times, so they are not equal.
+	level, err := plan.NewSite("Mauna Kea over the sea", loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if site.Equal(level) {
+		t.Error("a site with a height above its horizon equals one without")
+	}
 }
