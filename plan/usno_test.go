@@ -1289,13 +1289,16 @@ func TestUSNO_PolarMoon(t *testing.T) {
 func TestUSNO_AltitudeShift(t *testing.T) {
 	eph := newEph(t)
 
-	// Same geodetic position (Everest coordinates) at sea level vs summit
+	// Same geodetic position (Everest coordinates) at sea level vs summit.
+	// The summit looks down on a horizon 8849 m below and says so, which is
+	// what dips it: a height alone dips nothing (#1185).
 	altCases := []struct {
 		name   string
 		height float64
+		opts   []plan.SiteOption
 	}{
-		{"SeaLevel", 0},
-		{"EverestSummit", 8849},
+		{"SeaLevel", 0, nil},
+		{"EverestSummit", 8849, []plan.SiteOption{plan.WithHorizonHeight(unit.Meters(8849))}},
 	}
 
 	var (
@@ -1312,7 +1315,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 			tz, _ := time.LoadLocation("Asia/Kathmandu")
 
-			site, err := plan.NewSite(ac.name, geodetic, plan.WithTimeZone(tz))
+			site, err := plan.NewSite(ac.name, geodetic, append([]plan.SiteOption{plan.WithTimeZone(tz)}, ac.opts...)...)
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
 			}
