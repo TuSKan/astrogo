@@ -128,6 +128,12 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 go get github.com/TuSKan/astrogo
 ```
 
+astrogo needs Go 1.27 or later. `remote` decodes the services' JSON with
+`encoding/json/v2`, which Go 1.27 made a standard package; in Go 1.26 it needed
+`GOEXPERIMENT=jsonv2`. No dependency needs more than Go 1.26, so that package is
+what sets the floor, and CI tests Go 1.27 because it is the oldest release that
+builds astrogo.
+
 ## Examples
 
 Every one is a runnable `main` package. `go -C examples run ./<name>` — the Network

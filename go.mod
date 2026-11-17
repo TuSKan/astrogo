@@ -1,5 +1,7 @@
 module github.com/TuSKan/astrogo
 
+// Go 1.27 is the floor: remote/api uses encoding/json/v2, standard from 1.27.
+// No dependency needs more than 1.26 (#1198).
 go 1.27
 
 require (
