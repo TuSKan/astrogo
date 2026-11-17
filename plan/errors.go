@@ -12,6 +12,10 @@ import (
 var (
 	// ErrInvalidHorizon is returned when the horizon is outside the valid range.
 	ErrInvalidHorizon = errors.New("horizon must be between -90 and 90 degrees")
+
+	// ErrInvalidHorizonHeight is returned for a height above the horizon
+	// ([WithHorizonHeight]) that is negative or not a finite length.
+	ErrInvalidHorizonHeight = errors.New("plan: height above the horizon must be a finite, non-negative length")
 	// ErrNilLocation is returned when the geodetic location is nil.
 	ErrNilLocation = errors.New("geodetic location must not be nil")
 
