@@ -75,14 +75,17 @@ func TestNetworkExamplesRun(t *testing.T) {
 					continue
 				}
 
-				if derr := degraded(t, name); derr != nil {
-					unverified = append(unverified, pkg)
-					t.Logf("%s failed, not verified: %v (%v)\n%s", pkg, derr, err, out)
+				derr := degraded(t, name)
+				if derr == nil {
+					t.Errorf("%s failed: %v\n%s", pkg, err, out)
 
 					continue
 				}
 
-				t.Errorf("%s failed: %v\n%s", pkg, err, out)
+				// A service it uses rejected a request that cannot be wrong, so
+				// this failure is not evidence against the example.
+				unverified = append(unverified, pkg)
+				t.Logf("%s failed, not verified: %v (%v)\n%s", pkg, derr, err, out)
 			}
 
 			if len(unverified) > 0 && !t.Failed() {
