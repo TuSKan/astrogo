@@ -21,6 +21,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
@@ -56,7 +57,10 @@ func main() {
 	// the IERS bulletin, which the remote/eop import above fetches.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
-	fmt.Println("Fetching reference data (first run downloads ~145 MB)...")
+	show.Title("Does the model matter? Does the air?",
+		"Cerro Paranal, one night, changing one thing at a time")
+	fmt.Println()
+	show.Note("Fetching reference data (the first run downloads about 145 MB)...")
 
 	comparePresets(ctx, when)
 	compareAir(ctx, when)
@@ -72,9 +76,11 @@ func comparePresets(ctx context.Context, when time.GoTime) {
 	site := siteAt(heightM)
 	air := atmosphere.RuralAerosol(site.Height(), atmosphere.CleanMountainAOD550)
 
-	fmt.Printf("\nOne site, one night, three models of the same natural sky\n")
-	fmt.Printf("Cerro Paranal, %s UTC, clean mountain air\n\n", when.Format("2006-01-02 15:04"))
-	fmt.Printf("  %-14s %12s %14s\n", "preset", "zenith", "10° altitude")
+	show.Section("Three models of the same natural sky")
+	show.Note(when.Format("2006-01-02 15:04") + " UTC, clean mountain air")
+	fmt.Println()
+
+	tab := show.NewTable(show.Left("Preset"), show.Right("Zenith"), show.Right("10° altitude"))
 
 	presets := []skybrightness.Preset{
 		skybrightness.GAMBONSWeb,
@@ -101,30 +107,34 @@ func comparePresets(ctx context.Context, when time.GoTime) {
 		zenith := brightness(ctx, sky, scene, 90)
 		zeniths = append(zeniths, zenith)
 
-		fmt.Printf("  %-14s %8.3f mag %10.3f mag\n", p, zenith, brightness(ctx, sky, scene, 10))
+		tab.Row(string(p), fmt.Sprintf("%.3f mag", zenith), fmt.Sprintf("%.3f mag", brightness(ctx, sky, scene, 10)))
 	}
 
-	fmt.Printf(`
-They agree to %.3f mag at the zenith, and the way they disagree is the finding.
-
-Masana et al. (2024) say the effective-depth transfer behind their web service
-cannot exactly reproduce the Eq. 11 integral, and that it runs bright near the
-horizon and dark at the zenith by under a tenth of a magnitude for most cases.
-Both halves of that are in the table: gambons-web is the fainter of the two at
-the zenith and the brighter of the two at 10 degrees, so the sign of the gap
-flips between the columns, and neither gap reaches a twentieth of a magnitude.
-
-So anyone quoting a sky brightness to a tenth of a magnitude may take whichever
-is cheapest — and gambons-web is about a thousand times cheaper per direction
-than gambons-full, which runs the hemispheric integral for every direction
-asked of it. natural-sky is those same components again at Duriscoe's kappa
-rather than the web service's, and comes out faintest throughout because the
-higher kappa attenuates the diffuse terms harder.
-
-Observatory is absent on purpose. It adds moonlight and artificial skyglow, so
-it would be a different sky rather than a different transfer, and it needs a
-ground-emitter inventory this example does not build.
-`, spread(zeniths))
+	tab.Print()
+	fmt.Println()
+	show.Note(fmt.Sprintf("They agree to %.3f mag at the zenith, and the way they disagree", spread(zeniths)),
+		"is the finding.")
+	fmt.Println()
+	show.Note("Masana et al. (2024) say the effective-depth transfer behind their",
+		"web service cannot exactly reproduce the Eq. 11 integral, and that it",
+		"runs bright near the horizon and dark at the zenith by under a tenth",
+		"of a magnitude for most cases. Both halves of that are in the table:",
+		"gambons-web is the fainter of the two at the zenith and the brighter",
+		"of the two at 10 degrees, so the sign of the gap flips between the",
+		"columns, and neither gap reaches a twentieth of a magnitude.")
+	fmt.Println()
+	show.Note("So anyone quoting a sky brightness to a tenth of a magnitude may",
+		"take whichever is cheapest — and gambons-web is about a thousand times",
+		"cheaper per direction than gambons-full, which runs the hemispheric",
+		"integral for every direction asked of it. natural-sky is those same",
+		"components again at Duriscoe's kappa rather than the web service's,",
+		"and comes out faintest throughout because the higher kappa attenuates",
+		"the diffuse terms harder.")
+	fmt.Println()
+	show.Note("Observatory is absent on purpose. It adds moonlight and artificial",
+		"skyglow, so it would be a different sky rather than a different",
+		"transfer, and it needs a ground-emitter inventory this example does",
+		"not build.")
 }
 
 // compareAir runs one model over three atmospheres.
@@ -140,10 +150,12 @@ func compareAir(ctx context.Context, when time.GoTime) {
 		log.Fatalf("open: %v", err)
 	}
 
-	fmt.Printf("\nOne model, one night, three atmospheres\n")
-	fmt.Printf("The same coordinates each time, so only the air differs\n\n")
-	fmt.Printf("  %-22s %6s %7s %10s %13s\n",
-		"air", "height", "AOD550", "zenith", "10° altitude")
+	show.Section("One model, three atmospheres")
+	show.Note("The same coordinates each time, so only the air differs.")
+	fmt.Println()
+
+	tab := show.NewTable(show.Left("Air"), show.Right("Height"), show.Right("AOD550"),
+		show.Right("Zenith"), show.Right("10° altitude"))
 
 	for _, row := range []struct {
 		name    string
@@ -162,32 +174,34 @@ func compareAir(ctx context.Context, when time.GoTime) {
 			log.Fatalf("scene for %s: %v", row.name, err)
 		}
 
-		fmt.Printf("  %-22s %5.0fm %7.2f %6.3f mag %9.3f mag\n",
-			row.name, row.heightM, row.aod550,
-			brightness(ctx, sky, scene, 90), brightness(ctx, sky, scene, 10))
+		tab.Row(row.name, fmt.Sprintf("%.0f m", row.heightM), fmt.Sprintf("%.2f", row.aod550),
+			fmt.Sprintf("%.3f mag", brightness(ctx, sky, scene, 90)),
+			fmt.Sprintf("%.3f mag", brightness(ctx, sky, scene, 10)))
 	}
 
-	fmt.Print(`
-That ordering runs backwards, and it is not a bug.
-
-None of the natural presets models artificial light at all — GAMBONS describes
-a moonless night with no lamps in it. So the only thing more air and more
-aerosol can do here is extinguish starlight and zodiacal light faster than the
-diffuse term scatters them back, and the hazy sea-level sky comes out the
-darker of the three.
-
-That is correct physics and a trap. Read as advice about where to put a
-telescope it says the opposite of the truth. Getting the number a city dweller
-would recognize needs the Observatory preset over a real ground-emitter
-inventory, and that inventory is the one input satellite radiance alone cannot
-supply: the same VIIRS pixel is produced by many different real installations,
-differing in spectrum and in how much light they throw sideways rather than up.
-
-There is a third way the answer moves with the site, held fixed here on
-purpose. Different coordinates put a different part of the sky overhead, and
-starlight and zodiacal light follow it. See examples/18_sky_brightness, which
-sweeps altitude at one site and shows the same effect along one azimuth.
-`)
+	tab.Print()
+	fmt.Println()
+	show.Note("That ordering runs backwards, and it is not a bug.")
+	fmt.Println()
+	show.Note("None of the natural presets models artificial light at all —",
+		"GAMBONS describes a moonless night with no lamps in it. So the only",
+		"thing more air and more aerosol can do here is extinguish starlight",
+		"and zodiacal light faster than the diffuse term scatters them back,",
+		"and the hazy sea-level sky comes out the darker of the three.")
+	fmt.Println()
+	show.Note("That is correct physics and a trap. Read as advice about where to",
+		"put a telescope it says the opposite of the truth. Getting the number",
+		"a city dweller would recognize needs the Observatory preset over a",
+		"real ground-emitter inventory, and that inventory is the one input",
+		"satellite radiance alone cannot supply: the same VIIRS pixel is",
+		"produced by many different real installations, differing in spectrum",
+		"and in how much light they throw sideways rather than up.")
+	fmt.Println()
+	show.Note("There is a third way the answer moves with the site, held fixed",
+		"here on purpose. Different coordinates put a different part of the",
+		"sky overhead, and starlight and zodiacal light follow it. See",
+		"examples/18_sky_brightness, which sweeps altitude at one site and",
+		"shows the same effect along one azimuth.")
 }
 
 // whatObservatoryAdds decomposes one sky under this module's own model.
@@ -235,14 +249,16 @@ func whatObservatoryAdds(ctx context.Context) {
 		log.Fatalf("surface brightness: %v", err)
 	}
 
-	fmt.Printf("\nWhat this module's own model adds\n")
-	fmt.Printf("The zenith at Cerro Paranal, %s UTC, Moon high and near full\n\n",
-		when.Format("2006-01-02 15:04"))
+	show.Section("What this module's own model adds")
+	show.Note(fmt.Sprintf("The zenith, %s UTC, the Moon high and near full", when.Format("2006-01-02 15:04")))
+	fmt.Println()
+
+	tab := show.NewTable(show.Left("Component"), show.Right("Brightness"), show.Right("Share"))
 
 	var moonShare, artificialShare float64
 
 	for _, r := range rows {
-		fmt.Printf("  %-20s %6.2f mag %6.2f%%\n", r.Component, r.Brightness, 100*r.Fraction)
+		tab.Row(string(r.Component), fmt.Sprintf("%.2f mag", r.Brightness), fmt.Sprintf("%.2f%%", 100*r.Fraction))
 
 		if r.Component == skybrightness.Moonlight {
 			moonShare = 100 * r.Fraction
@@ -253,23 +269,24 @@ func whatObservatoryAdds(ctx context.Context) {
 		}
 	}
 
-	fmt.Printf("  %-20s %6.2f mag\n", "total", total)
-
-	fmt.Printf(`
-Moonlight is %.1f per cent of that sky. It is the largest capability
-difference between this preset and GAMBONS, which models a moonless night and
-has no term for it at all, and it is why Observatory has no published
-counterpart to be validated against. The natural components are unchanged in
-kind from the tables above — they are simply swamped, and comparing this total
-against those would be comparing two different skies.
-
-Artificial skyglow is the other addition, and here it is %.2f per cent: a town
-120 km away barely reaches a site chosen for being far from towns, which is
-the correct answer for Paranal and the reason it was worth running rather than
-asserting. That term is worth exactly as much as the inventory behind it, and
-this inventory is a stated estimate — see illustrativeTown for which half of
-it is measurable and which half no satellite can supply.
-`, moonShare, artificialShare)
+	tab.Row("total", fmt.Sprintf("%.2f mag", total), "")
+	tab.Print()
+	fmt.Println()
+	show.Note(fmt.Sprintf("Moonlight is %.1f per cent of that sky. It is the largest", moonShare),
+		"capability difference between this preset and GAMBONS, which models",
+		"a moonless night and has no term for it at all, and it is why",
+		"Observatory has no published counterpart to be validated against.",
+		"The natural components are unchanged in kind from the tables above —",
+		"they are simply swamped, and comparing this total against those would",
+		"be comparing two different skies.")
+	fmt.Println()
+	show.Note(fmt.Sprintf("Artificial skyglow is the other addition, and here it is %.2f", artificialShare),
+		"per cent: a town 120 km away barely reaches a site chosen for being",
+		"far from towns, which is the correct answer for Paranal and the reason",
+		"it was worth running rather than asserting. That term is worth exactly",
+		"as much as the inventory behind it, and this inventory is a stated",
+		"estimate — see illustrativeTown for which half of it is measurable and",
+		"which half no satellite can supply.")
 }
 
 // illustrativeTown stands in for the nearest town, about 120 km north — which

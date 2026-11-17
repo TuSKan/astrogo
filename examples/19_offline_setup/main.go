@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 
@@ -50,7 +51,8 @@ func cacheLocation(ctx context.Context, id remote.EndpointID, name string) strin
 }
 
 func main() {
-	fmt.Println("=== astrogo offline / air-gapped setup ===")
+	show.Title("Offline and air-gapped setup",
+		"No download without consent; pre-seeded files just work")
 
 	// ── 1. The kill switch ──────────────────────────────────────────────
 	// With offline mode on, no endpoint — API or download — may be
@@ -63,14 +65,14 @@ func main() {
 	// even while offline, per point 2 below — that's the whole point of
 	// pre-seeding, not a bug).
 	remote.SetOffline(true)
-	fmt.Println("\n[1] remote.SetOffline(true) is active.")
+
+	show.Section("1. The kill switch: remote.SetOffline(true)")
 
 	_, err := remote.URL(remote.NAIFSPK)
 	if errors.Is(err, remote.ErrOffline) {
-		fmt.Println("    remote.URL correctly refused to resolve an endpoint:")
-		fmt.Printf("      %v\n", err)
+		show.Fields(show.KV("remote.URL", "refused, as it must: %v", err))
 	} else {
-		fmt.Printf("    unexpected: %v\n", err)
+		show.Fields(show.KV("remote.URL", "unexpected: %v", err))
 	}
 
 	remote.SetOffline(false) // restore for the rest of this example
@@ -83,7 +85,7 @@ func main() {
 	// before ever considering a download, so this hits zero network as
 	// long as the files are already there — no separate local-only
 	// constructor to bypass remote with.
-	fmt.Println("\n[2] eph.NewProvider against a pre-seeded cache, zero network")
+	show.Section("2. A pre-seeded kernel, zero network")
 
 	ctx := context.Background()
 	lskLoc := cacheLocation(ctx, remote.NAIFLSK, "naif0012.tls")
@@ -91,23 +93,26 @@ func main() {
 
 	p, err := eph.NewProvider(ctx, eph.Planets, "de440s")
 	if err != nil {
-		fmt.Printf("    no cached kernels found at %s (%v)\n", remote.DataDirURL(), err)
-		fmt.Println("    run example 09 or 11 first (with downloads enabled) to populate the")
-		fmt.Println("    cache, or copy pre-built de440s.bsp/naif0012.tls files there yourself.")
+		show.Note(fmt.Sprintf("No cached kernels at %s (%v).", remote.DataDirURL(), err),
+			"Run example 09 or 11 first, with downloads enabled, to populate the",
+			"cache, or copy pre-built de440s.bsp and naif0012.tls there yourself.")
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
 		state, err := eph.At(p, time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC)).Geometric(eph.MarsBarycenter, eph.Earth)
 		if err != nil {
-			fmt.Printf("    Geometric: %v\n", err)
+			show.Fields(show.KV("Geometric", "%v", err))
 		} else {
-			fmt.Printf("    Mars geocentric distance: %.4f AU (from %s, %s)\n",
-				state.Pos.Norm(), lskLoc, spkLoc)
+			show.Fields(
+				show.KV("Mars, geocentric", "%.4f AU", state.Pos.Norm()),
+				show.KV("Leap seconds", "%s", lskLoc),
+				show.KV("Kernel", "%s", spkLoc),
+			)
 		}
 	}
 
 	// ── 3. Time.EOP() — local Earth-orientation data, loaded automatically ──
-	fmt.Println("\n[3] Time.EOP() — local Earth-orientation data, loaded automatically")
+	show.Section("3. Earth orientation, loaded by the first Time.EOP()")
 
 	iersLoc := cacheLocation(ctx, remote.IERSFinals2000A, "finals2000A.data")
 
@@ -116,10 +121,15 @@ func main() {
 	_ = time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC).EOP()
 
 	if lo, hi, ok := time.Coverage(); ok {
-		fmt.Printf("    loaded EOP data automatically: MJD %.0f–%.0f (from %s)\n", lo, hi, iersLoc)
+		show.Fields(
+			show.KV("Coverage", "MJD %.0f–%.0f", lo, hi),
+			show.KV("Bulletin", "%s", iersLoc),
+		)
 	} else {
-		fmt.Printf("    no local EOP cache at %s — call remote.EnableDownloads(0, remote.IERSFinals2000A)\n", iersLoc)
-		fmt.Println("    once (with network access) to populate it, or ship a finals2000A.data file with your deployment.")
+		show.Note(fmt.Sprintf("No local EOP cache at %s.", iersLoc),
+			"Call remote.EnableDownloads(0, remote.IERSFinals2000A) once, with",
+			"network access, to populate it, or ship finals2000A.data with your",
+			"deployment.")
 	}
 
 	// Earth-orientation data works exactly like the kernel above: pre-seed
