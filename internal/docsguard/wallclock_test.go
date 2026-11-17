@@ -21,9 +21,11 @@ var wallClockAllowed = map[string]string{
 	"ephemeris/jpl/validation/gen_corpus_test.go": "stamps the generation time into the corpus " +
 		"manifest, which is the provenance record",
 	"internal/changelog/assemble_test.go":                   "release dating",
+	"remote/api/budget_test.go":                             "a call's time budget; elapsed time is the subject",
 	"remote/api/pace_test.go":                               "rate limiting; elapsed time is the subject",
 	"remote/fetch_test.go":                                  "a download lock's age is measured from the present; the test needs one older than twice the timeout and younger than the 30-minute default",
 	"remote/file/lock_test.go":                              "lock acquisition timing is the subject",
+	"remote/unreachable_test.go":                            "a silent host's cooldown is defined relative to now, and a refusal's speed is the subject",
 	"skybrightness/dataset/airglow/almanac_network_test.go": "queries a live service for the current sky",
 	"skybrightness/dataset/starlight/gaia_network_test.go":  "measures elapsed time to show the cache works",
 	"skybrightness/gambons_allsky_test.go":                  "measures elapsed time for its own report",
