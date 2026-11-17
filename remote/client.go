@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/TuSKan/astrogo/remote/api"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Client is one component's I/O policy: which endpoints it may reach, where
@@ -96,6 +97,14 @@ type Client struct {
 	// It has its own lock because its key needs DataDirURL, which takes mu.
 	rejected   map[string]rejection
 	rejectedMu sync.Mutex
+
+	// noAnswer holds, per host, the last request that got no answer, so a
+	// request inside cooldown fails at once rather than waiting the timeout
+	// out again. See [ErrUnreachable]. Only in memory: it is state, not
+	// policy, so Clone starts without it but keeps the cooldown.
+	noAnswer   map[string]noAnswer
+	cooldown   time.Duration
+	noAnswerMu sync.Mutex
 }
 
 // NewClient returns a client with the default policy: online, every endpoint
@@ -111,6 +120,8 @@ func NewClient() *Client {
 	return &Client{
 		endpoints:  defaultEndpoints(),
 		transports: make(map[EndpointID]*api.Client),
+		noAnswer:   make(map[string]noAnswer),
+		cooldown:   defaultUnreachableCooldown,
 	}
 }
 
@@ -134,6 +145,10 @@ func (c *Client) Clone() *Client {
 		endpoints[id] = cloneEndpoint(ep)
 	}
 
+	c.noAnswerMu.Lock()
+	cooldown := c.cooldown
+	c.noAnswerMu.Unlock()
+
 	return &Client{
 		endpoints:  endpoints,
 		transports: make(map[EndpointID]*api.Client),
@@ -141,6 +156,8 @@ func (c *Client) Clone() *Client {
 		policy:     c.policy,
 		dataDirURL: c.dataDirURL,
 		offline:    c.offline,
+		noAnswer:   make(map[string]noAnswer),
+		cooldown:   cooldown,
 	}
 }
 

@@ -12,6 +12,10 @@ import (
 var (
 	// ErrInvalidHorizon is returned when the horizon is outside the valid range.
 	ErrInvalidHorizon = errors.New("horizon must be between -90 and 90 degrees")
+
+	// ErrInvalidHorizonHeight is returned for a height above the horizon
+	// ([WithHorizonHeight]) that is negative or not a finite length.
+	ErrInvalidHorizonHeight = errors.New("plan: height above the horizon must be a finite, non-negative length")
 	// ErrNilLocation is returned when the geodetic location is nil.
 	ErrNilLocation = errors.New("geodetic location must not be nil")
 
@@ -101,6 +105,15 @@ var (
 	ErrNoConvergence = errors.New("solver: did not converge within MaxIter")
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")
+
+	// ErrNoTwilight indicates the Sun does not cross a twilight threshold
+	// within a day, so there is no night of that kind to return: astronomical
+	// twilight never ends on a summer night at 51°N, and a polar day or night
+	// lasts weeks. NightOf and VisibleTonight return it.
+	ErrNoTwilight = errors.New("plan: the Sun does not cross the twilight threshold within a day")
+	// ErrUnknownTwilightKind indicates a TwilightKind that TwilightThreshold
+	// does not know.
+	ErrUnknownTwilightKind = errors.New("plan: unknown twilight kind")
 
 	// ErrUnknownSite indicates NewKnownSite found no entry matching the
 	// requested name (checked against every known site's name and

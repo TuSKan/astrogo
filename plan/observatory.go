@@ -32,6 +32,11 @@ type Site struct {
 	// horizonAir is the air the rise and set horizon refracts through, or
 	// nil for the almanacs' fixed 34′; see WithHorizonRefraction.
 	horizonAir *atmosphere.Refraction
+
+	// horizonHeight is the observer's height above the visible horizon, which
+	// the rise and set horizon dips by; zero, the default, is no dip. See
+	// WithHorizonHeight.
+	horizonHeight unit.Length
 }
 
 // HorizonProfile computes the local horizon elevation limit at a given
@@ -43,8 +48,9 @@ type Site struct {
 //
 // [Horizon] is the constraint that consumes it, gating visibility per
 // azimuth — the case a scalar threshold cannot express. RiseSetThreshold and
-// friends still use HorizonDip, the atmospheric dip from elevation, which is a
-// different quantity. Set a profile via WithHorizonProfile; Site.HorizonAt
+// friends use HorizonDip, the dip of a horizon the observer looks down on
+// (WithHorizonHeight), which is a different quantity. Set a profile via
+// WithHorizonProfile; Site.HorizonAt
 // falls back to the scalar Horizon() when none is set, so a site nobody has
 // surveyed still answers.
 type HorizonProfile func(azimuth angle.Angle) angle.Angle
@@ -250,14 +256,30 @@ func WithHorizonProfile(p HorizonProfile) SiteOption {
 // much less; over a land horizon near the site's own height it is the site's
 // air, [Site.Refraction] or measured values.
 //
-// The refraction is taken at 0° of apparent altitude and added to the dip,
-// as the almanacs add their 34′ (see [Site.RiseSetThreshold]). At 10 °C and
+// The refraction is taken at 0° of apparent altitude and added to any dip
+// ([WithHorizonHeight]), as the almanacs add their 34′ (see
+// [Site.RiseSetThreshold]). At 10 °C and
 // 1010 hPa it is 33.8′. Observed horizon refraction varies from night to
 // night by more than any of this corrects: against timed sunrises and
 // sunsets no model predicts a rise or set better than about 2 minutes
 // (Wilson 2018), and none here claims to.
 func WithHorizonRefraction(air atmosphere.Refraction) SiteOption {
 	return func(s *Site) { s.horizonAir = &air }
+}
+
+// WithHorizonHeight sets the observer's height above the visible horizon,
+// from which the rise and set horizon dips by 1.76′·√h ([Site.HorizonDip]):
+// the height of a summit or a ship's deck above the sea it looks out over,
+// or of a mountain above the plain it overlooks. Without it there is no dip,
+// as USNO and the almanacs assume.
+//
+// It is not the site's height above the ellipsoid, which the dip used to be
+// taken from, always. A city on a plateau looks out on the plateau, not down
+// on a horizon 1,600 m below: Denver entered at its real height rose the Sun
+// 7.1 minutes before USNO, Madrid at 667 m 4.7 minutes, for a dip their
+// horizons do not have (#1185). For the old rule, pass the site's height.
+func WithHorizonHeight(h unit.Length) SiteOption {
+	return func(s *Site) { s.horizonHeight = h }
 }
 
 // WithTimeZone sets the site's local time zone. Defaults to UTC if omitted
@@ -284,7 +306,8 @@ func WithSiteAliases(aliases ...string) SiteOption {
 // name: A human-readable name for the site.
 // loc: The geodetic location (longitude, latitude, height).
 // opts: optional parameters — see WithHorizon, WithHorizonProfile,
-// WithHorizonRefraction, WithTimeZone, WithMPCCode, and WithSiteAliases.
+// WithHorizonRefraction, WithHorizonHeight, WithTimeZone, WithMPCCode, and
+// WithSiteAliases.
 func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error) {
 	if loc == nil {
 		return nil, ErrNilLocation
@@ -302,6 +325,12 @@ func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error
 
 	if s.horizon.Degrees() < -90 || s.horizon.Degrees() > 90 {
 		return nil, ErrInvalidHorizon
+	}
+
+	// A height above the horizon that is not a length would dip every rise
+	// and set by NaN, or by a negative amount, without an error.
+	if h := s.horizonHeight.Meters(); math.IsNaN(h) || math.IsInf(h, 0) || h < 0 {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidHorizonHeight, s.horizonHeight)
 	}
 
 	// A NaN temperature in the horizon air moved every rise and set by
@@ -497,12 +526,15 @@ func (s *Site) Refraction() atmosphere.Refraction {
 	return atmosphere.AtAltitude(s.location.Height())
 }
 
-// HorizonDip returns the dip of the visible horizon at this site's elevation:
-// 1.76′·√h with h in meters, the apparent dip, which includes terrestrial
-// refraction (see [atmosphere.HorizonDip]). At sea level it is zero; at 786 m
-// it is 0.82°, where the geometric dip, with no refraction, would be 0.90°.
+// HorizonDip returns the dip of the visible horizon below the level one:
+// 1.76′·√h for h the observer's height above that horizon in meters
+// ([WithHorizonHeight]), the apparent dip, which includes terrestrial
+// refraction (see [atmosphere.HorizonDip]). It is zero unless the site says
+// it looks down on its horizon, whatever its height above the ellipsoid; 786
+// m above the sea it is 0.82°, where the geometric dip, with no refraction,
+// would be 0.90°.
 func (s *Site) HorizonDip() angle.Angle {
-	return atmosphere.HorizonDip(s.location.Height())
+	return atmosphere.HorizonDip(s.horizonHeight)
 }
 
 // standardRefraction is the conventional refraction at the horizon, 34′,
@@ -523,7 +555,8 @@ const standardRefraction = 0.5667
 // rise/set definitions and Skyfield's find_risings put a star's horizon at
 // the same −34′.
 //
-// At sea level: −0.5667°. At 786 m: −1.389°.
+// With no dip, the default: −0.5667°, at any height. 786 m above a sea
+// horizon ([WithHorizonHeight]): −1.389°.
 //
 // With [WithHorizonRefraction] the 34′ is instead the refraction of the air
 // the site names, here and in the Sun's and Moon's thresholds.
@@ -544,9 +577,10 @@ func (s *Site) RiseSetThreshold() angle.Angle {
 // Astronomical Almanac, §9.311):
 //   - Solar semi-diameter: 16' (0.2667°)
 //   - Standard atmospheric refraction at horizon: 34' (0.5667°)
-//   - Horizon dip from elevation: 1.76'√h
+//   - Horizon dip: 1.76'√h for h the height above the visible horizon, zero
+//     unless [WithHorizonHeight] sets it
 //
-// Total at sea level: −(16' + 34') = −50' = −0.8333°. With
+// Total with no dip: −(16' + 34') = −50' = −0.8333°. With
 // [WithHorizonRefraction] the 34' is that air's refraction.
 func (s *Site) SunRiseSetThreshold() angle.Angle {
 	const sunSemiDiameter = 0.2667 // degrees, ~16 arcmin
@@ -617,6 +651,7 @@ func (s *Site) Equal(other *Site) bool {
 		math.Abs(s.location.Lat().Radians()-other.location.Lat().Radians()) < eps &&
 		math.Abs(s.location.Height().Meters()-other.location.Height().Meters()) < eps &&
 		math.Abs(s.horizon.Radians()-other.horizon.Radians()) < eps &&
+		s.horizonHeight == other.horizonHeight &&
 		sameHorizonAir(s.horizonAir, other.horizonAir) &&
 		tzEqual
 }

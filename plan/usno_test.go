@@ -457,9 +457,24 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				// #532 it was skipped as "handled separately" and nothing else
 				// compared it, so astrogo's twilight times had no external
 				// reference at all.
-				civilDawn, civilDusk, err := plan.CivilDawnDusk(start, end, site, prov)
+				// USNO prints the date's own morning dawn and evening dusk,
+				// which belong to two nights, so they are the date's
+				// crossings rather than one NightOf.
+				civilNights, err := plan.TwilightEvents(start, end, site, prov, plan.CivilTwilight)
 				if err != nil {
-					t.Fatalf("CivilDawnDusk failed: %v", err)
+					t.Fatalf("TwilightEvents failed: %v", err)
+				}
+
+				var civilDawn, civilDusk *plan.Event
+
+				for _, n := range civilNights {
+					if civilDawn == nil {
+						civilDawn = n.Dawn
+					}
+
+					if civilDusk == nil {
+						civilDusk = n.Dusk
+					}
 				}
 
 				for _, sp := range resp.Properties.Data.SunData {
@@ -989,8 +1004,11 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			geodetic0, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), 0)
 			site0, _ := plan.NewSite(loc.Name+" (0m)", geodetic0, plan.WithTimeZone(tz))
 
+			// The summit looks down on a horizon far below it, so it says so:
+			// a height above the ellipsoid alone dips nothing (#1185).
 			geodetic, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
-			site, _ := plan.NewSite(loc.Name+" (8849m)", geodetic, plan.WithTimeZone(tz))
+			site, _ := plan.NewSite(loc.Name+" (8849m)", geodetic, plan.WithTimeZone(tz),
+				plan.WithHorizonHeight(unit.Meters(loc.Height)))
 
 			t.Logf("Horizon dip (8849m): %.4f°", site.HorizonDip().Degrees())
 			t.Logf("Sun threshold (0m):    %.4f°", site0.SunRiseSetThreshold().Degrees())
@@ -1024,6 +1042,24 @@ func TestUSNO_HighAltitude(t *testing.T) {
 
 			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents0, sunUp(site0), start, tz)
 			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEvents0, moonUp(t, site0, eph), start, tz)
+
+			// ── Part 1b: entered at 8849 m with no height above its horizon,
+			// the summit rises and sets on USNO's times too, since a height
+			// alone dips nothing (#1185) ──
+			high, _ := plan.NewSite(loc.Name+" (8849m, no dip)", geodetic, plan.WithTimeZone(tz))
+
+			sunEventsHigh, err := plan.SunEvents(start, end, high, eph)
+			if err != nil {
+				t.Fatalf("SunEvents (8849m, no dip) failed: %v", err)
+			}
+
+			moonEventsHigh, err := plan.MoonEvents(start, end, high, eph)
+			if err != nil {
+				t.Fatalf("MoonEvents (8849m, no dip) failed: %v", err)
+			}
+
+			compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEventsHigh, sunUp(high), start, tz)
+			compareUSNOEvents(t, "Moon", resp.Properties.Data.MoonData, moonEventsHigh, moonUp(t, high, eph), start, tz)
 
 			// ── Part 2: Altitude correction (astrogo 8849m vs 0m) ──
 			t.Log("── Altitude correction (8849m vs 0m) ──")
@@ -1268,13 +1304,16 @@ func TestUSNO_PolarMoon(t *testing.T) {
 func TestUSNO_AltitudeShift(t *testing.T) {
 	eph := newEph(t)
 
-	// Same geodetic position (Everest coordinates) at sea level vs summit
+	// Same geodetic position (Everest coordinates) at sea level vs summit.
+	// The summit looks down on a horizon 8849 m below and says so, which is
+	// what dips it: a height alone dips nothing (#1185).
 	altCases := []struct {
 		name   string
 		height float64
+		opts   []plan.SiteOption
 	}{
-		{"SeaLevel", 0},
-		{"EverestSummit", 8849},
+		{"SeaLevel", 0, nil},
+		{"EverestSummit", 8849, []plan.SiteOption{plan.WithHorizonHeight(unit.Meters(8849))}},
 	}
 
 	var (
@@ -1291,7 +1330,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 			tz, _ := time.LoadLocation("Asia/Kathmandu")
 
-			site, err := plan.NewSite(ac.name, geodetic, plan.WithTimeZone(tz))
+			site, err := plan.NewSite(ac.name, geodetic, append([]plan.SiteOption{plan.WithTimeZone(tz)}, ac.opts...)...)
 			if err != nil {
 				t.Fatalf("Failed to create site: %v", err)
 			}

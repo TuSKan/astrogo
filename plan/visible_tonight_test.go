@@ -193,13 +193,14 @@ func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 // TestVisibleTonight_MidnightNightOrdersDawnAfterDusk is a regression test
 // for a real bug found via live testing: an earlier version searched the
 // same [night, night+24h) window for both dusk and dawn independently.
-// When night is local midnight (a documented valid choice per
-// VisibleTonight's doc comment), the first dawn found in that window is
+// When night was local midnight, the first dawn found in that window was
 // that same morning's — before dusk, not after it — silently producing an
 // inverted [start, end) that made every real candidate (confirmed live:
 // ~150 of them, including Sirius) evaluate as never visible, with no
 // error surfaced. testNight (noon UTC) never exercised this path, since
 // noon always falls between a morning's dawn and that evening's dusk.
+// Local midnight is inside a night, and VisibleTonight now plans that one,
+// the night NightOf returns: dusk the evening before, dawn that morning.
 func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 	t.Parallel()
 
@@ -233,7 +234,15 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 		HasCoord: true, VMag: -1.0, HasVMag: true, Catalog: "test",
 	}
 
-	site := quintaCalixtoSite(t)
+	// A dipped horizon is the case under test, so the site looks down on its
+	// horizon from its own height: a height alone dips nothing (#1185).
+	base := quintaCalixtoSite(t)
+
+	site, err := plan.NewSite(base.Name(), base.Location(), plan.WithHorizonHeight(base.Height()))
+	if err != nil {
+		t.Fatalf("NewSite: %v", err)
+	}
+
 	night := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{grazer}}}
 

@@ -17,8 +17,14 @@
 // [KnownSiteNames] and [NewKnownSite], and the Minor Planet Center's
 // observatory codes from [MPCObservatories] and [NewMPCSite]. A [SiteOption]
 // adds a local horizon ([WithHorizon], [WithHorizonProfile] and a
-// [HorizonProfile], [WithHorizonRefraction]), a time zone ([WithTimeZone]),
-// an MPC code ([WithMPCCode]) or aliases ([WithSiteAliases]).
+// [HorizonProfile], [WithHorizonRefraction], and [WithHorizonHeight] for a
+// site that looks down on its horizon), a time zone ([WithTimeZone]), an MPC
+// code ([WithMPCCode]) or aliases ([WithSiteAliases]).
+//
+// Rise and set use the almanacs' horizon: the geometric one, lowered by 34′
+// of refraction, at any height above the ellipsoid. The dip of a horizon
+// below the observer is added only where WithHorizonHeight says there is one,
+// a summit over the sea, since a city on a plateau looks out on the plateau.
 //
 // # Targets
 //
@@ -66,11 +72,11 @@
 // # Rise, set and twilight
 //
 // [SunEvents] and [SunriseSunset], [MoonEvents] and [MoonriseMoonset], and
-// [TwilightEvents] for each [TwilightKind]; [CivilDawnDusk],
-// [NauticalDawnDusk] and [AstronomicalDawnDusk] answer the common case
-// directly. [DayEvents] gives a target's rise, set and transit within one
-// local calendar day, and [Episode] the whole continuous span it is up
-// around an interval.
+// [TwilightEvents] for each [TwilightKind]; [NightOf] answers the common
+// case directly, the one [Night] an instant is in or comes before.
+// [DayEvents] gives a target's rise, set and transit within one local
+// calendar day, and [Episode] the whole continuous span it is up around an
+// interval.
 //
 // # Geometric events
 //
