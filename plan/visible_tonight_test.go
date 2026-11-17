@@ -233,7 +233,15 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 		HasCoord: true, VMag: -1.0, HasVMag: true, Catalog: "test",
 	}
 
-	site := quintaCalixtoSite(t)
+	// A dipped horizon is the case under test, so the site looks down on its
+	// horizon from its own height: a height alone dips nothing (#1185).
+	base := quintaCalixtoSite(t)
+
+	site, err := plan.NewSite(base.Name(), base.Location(), plan.WithHorizonHeight(base.Height()))
+	if err != nil {
+		t.Fatalf("NewSite: %v", err)
+	}
+
 	night := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{grazer}}}
 
