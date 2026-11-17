@@ -24,6 +24,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -55,25 +56,25 @@ func main() {
 		log.Fatalf("site: %v", err)
 	}
 
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
-	fmt.Println("  SIRIUS — barycentric/heliocentric radial-velocity correction")
-	fmt.Println("  AstroGo | coord.Context | classical projection, ~1 m/s accuracy")
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
+	show.Title("Radial-velocity correction: Sirius",
+		"coord.Context, from "+site.Name()+" across 2026")
 	fmt.Println()
-	fmt.Printf("  Target             Sirius (α CMa)\n")
-	fmt.Printf("  RA / Dec           %s / %s\n", target.RA().HMSString(2), target.Dec().DMSString(1))
-	fmt.Printf("  Published RV       %.2f km/s (barycentric)\n", siriusPublishedV)
-	fmt.Printf("  Site               %s\n", site.Name())
 
+	show.Fields(
+		show.KV("Target", "Sirius (α CMa)"),
+		show.KV("RA / Dec", "%s / %s", target.RA().HMSString(2), target.Dec().DMSString(1)),
+		show.KV("Published RV", "%.2f km/s, barycentric", siriusPublishedV),
+		show.KV("Site", "%s", site.Name()),
+	)
+
+	show.Section("What the site measures, and the correction back")
+	show.Note("Earth's orbital motion adds up to ±30 km/s to what a spectrograph",
+		"reads. The correction removes it, so every row comes back to the",
+		"star's own -5.50 km/s.")
 	fmt.Println()
-	fmt.Println("── Across 2026: what Mauna Kea measures, and the correction back ────")
-	fmt.Println()
-	fmt.Println("  Earth's orbital motion adds up to ±30 km/s to what a spectrograph")
-	fmt.Println("  reads. The correction removes it, so every row comes back to the")
-	fmt.Println("  star's own -5.50 km/s.")
-	fmt.Println()
-	fmt.Println("  Date          Bary. corr.   Helio. corr.   Measured RV    Corrected RV")
-	fmt.Println("  ──────────    ───────────   ────────────   ───────────    ────────────")
+
+	tab := show.NewTable(show.Left("Date"), show.Right("Barycentric corr."),
+		show.Right("Heliocentric corr."), show.Right("Measured"), show.Right("Corrected"))
 
 	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
@@ -104,23 +105,30 @@ func main() {
 		}
 
 		// unit.Velocity holds m/s; KmPerSec is what the column says.
-		fmt.Printf("  %s    %+8.3f km/s   %+8.3f km/s   %+8.3f km/s  %+8.3f km/s\n",
-			t.Format("2006-01-02"), baryCorr.KmPerSec(), helioCorr.KmPerSec(), measured.KmPerSec(), corrected.KmPerSec())
+		tab.Row(t.Format("2006-01-02"),
+			fmt.Sprintf("%+.3f km/s", baryCorr.KmPerSec()),
+			fmt.Sprintf("%+.3f km/s", helioCorr.KmPerSec()),
+			fmt.Sprintf("%+.3f km/s", measured.KmPerSec()),
+			fmt.Sprintf("%+.3f km/s", corrected.KmPerSec()))
 	}
 
+	tab.Print()
+
+	show.Section("How the correction is applied")
+	show.Note("rvBarycentric = ctx.BarycentricRadialVelocity(target, rvMeasured)")
 	fmt.Println()
-	fmt.Println("  rvBarycentric = ctx.BarycentricRadialVelocity(target, rvMeasured)")
-	fmt.Println("  Not rvMeasured + the correction: redshifts compose by multiplying,")
-	fmt.Println("  so the exact form carries a third term rvMeasured*corr/c. With corr")
-	fmt.Println("  at most Earth's 30 km/s, that is up to 0.55 m/s for Sirius and 30 m/s")
-	fmt.Println("  for a halo star at 300 km/s.")
-	fmt.Println("  This carries the observer's own clock as well as their motion: the")
-	fmt.Println("  second-order Doppler shift, the Sun's gravitational potential at the")
-	fmt.Println("  observer and Earth's own, together about 4.65 m/s. Measured against")
-	fmt.Println("  Astropy over 175 cases, the two agree to 0.5 mm/s.")
+	show.Note("Not rvMeasured + the correction: redshifts compose by multiplying,",
+		"so the exact form carries a third term rvMeasured*corr/c. With corr",
+		"at most Earth's 30 km/s, that is up to 0.55 m/s for Sirius and 30 m/s",
+		"for a halo star at 300 km/s.")
 	fmt.Println()
-	fmt.Println("  Still omitted: light-travel time to the barycenter, and the target's")
-	fmt.Println("  own proper motion over that crossing. Both need the target's distance")
-	fmt.Println("  and epoch, which a bare ICRS direction does not carry.")
-	fmt.Println("═══════════════════════════════════════════════════════════════════")
+	show.Note("It carries the observer's own clock as well as their motion: the",
+		"second-order Doppler shift, the Sun's gravitational potential at the",
+		"observer and Earth's own, together about 4.65 m/s. Against Astropy",
+		"over 175 cases the two agree within 3 mm/s, half a millimeter per",
+		"second typically.")
+	fmt.Println()
+	show.Note("Still omitted: light-travel time to the barycenter, and the target's",
+		"own proper motion over that crossing. Both need the target's distance",
+		"and epoch, which a bare ICRS direction does not carry.")
 }

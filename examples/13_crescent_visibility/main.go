@@ -16,16 +16,12 @@ import (
 	"log"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println("  Lunar Crescent Visibility — Quinta Calixto")
-	fmt.Println("══════════════════════════════════════════════════════════════")
-	fmt.Println()
-
 	// This example runs offline, so it uses no Earth-orientation data
 	// (UT1 = UTC, no polar motion). That can move the Moon's and Sun's
 	// altitudes by up to 13.5 arcsec, far below the tenths of a degree the
@@ -57,8 +53,6 @@ func main() {
 		log.Fatalf("NextNewMoon: %v", err)
 	}
 
-	fmt.Printf("  New Moon: %s\n\n", newMoon.Time)
-
 	// ── Evaluate the first evening after the New Moon ───────────────────
 	// The crescent is typically first visible on the evening following
 	// the astronomical New Moon (conjunction). CrescentVisibility takes the
@@ -71,19 +65,76 @@ func main() {
 		log.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	fmt.Printf("  Sunset (Quinta Calixto): %s\n", result.Sunset)
-	fmt.Printf("  Moonset:                 %s\n", result.Moonset)
-	fmt.Printf("  Best time:               %s\n\n", result.BestTime)
+	const clock = "2006-01-02 15:04 MST"
 
-	fmt.Println(result.String())
+	show.Title("Lunar crescent visibility", site.Name()+", the evening after December 2026's New Moon")
+
+	show.Section("The evening")
+	show.Fields(
+		show.KV("New Moon", "%s", newMoon.Time.Format(clock)),
+		show.KV("Sunset", "%s", result.Sunset.Format(clock)),
+		show.KV("Moonset", "%s", result.Moonset.Format(clock)),
+		show.KV("Best time", "%s", result.BestTime.Format(clock)),
+	)
+
+	// ── Yes-or-no criteria ──────────────────────────────────────────────
+	// Each reads the geometry in its own convention: at sunset, at the best
+	// time, or with the Moon's altitude measured to its lower limb. That is
+	// why the arc of vision differs between rows of the same evening.
+	verdicts := []struct {
+		name string
+		v    plan.CrescentVerdict
+	}{
+		{"Fotheringham (1910)", result.Fotheringham},
+		{"Maunder (1911)", result.Maunder},
+		{"Danjon (1932)", result.Danjon},
+		{"Bruin (1977)", result.Bruin},
+		{"Ilyas (1983)", result.Ilyas1983},
+		{"Ilyas (1988)", result.Ilyas1988},
+		{"MABIMS (1995)", result.MABIMS1995},
+		{"Fatoohi (1998)", result.Fatoohi1998},
+		{"SAAO naked (2001)", result.CaldwellNakedEye},
+		{"SAAO aided (2001)", result.CaldwellOptical},
+		{"Krauss Athens (2012)", result.KraussAthenian},
+		{"Istanbul (2016)", result.Istanbul2016},
+		{"Alrefay naked (2018)", result.AlrefayNakedEye},
+		{"Alrefay aided (2018)", result.AlrefayOpticalAid},
+		{"MABIMS (2021)", result.MABIMS2021},
+	}
+
+	show.Section("Criteria")
+
+	tab := show.NewTable(show.Left("Criterion"), show.Left("Verdict"),
+		show.Right("ARCV"), show.Right("ARCL"), show.Right("DAZ"), show.Right("Moon"), show.Right("Width"))
+
+	for _, c := range verdicts {
+		verdict := "not visible"
+		if c.v.Visible {
+			verdict = "visible"
+		}
+
+		p := c.v.Params
+		tab.Row(c.name, verdict,
+			fmt.Sprintf("%.2f°", p.ArcV.Degrees()), fmt.Sprintf("%.2f°", p.ArcL.Degrees()),
+			fmt.Sprintf("%.2f°", p.DAZ.Degrees()), fmt.Sprintf("%.2f°", p.MAlt.Degrees()),
+			fmt.Sprintf("%.2f′", p.W.Arcminutes()))
+	}
+
+	tab.Print()
+
+	// ── Zone criteria ───────────────────────────────────────────────────
+	// Three criteria grade the evening rather than answer yes or no, each
+	// from one discriminant: Yallop's q, Odeh's V and Qureshi's S.
+	show.Section("Zones")
+
+	zones := show.NewTable(show.Left("Criterion"), show.Left("Zone"), show.Right("Value"), show.Left("Meaning"))
+	zones.Row("Yallop (1997), q", result.Yallop.Code, fmt.Sprintf("%.4f", result.Yallop.Value), result.Yallop.Label)
+	zones.Row("Odeh (2004), V", result.Odeh.Code, fmt.Sprintf("%.4f", result.Odeh.Value), result.Odeh.Label)
+	zones.Row("Qureshi (2010), S", result.Qureshi.Code, fmt.Sprintf("%.4f", result.Qureshi.Value), result.Qureshi.Label)
+	zones.Print()
 	fmt.Println()
 
-	// ── Summary ─────────────────────────────────────────────────────────
-	fmt.Println("─── Multi-Zone Classification ──────────────────────────────")
-	fmt.Printf("  Yallop (1998):  Zone %s — %s (q=%.4f)\n",
-		result.Yallop.Code, result.Yallop.Label, result.Yallop.Value)
-	fmt.Printf("  Odeh (2004):    %s — %s (V=%.4f)\n",
-		result.Odeh.Code, result.Odeh.Label, result.Odeh.Value)
-	fmt.Printf("  Qureshi (2010): Zone %s — %s (S=%.4f)\n",
-		result.Qureshi.Code, result.Qureshi.Label, result.Qureshi.Value)
+	show.Note("ARCV is the arc of vision, the Moon's altitude above the Sun's;",
+		"ARCL the arc of light, their separation; DAZ their difference in",
+		"azimuth; Moon the Moon's altitude; Width the crescent's width.")
 }
