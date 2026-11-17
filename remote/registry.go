@@ -34,12 +34,13 @@ func (c *Client) Endpoints() []Endpoint {
 	return out
 }
 
-// cloneEndpoint copies ep's Files slice so a caller mutating a returned
-// Endpoint (or its Files) can never corrupt the registry's own copy —
-// every other Endpoint field is a value type and already snapshot-safe
-// via Go's plain struct copy.
+// cloneEndpoint copies ep's Files and Mirrors slices so a caller mutating a
+// returned Endpoint (or either slice) can never corrupt the registry's own
+// copy — every other Endpoint field is a value type and already
+// snapshot-safe via Go's plain struct copy.
 func cloneEndpoint(ep Endpoint) Endpoint {
 	ep.Files = slices.Clone(ep.Files)
+	ep.Mirrors = slices.Clone(ep.Mirrors)
 
 	return ep
 }
@@ -85,11 +86,13 @@ func (c *Client) setEnabled(enabled bool, ids []EndpointID) {
 }
 
 // SetURL overrides an endpoint's base URL, e.g. to point at a mirror or an
-// internal proxy. Returns ErrUnknownEndpoint for an unregistered id.
+// internal proxy, and clears its [Endpoint.Mirrors]: the URL the caller chose
+// is the one asked. Returns ErrUnknownEndpoint for an unregistered id.
 func SetURL(id EndpointID, url string) error { return Default().SetURL(id, url) }
 
-// SetURL overrides an endpoint's base URL for this client only. Returns
-// ErrUnknownEndpoint for an unregistered id.
+// SetURL overrides an endpoint's base URL for this client only, and clears
+// its mirrors, as the package-level [SetURL] does. Returns ErrUnknownEndpoint
+// for an unregistered id.
 func (c *Client) SetURL(id EndpointID, url string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -100,6 +103,7 @@ func (c *Client) SetURL(id EndpointID, url string) error {
 	}
 
 	ep.URL = url
+	ep.Mirrors = nil
 	c.endpoints[id] = ep
 
 	return nil

@@ -317,6 +317,19 @@ type Endpoint struct {
 	// fails to resolve. See TestKeyParamServesOneObjectUnderAnyName and
 	// TestWithoutKeyParamANameResolvesUnderneath in remote/file.
 	URL string
+	// Mirrors are other base URLs serving the same API (KindAPI), tried in
+	// order when the host at URL is not serving it: it gives no answer, which
+	// [ErrUnreachable] marks, or it answers 404, or a 5xx once its retries are
+	// spent. Any other answer is the answer, so a mirror is never asked to
+	// settle a request the primary refused as malformed. Register mirrors only
+	// for an API where a 404 means the service is not there, as for a TAP sync
+	// endpoint, never for one where it means "no such object".
+	//
+	// [SetURL] clears them, since a URL the caller chose is the one it wants,
+	// and [Reset] restores them. SIMBAD has two: since the CDS incident of
+	// 2026-11-13 its primary has given no answer, then a 404 maintenance page,
+	// and every caller had to know to point SetURL at a mirror by hand (#1214).
+	Mirrors []string
 	// Kind is KindAPI or KindFile.
 	Kind Kind
 	// Subsystem names the astrogo package family using this endpoint. For
@@ -536,8 +549,15 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Timeout:     30 * time.Second,
 		},
 		SIMBAD: {
-			ID:             SIMBAD,
-			URL:            "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
+			ID:  SIMBAD,
+			URL: "https://simbad.cds.unistra.fr/simbad/sim-tap/sync",
+			// The Harvard CfA and IDIA mirrors, both answering the same ADQL
+			// on 2026-11-16 while the primary gave no answer. The CfA mirror's
+			// data then ran to 2026-10-14.
+			Mirrors: []string{
+				"https://simbad.cfa.harvard.edu/simbad/sim-tap/sync",
+				"https://simbad.idia.ac.za/simbad/sim-tap/sync",
+			},
 			Kind:           KindAPI,
 			Subsystem:      "catalog/simbad",
 			Description:    "CDS SIMBAD TAP service",
