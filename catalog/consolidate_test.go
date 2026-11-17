@@ -220,3 +220,25 @@ func ids(ts []catalog.Target) []string {
 
 	return out
 }
+
+// TestConsolidateUnionsMemberships: what a merged object is a member of is
+// every record's, as its identifiers are, each named once in its own
+// spelling; each catalog records the hierarchy it knows (#1182).
+func TestConsolidateUnionsMemberships(t *testing.T) {
+	t.Parallel()
+
+	got := catalog.Consolidate([]catalog.Record{
+		{Provider: "simbad", Target: catalog.Target{ID: "* alf Cen A", MemberOf: []string{"* alf Cen"}}},
+		{Provider: "other", Target: catalog.Target{
+			ID: "HD 128620", Aliases: []string{"* alf Cen A"},
+			MemberOf: []string{"* alf Cen", " WDS J14396-6050AB ", ""},
+		}},
+	})
+	if len(got) != 1 {
+		t.Fatalf("got %d targets, want one: the two records share * alf Cen A", len(got))
+	}
+
+	if want := []string{"* alf Cen", "WDS J14396-6050AB"}; !slices.Equal(got[0].MemberOf, want) {
+		t.Errorf("MemberOf = %q, want %q", got[0].MemberOf, want)
+	}
+}

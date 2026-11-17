@@ -288,6 +288,12 @@ func printVisibleTonightTable(results []plan.VisibleObject, loc *time.Location) 
 			name = r.Target.ID
 		}
 
+		// An observing group is one point of light to the eye, listed once at
+		// its combined magnitude; r.Members holds each of its records.
+		if len(r.Members) > 0 {
+			name = fmt.Sprintf("%s (group of %d)", name, len(r.Members))
+		}
+
 		rows[i] = tableRow{
 			num:           strconv.Itoa(i + 1),
 			object:        name,

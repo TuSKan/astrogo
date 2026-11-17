@@ -18,7 +18,9 @@ import (
 // one row, merged by catalog.Consolidate's policy: SIMBAD's record comes
 // first, so its ID is kept, and its magnitude ranks above OpenNGC's.
 // Rigil Kentaurus and its component A, 8 arcsec apart but with identifiers of
-// their own, stay two: nothing merges by position.
+// their own, stay two: nothing merges by position. Observing groups, which
+// list them as one point of light (#1182), are off here, so the rows are the
+// identities alone.
 func TestVisibleTonightListsAnObjectOnce(t *testing.T) {
 	t.Parallel()
 
@@ -38,7 +40,7 @@ func TestVisibleTonightListsAnObjectOnce(t *testing.T) {
 	}}
 
 	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2,
-		[]resolve.BrightObjectSearcher{simbad, openngc}, ephemeris.Default())
+		[]resolve.BrightObjectSearcher{simbad, openngc}, ephemeris.Default(), plan.WithResolution(0))
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}

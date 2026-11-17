@@ -942,6 +942,7 @@ func mergeGroup(g group) Target {
 	}
 
 	merged.Aliases = collectAliases(g)
+	merged.MemberOf = collectMemberships(g)
 
 astrometry:
 	for _, provider := range ranking(astrometricPrecedence, g) {
@@ -1048,6 +1049,24 @@ func collectAliases(g group) []string {
 
 		for _, a := range c.target.Aliases {
 			add(a)
+		}
+	}
+
+	return out
+}
+
+// collectMemberships unions every group member's MemberOf, as collectAliases
+// unions their identifiers: each catalog records the hierarchy it knows, so
+// no one record's list is the whole of it. Duplicates are dropped by exact
+// spelling, as there.
+func collectMemberships(g group) []string {
+	var out []string
+
+	for _, c := range g.candidates {
+		for _, m := range c.target.MemberOf {
+			if m = strings.TrimSpace(m); m != "" && !slices.Contains(out, m) {
+				out = append(out, m)
+			}
 		}
 	}
 

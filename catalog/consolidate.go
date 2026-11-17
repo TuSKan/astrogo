@@ -48,7 +48,8 @@ type Record struct {
 //
 // The merged Target's Provenance names the provider of each field. Its
 // aliases are every record's ID and aliases; no record's display Name is
-// added, since an alias is an identity key and a display name is not.
+// added, since an alias is an identity key and a display name is not. What it
+// is a member of, MemberOf, is every record's.
 //
 // Targets come in the order of their first records.
 func Consolidate(records []Record) []Target {

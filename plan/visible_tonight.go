@@ -35,6 +35,11 @@ type VisibleObject struct {
 	// asteroid, or comet. A peak below 0° — above an elevated site's dipped
 	// horizon but not the astronomical one — takes the horizon's airmass, so
 	// its extinction there is a lower bound.
+	//
+	// For an observing group (see Members) it is the group's combined
+	// magnitude, m = -2.5 log10(sum of 10^(-0.4 m_i)), over the members whose
+	// light is not already in another member's: a star system's record holds
+	// its components' light, so the two are never added.
 	ApparentMag float64
 	// RiseTime/TransitTime/SetTime are the real geometric event instants
 	// within [start, end] — each is zero (time.Time{}) if that event
@@ -82,6 +87,15 @@ type VisibleObject struct {
 	// and that is gated behind the same phases the skybrightness roadmap
 	// gates it behind.
 	SkyNote string
+	// Members are the stars this row stands for when it is an observing
+	// group: stars closer together than the observer resolves (see
+	// WithResolution), which the observer sees as one point of light, alf Cen
+	// A and B and their system's record to the naked eye. Each member keeps
+	// its own row, brightest first, and Target and every other field above
+	// are the brightest counted member's, with ApparentMag the group's.
+	//
+	// Members is nil for an object seen on its own (#1182).
+	Members []VisibleObject
 }
 
 type visibleTonightConfig struct {
@@ -90,6 +104,7 @@ type visibleTonightConfig struct {
 	includeMoons          bool
 	forceSmallBodyKernels bool
 	air                   *atmosphere.Atmosphere
+	resolution            angle.Angle
 }
 
 // The wavelength VisibleTonight's V magnitudes are dimmed at. The ozone column
@@ -243,6 +258,17 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // kernel path unconditionally. A candidate whose ephemeris (either path)
 // can't be obtained is skipped, not treated as fatal.
 //
+// # One row for each point of light
+//
+// Stars closer together than the observer resolves, one minute of arc by
+// default (see [WithResolution]), are one row, an observing group, with each
+// star among its [VisibleObject.Members]: alf Cen A and B and their system's
+// record are one naked-eye row, at their combined magnitude, with each star's
+// light counted once (#1182). The members are separate objects, as their
+// catalogs keep them; only the listing joins them. A group is made of stars
+// that each pass magLimit, so two stars each fainter than it, whose light
+// together would pass, are not listed.
+//
 // # The result can be incomplete, and says so
 //
 // That skip covers a network failure as well as a missing orbit. A kernel
@@ -289,6 +315,7 @@ func VisibleTonight(
 	cfg := visibleTonightConfig{
 		minAltitude: angle.Deg(-site.HorizonDip().Degrees()),
 		step:        unit.Minutes(10),
+		resolution:  eyeResolution,
 	}
 
 	for _, opt := range opts {
@@ -345,34 +372,36 @@ func VisibleTonight(
 	// considerate of here, so this uses every core rather than a small
 	// fixed bound.
 	type evalResult struct {
-		vo   VisibleObject
-		name string
-		ok   bool
 		err  error
+		name string
+		obj  placedObject
+		ok   bool
 	}
 
 	// The skip reason travels in the result rather than through parallel.Map's
 	// own error return: that is an errgroup, so it keeps only the first error
 	// and cancels the rest, and one candidate failing must not stop the others.
 	evaluated, _ := parallel.Map(candidates, 0, func(_ int, c visibleCandidate) (evalResult, error) {
-		vo, ok, err := evaluateCandidate(ctx, c, start, end, site, planetProvider, magLimit, cfg)
+		obj, ok, err := evaluateCandidate(ctx, c, start, end, site, planetProvider, magLimit, cfg)
 
 		if c.closer != nil {
 			_ = c.closer.Close()
 		}
 
-		return evalResult{vo: vo, name: c.obj.Name(), ok: ok, err: err}, nil
+		return evalResult{obj: obj, name: c.obj.Name(), ok: ok, err: err}, nil
 	})
 
-	results := make([]VisibleObject, 0, len(candidates))
+	visible := make([]placedObject, 0, len(candidates))
 
 	for _, r := range evaluated {
 		if r.ok {
-			results = append(results, r.vo)
+			visible = append(visible, r.obj)
 		}
 
 		dropped.add("candidate", r.name, r.err)
 	}
+
+	results := observingGroups(visible, cfg.resolution)
 
 	slices.SortFunc(results, func(a, b VisibleObject) int {
 		return cmp.Compare(a.ApparentMag, b.ApparentMag)
@@ -397,7 +426,8 @@ func VisibleTonight(
 // two sources both carry is one target, SIMBAD's Alnilam with OpenNGC's
 // NGC 1990, which OpenNGC catalogs as the star (#1136). That is identity
 // only: a star system and its components are separate objects with
-// identifiers of their own, and stay separate here.
+// identifiers of their own, and stay separate here. They are listed as one
+// point of light later, by observingGroups, which keeps each of them.
 func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, at time.Time, dropped *skips) []resolve.Target {
 	// A source's own query error is handled per-item below (skipped, not
 	// propagated), so parallel.Map's own error return is never non-nil.
@@ -737,7 +767,7 @@ func asObject(obj Observable) coord.Object {
 // on purpose — see its doc comment), so this check, against the real
 // computed-and-extinguished magnitude, is the only place that bound is
 // enforced for real.
-func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (VisibleObject, bool, error) {
+func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (placedObject, bool, error) {
 	obj := c.obj
 
 	// skipped reports a candidate dropped because it could not be evaluated,
@@ -751,11 +781,11 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	//
 	// Warn, not Info: the result is quietly less complete than it looks, which
 	// is exactly what that level is for. See the logging package.
-	skipped := func(stage string, err error) (VisibleObject, bool, error) {
+	skipped := func(stage string, err error) (placedObject, bool, error) {
 		logging.WarnContext(ctx, "candidate skipped: could not evaluate",
 			"target", obj.Name(), "stage", stage, "err", err)
 
-		return VisibleObject{}, false, fmt.Errorf("%s: %w", stage, err)
+		return placedObject{}, false, fmt.Errorf("%s: %w", stage, err)
 	}
 
 	windows, err := ObservableWindows(obj, start, end, cfg.step, site, Altitude{Threshold: cfg.minAltitude})
@@ -764,7 +794,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	}
 
 	if len(windows) == 0 {
-		return VisibleObject{}, false, nil // evaluated: never clears the horizon
+		return placedObject{}, false, nil // evaluated: never clears the horizon
 	}
 
 	events, err := VisibilityEvents(start, end, obj, site)
@@ -806,7 +836,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	}
 
 	if peakTime.IsZero() {
-		return VisibleObject{}, false, nil // evaluated: no maximum inside the window
+		return placedObject{}, false, nil // evaluated: no maximum inside the window
 	}
 
 	pos, err := obj.Position(peakTime)
@@ -835,7 +865,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	}
 
 	if !ok {
-		return VisibleObject{}, false, nil // evaluated: no published magnitude
+		return placedObject{}, false, nil // evaluated: no published magnitude
 	}
 
 	// The windows are found against the site's dipped horizon, which for an
@@ -861,7 +891,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 
 	vo.ApparentMag = rawMag + extinction
 	if vo.ApparentMag >= magLimit {
-		return VisibleObject{}, false, nil
+		return placedObject{}, false, nil
 	}
 
 	if full, abbr, err := constellation.Lookup(pos); err == nil {
@@ -872,7 +902,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		vo.SkyNote = moonNote(planetProvider, obj, peakTime, astroCtx)
 	}
 
-	return vo, true, nil
+	return placedObject{vo: vo, pos: pos}, true, nil
 }
 
 // defaultNightAir is the air VisibleTonight assumes when the caller names

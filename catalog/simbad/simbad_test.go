@@ -450,7 +450,12 @@ func TestSearchBrightMock(t *testing.T) {
 
 		w.Header().Set("Content-Type", "text/csv")
 
-		if err := r.ParseForm(); err == nil && isIdentifierQuery(r.PostForm.Get("QUERY")) {
+		if err := r.ParseForm(); err == nil && isMembershipQuery(r.PostForm.Get("QUERY")) {
+			_, _ = w.Write([]byte(noMemberships))
+			return
+		}
+
+		if isIdentifierQuery(r.PostForm.Get("QUERY")) {
 			_, _ = w.Write([]byte(identifierAnswer(t, r.PostForm.Get("QUERY"), func(oid int64) string {
 				return map[int64]string{1: "* alf CMa|NAME Sirius|HD  48915", 2: "* alf Car|NAME Canopus", 3: "* bet Ori|NAME Rigel"}[oid]
 			})))
