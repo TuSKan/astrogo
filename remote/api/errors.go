@@ -15,3 +15,13 @@ import "errors"
 // under its own name, so an errors.Is against remote.ErrRetriable keeps
 // matching and no caller learns this package exists.
 var ErrRetriable = errors.New("remote: retriable failure")
+
+// ErrNoResponse marks a request that ended without an answer from the
+// service: the host could not be reached, the connection failed, nothing came
+// back within the client's timeout, or the caller's own context ended it. A
+// status the service did send is an *HTTPError instead, so a caller can tell
+// "the service said no" from "the service said nothing".
+//
+// The parent package reads it to remember a host that does not answer; see
+// [github.com/TuSKan/astrogo/remote.ErrUnreachable].
+var ErrNoResponse = errors.New("no answer")
