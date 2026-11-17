@@ -1102,50 +1102,60 @@ func NightOf(t time.Time, site *Site, prov eph.Provider, kind TwilightKind) (Nig
 		return Night{}, fmt.Errorf("%w: %d", ErrUnknownTwilightKind, int(kind))
 	}
 
-	day := unit.Days(1)
-
-	ahead, err := twilightCrossings(t, t.Add(day), site, prov, threshold)
+	dusk, dawn, err := nightAcross(t, site, prov, threshold, kind.String()+" twilight")
 	if err != nil {
 		return Night{}, err
 	}
 
+	return Night{Dusk: dusk, Dawn: dawn, Kind: kind}, nil
+}
+
+// nightAcross is NightOf for any solar altitude threshold, in degrees: the
+// Sun's descent through it that begins the night t is in, or the one after t,
+// and the ascent that ends it. what names the threshold in an error.
+func nightAcross(t time.Time, site *Site, prov eph.Provider, threshold float64, what string) (dusk, dawn time.Time, err error) {
+	day := unit.Days(1)
+
+	ahead, err := twilightCrossings(t, t.Add(day), site, prov, threshold)
+	if err != nil {
+		return dusk, dawn, err
+	}
+
 	first := firstCrossing(ahead, EventRise, EventSet)
 	if first == nil {
-		return Night{}, fmt.Errorf("%w: %s twilight, within a day after %v", ErrNoTwilight, kind, t)
+		return dusk, dawn, fmt.Errorf("%w: %s, within a day after %v", ErrNoTwilight, what, t)
 	}
 
 	if first.Kind == EventRise {
 		// t is in the night that this dawn ends.
 		behind, err := twilightCrossings(t.Add(-day), t, site, prov, threshold)
 		if err != nil {
-			return Night{}, err
+			return dusk, dawn, err
 		}
 
 		for _, e := range slices.Backward(behind) {
 			if e.Kind == EventSet {
-				return Night{Dusk: e.Time, Dawn: first.Time, Kind: kind}, nil
+				return e.Time, first.Time, nil
 			}
 		}
 
-		return Night{}, fmt.Errorf("%w: %s twilight, within a day before %v", ErrNoTwilight, kind, t)
+		return dusk, dawn, fmt.Errorf("%w: %s, within a day before %v", ErrNoTwilight, what, t)
 	}
 
 	// t is before the night this dusk begins.
-	dusk := *first
-
-	dawn := firstCrossing(ahead, EventRise)
-	if dawn == nil || !dawn.Time.After(dusk.Time) {
-		later, err := twilightCrossings(t.Add(day), dusk.Time.Add(day), site, prov, threshold)
+	rise := firstCrossing(ahead, EventRise)
+	if rise == nil || !rise.Time.After(first.Time) {
+		later, err := twilightCrossings(t.Add(day), first.Time.Add(day), site, prov, threshold)
 		if err != nil {
-			return Night{}, err
+			return dusk, dawn, err
 		}
 
-		if dawn = firstCrossing(later, EventRise); dawn == nil {
-			return Night{}, fmt.Errorf("%w: %s twilight, within a day after the dusk at %v", ErrNoTwilight, kind, dusk.Time)
+		if rise = firstCrossing(later, EventRise); rise == nil {
+			return dusk, dawn, fmt.Errorf("%w: %s, within a day after the dusk at %v", ErrNoTwilight, what, first.Time)
 		}
 	}
 
-	return Night{Dusk: dusk.Time, Dawn: dawn.Time, Kind: kind}, nil
+	return first.Time, rise.Time, nil
 }
 
 // firstCrossing returns the first of events whose kind is one of kinds, or
