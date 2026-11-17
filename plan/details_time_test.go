@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -49,9 +48,9 @@ func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
 			"Time of maximum elevation:": d.TransitTime,
 			"Set time:":                  d.SetTime,
 		} {
-			want := label + "\t" + at.In(c.zone).Format("2006-01-02 15:04") + " " + c.name
-			if !strings.Contains(s, want) {
-				t.Errorf("%s: String() lacks %q:\n%s", c.name, want, s)
+			want := at.In(c.zone).Format("2006-01-02 15:04") + " " + c.name
+			if got := detailValue(s, label); got != want {
+				t.Errorf("%s: String()'s %q line reads %q, want %q:\n%s", c.name, label, got, want, s)
 			}
 		}
 	}

@@ -34,7 +34,7 @@ func TestStringPrintsExtraPropsInAStableOrder(t *testing.T) {
 	var got []string
 
 	for line := range strings.Lines(first) {
-		if key, _, ok := strings.Cut(line, ":\t"); ok && d.ExtraProps[key] != "" {
+		if key, _, ok := strings.Cut(line, ":"); ok && d.ExtraProps[key] != "" {
 			got = append(got, key)
 		}
 	}

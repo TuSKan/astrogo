@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -74,7 +75,11 @@ type TargetDetails struct {
 // its date and that zone's name, for example "2026-04-25 06:20 -03".
 const detailsTimeLayout = "2006-01-02 15:04 MST"
 
-// String formats the details as a textual summary.
+// String formats the details as a textual summary: the name, description
+// and source, then one "Label: value" line per known field, and the extra
+// properties after a blank line. The values of each block start in one
+// column, the labels padded to the longest label in it. A field with nothing
+// to show is left out.
 func (d TargetDetails) String() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n", strings.ToUpper(d.Name))
@@ -87,72 +92,102 @@ func (d TargetDetails) String() string {
 		fmt.Fprintf(&b, "%s\n\n", d.Source)
 	}
 
+	var rows detailRows
+
 	if d.Magnitude != "" {
-		fmt.Fprintf(&b, "Magnitude:\t%s\n", d.Magnitude)
+		rows.add("Magnitude", d.Magnitude)
 	}
 
 	if d.RadialVelocity != "" {
-		fmt.Fprintf(&b, "Radial velocity:\t%s\n", d.RadialVelocity)
+		rows.add("Radial velocity", d.RadialVelocity)
 	}
 
-	fmt.Fprintf(&b, "RA (ICRS):\t%s\n", d.RA.HMSString(1))
-	fmt.Fprintf(&b, "Dec (ICRS):\t%s\n", d.Dec.DMSString(0))
-	fmt.Fprintf(&b, "Altitude:\t%s\n", d.Altitude.DMSString(0))
-	fmt.Fprintf(&b, "Azimuth:\t%s\n", d.Azimuth.DMSString(0))
+	rows.add("RA (ICRS)", d.RA.HMSString(1))
+	rows.add("Dec (ICRS)", d.Dec.DMSString(0))
+	rows.add("Altitude", d.Altitude.DMSString(0))
+	rows.add("Azimuth", d.Azimuth.DMSString(0))
 	// Zero means nothing supplied a distance: OpenNGC gives none for a
 	// galaxy, and a star without a parallax has none. It used to print as
 	// "0.0000 pc", which reads as a measurement (#1132).
 	if d.Distance != 0 {
-		fmt.Fprintf(&b, "Distance:\t%.4f %s\n", d.distanceInItsUnit(), d.DistanceUnit)
+		rows.add("Distance", fmt.Sprintf("%.4f %s", d.distanceInItsUnit(), d.DistanceUnit))
 	}
 
 	if d.AngularSize != "" {
-		fmt.Fprintf(&b, "Angular size(s):\t%s\n", d.AngularSize)
+		rows.add("Angular size(s)", d.AngularSize)
 	}
 
 	// Each time carries its date and zone: the time of day alone dropped
 	// both, so a UTC context's times read as local ones, and a set after
 	// midnight read as the same day's (#1133).
 	if d.RiseTime != nil {
-		fmt.Fprintf(&b, "Rise time:\t%s\n", d.RiseTime.Format(detailsTimeLayout))
-		fmt.Fprintf(&b, "Rise azimuth:\t%s\n", d.RiseAzimuth.DMSString(0))
+		rows.add("Rise time", d.RiseTime.Format(detailsTimeLayout))
+		rows.add("Rise azimuth", d.RiseAzimuth.DMSString(0))
 	}
 
 	if d.TransitTime != nil {
-		fmt.Fprintf(&b, "Time of maximum elevation:\t%s\n", d.TransitTime.Format(detailsTimeLayout))
-		fmt.Fprintf(&b, "Maximum elevation:\t%.1f°\n", d.MaxElevation.Degrees())
+		rows.add("Time of maximum elevation", d.TransitTime.Format(detailsTimeLayout))
+		rows.add("Maximum elevation", fmt.Sprintf("%.1f°", d.MaxElevation.Degrees()))
 	}
 
 	if d.SetTime != nil {
-		fmt.Fprintf(&b, "Set time:\t%s\n", d.SetTime.Format(detailsTimeLayout))
-		fmt.Fprintf(&b, "Set azimuth:\t%s\n", d.SetAzimuth.DMSString(0))
+		rows.add("Set time", d.SetTime.Format(detailsTimeLayout))
+		rows.add("Set azimuth", d.SetAzimuth.DMSString(0))
 	}
 
 	if d.Elongation.Radians() != 0 {
-		fmt.Fprintf(&b, "Elongation:\t%.1f°\n", d.Elongation.Degrees())
+		rows.add("Elongation", fmt.Sprintf("%.1f°", d.Elongation.Degrees()))
 	}
 
-	if len(d.ExtraProps) > 0 {
-		b.WriteString("\n")
-		// Output known props first if they exist
-		if v, ok := d.ExtraProps["Messier number"]; ok {
-			fmt.Fprintf(&b, "Messier number:\t%s\n", v)
-		}
+	rows.write(&b)
 
-		if v, ok := d.ExtraProps["NGC/IC number"]; ok {
-			fmt.Fprintf(&b, "NGC/IC number:\t%s\n", v)
+	if len(d.ExtraProps) > 0 {
+		var extra detailRows
+
+		// The known props first, if they exist.
+		for _, k := range []string{"Messier number", "NGC/IC number"} {
+			if v, ok := d.ExtraProps[k]; ok {
+				extra.add(k, v)
+			}
 		}
 
 		// The rest in key order. Ranging over the map printed them in Go's
 		// randomized map order, different from one run to the next (#1134).
 		for _, k := range slices.Sorted(maps.Keys(d.ExtraProps)) {
 			if k != "Messier number" && k != "NGC/IC number" {
-				fmt.Fprintf(&b, "%s:\t%s\n", k, d.ExtraProps[k])
+				extra.add(k, d.ExtraProps[k])
 			}
 		}
+
+		b.WriteString("\n")
+		extra.write(&b)
 	}
 
 	return b.String()
+}
+
+// detailRows is one block of [TargetDetails.String]'s "Label: value" lines.
+//
+// The values are aligned by padding each label to the block's longest, in
+// characters. They used to follow a tab, which a terminal expands to the next
+// multiple of eight columns, so labels of different lengths put their values
+// in different columns: "Magnitude:" and "Radial velocity:" eight apart.
+type detailRows [][2]string
+
+func (r *detailRows) add(label, value string) {
+	*r = append(*r, [2]string{label, value})
+}
+
+func (r detailRows) write(b *strings.Builder) {
+	width := 0
+	for _, row := range r {
+		width = max(width, utf8.RuneCountInString(row[0]))
+	}
+
+	for _, row := range r {
+		pad := width - utf8.RuneCountInString(row[0])
+		fmt.Fprintf(b, "%s:%s %s\n", row[0], strings.Repeat(" ", pad), row[1])
+	}
 }
 
 // distanceInItsUnit renders Distance in whatever [TargetDetails.DistanceUnit]
