@@ -43,10 +43,65 @@ type ScheduledBlock struct {
 	SetupTime time.Duration // Time spent on setup/slew before exposing
 }
 
-// UnscheduledBlock represents a block that could not be scheduled.
+// UnscheduledBlock is a block that could not be scheduled, and why.
+//
+// Every unscheduled block used to carry one reason, "constraints
+// unsatisfied, insufficient time, or cadence unfulfillable in window", which
+// could not tell an altitude limit from a Moon distance, from a window too
+// short for the block (#1207). Cause now says which, Constraint names the
+// constraint, and Reason says it in words.
+//
+// The reason is the one the strategy's forward pass found: for
+// [SwapOptimizedStrategy], its first, greedy pass, whose verdict its later
+// passes did not overturn.
 type UnscheduledBlock struct {
-	Block  *Block
+	Block *Block
+	// Constraint is the constraint that rejected the most placements of the
+	// block, the first of them on a tie: the one that kept it out, when Cause
+	// is CauseConstraint. For CauseCadence it is the one that rejected the
+	// most placements, if any did. It is nil when none rejected one.
+	Constraint Constraint
+	// Reason says why in words: the cause, the constraint with how many of
+	// the placements tried it rejected, and the constraint's own reason the
+	// last time it rejected one, such as "target is below the horizon".
 	Reason string
+	// Cause is what kept the block out.
+	Cause UnscheduledCause
+	// Observed is how many times the block was placed: for CauseCadence, the
+	// observations made before the window ran out for the rest; zero
+	// otherwise.
+	Observed int
+}
+
+// UnscheduledCause is what kept a block out of a schedule.
+type UnscheduledCause int
+
+const (
+	// CauseNoTime is a block that never fit: the block, with the slew to it,
+	// was longer than the time the window had left at every instant the
+	// strategy tried, so no placement of it reached its constraints.
+	CauseNoTime UnscheduledCause = iota + 1
+	// CauseConstraint is a block whose every placement that fit in the
+	// window failed a constraint. UnscheduledBlock.Constraint names the one
+	// that failed most often.
+	CauseConstraint
+	// CauseCadence is a block observed fewer times than its Cadence asks:
+	// the window ended before the remaining repeats could be placed.
+	CauseCadence
+)
+
+// String names the cause.
+func (c UnscheduledCause) String() string {
+	switch c {
+	case CauseNoTime:
+		return "no time"
+	case CauseConstraint:
+		return "constraint"
+	case CauseCadence:
+		return "cadence"
+	default:
+		return fmt.Sprintf("UnscheduledCause(%d)", int(c))
+	}
 }
 
 // Schedule is the final generated observation timeline.
@@ -333,29 +388,46 @@ func checkConstraintsInterval(
 	sky *runSky,
 	constraints ...Constraint,
 ) (bool, error) {
-	check := func(t time.Time) (bool, error) {
+	failed, _, err := firstFailure(target, start, end, step, site, ctxAt, sky, constraints...)
+
+	return failed < 0 && err == nil, err
+}
+
+// firstFailure is checkConstraintsInterval saying which constraint failed:
+// the index in constraints of the first to fail, at the first step where one
+// does, with its Result, or -1 when all pass throughout.
+func firstFailure(
+	target Observable,
+	start, end time.Time,
+	step time.Duration,
+	site *Site,
+	ctxAt func(time.Time) *coord.Context,
+	sky *runSky,
+	constraints ...Constraint,
+) (int, Result, error) {
+	check := func(t time.Time) (int, Result, error) {
 		ctx := ctxAt(t)
 
-		for _, c := range constraints {
+		for i, c := range constraints {
 			res, err := checkConstraint(c, target, t, site, ctx, sky)
 			if err != nil {
-				return false, fmt.Errorf("plan: constraint at %s: %w",
+				return -1, Result{}, fmt.Errorf("plan: constraint at %s: %w",
 					t.Format(time.RFC3339), err)
 			}
 
 			if !res.Pass {
-				return false, nil
+				return i, res, nil
 			}
 		}
 
-		return true, nil
+		return -1, Result{}, nil
 	}
 
 	t := start
 	for t.Before(end) || t.Equal(end) {
-		ok, err := check(t)
-		if err != nil || !ok {
-			return false, err
+		failed, res, err := check(t)
+		if err != nil || failed >= 0 {
+			return failed, res, err
 		}
 
 		t = t.Add(time.FromGoDuration(step))
@@ -366,7 +438,7 @@ func checkConstraintsInterval(
 		return check(end)
 	}
 
-	return true, nil
+	return -1, Result{}, nil
 }
 
 // GreedyStrategy traverses time forward and schedules the first block in the list
@@ -411,9 +483,12 @@ func (s *GreedyStrategy) schedule(
 	var lastBlock *Block
 
 	type activeItem struct {
-		b         *Block
 		available time.Time
-		rem       int
+		b         *Block
+		// constraints are the planner's and the block's, as checked.
+		constraints []Constraint
+		misses      unscheduledTally
+		rem         int
 	}
 
 	var unassigned []*activeItem
@@ -424,10 +499,16 @@ func (s *GreedyStrategy) schedule(
 			repeats = b.Cadence.Repeats
 		}
 
+		// Combine base planner constraints with block-specific constraints
+		constraints := append(make([]Constraint, 0, len(planner.Constraints)+len(b.Constraints)), planner.Constraints...)
+		constraints = append(constraints, b.Constraints...)
+
 		unassigned = append(unassigned, &activeItem{
-			b:         b,
-			available: window.Start,
-			rem:       repeats,
+			b:           b,
+			available:   window.Start,
+			rem:         repeats,
+			constraints: constraints,
+			misses:      newUnscheduledTally(len(constraints)),
 		})
 	}
 
@@ -463,17 +544,15 @@ func (s *GreedyStrategy) schedule(
 				continue // Block execution exceeds the scheduling window
 			}
 
-			// Combine base planner constraints with block-specific constraints
-			allConstraints := append(make([]Constraint, 0, len(planner.Constraints)+len(b.Constraints)), planner.Constraints...)
-			allConstraints = append(allConstraints, b.Constraints...)
-
 			// Check observability over the full duration
-			ok, err := checkConstraintsInterval(b.Target, startTime, endTime, step, planner.Site, ctxAt, sky, allConstraints...)
+			failed, res, err := firstFailure(b.Target, startTime, endTime, step, planner.Site, ctxAt, sky, item.constraints...)
 			if err != nil {
 				return nil, fmt.Errorf("plan: greedy: block %s: %w", b.ID, err)
 			}
 
-			if ok {
+			item.misses.tried(failed, res)
+
+			if failed < 0 {
 				// A greedy run scores each placement once and never returns to
 				// it, so it keeps no record of the Moon: one would hold only
 				// what is not asked for again, measured at 14% more bytes and
@@ -488,6 +567,7 @@ func (s *GreedyStrategy) schedule(
 
 				currentTime = endTime
 				lastBlock = b
+				item.misses.observed++
 
 				if item.rem > 0 {
 					item.rem--
@@ -530,13 +610,85 @@ func (s *GreedyStrategy) schedule(
 	}
 
 	for _, item := range unassigned {
-		sched.Unscheduled = append(sched.Unscheduled, UnscheduledBlock{
-			Block:  item.b,
-			Reason: "constraints unsatisfied, insufficient time, or cadence unfulfillable in window",
-		})
+		sched.Unscheduled = append(sched.Unscheduled, item.misses.unscheduled(item.b, item.constraints))
 	}
 
 	return sched, nil
+}
+
+// unscheduledTally keeps what a strategy learned about a block it has not
+// placed yet: how many placements that fit in the window it tried, how many
+// each constraint rejected and, from the last, why, and how many times it
+// placed the block.
+type unscheduledTally struct {
+	rejected []int
+	why      []string
+	tries    int
+	observed int
+}
+
+func newUnscheduledTally(constraints int) unscheduledTally {
+	return unscheduledTally{rejected: make([]int, constraints), why: make([]string, constraints)}
+}
+
+// tried records one placement that fit in the window: failed is the index of
+// the constraint that rejected it, with that constraint's result, or -1 when
+// none did.
+func (t *unscheduledTally) tried(failed int, res Result) {
+	t.tries++
+
+	if failed >= 0 {
+		t.rejected[failed]++
+		t.why[failed] = res.Reason
+	}
+}
+
+// unscheduled is what the tally says of b, left unscheduled, whose
+// constraints are those it was checked against.
+func (t *unscheduledTally) unscheduled(b *Block, constraints []Constraint) UnscheduledBlock {
+	ub := UnscheduledBlock{Block: b, Observed: t.observed}
+
+	worst := -1
+
+	for i, n := range t.rejected {
+		if n > 0 && (worst < 0 || n > t.rejected[worst]) {
+			worst = i
+		}
+	}
+
+	var rejection string
+
+	if worst >= 0 {
+		ub.Constraint = constraints[worst]
+		rejection = fmt.Sprintf("%T rejected %d of the %d placements tried", ub.Constraint, t.rejected[worst], t.tries)
+
+		if why := t.why[worst]; why != "" {
+			rejection += ": " + why
+		}
+	}
+
+	switch {
+	case t.observed > 0:
+		ub.Cause = CauseCadence
+
+		times := 1
+		if b.Cadence != nil {
+			times += b.Cadence.Repeats
+		}
+
+		ub.Reason = fmt.Sprintf("observed %d of %d times before the window ended", t.observed, times)
+		if rejection != "" {
+			ub.Reason += "; " + rejection
+		}
+	case worst < 0:
+		ub.Cause = CauseNoTime
+		ub.Reason = "the block and the slew to it never fit in the time the window had left"
+	default:
+		ub.Cause = CauseConstraint
+		ub.Reason = rejection
+	}
+
+	return ub
 }
 
 // PriorityStrategy pre-sorts blocks by Priority (descending) before applying
