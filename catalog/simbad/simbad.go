@@ -125,7 +125,9 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // SearchBright returns every SIMBAD object brighter than req.MaxVMag,
 // brightest-first — the bulk counterpart to Resolve/Search's name-driven
 // lookup (see BuildBrightQuery for why this can't reuse ResolveObject's
-// query/parse path directly).
+// query/parse path directly). Transients are the exception: a supernova's or
+// a nova's catalog magnitude is its outburst's, not the brightness of
+// anything in the sky now, so they are left out (#1137).
 //
 // With req.Limit set it returns at most that many. Without one it returns
 // every object, up to 50,000, SIMBAD's own default output limit; a bound

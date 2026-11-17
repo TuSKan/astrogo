@@ -156,7 +156,7 @@ func main() {
 			marker = "◀ CANDIDATE"
 		}
 
-		fmt.Printf("  %-22s  %6.3f    %6.3f    %-10s  %-6s  %-12s  %s\n",
+		fmt.Printf("  %-22s  %6.3f    %+7.4f   %-10s  %-6s  %-12s  %s\n",
 			e.Time.FormatJulian("2006-01-02 15:04 MST"),
 			absLat,
 			e.Gamma,

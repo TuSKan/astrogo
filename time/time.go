@@ -465,9 +465,15 @@ func FromGo(t time.Time) Time {
 	return result
 }
 
-// NowUTC returns the current time in the UTC scale.
+// NowUTC returns the current time in the UTC scale, displayed in UTC: its
+// [Time.String], [Time.Format] and [Time.ToGo] show the UTC clock.
+//
+// It used to keep the host's local zone for display, as [FromGo] keeps the
+// zone it is given, so NowUTC().Format("15:04 UTC") printed the local clock
+// labeled UTC (#1142). For the current instant shown on the local clock, use
+// FromGo(Now()), or call [Time.In] with the zone wanted.
 func NowUTC() Time {
-	return FromGo(time.Now())
+	return FromGo(time.Now().UTC())
 }
 
 // ZeroTime returns the zero time, defined as JD 0 in the UTC scale.
