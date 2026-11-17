@@ -4,8 +4,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
 
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 )
@@ -28,7 +32,7 @@ func main() {
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD, catalog.MAST)
 
 	query := "Andromeda"
-	fmt.Printf("Executing advanced Search for ambiguous query: %q...\n", query)
+	show.Title("Name resolution", fmt.Sprintf("Search(%q) across OpenNGC, SIMBAD and MAST", query))
 
 	// 3. Perform a fuzzy Search combining all endpoints.
 	//
@@ -38,42 +42,55 @@ func main() {
 	// used to be the same answer.
 	results, err := resolver.Search(ctx, query)
 	if err != nil {
-		fmt.Printf("Search failed: %v\n", err)
-		return
+		log.Fatalf("search: %v", err)
 	}
 
 	if len(results) == 0 {
-		fmt.Println("No matches found.")
+		show.Note("", "No matches found.")
 		return
 	}
 
-	fmt.Printf("\nFound %d matching objects across the catalogs:\n\n", len(results))
+	// 4. The merged, ranked targets: one row each, however many catalogs
+	// contributed to it.
+	tab := show.NewTable(show.Right("#"), show.Left("Name"), show.Left("Kind"), show.Left("Catalog"),
+		show.Right("RA"), show.Right("Dec"))
 
-	// 4. Iterate over the uniquely merged and ranked targets
 	for i, t := range results {
-		fmt.Printf("[%d] %-30s | Kind: %-15s | DB: %s\n", i+1, t.Name, t.Kind, t.Catalog)
-		fmt.Printf("    ID: %-26s | ICRS: %s\n", t.ID, t.Coord)
-
-		if len(t.Aliases) > 0 {
-			// Show up to 3 aliases to demonstrate why it matched
-			alts := t.Aliases
-			if len(alts) > 3 {
-				alts = alts[:3]
-			}
-
-			fmt.Printf("    Aliases: %v\n", alts)
+		ra, dec := "", ""
+		if t.HasCoord {
+			ra, dec = t.Coord.RA().HMSString(1), t.Coord.Dec().DMSString(0)
 		}
 
-		fmt.Println("    -------------------------------------------------------------------")
+		tab.Row(strconv.Itoa(i+1), t.Name, string(t.Kind), t.Catalog, ra, dec)
 	}
 
-	// 5. Demonstrate Resolve(), which now cross-matches and merges every
-	// provider's hit for the query into a single, richer Target instead of
-	// returning the first provider that happens to answer.
-	fmt.Printf("\nExecuting Resolve() on %q...\n", "M31")
+	fmt.Println()
+	tab.Print()
 
+	// Up to three aliases each, which is why a row matched.
+	show.Section("Why they matched")
+
+	for i, t := range results {
+		if len(t.Aliases) == 0 {
+			continue
+		}
+
+		alts := t.Aliases[:min(len(t.Aliases), 3)]
+		show.Note(fmt.Sprintf("%d. %s", i+1, strings.Join(alts, ", ")))
+	}
+
+	// 5. Resolve cross-matches every provider's hit for one name and merges
+	// them into a single, richer Target, recording which catalog gave each
+	// field.
 	exact, err := resolver.Resolve(ctx, "M31")
-	if err == nil {
-		fmt.Printf("Matched: %s (%s), merged from %d field(s) with attributed provenance.\n", exact.Name, exact.ID, len(exact.Provenance))
+	if err != nil {
+		log.Fatalf("resolve: %v", err)
 	}
+
+	show.Section(`Resolve("M31")`)
+	show.Fields(
+		show.KV("Name", "%s", exact.Name),
+		show.KV("ID", "%s", exact.ID),
+		show.KV("Fields merged", "%d, each with the catalog it came from", len(exact.Provenance)),
+	)
 }

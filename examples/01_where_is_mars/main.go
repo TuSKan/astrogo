@@ -4,10 +4,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -53,8 +55,22 @@ func main() {
 		log.Fatalf("Error converting to Alt/Az: %v", err)
 	}
 
-	fmt.Printf("Time: %s (%s)\n", tm, tm.Format("2006-01-02 15:04:05 -0700"))
-	fmt.Printf("Observer: Quinta Calixto, Brazil\n")
-	fmt.Printf("Mars Altitude: %.2f°\n", skyPos.Alt().Degrees())
-	fmt.Printf("Mars Azimuth:  %.2f°\n", skyPos.Az().Degrees())
+	show.Title("Where is Mars?", "Quinta Calixto, Brazil")
+	fmt.Println()
+	show.Fields(
+		show.KV("Time", "%s", tm.Format("2006-01-02 15:04 MST")),
+		show.KV("Altitude", "%.2f°", skyPos.Alt().Degrees()),
+		show.KV("Azimuth", "%.2f°  (%s)", skyPos.Az().Degrees(), compassPoint(skyPos.Az().Degrees())),
+	)
+
+	if skyPos.Alt().Degrees() < 0 {
+		show.Note("", "Mars is below the horizon at this moment.")
+	}
+}
+
+// compassPoint names the nearest of the 16 compass points to an azimuth in
+// degrees, measured from north through east.
+func compassPoint(az float64) string {
+	points := []string{"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
+	return points[int(math.Round(az/22.5))%16]
 }
