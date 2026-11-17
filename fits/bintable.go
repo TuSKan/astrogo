@@ -2,6 +2,7 @@ package fits
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -358,6 +359,35 @@ func ReadBintable(h *Header, r io.Reader) (*BintableHDU, error) {
 	}
 
 	return hdu, discardPadding(r, consumed)
+}
+
+// ColumnUnit returns the unit the column named colName declares in its TUNITn
+// keyword, such as "deg" or "h", or "" when it declares none. The name matches
+// as [BintableHDU.GetFloatColumn] matches it.
+//
+// A column's values mean nothing without it: a right ascension of 5.92 is
+// Betelgeuse in hours and a point 83 degrees away in degrees, and only the
+// header says which.
+func (hdu *BintableHDU) ColumnUnit(colName string) (string, error) {
+	if hdu.Batch == nil {
+		return "", ErrUninitBatch
+	}
+
+	idx := hdu.columnIndex(colName)
+	if idx < 0 {
+		return "", fmt.Errorf("%w: %s", ErrColumnNotFound, colName)
+	}
+
+	unit, err := hdu.Header().GetString(fmt.Sprintf("TUNIT%d", idx+1))
+	if errors.Is(err, ErrKeyNotFound) {
+		return "", nil
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("column %s: TUNIT%d: %w", colName, idx+1, err)
+	}
+
+	return strings.TrimSpace(unit), nil
 }
 
 // GetStringColumn extracts a FITS binary table column and safely converts it

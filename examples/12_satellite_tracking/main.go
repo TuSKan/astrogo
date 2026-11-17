@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
+	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -13,6 +13,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
@@ -38,8 +39,6 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// 1. Resolve ISS (Zarya) from NORAD Catalog
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Resolving ISS (Zarya) from NORAD Catalog")
-
 	resolver := catalog.NewResolver(catalog.NORAD)
 
 	target, err := resolver.Resolve(context.Background(), "ISS (Zarya)")
@@ -47,21 +46,24 @@ func main() {
 		log.Fatalf("Failed to resolve ISS (Zarya): %v", err)
 	}
 
-	fmt.Printf("  Name:     %s\n", target.Name)
-	fmt.Printf("  NORAD ID: %s\n", target.ID)
-	fmt.Printf("  Intl Des: %s\n", target.Designation)
 	// A TLE describes an orbit well for a few days either side of its
 	// epoch, and CelesTrak serves the current one, so this example works
 	// from the present moment rather than a fixed date.
 	now := time.NowUTC()
 
-	fmt.Printf("  Epoch:    %s (%.1f days ago)\n", target.Epoch.Format("2006-01-02 15:04:05 UTC"), now.Sub(target.Epoch).Days())
+	show.Title("Tracking the ISS", "From CelesTrak's current element set, through SGP4")
+
+	show.Section("The element set")
+	show.Fields(
+		show.KV("Name", "%s", target.Name),
+		show.KV("NORAD ID", "%s", target.ID),
+		show.KV("International designator", "%s", target.Designation),
+		show.KV("Epoch", "%s, %.1f days ago", target.Epoch.Format("2006-01-02 15:04:05 UTC"), now.Sub(target.Epoch).Days()),
+	)
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 2. Create Provider from Target TLE
 	// ═══════════════════════════════════════════════════════════════════════
-	header("SGP4 Propagation (via eph.At(...).Geometric)")
-
 	prov, err := eph.NewProvider(context.Background(), eph.Satellites, target.Name,
 		eph.WithTLE(target.TLELine1, target.TLELine2))
 	if err != nil {
@@ -95,16 +97,9 @@ func main() {
 		log.Fatalf("icrs: %v", err)
 	}
 
-	fmt.Printf("  At:       %s\n", now.Format("2006-01-02 15:04:05 UTC"))
-	fmt.Printf("  RA:       %s\n", icrs.RA())
-	fmt.Printf("  Dec:      %s\n", icrs.Dec())
-	fmt.Printf("  Distance: %.1f km\n", state.DistanceKm())
-
 	// ═══════════════════════════════════════════════════════════════════════
 	// 3. Height Above the WGS84 Ellipsoid
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Orbital Altitude")
-
 	// The *satellite.Satellite knows the ellipsoid; a generic Provider only
 	// knows a geocentric distance.
 	alt, err := sat.Altitude(now)
@@ -112,13 +107,18 @@ func main() {
 		log.Fatalf("Altitude failed: %v", err)
 	}
 
-	fmt.Printf("  Altitude: %.1f km above the WGS84 ellipsoid\n", alt.Km())
+	show.Section("Where it is now, through eph.At(...).Geometric")
+	show.Fields(
+		show.KV("At", "%s", now.Format("2006-01-02 15:04:05 UTC")),
+		show.KV("RA", "%s", icrs.RA().HMSString(1)),
+		show.KV("Dec", "%s", icrs.Dec().DMSString(0)),
+		show.KV("From Earth's center", "%.1f km", state.DistanceKm()),
+		show.KV("Above the WGS84 ellipsoid", "%.1f km", alt.Km()),
+	)
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 4. Look Angle via coord.Context (same API for ISS (Zarya) and Mars)
 	// ═══════════════════════════════════════════════════════════════════════
-	header("Look Angle — Quinta Calixto, Brazil")
-
 	// Observer: Quinta Calixto (-22.528478°, -46.473002°, 835.05m)
 	observer, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
 	if err != nil {
@@ -133,15 +133,17 @@ func main() {
 		log.Fatalf("LookAngle failed: %v", err)
 	}
 
-	fmt.Printf("  Azimuth:    %s (%.2f°)\n", altaz.Az(), altaz.Az().Degrees())
-	fmt.Printf("  Elevation:  %s (%.2f°)\n", altaz.Alt(), altaz.Alt().Degrees())
-	fmt.Printf("  Range:      %.1f km\n", altaz.Dist().Km())
-
+	status := "below the horizon"
 	if altaz.Alt().Degrees() > 0 {
-		fmt.Printf("  Status:     ☀ ABOVE HORIZON\n")
-	} else {
-		fmt.Printf("  Status:     ● Below horizon\n")
+		status = "above the horizon"
 	}
+
+	show.Section("From Quinta Calixto, Brazil, through coord.Context")
+	show.Fields(
+		show.KV("Azimuth", "%.2f°", altaz.Az().Degrees()),
+		show.KV("Elevation", "%+.2f°, %s", altaz.Alt().Degrees(), status),
+		show.KV("Range", "%.1f km", altaz.Dist().Km()),
+	)
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 5. Pass Prediction
@@ -155,66 +157,58 @@ func main() {
 		log.Fatalf("loc: %v", err)
 	}
 
-	header("Pass Prediction (next 24h, min %1.f° elevation)", minEl.Degrees())
-
 	passes, err := plan.SatellitePasses(prov, sat.ID(), target.Name, start, end, observer, minEl)
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}
 
+	show.Section(fmt.Sprintf("Passes above %.0f° in the next 24 hours", minEl.Degrees()))
+
 	if len(passes) == 0 {
-		fmt.Printf("  No passes above %.1f° found in the next 24 hours.\n", minEl.Degrees())
-	} else {
-		fmt.Printf("  Found %d pass(es) above %.1f° in 24 hours:\n\n", len(passes), minEl.Degrees())
+		show.Note("None.")
 
-		for i, pass := range passes {
-			fmt.Printf("  ┌─── Pass %d ──────────────────────────────────────────────┐\n", i+1)
-			// A pass in progress when the 24 hours begin or end is cut off
-			// there: its first or last event is the window's edge, not a
-			// rise or a set.
-			riseLabel, setLabel := "AOS (Rise)", "LOS (Set) "
-			if pass.RiseCutOff {
-				riseLabel = "Win. start"
-			}
-
-			if pass.SetCutOff {
-				setLabel = "Win. end  "
-			}
-
-			printPassEvent(riseLabel, pass.Rise, loc)
-			printPassEvent("TCA (Max) ", pass.Culmination, loc)
-			printPassEvent(setLabel, pass.Set, loc)
-			fmt.Printf("  │  Duration:    %s\n", fmtDuration(pass.Duration))
-			fmt.Println("  └──────────────────────────────────────────────────────────┘")
-
-			if i < len(passes)-1 {
-				fmt.Println()
-			}
-		}
+		return
 	}
+
+	tab := show.NewTable(show.Right("Pass"), show.Left("Event"), show.Left("Time"),
+		show.Right("Azimuth"), show.Right("Elevation"), show.Right("Range"))
+
+	for i, pass := range passes {
+		// A pass here runs from where the satellite climbs past the minimum
+		// elevation to where it drops below it, not from rise to set. One in
+		// progress when the 24 hours begin or end is cut off there: its
+		// first or last event is the window's edge.
+		riseLabel := fmt.Sprintf("above %.0f°", minEl.Degrees())
+		setLabel := fmt.Sprintf("below %.0f°", minEl.Degrees())
+
+		if pass.RiseCutOff {
+			riseLabel = "window start"
+		}
+
+		if pass.SetCutOff {
+			setLabel = "window end"
+		}
+
+		n := strconv.Itoa(i + 1)
+		tab.Row(passRow(n, riseLabel, pass.Rise, loc)...)
+		tab.Row(passRow("", "highest", pass.Culmination, loc)...)
+		tab.Row(passRow("", setLabel, pass.Set, loc)...)
+		tab.Row("", "lasting "+fmtDuration(pass.Duration), "", "", "", "")
+	}
+
+	tab.Print()
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
-func header(titleFormat string, a ...any) {
-	title := fmt.Sprintf(titleFormat, a...)
-	width := 62
-	pad := max(width-len(title)-4, 0)
-	fmt.Printf("\n  ══ %s %s\n\n", title, strings.Repeat("═", pad))
-}
-
-func printPassEvent(label string, ev plan.PassEvent, loc *time.Location) {
-	fmt.Printf("  │  %-10s  %s  Az: %6.1f°  El: %5.1f°  Rng: %6.0f km\n",
-		label,
-		fmtTime(ev.Time, loc),
-		ev.Azimuth.Degrees(),
-		ev.Elevation.Degrees(),
-		ev.Range.Km(),
-	)
-}
-
-func fmtTime(t time.Time, loc *time.Location) string {
-	return t.ToGo().In(loc).Format("2006-01-02 15:04:05 MST")
+func passRow(pass, label string, ev plan.PassEvent, loc *time.Location) []string {
+	return []string{
+		pass, label,
+		ev.Time.ToGo().In(loc).Format("2006-01-02 15:04:05 MST"),
+		fmt.Sprintf("%.1f°", ev.Azimuth.Degrees()),
+		fmt.Sprintf("%.1f°", ev.Elevation.Degrees()),
+		fmt.Sprintf("%.0f km", ev.Range.Km()),
+	}
 }
 
 func fmtDuration(d time.Duration) string {

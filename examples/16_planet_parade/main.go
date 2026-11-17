@@ -20,6 +20,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
@@ -37,10 +38,8 @@ type planetDef struct {
 }
 
 func main() {
-	fmt.Println("═══════════════════════════════════════════════════════════════")
-	fmt.Println("  The Great Planet Parade — February 28, 2025")
-	fmt.Println("  Seven Planets in the Evening Sky from Quinta Calixto")
-	fmt.Println("═══════════════════════════════════════════════════════════════")
+	show.Title("The great planet parade, February 28, 2025",
+		"Seven planets in the evening sky from Quinta Calixto")
 
 	// ── Setup: JPL DE442 ──────────────────────────────────────────────
 	// Kernel downloads are opt-in — see README "Data downloads & offline
@@ -86,8 +85,6 @@ func main() {
 	}
 
 	// ── Part 1: Solar Events ──────────────────────────────────────────
-	fmt.Println("\n── Solar Events (February 28, 2025 BRT) ──────────────────────")
-
 	day := time.Date(2025, time.February, 28, 0, 0, 0, 0, brtz)
 	next := day.Add(unit.Hours(24))
 
@@ -111,24 +108,24 @@ func main() {
 		log.Fatalf("AstronomicalDawnDusk: %v", err)
 	}
 
-	fmt.Printf("  Sunset:            %s BRT\n", sunset.Time.In(brtz).Format("15:04:05"))
-	fmt.Printf("  Civil dusk:        %s BRT  (Sun < −6°)\n", civilDusk.Time.In(brtz).Format("15:04:05"))
-	fmt.Printf("  Nautical dusk:     %s BRT  (Sun < −12°)\n", nautDusk.Time.In(brtz).Format("15:04:05"))
-	fmt.Printf("  Astronomical dusk: %s BRT  (Sun < −18°)\n", astroDusk.Time.In(brtz).Format("15:04:05"))
+	show.Section("Dusk, February 28, 2025")
+	show.Fields(
+		show.KV("Sunset", "%s", sunset.Time.In(brtz).Format("15:04:05 MST")),
+		show.KV("Civil dusk", "%s  Sun 6° down", civilDusk.Time.In(brtz).Format("15:04:05 MST")),
+		show.KV("Nautical dusk", "%s  Sun 12° down", nautDusk.Time.In(brtz).Format("15:04:05 MST")),
+		show.KV("Astronomical dusk", "%s  Sun 18° down", astroDusk.Time.In(brtz).Format("15:04:05 MST")),
+	)
 
 	// ── Part 2: Planetary Positions at Civil Dusk ──────────────────────
-	fmt.Println("\n── Planetary Positions at Civil Dusk ──────────────────────────")
-	fmt.Printf("  Time: %s\n\n", civilDusk.Time.In(brtz).Format("2006-01-02 15:04:05 MST"))
-	fmt.Println("  Planet    │ Ecl. λ   │ Alt      │ Az       │ Airmass")
-	fmt.Println("  ──────────┼──────────┼──────────┼──────────┼────────")
-
 	ctx := coord.NewContext(civilDusk.Time, loc, atm)
+
+	positions := show.NewTable(show.Left("Planet"), show.Right("Ecliptic λ"),
+		show.Right("Altitude"), show.Right("Azimuth"), show.Right("Airmass"))
 
 	for _, p := range planets {
 		icrs, err := p.Target.Position(civilDusk.Time)
 		if err != nil {
-			fmt.Printf("  %-9s │ error: %v\n", p.Name, err)
-			continue
+			log.Fatalf("%s position: %v", p.Name, err)
 		}
 
 		altaz, err := ctx.ICRSToAltAz(icrs)
@@ -150,44 +147,35 @@ func main() {
 			amStr = fmt.Sprintf("%.1f", am)
 		}
 
-		fmt.Printf("  %-9s │ %6.1f°  │ %+6.1f°  │ %5.1f°   │ %s\n",
-			p.Name, ecl.Lon().Degrees(), alt, altaz.Az().Degrees(), amStr)
+		positions.Row(p.Name, fmt.Sprintf("%.1f°", ecl.Lon().Degrees()),
+			fmt.Sprintf("%+.1f°", alt), fmt.Sprintf("%.1f°", altaz.Az().Degrees()), amStr)
 	}
+
+	show.Section("The planets at civil dusk, " + civilDusk.Time.In(brtz).Format("15:04 MST"))
+	positions.Print()
 
 	// ── Part 3: Altitude Timeline ────────────────────────────────────
-	fmt.Println("\n── Altitude Timeline (sunset → +75 min, every 5 min) ─────────")
-	fmt.Print("  Time (BRT) │")
+	cols := make([]show.Column, 0, 1+len(planets))
+	cols = append(cols, show.Left("Time"))
 
 	for _, p := range planets {
-		name := p.Name
-		if len(name) > 5 {
-			name = name[:5]
-		}
-
-		fmt.Printf(" %-5s │", name)
+		cols = append(cols, show.Right(p.Name))
 	}
 
-	fmt.Println()
-	fmt.Print("  ───────────┼")
-
-	for range planets {
-		fmt.Print("───────┼")
-	}
-
-	fmt.Println()
+	timeline := show.NewTable(cols...)
 
 	tStart := sunset.Time
 	for minutes := 0; minutes <= 75; minutes += 5 {
 		t := tStart.Add(unit.Minutes(float64(minutes)))
 		c := coord.NewContext(t, loc, atm)
 
-		fmt.Printf("  %s │", t.In(brtz).Format("15:04"))
+		row := make([]string, 0, 1+len(planets))
+		row = append(row, t.In(brtz).Format("15:04"))
 
 		for _, p := range planets {
 			icrs, err := p.Target.Position(t)
 			if err != nil {
-				fmt.Print("  err  │")
-				continue
+				log.Fatalf("%s position: %v", p.Name, err)
 			}
 
 			altaz, err := c.ICRSToAltAz(icrs)
@@ -195,20 +183,20 @@ func main() {
 				log.Fatalf("altaz: %v", err)
 			}
 
-			alt := altaz.Alt().Degrees()
-			if alt < 0 {
-				fmt.Print("  ───  │")
+			if alt := altaz.Alt().Degrees(); alt < 0 {
+				row = append(row, "set")
 			} else {
-				fmt.Printf(" %+4.0f° │", alt)
+				row = append(row, fmt.Sprintf("%+.0f°", alt))
 			}
 		}
 
-		fmt.Println()
+		timeline.Row(row...)
 	}
 
-	// ── Part 4: Ecliptic Longitude Span ──────────────────────────────
-	fmt.Println("\n── Ecliptic Clustering Analysis ───────────────────────────────")
+	show.Section("Altitude from sunset, every 5 minutes")
+	timeline.Print()
 
+	// ── Part 4: Ecliptic Longitude Span ──────────────────────────────
 	lons := make([]float64, 0, len(planets))
 
 	for _, p := range planets {
@@ -243,15 +231,18 @@ func main() {
 		}
 	}
 
-	fmt.Printf("  Ecliptic longitude span: %.0f°\n", minSpan)
-
+	half := "no: they spread over more than half of it"
 	if minSpan < 180 {
-		fmt.Println("  All planets are in the same half of the sky ✓")
+		half = "yes"
 	}
 
-	// ── Part 5: Near-Conjunctions ────────────────────────────────────
-	fmt.Println("\n── Closest Approaches (Feb 15 – Mar 15, 2025) ────────────────")
+	show.Section("How tightly they cluster on the ecliptic")
+	show.Fields(
+		show.KV("Span in ecliptic longitude", "%.0f°", minSpan),
+		show.KV("All in one half of the sky", "%s", half),
+	)
 
+	// ── Part 5: Near-Conjunctions ────────────────────────────────────
 	searchStart := time.Date(2025, time.February, 15, 0, 0, 0, 0, time.LocationUTC)
 	searchEnd := time.Date(2025, time.March, 15, 0, 0, 0, 0, time.LocationUTC)
 
@@ -263,42 +254,51 @@ func main() {
 		{2, 3}, // Mars–Jupiter
 	}
 
+	closest := show.NewTable(show.Left("Pair"), show.Right("Separation"), show.Left("When"))
+
 	for _, pair := range pairs {
-		appulses, err := plan.Appulses(searchStart, searchEnd,
-			planets[pair[0]].Target, planets[pair[1]].Target)
-		if err != nil || len(appulses) == 0 {
+		a, b := planets[pair[0]], planets[pair[1]]
+
+		appulses, err := plan.Appulses(searchStart, searchEnd, a.Target, b.Target)
+		if err != nil {
+			log.Fatalf("%s–%s closest approach: %v", a.Name, b.Name, err)
+		}
+
+		if len(appulses) == 0 {
+			closest.Row(a.Name+" – "+b.Name, "", "none in the window")
+
 			continue
 		}
 
 		for _, app := range appulses {
-			fmt.Printf("  %s – %s: closest %.2f° on %s\n",
-				planets[pair[0]].Name, planets[pair[1]].Name,
-				app.Value, app.Time.Format("2006-01-02 15:04 MST"))
+			closest.Row(a.Name+" – "+b.Name, fmt.Sprintf("%.2f°", app.Value), app.Time.Format("2006-01-02 15:04 MST"))
 		}
 	}
 
+	show.Section("Closest approaches, February 15 to March 15, 2025")
+	closest.Print()
+
 	// ── Part 6: Visibility Summary ───────────────────────────────────
-	fmt.Println("\n── Visibility Summary ─────────────────────────────────────────")
-	fmt.Println("  Planet    │ Naked Eye │ Notes")
-	fmt.Println("  ──────────┼───────────┼──────────────────────────────────")
-
-	visibility := []struct {
-		name, eye, notes string
-	}{
-		{"Venus", "✅ Yes", "Brilliant, brightest object in the sky"},
-		{"Jupiter", "✅ Yes", "Bright, unmissable high in the sky"},
-		{"Mars", "✅ Yes", "Steady, reddish, near zenith"},
-		{"Saturn", "⚠️  Hard", "Faint and very low, in twilight glow"},
-		{"Mercury", "⚠️  Hard", "Bright but very low, ~20 min window"},
-		{"Uranus", "❌ No", "Too faint naked-eye — binoculars required"},
-		{"Neptune", "❌ No", "Always requires telescope"},
-	}
-	for _, v := range visibility {
-		fmt.Printf("  %-9s │ %-9s │ %s\n", v.name, v.eye, v.notes)
+	// A judgment from the tables above and the planets' brightness, not a
+	// computation: Mercury and Saturn are low in the twilight glow, and
+	// Uranus and Neptune are too faint for the naked eye anywhere.
+	summary := show.NewTable(show.Left("Planet"), show.Left("Naked eye"), show.Left("Notes"))
+	for _, v := range []struct{ name, eye, notes string }{
+		{"Venus", "yes", "brilliant, the brightest object in the sky"},
+		{"Jupiter", "yes", "bright, 44° up in the north-northwest"},
+		{"Mars", "yes", "steady and reddish, 35° up in the north-northeast"},
+		{"Saturn", "hard", "faint and very low, in the twilight glow"},
+		{"Mercury", "hard", "bright but very low, a window of about 20 minutes"},
+		{"Uranus", "no", "too faint for the naked eye: binoculars"},
+		{"Neptune", "no", "always needs a telescope"},
+	} {
+		summary.Row(v.name, v.eye, v.notes)
 	}
 
-	fmt.Println("\n═══════════════════════════════════════════════════════════════")
-	fmt.Println("  Computed with astrogo + JPL DE442 ephemerides")
-	fmt.Println("  Rise/set validated to ≤0.6 min vs U.S. Naval Observatory")
-	fmt.Println("═══════════════════════════════════════════════════════════════")
+	show.Section("What could be seen")
+	summary.Print()
+	fmt.Println()
+	show.Note("Computed with astrogo and the JPL DE442 ephemeris. Sun and Moon",
+		"rise and set are validated against the U.S. Naval Observatory to",
+		"0.6 minutes (docs/VALIDATION.md).")
 }

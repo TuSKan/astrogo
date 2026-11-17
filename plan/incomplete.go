@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/TuSKan/astrogo/catalog/resolve"
 )
 
 // ErrIncomplete marks a result that is usable but shorter than it should be.
@@ -37,7 +39,11 @@ import (
 // is the caller's job. #177 fixed six predicates that answered "no" when they
 // meant "could not tell"; this is the same defect one layer up, where the
 // answer was a short list.
-var ErrIncomplete = errors.New("plan: result is incomplete")
+//
+// It is [resolve.ErrIncomplete], the value catalog.Resolver.Search returns
+// with partial matches too, so one errors.Is check covers a short result from
+// either package (#1143).
+var ErrIncomplete = resolve.ErrIncomplete
 
 // skips collects the reasons a result came back short.
 //
