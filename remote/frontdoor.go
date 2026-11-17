@@ -201,8 +201,14 @@ func (c *Client) Get(ctx context.Context, id EndpointID, path string, query url.
 		return nil, err
 	}
 
-	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return inner.Get(ctx, base, path, query)
+	host := hostOf(base)
+	if err := c.answering(host); err != nil {
+		return nil, err
+	}
+
+	body, err := inner.Get(ctx, base, path, query)
+
+	return body, c.heard(ctx, host, err)
 }
 
 // GetJSON issues a GET against endpoint id and decodes the response into out.
@@ -217,8 +223,12 @@ func (c *Client) GetJSON(ctx context.Context, id EndpointID, path string, query 
 		return err
 	}
 
-	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return inner.GetJSON(ctx, base, path, query, out)
+	host := hostOf(base)
+	if err := c.answering(host); err != nil {
+		return err
+	}
+
+	return c.heard(ctx, host, inner.GetJSON(ctx, base, path, query, out))
 }
 
 // PostForm posts form to endpoint id and returns the response body, which the
@@ -235,8 +245,14 @@ func (c *Client) PostForm(ctx context.Context, id EndpointID, path string, form 
 		return nil, err
 	}
 
-	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return inner.PostForm(ctx, base, path, form)
+	host := hostOf(base)
+	if err := c.answering(host); err != nil {
+		return nil, err
+	}
+
+	body, err := inner.PostForm(ctx, base, path, form)
+
+	return body, c.heard(ctx, host, err)
 }
 
 // PostJSON posts payload as JSON to endpoint id and returns the response body,
@@ -253,8 +269,14 @@ func (c *Client) PostJSON(ctx context.Context, id EndpointID, path string, paylo
 		return nil, err
 	}
 
-	//nolint:wrapcheck // pure delegation to remote/api, internal to this package; its errors are already prefixed
-	return inner.PostJSON(ctx, base, path, payload)
+	host := hostOf(base)
+	if err := c.answering(host); err != nil {
+		return nil, err
+	}
+
+	body, err := inner.PostJSON(ctx, base, path, payload)
+
+	return body, c.heard(ctx, host, err)
 }
 
 // Close releases the idle connections of every transport this client opened.

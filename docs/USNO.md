@@ -65,7 +65,7 @@ Supplement convention:
 | Lunar semi-diameter | the Moon's at that instant, 14.7'–16.8' (#693) |
 | Standard atmospheric refraction | 34' (0.5667°) |
 | Total at sea level | **−50' (−0.8333°)** |
-| Horizon dip from elevation _h_ | 1.76'√_h_ |
+| Horizon dip, _h_ above the visible horizon | 1.76'√_h_, none unless `plan.WithHorizonHeight` sets _h_ |
 
 > **Note:** The USNO `rstt/oneday` API ignores the `height` parameter for
 > rise/set times (verified empirically: `height=0` and `height=786` return
@@ -143,8 +143,9 @@ Supplement convention:
 ### Civil twilight (Sun's center at −6°)
 
 The same responses carry USNO's Begin and End Civil Twilight. They were
-discarded until #532. `plan.CivilDawnDusk` is now held to them at 1 min, which
-is USNO's minute rounding plus half a minute of margin. Twilight is a
+discarded until #532. `plan.TwilightEvents`' civil dawn and dusk, the
+crossings `plan.NightOf` pairs, are now held to them at 1 min, which is USNO's
+minute rounding plus half a minute of margin. Twilight is a
 geometric threshold, with no refraction or horizon dip, so it does not need
 rise and set's 2 min. As a canary, a −5.5° threshold misses all 18 events by
 1.8–5.3 min.
@@ -270,7 +271,9 @@ All tests use the USNO API v4.0.1:
 > uses a fixed sea-level model for rise/set timing. The `height` parameter
 > may affect other endpoints or future API versions. This limitation is
 > documented so that callers do not mistakenly assume USNO accounts for
-> observer elevation in rise/set calculations.
+> observer elevation in rise/set calculations. astrogo matches it: a site's
+> height above the ellipsoid moves no rise or set, and only
+> `plan.WithHorizonHeight` adds a dip (#1185).
 
 ---
 
@@ -323,7 +326,7 @@ standard mid-latitude assumptions break down.
 |---|---|---|---|---|
 | **North Pole** | 89.99°N | 0° | 0 m | Midnight sun / polar night |
 | **South Pole** | 89.99°S | 0° | 0 m | Reverse polar phenomena |
-| **Mount Everest** | 27.99°N | 86.93°E | 8849 m | Extreme horizon dip (~2.76°) |
+| **Mount Everest** | 27.99°N | 86.93°E | 8849 m | Extreme height; a ~2.76° dip with `WithHorizonHeight` |
 | **Equator** | 0° | 0° | 0 m | Fast-setting bodies, ~12h day |
 | **Tromsø** | 69.65°N | 18.96°E | 0 m | Near-polar boundary |
 
@@ -354,19 +357,26 @@ correctly yielding zero rise/set events.
 
 ### High Altitude — Mount Everest (8849m)
 
-At extreme elevation the horizon dip is ~2.76°: 1.76′√h, which includes
-terrestrial refraction (the geometric dip would be 3.02°). It shifts
-rise/set times significantly (sunrise earlier, sunset later).
+A site's height above the ellipsoid does not lower its horizon: rise and set
+at 8849 m are the sea-level ones, as USNO's are. A summit that looks down on
+a horizon far below says so with `plan.WithHorizonHeight`, and from 8849 m
+above it the dip is ~2.76°: 1.76′√h, which includes terrestrial refraction
+(the geometric dip would be 3.02°). It shifts rise/set times significantly
+(sunrise earlier, sunset later). Until #1185 the dip was taken from the
+height above the ellipsoid, always, which put an inland city minutes from
+USNO.
 
 > **USNO API Limitation:** The `height` parameter has no effect on the
 > `rstt/oneday` endpoint's rise/set output (verified: `height=0` and
 > `height=8849` return identical times). Therefore the high-altitude test
-> validates: (1) sea-level astrogo vs USNO (must match ≤2 min), and
-> (2) astrogo altitude correction (8849m vs 0m) internally.
+> validates: (1) sea-level astrogo vs USNO (must match ≤2 min), (2) a site
+> entered at 8849 m with no height above its horizon gives the sea-level
+> times, and (3) the dip from `WithHorizonHeight(8849 m)` (8849 m vs 0 m)
+> internally.
 
 #### Threshold Comparison
 
-| Property | Sea Level (0m) | Everest (8849m) |
+| Property | Sea Level (0m) | Everest, 8849 m above its horizon |
 |---|---|---|
 | Horizon Dip | 0° | 2.7594° |
 | Sun Threshold | −0.8334° | −3.5928° |
@@ -387,7 +397,7 @@ rise/set times significantly (sunrise earlier, sunset later).
 | 2026-12-21 | Sun Rise | 06:44 | 06:44:13 | 0.2 min |
 | 2026-12-21 | Sun Set | 17:06 | 17:06:18 | 0.3 min |
 
-#### Part 2: Altitude Correction (astrogo 8849m vs 0m)
+#### Part 2: The Dip From 8849 m Above the Horizon (`WithHorizonHeight`, astrogo 8849m vs 0m)
 
 | Date | Event | astrogo (0m) | astrogo (8849m) | Shift |
 |---|---|---|---|---|

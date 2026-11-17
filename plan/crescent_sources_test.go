@@ -59,7 +59,13 @@ func TestFotheringhamTableIsGeocentricAtGeometricSunset(t *testing.T) {
 
 // Fatoohi, Stephenson & Al-Dargazelli (1998), Table I: elongations at sunset
 // "allowing for parallax". They agree with the topocentric elongation to
-// 0.07°; the geocentric one is 0.8°–1.0° larger.
+// 0.12°; the geocentric one is 0.8°–1.0° larger, which is the distinction
+// this holds.
+//
+// The bound was 0.07° while every site's sunset was dipped by its height.
+// The table is rounded to 0.1°, and the paper does not say which horizon its
+// sunsets were taken at; at the almanac horizon (#1185) the two elevated
+// rows, 1524 m and 259 m, sit 0.11° and 0.07° from it.
 func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 	t.Parallel()
 
@@ -90,7 +96,7 @@ func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 			t.Fatalf("row %d: %v", o.row, err)
 		}
 
-		if got := r.Fatoohi1998.Params.ArcL.Degrees(); math.Abs(got-o.elong) > 0.07 {
+		if got := r.Fatoohi1998.Params.ArcL.Degrees(); math.Abs(got-o.elong) > 0.12 {
 			t.Errorf("row %d: elongation %.3f°, Fatoohi's Table I has %.1f°", o.row, got, o.elong)
 		}
 
@@ -279,7 +285,11 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 	prov := eph.Default()
 	portOfSpain, portOfSpainEvening := portOfSpainEvening(t)
 
-	calixto, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	// Dipped by its height, as every site was before #1185: the later sunset
+	// that puts the Moon's lower limb on the horizon, where refraction is at
+	// its largest, which is what this case reads.
+	calixto, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05,
+		WithHorizonHeight(unit.Meters(835.05)))
 	if err != nil {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}

@@ -128,8 +128,12 @@ func WithIdempotentPost() Option {
 type Client struct {
 	rc *resty.Client
 
-	// timeout is the per-request deadline this client was built with, kept so
-	// [Client.Timeout] can report it.
+	// timeout is the deadline this client was built with, kept so
+	// [Client.Timeout] can report it. It bounds a whole call: every attempt,
+	// the waits between them, and the reading of the body. It used to bound
+	// each attempt alone, so a host that never answered cost a call one
+	// timeout per attempt, four of them by default, 73 s for SIMBAD on
+	// Windows and up to 2 min where a connection waits out the full 30 s.
 	timeout time.Duration
 
 	// retryPolicy is consulted twice: by resty, to decide whether to retry,
@@ -145,8 +149,10 @@ type Client struct {
 	last        time.GoTime
 }
 
-// NewClient builds a client with timeout as its per-request deadline; zero
-// means [DefaultTimeout].
+// NewClient builds a client with timeout as the deadline of each call, its
+// retries and its body included; zero means [DefaultTimeout]. A retry is made
+// only inside it, so a call never takes longer than the timeout, however many
+// attempts the policy allows.
 //
 // There is no error to return, because there is nothing left to get wrong: a
 // caller with an endpoint's registered timeout passes it, and every other
@@ -232,13 +238,15 @@ func (c *Client) Get(ctx context.Context, baseURL string, path string, query url
 	}
 	defer release()
 
+	ctx, cancel := c.budget(ctx)
+
 	resp, err := c.rc.R().
 		SetContext(ctx).
 		SetQueryParamsFromValues(query).
 		SetResponseDoNotParse(true).
 		Get(full)
 
-	return c.body(resp, err)
+	return c.body(resp, err, cancel)
 }
 
 // GetJSON issues a GET and decodes the JSON response into out, closing the
@@ -299,6 +307,17 @@ func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payl
 	return c.post(ctx, full, "application/json", encoded)
 }
 
+// budget bounds one call by the client's timeout: every attempt and every
+// wait between them comes out of it, so a retry happens only while time is
+// left. The returned cancel releases it, which [Client.body] does once the
+// caller is done with the response.
+//
+// Pacing waits before it starts. That wait is spent being polite to the
+// service, not waiting for its answer.
+func (c *Client) budget(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, c.timeout)
+}
+
 // post sends body to full, from a reader of its own on every attempt.
 //
 // # Why not resty's own form and byte-slice bodies
@@ -316,6 +335,8 @@ func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payl
 // for each attempt, installed by a retry hook, also means a retry never
 // shares a cursor with an earlier attempt's write that is still running.
 func (c *Client) post(ctx context.Context, full, contentType string, body []byte) (io.ReadCloser, error) {
+	ctx, cancel := c.budget(ctx)
+
 	req := c.rc.R().
 		SetContext(ctx).
 		SetHeader("Content-Type", contentType).
@@ -328,7 +349,7 @@ func (c *Client) post(ctx context.Context, full, contentType string, body []byte
 
 	resp, err := req.Post(full)
 
-	return c.body(resp, err)
+	return c.body(resp, err, cancel)
 }
 
 // pace blocks until this client is allowed to make its next request.
@@ -385,16 +406,24 @@ func requestURL(baseURL string, path string) (string, error) {
 // body turns a resty exchange into the (stream, error) pair every method
 // here returns. A non-2xx becomes an *HTTPError carrying the body, since
 // these services describe their failures in it.
-func (c *Client) body(resp *resty.Response, err error) (io.ReadCloser, error) {
+//
+// cancel releases the call's [Client.budget]. Every failure releases it here;
+// a success hands it to the stream, which releases it on Close, since the
+// caller reads the body after this returns and the budget bounds that read.
+// A failure with no response at all wraps [ErrNoResponse].
+func (c *Client) body(resp *resty.Response, err error, cancel context.CancelFunc) (io.ReadCloser, error) {
 	if err != nil {
+		cancel()
+
 		if resp != nil && resp.Body != nil {
 			_ = resp.Body.Close()
 		}
 
-		return nil, fmt.Errorf("remote/api: request failed: %w", err)
+		return nil, fmt.Errorf("remote/api: request failed: %w: %w", ErrNoResponse, err)
 	}
 
 	if resp.IsStatusFailure() {
+		defer cancel()
 		defer func() { _ = resp.Body.Close() }()
 
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
@@ -416,7 +445,28 @@ func (c *Client) body(resp *resty.Response, err error) (io.ReadCloser, error) {
 		return nil, httpErr
 	}
 
-	return resp.Body, nil
+	return &budgetedBody{ReadCloser: resp.Body, cancel: cancel}, nil
+}
+
+// budgetedBody is a response body that releases its call's budget when it is
+// closed. The budget has to outlive the call that returned the body, since the
+// caller reads the body afterwards.
+type budgetedBody struct {
+	io.ReadCloser
+
+	cancel context.CancelFunc
+}
+
+// Close closes the body and releases the call's budget.
+func (b *budgetedBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+
+	if err != nil {
+		return fmt.Errorf("remote/api: closing a response body: %w", err)
+	}
+
+	return nil
 }
 
 // maxErrorBody bounds how much of a failed response is captured in

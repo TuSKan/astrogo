@@ -36,7 +36,9 @@ import (
 func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewSiteEarthLocation("Everest", 27.9881, 86.925, 8849)
+	// The summit looks down on a horizon 8849 m below, which is what makes
+	// the dip in the threshold its own: a height alone dips nothing (#1185).
+	site, err := NewSiteEarthLocation("Everest", 27.9881, 86.925, 8849, WithHorizonHeight(unit.Meters(8849)))
 	if err != nil {
 		t.Fatalf("NewSiteEarthLocation: %v", err)
 	}

@@ -510,6 +510,30 @@ func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 	return altaz, nil
 }
 
+// ParallacticAngle returns the parallactic angle of an observed position at
+// this Context's site: the angle at the object between the direction to the
+// north celestial pole and the direction to the zenith. On the meridian it
+// is zero south of the zenith and 180° north of it; it is positive west of
+// the meridian and negative east of it, in (−180°, 180°], as SOFA's iauHd2pa
+// defines it.
+//
+// It is the angle a field rotates by on an alt-azimuth mount, and the angle
+// atmospheric dispersion spreads a star along, so a slit set to it lies along
+// the dispersion.
+//
+// c is an observed position, as [Context.ICRSToAltAz] and the other observed
+// transforms return it, so any target's will do. Its hour angle and
+// declination are recovered by the rotation iauAtioq uses, SOFA's iauAe2hd at
+// the site's geodetic latitude, and the angle is SOFA's iauHd2pa of them. At
+// the zenith, and at a pole, it is undefined; iauHd2pa returns zero there.
+func (ctx *Context) ParallacticAngle(c AltAz) angle.Angle {
+	// Not ctx.astrom.Phi: iauApco fills only its sine and cosine.
+	phi := ctx.site.Lat().Radians()
+	ha, dec := gofaext.Ae2hd(c.Az().Radians(), c.Alt().Radians(), phi)
+
+	return angle.Rad(gofaext.Hd2pa(ha, dec, phi))
+}
+
 // ICRSToHourAngle converts ICRS coordinates to local observed Hour Angle.
 // If the ICRS carries kinematics, they are forwarded to SOFA for rigorous
 // space-motion propagation.
