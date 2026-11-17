@@ -4,6 +4,7 @@ package examples_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -17,10 +18,16 @@ import (
 )
 
 // TestNetworkExamplesRun runs every example the README says reaches the
-// network and requires each of its programs to exit 0. One whose endpoints
-// cannot be reached is skipped, as the network tests skip; one that reaches
-// them and still fails, fails. Examples 02, 03, 05, 12 and 20 were each found
-// broken at the release commit only by running them by hand (#1188).
+// network and requires each of its programs to exit 0. Examples 02, 03, 05,
+// 12 and 20 were each found broken at the release commit only by running
+// them by hand (#1188).
+//
+// An outage is not a failure, as for the network tests. An example whose
+// endpoint hosts cannot be reached is skipped. A program that fails while a
+// service it uses rejects a control request that cannot be wrong, as SIMBAD
+// answered every request with a 404 page through the CDS outage of
+// 2026-11-13, is reported as not verified rather than failed; the example is
+// skipped if nothing else in it failed.
 //
 // The programs share one cache, so a kernel two of them use is fetched once.
 // ASTROGO_CACHE_DIR names it when set, as the nightly workflow sets it to a
@@ -49,6 +56,8 @@ func TestNetworkExamplesRun(t *testing.T) {
 				testutil.RequireReachable(t, endpointHost(t, id))
 			}
 
+			var unverified []string
+
 			for _, pkg := range examplePrograms(t, name) {
 				ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
 
@@ -60,16 +69,64 @@ func TestNetworkExamplesRun(t *testing.T) {
 
 				cancel()
 
-				if err != nil {
-					t.Errorf("%s failed: %v\n%s", pkg, err, out)
+				if err == nil {
+					t.Logf("%s:\n%s", pkg, out)
 
 					continue
 				}
 
-				t.Logf("%s:\n%s", pkg, out)
+				if derr := degraded(t, name); derr != nil {
+					unverified = append(unverified, pkg)
+					t.Logf("%s failed, not verified: %v (%v)\n%s", pkg, derr, err, out)
+
+					continue
+				}
+
+				t.Errorf("%s failed: %v\n%s", pkg, err, out)
+			}
+
+			if len(unverified) > 0 && !t.Failed() {
+				t.Skipf("not verified, a service they use is degraded: %v", unverified)
 			}
 		})
 	}
+}
+
+// degraded returns why a service the example name uses is degraded: the
+// error of a control request it rejected, for each endpoint that has one.
+// It returns nil when every such service answers its control, so a failure is
+// the example's.
+func degraded(t *testing.T, name string) error {
+	t.Helper()
+
+	for _, id := range networkExamples[name] {
+		control, ok := tapControls[id]
+		if !ok {
+			continue
+		}
+
+		syncURL, err := remote.URL(id)
+		if err != nil {
+			t.Fatalf("endpoint %q: %v", id, err)
+		}
+
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+		err = testutil.TAPControl(ctx, syncURL, control.from, control.column)()
+
+		cancel()
+
+		if err != nil {
+			return fmt.Errorf("%s rejected a control request: %w", id, err)
+		}
+	}
+
+	return nil
+}
+
+// tapControls names, for each TAP service an example uses, a table and column
+// it has served for decades, for testutil.TAPControl.
+var tapControls = map[remote.EndpointID]struct{ from, column string }{
+	remote.SIMBAD: {"basic", "main_id"},
 }
 
 // endpointHost returns the host and port the endpoint id is served from, as
