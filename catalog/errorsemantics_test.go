@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -154,8 +155,14 @@ func TestASuccessfulProviderWinsOverAFailedOne(t *testing.T) {
 }
 
 // TestSearchKeepsPartialResultsAndReportsTotalFailure covers both of Search's
-// arms: matches from working providers survive one failing, and a failure is
-// only reported when there is nothing to show for it.
+// arms. Matches from working providers survive one failing, and come back with
+// an error wrapping ErrIncomplete that names the failed catalog, counts it, and
+// carries its reason. When every provider fails there is nothing usable, and
+// the error does not claim a partial result.
+//
+// The partial arm returned a nil error until #1143: the failure was dropped
+// whenever anything was found, so a caller could not tell a complete answer
+// from one missing a catalog.
 func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 	t.Parallel()
 
@@ -168,12 +175,18 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 	}
 
 	got, err := partial.Search(context.Background(), "M31")
-	if err != nil {
-		t.Fatalf("a partial outage suppressed usable results: %v", err)
-	}
-
 	if len(got) != 1 {
 		t.Errorf("got %d results, want 1 from the working provider", len(got))
+	}
+
+	if !errors.Is(err, ErrIncomplete) || !errors.Is(err, errOutage) {
+		t.Fatalf("err = %v, want ErrIncomplete wrapping the outage", err)
+	}
+
+	for _, want := range []string{"broken", "1 of 2 catalogs"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %q, want it to say %q", err, want)
+		}
 	}
 
 	total := &Resolver{
@@ -181,8 +194,13 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
 	}
 
-	if _, err := total.Search(context.Background(), "M31"); !errors.Is(err, errOutage) {
-		t.Errorf("err = %v, want the underlying outage", err)
+	results, err := total.Search(context.Background(), "M31")
+	if len(results) != 0 || !errors.Is(err, errOutage) {
+		t.Errorf("total outage: %d results, err = %v; want none and the underlying outage", len(results), err)
+	}
+
+	if errors.Is(err, ErrIncomplete) {
+		t.Errorf("total outage: err = %v claims a partial result where there is none", err)
 	}
 }
 

@@ -2,10 +2,12 @@ package plan
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -178,5 +180,26 @@ func TestRawMagnitudeSeparatesFailureFromAbsence(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("an absent magnitude was reported as a failure: %v", err)
+	}
+}
+
+// TestErrIncompleteIsSharedWithCatalog: a partial result from catalog's
+// Resolver.Search and one from VisibleTonight answer the same errors.Is check,
+// so a caller handling both writes one branch (#1143). They were two values
+// with the same meaning, and catalog had none at all.
+func TestErrIncompleteIsSharedWithCatalog(t *testing.T) {
+	t.Parallel()
+
+	fromCatalog := fmt.Errorf("catalog: searching %q: %w", "M31", catalog.ErrIncomplete)
+	if !errors.Is(fromCatalog, ErrIncomplete) {
+		t.Errorf("errors.Is(%v, plan.ErrIncomplete) = false, want true", fromCatalog)
+	}
+
+	var s skips
+
+	s.add("bright source", "simbad", errBadRow)
+
+	if err := s.err(); !errors.Is(err, catalog.ErrIncomplete) {
+		t.Errorf("errors.Is(%v, catalog.ErrIncomplete) = false, want true", err)
 	}
 }

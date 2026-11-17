@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -40,9 +41,21 @@ func main() {
 	// point: an empty result now means the catalogs were asked and matched
 	// nothing, where an error means at least one could not be reached. They
 	// used to be the same answer.
+	//
+	// A catalog that cannot be reached does not cost the others' matches:
+	// Search returns them with an error wrapping catalog.ErrIncomplete, which
+	// names each catalog that failed and why. Only an error without it means
+	// nothing usable came back.
 	results, err := resolver.Search(ctx, query)
-	if err != nil {
+
+	incomplete := errors.Is(err, catalog.ErrIncomplete)
+	if err != nil && !incomplete {
 		log.Fatalf("search: %v", err)
+	}
+
+	if incomplete {
+		fmt.Println()
+		show.Note("Some catalogs could not answer, so these results may be missing their matches:", err.Error())
 	}
 
 	if len(results) == 0 {
