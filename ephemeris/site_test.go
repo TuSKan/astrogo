@@ -50,7 +50,12 @@ func TestSiteApparentIsSOFAsTopocentricPlace(t *testing.T) {
 
 		for h := range 30 * 24 {
 			at := start.Add(unit.Hours(float64(h)))
-			ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+			ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			in := eph.At(p, at)
 
 			app, err := in.Apparent(body, eph.Site(ctx))
@@ -134,7 +139,12 @@ func TestSiteIsTheContextsObserver(t *testing.T) {
 	}
 
 	at := time.Date(2026, time.June, 10, 3, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	in := eph.At(p, at)
 
 	fromSite, err := in.Astrometric(eph.Moon, eph.Site(ctx))

@@ -119,7 +119,11 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		ctx := coord.NewContext(diurnalEpoch, site, atm)
+		ctx, err := coord.NewContext(diurnalEpoch, site, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height().Meters())
 
 		var worstAgainstSOFA, worstShift float64

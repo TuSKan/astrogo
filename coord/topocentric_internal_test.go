@@ -27,7 +27,10 @@ func TestTopocentricToObservedIsSOFAsCIRSToObserved(t *testing.T) {
 	at := time.Date(2026, time.June, 21, 3, 0, 0, 0, time.LocationUTC)
 
 	for _, atm := range []atmosphere.Refraction{{}, {Pressure: 744, Temperature: 10, Humidity: 0.2, Wavelength: 0.55}} {
-		ctx := NewContext(at, site, atm)
+		ctx, err := NewContext(at, site, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		var worst float64
 

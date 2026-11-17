@@ -263,7 +263,11 @@ func TestCrescentGeometryReportsAFailedLookup(t *testing.T) {
 	t.Parallel()
 
 	site, evening := portOfSpainEvening(t)
-	ctx := coord.NewContext(evening, site.Location(), atmosphere.Refraction{})
+
+	ctx, err := coord.NewContext(evening, site.Location(), atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, body := range []eph.ID{eph.Sun, eph.Moon} {
 		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ time.Time) bool { return id == body }}

@@ -30,7 +30,10 @@ func TestGeocentricToObservedCarriesTheTopocentricDistance(t *testing.T) {
 		t.Fatalf("Moon position: %v", err)
 	}
 
-	ctx := coord.NewContext(at, site, atmosphere.StandardRefraction())
+	ctx, err := coord.NewContext(at, site, atmosphere.StandardRefraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	got := ctx.GeocentricToObserved(moon).Dist().AU()
 	want := moon.Sub(ctx.ObsVec()).Norm()

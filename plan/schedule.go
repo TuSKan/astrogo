@@ -87,7 +87,16 @@ type Transition struct {
 //
 // An error means a target could not be observed, and names which end.
 func NewTransition(from, to *Block, fromTime, toTime time.Time, site *Site) (Transition, error) {
-	return newTransition(from, to, fromTime, toTime, site, movingContext(site.Location(), site.Refraction()))
+	if site == nil {
+		return Transition{}, ErrNilSite
+	}
+
+	ctxAt, err := movingContext(fromTime, site.Location(), site.Refraction())
+	if err != nil {
+		return Transition{}, err
+	}
+
+	return newTransition(from, to, fromTime, toTime, site, ctxAt)
 }
 
 // newTransition is NewTransition with the Context for each instant supplied
@@ -378,8 +387,12 @@ type GreedyStrategy struct {
 
 // Schedule implements Strategy for GreedyStrategy.
 func (s *GreedyStrategy) Schedule(planner *Planner, window Window, blocks []*Block, transition TransitionModel) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition,
-		movingContext(planner.Site.Location(), planner.Site.Refraction()), newRunSky(false))
+	ctxAt, err := siteContexts(window.Start, window.End, planner.Site)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.schedule(planner, window, blocks, transition, ctxAt, newRunSky(false))
 }
 
 // schedule is Schedule with the Context for each instant supplied by ctxAt,

@@ -83,7 +83,7 @@ func TestRankObservableScoresTheMoonFromTheObserver(t *testing.T) {
 				t.Fatalf("GeocentricVec: %v", err)
 			}
 
-			aa := coord.NewContext(tt, site.Location(), site.Refraction()).GeocentricToObserved(vec)
+			aa := mustContext(t, tt, site.Location(), site.Refraction()).GeocentricToObserved(vec)
 			peak = math.Max(peak, aa.Alt().Degrees())
 		}
 

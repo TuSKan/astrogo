@@ -213,7 +213,7 @@ func runAllSky(t *testing.T) allSkyRun {
 		galactic coord.Galactic
 	}
 
-	cc := coord.NewContext(time.FromGo(scene.Time), scene.Observer,
+	cc := mustContext(t, time.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	var samples []sample

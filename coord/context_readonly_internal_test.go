@@ -48,9 +48,9 @@ func readOnlyContexts(t *testing.T) []*Context {
 	modeled.Model = atmosphere.RefractionBennett{}
 
 	return []*Context{
-		NewContext(at, site, atmosphere.StandardRefraction()),
-		NewContext(at, site, atmosphere.Refraction{}),
-		NewContext(at, site, modeled),
+		mustContext(t, at, site, atmosphere.StandardRefraction()),
+		mustContext(t, at, site, atmosphere.Refraction{}),
+		mustContext(t, at, site, modeled),
 	}
 }
 

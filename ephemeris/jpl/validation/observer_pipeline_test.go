@@ -60,7 +60,11 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// Actually, Astrometric is defined wrt ICRS cleanly.
 
 	// 2. Map through to Apparent!
-	ctx := coord.NewContext(obsTime, site, atmosphere.StandardRefraction())
+	ctx, err := coord.NewContext(obsTime, site, atmosphere.StandardRefraction())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	apparent := ctx.AstrometricToCIRS(coord.NewAstrometric(astro.RA(), astro.Dec()))
 
 	// AstroGo uses CIRS (Celestial Intermediate Reference System) for Apparent coords.
@@ -93,7 +97,11 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	atmNoRef := atmosphere.StandardRefraction()
 	atmNoRef.Model = atmosphere.RefractionNone{}
 
-	ctxNoRef := coord.NewContext(obsTime, site, atmNoRef)
+	ctxNoRef, err := coord.NewContext(obsTime, site, atmNoRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	observed := ctxNoRef.CIRSToObserved(apparent)
 
 	t.Logf("AstroGo  Geometric Observer  : Azimuth=%v, Elevation=%v", observed.Az().Degrees(), observed.Alt().Degrees())

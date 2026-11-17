@@ -131,7 +131,7 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 			t.Fatalf("Position: %v", err)
 		}
 
-		aa, err := coord.NewContext(at, site.Location(), atmosphere.Refraction{}).ICRSToAltAz(pos)
+		aa, err := mustContext(t, at, site.Location(), atmosphere.Refraction{}).ICRSToAltAz(pos)
 		if err != nil {
 			t.Fatalf("ICRSToAltAz: %v", err)
 		}

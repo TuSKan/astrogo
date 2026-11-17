@@ -64,9 +64,9 @@ func sameICRSBits(a, b coord.ICRS) bool {
 // every target in the run then sees one sky.
 func TestRunSkyAnswersAsTheConstraintsDo(t *testing.T) {
 	site := runSkySite(t)
-	ctxAt := movingContext(site.Location(), site.Refraction())
 	sky := newRunSky(false)
 	start := runSkyStart()
+	ctxAt := mustMoving(t, start, site.Location(), site.Refraction())
 
 	var none *runSky
 
@@ -157,7 +157,7 @@ func TestRunSkyAnswersAsTheConstraintsDo(t *testing.T) {
 func TestRunSkyKeepsWhatItComputed(t *testing.T) {
 	site := runSkySite(t)
 	at := runSkyStart()
-	ctx := movingContext(site.Location(), site.Refraction())(at)
+	ctx := mustMoving(t, at, site.Location(), site.Refraction())(at)
 	sky := newRunSky(false)
 
 	if _, err := sky.sunAltitude(at, ctx); err != nil {
@@ -200,7 +200,7 @@ func TestRunSkyKeepsWhatItComputed(t *testing.T) {
 func TestMoonIllumWithItsOwnProviderIsNeverAnsweredFromTheRun(t *testing.T) {
 	site := runSkySite(t)
 	at := runSkyStart()
-	ctx := movingContext(site.Location(), site.Refraction())(at)
+	ctx := mustMoving(t, at, site.Location(), site.Refraction())(at)
 	sky := newRunSky(false)
 
 	const sentinel = 7.0
@@ -295,11 +295,11 @@ func TestSchedulingWithTheRunsSkyIsBitIdentical(t *testing.T) {
 	}{
 		{"greedy", func(sky *runSky) (*Schedule, error) {
 			return (&GreedyStrategy{}).schedule(planner, window, blocks(), transition,
-				movingContext(site.Location(), site.Refraction()), sky)
+				mustMoving(t, window.Start, site.Location(), site.Refraction()), sky)
 		}},
 		{"swap over priority", func(sky *runSky) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window,
-				blocks(), transition, movingContext(site.Location(), site.Refraction()), sky)
+				blocks(), transition, mustMoving(t, window.Start, site.Location(), site.Refraction()), sky)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

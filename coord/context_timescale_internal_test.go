@@ -61,7 +61,10 @@ func TestContextRotatesStarsByItsOwnUT1(t *testing.T) {
 		time.Date(2016, time.December, 31, 23, 30, 0, 0, time.LocationUTC),
 		time.Date(2026, time.June, 15, 3, 0, 0, 0, time.LocationUTC),
 	) {
-		ctx := NewContext(epoch, loc, atm)
+		ctx, err := NewContext(epoch, loc, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		ut1, ut2 := epoch.UTC().UT1Using(ctx.eop.DUT1).JDParts()
 		want := gofaext.Era00(ut1, ut2) + ctx.astrom.Along
@@ -111,7 +114,10 @@ func TestContextAstrometryIsSOFAsFrom1960(t *testing.T) {
 	}
 
 	for _, epoch := range epochs {
-		ctx := NewContext(epoch, loc, atm)
+		ctx, err := NewContext(epoch, loc, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		utc1, utc2 := epoch.UTC().JDParts()
 
@@ -177,7 +183,10 @@ func TestAltAzToICRSInvertsICRSToAltAz(t *testing.T) {
 	}
 
 	for _, epoch := range append(sofaStepDays, time.Date(2026, time.June, 15, 3, 0, 0, 0, time.LocationUTC)) {
-		ctx := NewContext(epoch, loc, atm)
+		ctx, err := NewContext(epoch, loc, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		for _, star := range stars {
 			aa, err := ctx.ICRSToAltAz(star)

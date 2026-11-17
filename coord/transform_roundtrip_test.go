@@ -268,7 +268,10 @@ func TestAltAzICRSRoundTrip(t *testing.T) {
 	at := time.FromGo(time.GoDate(2026, 8, 21, 3, 0, 0, 0, time.LocationUTC))
 
 	// No refraction, so the transform is a pure geometric inverse.
-	ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, alt := range []float64{5, 15, 30, 45, 60, 80, 89} {
 		for _, az := range []float64{0, 45, 90, 135, 180, 225, 270, 315, 359.9} {

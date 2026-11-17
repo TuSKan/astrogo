@@ -69,7 +69,10 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 		// degrees, and the semi-diameter, in arcminutes, from a fresh
 		// geometric Context.
 		limbAbove := func(at time.Time) (float64, float64) {
-			ctx := coord.NewContext(at, loc, atmosphere.Refraction{})
+			ctx, err := coord.NewContext(at, loc, atmosphere.Refraction{})
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			vec, err := moon.GeocentricVec(at)
 			if err != nil {

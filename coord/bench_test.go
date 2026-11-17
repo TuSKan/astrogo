@@ -22,7 +22,9 @@ func BenchmarkNewContext(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 
 	for b.Loop() {
-		_ = coord.NewContext(t, loc, atm)
+		if _, err := coord.NewContext(t, loc, atm); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -32,7 +34,9 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 
 	for b.Loop() {
-		_ = coord.NewContext(t, loc, atm)
+		if _, err := coord.NewContext(t, loc, atm); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -50,7 +54,7 @@ func BenchmarkSetTime(b *testing.B) {
 		steps int
 	}{{"within the hour", 11}, {"a night", 96}} {
 		b.Run(c.name, func(b *testing.B) {
-			ctx := coord.NewContext(start, loc, atmosphere.StandardRefraction())
+			ctx := mustContext(b, start, loc, atmosphere.StandardRefraction())
 
 			steps := make([]time.Time, c.steps)
 			for i := range steps {
@@ -93,7 +97,7 @@ func BenchmarkAltitudeCurve(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				ctx := coord.NewContext(ticks[0], loc, atm)
+				ctx := mustContext(b, ticks[0], loc, atm)
 
 				for _, t := range ticks {
 					ctx.SetTime(t)
@@ -118,7 +122,8 @@ func BenchmarkICRSToAltAz(b *testing.B) {
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4)) // Orion
 
 	for b.Loop() {
-		ctx := coord.NewContext(t, loc, atm)
+		ctx := mustContext(b, t, loc, atm)
+
 		_, _ = ctx.ICRSToAltAz(pos)
 	}
 }
@@ -130,7 +135,9 @@ func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
-	ctx := coord.NewContext(t, loc, atm)
+
+	ctx := mustContext(b, t, loc, atm)
+
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
 
 	for b.Loop() {
@@ -157,7 +164,8 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 	for b.Loop() {
 		// One context per star (scalar pattern — what the current code does)
 		for _, s := range stars {
-			ctx := coord.NewContext(t, loc, atm)
+			ctx := mustContext(b, t, loc, atm)
+
 			_, _ = ctx.ICRSToAltAz(s)
 		}
 	}
@@ -177,7 +185,8 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 
 	for b.Loop() {
 		// One context for all stars (batched pattern)
-		ctx := coord.NewContext(t, loc, atm)
+		ctx := mustContext(b, t, loc, atm)
+
 		for _, s := range stars {
 			_, _ = ctx.ICRSToAltAz(s)
 		}
@@ -195,7 +204,11 @@ func BenchmarkReducer(b *testing.B) {
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
 	for b.Loop() {
-		r := coord.NewReducer(loc, t, atm)
+		r, err := coord.NewReducer(loc, t, atm)
+		if err != nil {
+			b.Fatal(err)
+		}
+
 		_ = r.Reduce(v)
 	}
 }
@@ -208,7 +221,14 @@ func BenchmarkReducer_Cached(b *testing.B) {
 	t := time.FromJD(2460000.5, time.UTC)
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
-	r := coord.NewReducer(loc, t, atm)
+	r, err := coord.NewReducer(loc, t, atm)
+
+	if err != nil {
+
+		b.Fatal(err)
+
+	}
+
 	_ = r.Reduce(v) // warm up the cache
 
 	for b.Loop() {
@@ -222,7 +242,8 @@ func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
-	ctx := coord.NewContext(t, loc, atm)
+
+	ctx := mustContext(b, t, loc, atm)
 
 	const n = 10000
 
@@ -251,7 +272,8 @@ func BenchmarkReduceBatch_10k(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
-	ctx := coord.NewContext(t, loc, atm)
+
+	ctx := mustContext(b, t, loc, atm)
 
 	const n = 10000
 

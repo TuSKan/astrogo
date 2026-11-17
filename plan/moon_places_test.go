@@ -132,11 +132,11 @@ func TestSchedulingWithTheRunsMoonIsBitIdentical(t *testing.T) {
 	}{
 		{"swap, default passes", func(sky *runSky) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{}).schedule(planner, window, makeBlocks(n), transition,
-				movingContext(site.Location(), site.Refraction()), sky)
+				mustMoving(t, window.Start, site.Location(), site.Refraction()), sky)
 		}},
 		{"swap, three passes over Priority", func(sky *runSky) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window,
-				makeBlocks(n), transition, movingContext(site.Location(), site.Refraction()), sky)
+				makeBlocks(n), transition, mustMoving(t, window.Start, site.Location(), site.Refraction()), sky)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

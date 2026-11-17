@@ -349,7 +349,10 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	// evalCtx backs observe, declared here so a single cache persists across
 	// every sample and bisection iteration within this solveVisibility call.
-	evalCtx := movingContext(spec.Observer.Location(), geomAtm)
+	evalCtx, err := movingContext(start, spec.Observer.Location(), geomAtm)
+	if err != nil {
+		return nil, err
+	}
 
 	// limb is what spec.UpperLimb adds to the geometric altitude, in degrees:
 	// the target's semi-diameter at t, or nothing for its center.
@@ -1465,7 +1468,10 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 // with a nil error, indistinguishable from a quiet sky (#437).
 func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, err error) {
 	at := func(atm atmosphere.Refraction) (coord.AltAz, error) {
-		ctx := coord.NewContext(t, spec.Observer.Location(), atm)
+		ctx, err := coord.NewContext(t, spec.Observer.Location(), atm)
+		if err != nil {
+			return coord.AltAz{}, err
+		}
 
 		if mb, isMoving := spec.Target.(MovingBody); isMoving {
 			aa, err := observedPlace(mb, t, ctx)

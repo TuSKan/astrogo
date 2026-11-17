@@ -119,7 +119,7 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 			t.Fatalf("ToICRS: %v", err)
 		}
 
-		altaz, err := coord.NewContext(at, loc, atmosphere.Refraction{}).ICRSToAltAz(icrs)
+		altaz, err := mustContext(t, at, loc, atmosphere.Refraction{}).ICRSToAltAz(icrs)
 		if err != nil {
 			t.Fatalf("ICRSToAltAz: %v", err)
 		}
@@ -437,7 +437,7 @@ func moonDirection(t *testing.T, scene *skybrightness.Scene) coord.AltAz {
 		t.Fatalf("ToICRS: %v", err)
 	}
 
-	altaz, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()).ICRSToAltAz(icrs)
+	altaz, err := mustContext(t, at, scene.Observer, scene.Atmosphere.Refraction()).ICRSToAltAz(icrs)
 	if err != nil {
 		t.Fatalf("ICRSToAltAz: %v", err)
 	}

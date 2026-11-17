@@ -100,7 +100,11 @@ func TestZodiacalLightBesideTheSunIsNoContribution(t *testing.T) {
 	scene.Time = time.GoDate(2026, 3, 20, 17, 0, 0, 0, time.LocationUTC)
 
 	at := time.FromGo(scene.Time)
-	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+
+	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sun, err := eph.At(scene.Ephemeris, at).Apparent(eph.Sun, eph.Site(ctx))
 	if err != nil {

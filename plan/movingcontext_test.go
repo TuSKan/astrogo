@@ -82,7 +82,7 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 			return setTimeArcsec * (1 + obs/rng)
 		}, 10 * canceledArcsec},
 	} {
-		ctxAt := movingContext(site, defaultAtm)
+		ctxAt := mustMoving(t, start, site, defaultAtm)
 
 		var (
 			worst, worstOver float64
@@ -103,7 +103,7 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 				t.Fatalf("%v: LookAngle through the moving Context: %v", at, err)
 			}
 
-			exact, err := LookAngle(route.prov, sat.ID(), coord.NewContext(at, site, defaultAtm))
+			exact, err := LookAngle(route.prov, sat.ID(), mustContext(t, at, site, defaultAtm))
 			if err != nil {
 				t.Fatalf("%v: LookAngle through a fresh context: %v", at, err)
 			}
@@ -176,7 +176,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 			what string
 			at   time.Time
 		}{{"rise", p.Rise.Time}, {"set", p.Set.Time}} {
-			got, err := LookAngle(sat, sat.ID(), coord.NewContext(ev.at, site, defaultAtm))
+			got, err := LookAngle(sat, sat.ID(), mustContext(t, ev.at, site, defaultAtm))
 			if err != nil {
 				t.Errorf("%s at %v: LookAngle: %v", ev.what, ev.at, err)
 				continue
@@ -205,7 +205,7 @@ func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 	_, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	ctxAt := movingContext(site, defaultAtm)
+	ctxAt := mustMoving(t, start, site, defaultAtm)
 
 	// The Crab, as an ordinary catalog position; any fixed direction does.
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
@@ -219,7 +219,7 @@ func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 		at := start.Add(unit.Minutes(float64(m)))
 
 		got := ctxAt(at).AstrometricToCIRS(fixed)
-		want := coord.NewContext(at, site, defaultAtm).AstrometricToCIRS(fixed)
+		want := mustContext(t, at, site, defaultAtm).AstrometricToCIRS(fixed)
 
 		worst = max(worst, coord.Separation(
 			coord.NewICRS(got.RA(), got.Dec()),
@@ -247,7 +247,7 @@ func TestMovingContextHandlesBackwardsSteps(t *testing.T) {
 	_, site := testISS(t)
 
 	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
-	ctxAt := movingContext(site, defaultAtm)
+	ctxAt := mustMoving(t, start, site, defaultAtm)
 
 	// Sweep forward far enough to move the base several windows on, the way a
 	// six-hour sample loop does.
@@ -261,7 +261,7 @@ func TestMovingContextHandlesBackwardsSteps(t *testing.T) {
 	fixed := coord.NewAstrometric(angle.Deg(83.633), angle.Deg(22.014))
 
 	got := ctxAt(back).AstrometricToCIRS(fixed)
-	want := coord.NewContext(back, site, defaultAtm).AstrometricToCIRS(fixed)
+	want := mustContext(t, back, site, defaultAtm).AstrometricToCIRS(fixed)
 
 	sep := coord.Separation(
 		coord.NewICRS(got.RA(), got.Dec()),

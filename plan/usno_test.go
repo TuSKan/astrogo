@@ -1501,7 +1501,10 @@ func moonUp(t *testing.T, site *plan.Site, prov eph.Provider) func(plan.Event) b
 	horizon := site.RiseSetThreshold().Degrees()
 
 	return func(ev plan.Event) bool {
-		ctx := coord.NewContext(ev.Time, site.Location(), atmosphere.Refraction{})
+		ctx, err := coord.NewContext(ev.Time, site.Location(), atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		d, err := plan.AngularDiameter(moon, ev.Time, ctx)
 		if err != nil {

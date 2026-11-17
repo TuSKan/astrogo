@@ -59,7 +59,7 @@ prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de442")
 defer prov.Close()
 
 t := time.Date(2025, time.February, 28, 19, 0, 0, 0, time.LocationUTC)
-ctx := coord.NewContext(t, loc, atmosphere.AtAltitude(760))
+ctx, _ := coord.NewContext(t, loc, atmosphere.AtAltitude(760))
 
 planets := []plan.Observable{
     plan.NewMercury(prov), plan.NewVenus(prov), plan.NewMars(prov),

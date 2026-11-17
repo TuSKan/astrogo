@@ -88,7 +88,9 @@ func BenchmarkNewContextEOP(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				_ = coord.NewContext(t, loc, atm)
+				if _, err := coord.NewContext(t, loc, atm); err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
@@ -112,7 +114,7 @@ func BenchmarkSetTimeEOP(b *testing.B) {
 			b.Run(mode+"/"+c.name, func(b *testing.B) {
 				pinEOP(b, mode)
 
-				ctx := coord.NewContext(start, loc, atmosphere.StandardRefraction())
+				ctx := mustContext(b, start, loc, atmosphere.StandardRefraction())
 
 				steps := make([]time.Time, c.steps)
 				for i := range steps {
@@ -156,7 +158,8 @@ func BenchmarkSetTimeEOPParallel(b *testing.B) {
 		b.Run(mode, func(b *testing.B) {
 			pinEOP(b, mode)
 
-			ctx := coord.NewContext(start, loc, atmosphere.StandardRefraction())
+			ctx := mustContext(b, start, loc, atmosphere.StandardRefraction())
+
 			ctx.SetTime(steps[len(steps)-1])
 			ctx.SetTime(start)
 

@@ -143,7 +143,12 @@ func TestMovingBodyRadialVelocityAgainstHorizons(t *testing.T) {
 	const tlistJD = "2461114.5"
 
 	at := time.FromJD(2461114.5, time.UTC)
-	ctx := coord.NewContext(at, site, atmosphere.Refraction{Pressure: 0})
+
+	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{Pressure: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	e := ephemeris.Default()
 
 	for _, tc := range []struct {

@@ -61,7 +61,11 @@ func main() {
 	}
 
 	t := time.NowUTC().In(tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+
+	ctx, err := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+	if err != nil {
+		log.Fatalf("NewContext: %v", err)
+	}
 
 	fmt.Printf("Element set epoch: %s (%.1f days ago)\n\n",
 		catTarget.Epoch.In(tz).Format("2006-01-02 15:04 MST"), t.Sub(catTarget.Epoch).Days())

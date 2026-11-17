@@ -193,7 +193,11 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 				t.Fatalf("%s at JD %.1f: apparentVec: %v", body.name, jd, err)
 			}
 
-			ctx := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			ctx, err := coord.NewContext(tm, geo, atmosphere.Refraction{Pressure: 0})
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			zd := 90*3600 - ctx.GeocentricToObserved(vec).Alt().Degrees()*3600
 			worst = max(worst, zd)
 

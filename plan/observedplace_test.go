@@ -38,7 +38,11 @@ func TestObservedPlaceRoutesEachKindOfBody(t *testing.T) {
 	}
 
 	at := time.Date(2026, time.June, 10, 21, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	moon := NewMoon(p)
 

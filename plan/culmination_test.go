@@ -20,7 +20,12 @@ func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geo
 	bestEl := -90.0
 
 	sample := func(t time.Time) error {
-		altaz, err := LookAngle(prov, id, coord.NewContext(t, observer, defaultAtm))
+		ctx, err := coord.NewContext(t, observer, defaultAtm)
+		if err != nil {
+			return err
+		}
+
+		altaz, err := LookAngle(prov, id, ctx)
 		if err != nil {
 			return err
 		}
@@ -54,7 +59,12 @@ func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geo
 		}
 	}
 
-	altaz, err := LookAngle(prov, id, coord.NewContext(bestTime, observer, defaultAtm))
+	ctx, err := coord.NewContext(bestTime, observer, defaultAtm)
+	if err != nil {
+		return PassEvent{}, err
+	}
+
+	altaz, err := LookAngle(prov, id, ctx)
 	if err != nil {
 		return PassEvent{}, err
 	}

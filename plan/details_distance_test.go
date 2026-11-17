@@ -21,7 +21,11 @@ func TestStringOmitsAnUnknownDistance(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.Date(2026, time.April, 25, 20, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, loc, atmosphere.Refraction{})
+
+	ctx, err := coord.NewContext(tm, loc, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ra, dec := angle.Deg(101.287155), angle.Deg(-16.716116)
 

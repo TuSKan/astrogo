@@ -55,8 +55,12 @@ func (s *SwapOptimizedStrategy) Schedule(
 	blocks []*Block,
 	transition TransitionModel,
 ) (*Schedule, error) {
-	return s.schedule(planner, window, blocks, transition,
-		movingContext(planner.Site.Location(), planner.Site.Refraction()), newRunSky(true))
+	ctxAt, err := siteContexts(window.Start, window.End, planner.Site)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.schedule(planner, window, blocks, transition, ctxAt, newRunSky(true))
 }
 
 // schedule is Schedule with the Context for each instant of the swap and

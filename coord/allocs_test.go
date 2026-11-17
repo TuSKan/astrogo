@@ -53,7 +53,8 @@ func TestCachedContextTransformsDoNotAllocate(t *testing.T) {
 
 	atm := atmosphere.AtAltitude(2635)
 	epoch := time.FromJD(2460000.5, time.UTC)
-	ctx := coord.NewContext(epoch, loc, atm)
+
+	ctx := mustContext(t, epoch, loc, atm)
 
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
 	vec := vector.Vec3{X: 0.5, Y: 0.5, Z: 0.7071}
@@ -86,7 +87,7 @@ func TestBatchTransformDoesNotAllocate(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	ctx := coord.NewContext(time.FromJD(2460000.5, time.UTC), loc, atmosphere.AtAltitude(2635))
+	ctx := mustContext(t, time.FromJD(2460000.5, time.UTC), loc, atmosphere.AtAltitude(2635))
 
 	const n = 512
 
@@ -125,7 +126,7 @@ func TestNewContextAllocationIsBounded(t *testing.T) {
 	// anything that would make per-epoch setup look like per-target work.
 	const maxAllocs = 8
 
-	if got := testing.AllocsPerRun(200, func() { _ = coord.NewContext(epoch, loc, atm) }); got > maxAllocs {
+	if got := testing.AllocsPerRun(200, func() { _, _ = coord.NewContext(epoch, loc, atm) }); got > maxAllocs {
 		t.Errorf("NewContext allocates %v times per call, want at most %d (measured 1)",
 			got, maxAllocs)
 	}
@@ -145,7 +146,8 @@ func TestSetTimeDoesNotAllocate(t *testing.T) {
 
 	atm := atmosphere.AtAltitude(2635)
 	epoch := time.FromJD(2460000.5, time.UTC)
-	ctx := coord.NewContext(epoch, loc, atm)
+
+	ctx := mustContext(t, epoch, loc, atm)
 
 	near := []time.Time{epoch.Add(unit.Minutes(5)), epoch.Add(unit.Minutes(-20))}
 	far := []time.Time{epoch.Add(unit.Hours(3)), epoch.Add(unit.Hours(-3))}

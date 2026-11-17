@@ -73,7 +73,11 @@ func TestMoonNoteMeasuresFromTheSite(t *testing.T) {
 	t.Parallel()
 
 	site, at := paranalMoonNight(t)
-	ctx := coord.NewContext(at, site.Location(), site.Refraction())
+
+	ctx, err := coord.NewContext(at, site.Location(), site.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	note := moonNote(eph.Default(), NewStar("east of the Moon", angle.Deg(354.229381+29.8), angle.Deg(-0.062546)), at, ctx)
 	if !strings.Contains(note, "30° away") {

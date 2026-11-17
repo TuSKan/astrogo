@@ -16,7 +16,10 @@ import (
 //
 // This is the natural shape for an Apache Beam ParDo / Go errgroup worker:
 //
-//	ctx := coord.NewContext(t, site, atm)
+//	ctx, err := coord.NewContext(t, site, atm)
+//	if err != nil {
+//		return err
+//	}
 //	in := make([]vector.Vec3, len(stars))
 //	out := make([]coord.AltAz, len(stars))
 //	ctx.ReduceBatch(in, out)
@@ -61,7 +64,10 @@ func (ctx *Context) ReduceBatchParallel(in []vector.Vec3, out []AltAz) {
 //
 // This avoids per-call Context creation overhead for stellar targets:
 //
-//	ctx := coord.NewContext(t, site, atm)
+//	ctx, err := coord.NewContext(t, site, atm)
+//	if err != nil {
+//		return err
+//	}
 //	stars := []coord.ICRS{...}
 //	out := make([]coord.AltAz, len(stars))
 //	ctx.ICRSBatchToAltAz(stars, out)

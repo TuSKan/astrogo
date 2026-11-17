@@ -50,7 +50,7 @@ func TestCrescentVisibilityReadsTheMABIMSElongationGeocentric(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	g, err := crescentGeometryAt(coord.NewContext(r.Sunset, site.Location(), atmosphere.Refraction{}), prov)
+	g, err := crescentGeometryAt(mustContext(t, r.Sunset, site.Location(), atmosphere.Refraction{}), prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 	// on the ellipsoid, nearer the center than its equatorial radius by up to
 	// 0.34% and with its vertical off the geocentric by up to 0.19°, which
 	// moves this by under 0.004°.
-	g, err := crescentGeometryAt(coord.NewContext(r.BestTime, site.Location(), atmosphere.Refraction{}), prov)
+	g, err := crescentGeometryAt(mustContext(t, r.BestTime, site.Location(), atmosphere.Refraction{}), prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	sunsetCtx := coord.NewContext(r.Sunset, site.Location(), atmosphere.Refraction{})
+	sunsetCtx := mustContext(t, r.Sunset, site.Location(), atmosphere.Refraction{})
 
 	sunsetCtx.SetTime(r.BestTime)
 
@@ -155,7 +155,7 @@ func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
 
-	fresh, err := crescentGeometryAt(coord.NewContext(r.BestTime, site.Location(), atmosphere.Refraction{}), prov)
+	fresh, err := crescentGeometryAt(mustContext(t, r.BestTime, site.Location(), atmosphere.Refraction{}), prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}

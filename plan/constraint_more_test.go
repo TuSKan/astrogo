@@ -283,7 +283,10 @@ func TestHorizon(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			obj := NewStar(tc.name, tc.ra, tc.dec)
 
-			ctx := coord.NewContext(when, site.Location(), site.Refraction())
+			ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			aa, err := skyAltAzCtx(obj, when, ctx)
 			testutil.AssertNoError(t, err)
@@ -333,7 +336,10 @@ func TestHorizonFallsBackToTheScalarLimit(t *testing.T) {
 	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
 	obj := NewStar("target", angle.Deg(120), angle.Deg(-20))
 
-	ctx := coord.NewContext(when, site.Location(), site.Refraction())
+	ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	aa, err := skyAltAzCtx(obj, when, ctx)
 	testutil.AssertNoError(t, err)
@@ -380,7 +386,10 @@ func TestHorizonReadsTheSiteItIsGiven(t *testing.T) {
 
 	flat := ridgeSite(t, WithHorizonProfile(func(angle.Angle) angle.Angle { return angle.Deg(0) }))
 
-	ctx := coord.NewContext(when, flat.Location(), flat.Refraction())
+	ctx, err := coord.NewContext(when, flat.Location(), flat.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	aa, err := skyAltAzCtx(obj, when, ctx)
 	testutil.AssertNoError(t, err)

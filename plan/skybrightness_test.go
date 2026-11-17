@@ -54,7 +54,7 @@ func skyConstraintFixture(t *testing.T, vmag float64) (*Star, *Site, *coord.Cont
 	// exercised by accident.
 	star := NewStar("target", angle.Hour(16.5), angle.Deg(-24.6272), WithStarMagnitude(vmag))
 
-	ctx := coord.NewContext(when, site.Location(), site.Refraction())
+	ctx := mustContext(t, when, site.Location(), site.Refraction())
 
 	return star, site, ctx
 }
@@ -210,7 +210,7 @@ func TestLimitingMagnitudeBelowHorizonScoresZero(t *testing.T) {
 	// The north celestial pole, permanently below the horizon at -24.6.
 	star := NewStar("north pole", angle.Hour(0), angle.Deg(89.9), WithStarMagnitude(2))
 
-	ctx := coord.NewContext(time.Date(2026, time.March, 2, 5, 0, 0, 0, time.LocationUTC),
+	ctx := mustContext(t, time.Date(2026, time.March, 2, 5, 0, 0, 0, time.LocationUTC),
 		site.Location(), site.Refraction())
 
 	c := LimitingMagnitudeConstraint{Sky: fixedDepth(20)}

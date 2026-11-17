@@ -35,7 +35,7 @@ func refractionScene(t *testing.T) (withAtm, noAtm *coord.Context) {
 	dry := atm
 	dry.Pressure = 0
 
-	return coord.NewContext(epoch, site, atm), coord.NewContext(epoch, site, dry)
+	return mustContext(t, epoch, site, atm), mustContext(t, epoch, site, dry)
 }
 
 // farVector is a geocentric position vector pointing at an ICRS direction, far
@@ -248,7 +248,7 @@ func TestAltAzToICRSInvertsRefractionNearTheHorizon(t *testing.T) {
 	bennett := withAtm.Refraction()
 	bennett.Model = atmosphere.RefractionBennett{}
 
-	explicit := coord.NewContext(withAtm.Time(), withAtm.Site(), bennett)
+	explicit := mustContext(t, withAtm.Time(), withAtm.Site(), bennett)
 
 	var checked int
 

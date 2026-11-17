@@ -31,7 +31,8 @@ func TestGetDetails_Star(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC) // J2000
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
 		WithStarMagnitude(0.03),
@@ -91,7 +92,8 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	dso := NewDeepSkyObject("Andromeda Galaxy", angle.Hour(0.712), angle.Deg(41.27),
 		WithDSOMagnitude(3.4),
@@ -117,7 +119,8 @@ func TestGetDetails_MovingBody(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	mars := NewMars(eph.Default())
 
@@ -155,7 +158,8 @@ func TestGetDetails_String(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	star := NewStar("Sirius", angle.Hour(6.75), angle.Deg(-16.72), WithStarMagnitude(-1.46))
 
@@ -182,7 +186,8 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	const rvBarycentric = -5.5
 
@@ -227,7 +232,8 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78))
 
@@ -259,7 +265,8 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
-	ctx := coord.NewContext(tm, loc, site.Refraction())
+
+	ctx := mustContext(t, tm, loc, site.Refraction())
 
 	star := NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161), WithRadialVelocity(unit.KmPerSec(-5.5)))
 
@@ -293,7 +300,7 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 	t2 := t1.Add(unit.Days(182))
 
 	parseTopo := func(tm time.Time) float64 {
-		ctx := coord.NewContext(tm, loc, site.Refraction())
+		ctx := mustContext(t, tm, loc, site.Refraction())
 
 		d, err := star.GetDetails(ctx, DetailOverrides{})
 		testutil.AssertNoError(t, err)
@@ -331,7 +338,7 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	ctx := coord.NewContext(
+	ctx := mustContext(t,
 		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC),
 		site, atmosphere.Refraction{Pressure: 0})
 
@@ -508,7 +515,7 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 			site, err := NewSite("Test", loc)
 			testutil.AssertNoError(t, err)
 
-			ctx := coord.NewContext(time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+			ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
 
 			base, err := tc.target.GetDetails(ctx, DetailOverrides{})
 			testutil.AssertNoError(t, err)
@@ -547,7 +554,7 @@ func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
 	site, err := NewSite("Test", loc)
 	testutil.AssertNoError(t, err)
 
-	ctx := coord.NewContext(time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+	ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
 
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
 		WithStarMagnitude(0.03),

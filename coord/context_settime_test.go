@@ -30,7 +30,7 @@ func setTimeFixture(t *testing.T) (*coord.Geodetic, atmosphere.Refraction, time.
 func sameAsNewContext(t *testing.T, ctx *coord.Context, site *coord.Geodetic, atm atmosphere.Refraction, star coord.ICRS) float64 {
 	t.Helper()
 
-	fresh := coord.NewContext(ctx.Time(), site, atm)
+	fresh := mustContext(t, ctx.Time(), site, atm)
 
 	var worst float64
 
@@ -77,7 +77,8 @@ func sameAsNewContext(t *testing.T, ctx *coord.Context, site *coord.Geodetic, at
 func TestSetTime_ZeroDeltaMatchesNewContext(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
+
 	ctx.SetTime(base)
 
 	if d := sameAsNewContext(t, ctx, site, atm, star); d > 1e-12 {
@@ -99,7 +100,8 @@ const settimeBoundArcsec = 0.007
 func TestSetTime_IsNewContextAtANode(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
+
 	ctx.SetTime(base.Add(unit.Hours(12))) // evaluates the bracket's far end, a day out
 
 	for _, at := range []time.Time{base.Add(unit.Days(1)), base} {
@@ -123,7 +125,7 @@ func TestSetTime_IsNewContextAtANode(t *testing.T) {
 func TestSetTime_StaysWithinItsBound(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
 
 	var worst float64
 
@@ -158,7 +160,7 @@ func TestSetTime_StaysWithinItsBound(t *testing.T) {
 func TestSetTime_RebuildsFarAway(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
 
 	for _, days := range []float64{5, 40, -3} {
 		ctx.SetTime(base.Add(unit.Days(days)))
@@ -176,7 +178,7 @@ func TestSetTime_RebuildsFarAway(t *testing.T) {
 func TestSetTime_AdvancesEarthRotation(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
 
 	ha0, err := ctx.ICRSToHourAngle(star)
 	testutil.AssertNoError(t, err)
@@ -197,7 +199,7 @@ func TestSetTime_AdvancesEarthRotation(t *testing.T) {
 func TestContextIsAValue(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
 
 	before, err := ctx.ICRSToAltAz(star)
 	testutil.AssertNoError(t, err)
@@ -225,7 +227,7 @@ func TestContextIsAValue(t *testing.T) {
 func TestSetTime_StepsANightAsNewContextDoes(t *testing.T) {
 	site, atm, base, star := setTimeFixture(t)
 
-	ctx := coord.NewContext(base, site, atm)
+	ctx := mustContext(t, base, site, atm)
 
 	var worst float64
 

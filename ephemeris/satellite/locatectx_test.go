@@ -43,7 +43,11 @@ func TestLocateCtxIsStateAtTheContextInstant(t *testing.T) {
 
 	for i := range 12 {
 		at := start.Add(unit.Minutes(float64(10 * i)))
-		ctx := coord.NewContext(at, site, atmosphere.Refraction{})
+
+		ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		want, err := sat.Locate(sat.ID(), at)
 		if err != nil {
@@ -78,7 +82,10 @@ func TestLocateCtxRejectsUnexpectedID(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	ctx := coord.NewContext(time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC), paranal(t), atmosphere.Refraction{})
+	ctx, err := coord.NewContext(time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC), paranal(t), atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := sat.LocateCtx(eph.Sun, ctx); !errors.Is(err, satellite.ErrUnexpectedID) {
 		t.Errorf("LocateCtx(eph.Sun, ...) = %v, want ErrUnexpectedID", err)

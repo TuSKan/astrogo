@@ -60,7 +60,7 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 
 		for i := range ctxs {
 			times[i] = base.Add(unit.Minutes(float64(i * dayMinutes / sweepSteps)))
-			ctxs[i] = coord.NewContext(times[i], site.Location(), site.Refraction())
+			ctxs[i] = mustContext(t, times[i], site.Location(), site.Refraction())
 		}
 
 		for decDeg := -90.0; decDeg <= 90.0; decDeg += 5 {

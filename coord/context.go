@@ -1,6 +1,7 @@
 package coord
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
@@ -48,11 +49,6 @@ type Context struct {
 	// refa and refb are the refraction constants SOFA's astrometry carries,
 	// which depend on the atmosphere alone.
 	refa, refb float64
-
-	// badAir is atm failing [atmosphere.Refraction.Validate]. Every observed
-	// altitude is then NaN, rather than refracted through SOFA's clamp of it
-	// (#903).
-	badAir bool
 
 	site   *Geodetic
 	atm    atmosphere.Refraction
@@ -114,7 +110,29 @@ type Context struct {
 // stretches for a step in TAI−UTC (1959-12-31, ten in the 1960s, 1971-12-31)
 // the UT1s differed by up to 0.82 s, so a star and the Moon in one Context
 // were rotated by different Earths, 11.8″ apart (#474).
-func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context {
+//
+// # What it refuses
+//
+// A nil site is [ErrNilGeodetic], a time that is not finite is
+// [ErrNotFinite], and air that fails [atmosphere.Refraction.Validate] is that
+// error. Each used to be accepted: the nil site panicked, the time made every
+// place NaN, and the air made every observed altitude NaN, all with no error,
+// since NewContext had no way to return one (#1186). Refco would otherwise
+// clamp the air, so a NaN temperature came out as −150 °C and refracted 2.35
+// times too much (#903).
+func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) (*Context, error) {
+	if site == nil {
+		return nil, fmt.Errorf("coord: NewContext: %w", ErrNilGeodetic)
+	}
+
+	if jd := t.JD(); math.IsNaN(jd) || math.IsInf(jd, 0) {
+		return nil, fmt.Errorf("coord: NewContext: time %v: %w", t, ErrNotFinite)
+	}
+
+	if err := atm.Validate(); err != nil {
+		return nil, fmt.Errorf("coord: NewContext: %w", err)
+	}
+
 	ctx := &Context{site: site, atm: atm}
 	ctx.sinLat, ctx.cosLat = math.Sincos(site.Lat().Radians())
 	ctx.sinLon, ctx.cosLon = math.Sincos(site.Lon().Radians())
@@ -131,18 +149,9 @@ func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) *Context
 	// doubled the refraction (#904).
 	ctx.refa, ctx.refb = gofaext.Refco(p, atm.Temperature, atm.Humidity, atm.EffectiveWavelength())
 
-	// Refco clamps what it is given, so a NaN temperature came out as −150 °C
-	// and refracted 2.35 times too much (#903). Air that is not air makes the
-	// constants NaN, which SOFA's own astrometry carries into every observed
-	// place, and refract makes the rest NaN.
-	if atm.Validate() != nil {
-		ctx.badAir = true
-		ctx.refa, ctx.refb = math.NaN(), math.NaN()
-	}
-
 	ctx.build(t)
 
-	return ctx
+	return ctx, nil
 }
 
 // kmPerAU is the number of kilometers in one Astronomical Unit.
@@ -503,7 +512,14 @@ func (ctx *Context) TopocentricToObserved(v vector.Vec3) AltAz {
 // precomputed epoch pipeline matrices. If the ICRS carries stellar kinematics
 // (proper motion, parallax, radial velocity), they are forwarded to SOFA for
 // rigorous space-motion propagation.
+//
+// A position or kinematics that is not finite is [ErrNotFinite]. It used to
+// come back as a NaN place with a nil error (#1186).
 func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
+	if !c.Astrometric().finite() {
+		return AltAz{}, fmt.Errorf("coord: ICRSToAltAz: %v: %w", c, ErrNotFinite)
+	}
+
 	altaz := ctx.AstrometricToObserved(c.Astrometric())
 	altaz.SetDist(c.Dist())
 
@@ -518,7 +534,14 @@ func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 // returns, rotated from the horizon to the equator as iauAtioq rotates it,
 // with the latitude corrected for polar motion. Until #588 a Context with an
 // explicit refraction model returned the unrefracted hour angle.
+//
+// A position or kinematics that is not finite is [ErrNotFinite], as for
+// [Context.ICRSToAltAz].
 func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
+	if !c.Astrometric().finite() {
+		return 0, fmt.Errorf("coord: ICRSToHourAngle: %v: %w", c, ErrNotFinite)
+	}
+
 	_, _, ha := ctx.observed(ctx.atciq(c.Astrometric()))
 
 	return angle.Rad(ha).Wrap180(), nil
@@ -532,7 +555,14 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 // the precession-nutation series again on a Context built to cache it, and did
 // so at SOFA's own TT and UT1 rather than this Context's: on the days #474
 // names, the inverse of ICRSToAltAz was not ICRSToAltAz's inverse.
+//
+// An altitude or azimuth that is not finite is [ErrNotFinite]. It used to
+// come back as a NaN position with a nil error (#1186).
 func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
+	if !finite(c.Alt().Radians()) || !finite(c.Az().Radians()) {
+		return ICRS{}, fmt.Errorf("coord: AltAzToICRS: altitude %v, azimuth %v: %w", c.Alt(), c.Az(), ErrNotFinite)
+	}
+
 	var ri, di float64
 
 	switch {
@@ -652,8 +682,6 @@ func (ctx *Context) build(t time.Time) {
 // almanacs give 34′ (#588).
 func (ctx *Context) refract(alt angle.Angle) angle.Angle {
 	switch {
-	case ctx.badAir:
-		return angle.Rad(math.NaN())
 	case ctx.atm.Model != nil:
 		return alt + ctx.atm.Model.RefractFromTrue(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:
@@ -726,8 +754,6 @@ func (ctx *Context) geometric() gofaext.ASTROM {
 // one.
 func (ctx *Context) unrefract(alt angle.Angle) angle.Angle {
 	switch {
-	case ctx.badAir:
-		return angle.Rad(math.NaN())
 	case ctx.atm.Model != nil:
 		return alt - ctx.atm.Model.RefractFromApparent(alt, ctx.atm)
 	case ctx.atm.Pressure > 0:

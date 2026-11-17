@@ -251,11 +251,11 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 		Unscheduled: []UnscheduledBlock{{Block: b1}},
 	}
 
-	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(planner), nil, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(t, planner, start), nil, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("swapPass returned %v, want it to wrap the constraint's error", err)
 	}
 
-	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(planner), nil); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(t, planner, start), nil); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
 	}
 }
@@ -373,7 +373,7 @@ func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
 
 	ok, err := checkConstraintsInterval(
 		NewStar("A", angle.Zero(), angle.Zero()),
-		start, end, 10*time.Minute, site, movingContext(site.Location(), site.Refraction()), nil,
+		start, end, 10*time.Minute, site, mustMoving(t, start, site.Location(), site.Refraction()), nil,
 		endOnlyFailingConstraint{at: end},
 	)
 

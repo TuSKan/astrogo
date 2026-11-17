@@ -220,7 +220,11 @@ func main() {
 
 	loc := site.Location()
 	atm := atmosphere.AtAltitude(835.05)
-	ctx := coord.NewContext(now, loc, atm)
+
+	ctx, err := coord.NewContext(now, loc, atm)
+	if err != nil {
+		log.Fatalf("NewContext: %v", err)
+	}
 
 	details, err := moonTarget.GetDetails(ctx, plan.DetailOverrides{})
 	if err != nil {

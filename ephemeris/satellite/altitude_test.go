@@ -57,7 +57,10 @@ func TestAltitudeAgreesWithTheEarthFixedRoute(t *testing.T) {
 			t.Fatalf("State at %v: %v", tm, err)
 		}
 
-		ctx := coord.NewContext(tm, site, atmosphere.Refraction{Pressure: 0})
+		ctx, err := coord.NewContext(tm, site, atmosphere.Refraction{Pressure: 0})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		geo, err := coord.FromECEF(ctx.ICRSToITRS(st.Pos.MulScalar(metersPerAU)), coord.WGS84())
 		if err != nil {

@@ -201,7 +201,7 @@ func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Cont
 
 	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
-	return sat, site, coord.NewContext(tm, site.Location(), site.Refraction())
+	return sat, site, mustContext(t, tm, site.Location(), site.Refraction())
 }
 
 // TestEclipsedSatelliteHasNoMagnitude is #562's reproduction. The ISS passes

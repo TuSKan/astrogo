@@ -45,7 +45,10 @@ func main() {
 		log.Fatalf("loc: %v", err)
 	}
 
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+	ctx, err := coord.NewContext(t, loc, atmosphere.StandardRefraction())
+	if err != nil {
+		log.Fatalf("NewContext: %v", err)
+	}
 
 	altaz, err := ctx.ICRSToAltAz(sgrA)
 	if err != nil {

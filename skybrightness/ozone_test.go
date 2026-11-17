@@ -134,7 +134,11 @@ func moonOzoneAirmass(t *testing.T, scene *skybrightness.Scene) float64 {
 	t.Helper()
 
 	at := time.FromGo(scene.Time)
-	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+
+	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	moon, err := eph.At(scene.Ephemeris, at).Apparent(eph.Moon, eph.Site(ctx))
 	if err != nil {

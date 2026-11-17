@@ -424,7 +424,10 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 	// 0.95 degrees, above where the site sees it: a Moon at 9.2 degrees was
 	// charged 5.50 airmasses instead of 6.02, and one just below the site's
 	// horizon lit its sky (#646).
-	ctx := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+	if err != nil {
+		return nil, fmt.Errorf("skybrightness: moonlight: %w", err)
+	}
 
 	apparent, err := in.Apparent(eph.Moon, eph.Site(ctx))
 	if err != nil {

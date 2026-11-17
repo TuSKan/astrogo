@@ -83,6 +83,14 @@ var (
 	ErrStepTooLarge = errors.New("step exceeds maximum: large steps risk missing short visibility windows")
 	// ErrNotObservable indicates the object does not implement Observable.
 	ErrNotObservable = errors.New("object does not implement Observable")
+	// ErrNilSite indicates a nil *Site where one is needed: IsObservable,
+	// a constraint's Check, or the Horizon constraint, which reads the site's
+	// horizon. They used to panic on it (#1186).
+	ErrNilSite = errors.New("plan: site must not be nil")
+	// ErrNilTarget indicates a nil Observable where a constraint or
+	// IsObservable needs a target's position. They used to panic on it
+	// (#1186).
+	ErrNilTarget = errors.New("plan: target must not be nil")
 
 	// ErrBracketingViolated indicates f(a) and f(b) have the same sign in root finding.
 	ErrBracketingViolated = errors.New("solver: bracketing condition violated: f(a) and f(b) have the same sign")

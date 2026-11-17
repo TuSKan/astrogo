@@ -69,7 +69,7 @@ func testContext(t *testing.T) *coord.Context {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	return coord.NewContext(time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+	return mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
 }
 
 func TestAsteroid_HG_OppositionMagnitude(t *testing.T) {

@@ -37,7 +37,12 @@ func Example() {
 	// AtAltitude gives a standard atmosphere for the site's elevation. Its
 	// Model field is deliberately left nil, which means "use the default"
 	// rather than "no refraction" — see atmosphere.Refraction.EffectiveModel.
-	ctx := coord.NewContext(when, quintaCalixto(), atmosphere.AtAltitude(835.05))
+	ctx, err := coord.NewContext(when, quintaCalixto(), atmosphere.AtAltitude(835.05))
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
 
 	altaz := ctx.AstrometricToObserved(siriusICRS)
 
@@ -60,8 +65,19 @@ func ExampleContext_AstrometricToObserved() {
 	when := time.Date(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)
 	site := quintaCalixto()
 
-	withAir := coord.NewContext(when, site, atmosphere.AtAltitude(835.05))
-	vacuum := coord.NewContext(when, site, atmosphere.Refraction{})
+	withAir, err := coord.NewContext(when, site, atmosphere.AtAltitude(835.05))
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	vacuum, err := coord.NewContext(when, site, atmosphere.Refraction{})
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
 
 	// Sirius, which the example above puts at 20° — well above the horizon,
 	// where refraction is a real correction rather than an extrapolation.

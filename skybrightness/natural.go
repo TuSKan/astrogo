@@ -123,11 +123,16 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 
 	at := time.FromGo(scene.Time)
 
+	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
+	if err != nil {
+		return nil, err
+	}
+
 	frame := &sceneFrame{
 		observer:   scene.Observer,
 		at:         scene.Time,
 		refraction: scene.Atmosphere.Refraction(),
-		ctx:        coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction()),
+		ctx:        ctx,
 	}
 
 	if !needSun {

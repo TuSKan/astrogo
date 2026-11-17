@@ -85,7 +85,7 @@ func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {
 	model := &BasicTransitionModel{SlewRate: unit.DegreesPerSec(2)}
 	start := time.Date(2026, time.March, 20, 1, 0, 0, 0, time.LocationUTC)
 
-	ctxAt := movingContext(site.Location(), site.Refraction())
+	ctxAt := mustMoving(t, start, site.Location(), site.Refraction())
 	ctxAt(start.Add(unit.Minutes(40)))
 
 	builders := []struct {
@@ -148,7 +148,7 @@ func fullContextAltAz(t *testing.T, b *Block, at time.Time, site *Site) coord.Al
 		t.Fatalf("Position: %v", err)
 	}
 
-	aa, err := observedAltAz(b.Target, at, coord.NewContext(at, site.Location(), site.Refraction()), pos)
+	aa, err := observedAltAz(b.Target, at, mustContext(t, at, site.Location(), site.Refraction()), pos)
 	if err != nil {
 		t.Fatalf("observedAltAz: %v", err)
 	}

@@ -204,7 +204,7 @@ func TestScientificStability(t *testing.T) {
 			continue
 		}
 
-		observed := coord.NewContext(obsTime, site, atm).GeocentricToObserved(appState.Pos)
+		observed := mustContext(t, obsTime, site, atm).GeocentricToObserved(appState.Pos)
 
 		topocentric.Add(metrology.Sample{
 			Error: metrology.AngularSeparation(

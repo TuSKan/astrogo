@@ -52,7 +52,8 @@ func TestBarycentricRVCorrection_BoundedByEarthPlusSiteSpeed(t *testing.T) {
 
 	for day := 0; day < 366; day += 15 {
 		tm := base.Add(unit.Days(float64(day)))
-		ctx := coord.NewContext(tm, site, noRefraction)
+
+		ctx := mustContext(t, tm, site, noRefraction)
 
 		for _, target := range targets {
 			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
@@ -92,7 +93,8 @@ func TestBarycentricRVCorrection_AnnualSinusoid(t *testing.T) {
 
 	for day := 0; day < 366; day += 5 {
 		tm := base.Add(unit.Days(float64(day)))
-		ctx := coord.NewContext(tm, site, noRefraction)
+
+		ctx := mustContext(t, tm, site, noRefraction)
 
 		corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 
@@ -133,7 +135,8 @@ func TestBarycentricRVCorrection_AnnualSinusoid(t *testing.T) {
 func TestBarycentricRVCorrection_PerpendicularTargetIsZero(t *testing.T) {
 	site := equatorSite(t)
 	tm := time.Date(2026, time.March, 15, 6, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, site, noRefraction)
+
+	ctx := mustContext(t, tm, site, noRefraction)
 
 	v := ctx.BarycentricVelocity()
 	vUnit := v.Unit()
@@ -159,7 +162,8 @@ func TestBarycentricRVCorrection_PerpendicularTargetIsZero(t *testing.T) {
 func TestBarycentricRVCorrection_AntipodalTargetsFlipSign(t *testing.T) {
 	site := equatorSite(t)
 	tm := time.Date(2026, time.June, 10, 18, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, site, noRefraction)
+
+	ctx := mustContext(t, tm, site, noRefraction)
 
 	target := coord.NewICRS(angle.Deg(37), angle.Deg(-12))
 
@@ -190,7 +194,8 @@ func TestBarycentricRVCorrection_DiurnalAmplitudeScalesWithLatitude(t *testing.T
 
 		for h := range 24 {
 			tm := base.Add(unit.Days(float64(h) / 24.0))
-			ctx := coord.NewContext(tm, site, noRefraction)
+
+			ctx := mustContext(t, tm, site, noRefraction)
 
 			corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 			if corr < lo {
@@ -230,7 +235,8 @@ func TestBarycentricRVCorrection_DiurnalAmplitudeScalesWithLatitude(t *testing.T
 func TestHeliocentricRVCorrection_DiffersFromBarycentric(t *testing.T) {
 	site := equatorSite(t)
 	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	ctx := coord.NewContext(tm, site, noRefraction)
+
+	ctx := mustContext(t, tm, site, noRefraction)
 
 	target := coord.NewICRS(angle.Deg(200), angle.Deg(30))
 
@@ -278,7 +284,7 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 	const rvBarycentric = -12.34
 
 	for _, tm := range epochs {
-		ctx := coord.NewContext(tm, site, noRefraction)
+		ctx := mustContext(t, tm, site, noRefraction)
 
 		for _, target := range targets {
 			rvObserved, err := ctx.ObservedRadialVelocity(target, unit.KmPerSec(rvBarycentric))
@@ -316,7 +322,7 @@ func TestObservedRadialVelocity_RoundTripsWithBarycentricRVCorrection(t *testing
 // out rather than expressed as the product it comes from.
 func TestBarycentricRadialVelocity_ComposesRedshiftsMultiplicatively(t *testing.T) {
 	site := equatorSite(t)
-	ctx := coord.NewContext(
+	ctx := mustContext(t,
 		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 
 	// Speed of light in km/s, spelled out here so the test does not import
@@ -363,7 +369,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 	// Early January, when Earth is near perihelion and moving fastest, and a
 	// target on the ecliptic at RA 0 — the geometry that maximizes the
 	// correction and so the term that scales with it.
-	ctx := coord.NewContext(
+	ctx := mustContext(t,
 		time.Date(2026, time.January, 4, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 	target := coord.NewICRS(angle.Zero(), angle.Zero())
 
@@ -438,7 +444,7 @@ func TestBarycentricRadialVelocity_ExceedsTheAdditiveFormByTheDocumentedAmount(t
 // the ephemeris moved. These can.
 func TestTopocentricRadialVelocityIsTheLineOfSightComponent(t *testing.T) {
 	site := equatorSite(t)
-	ctx := coord.NewContext(
+	ctx := mustContext(t,
 		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 
 	// Far enough that the observer's offset from the geocenter does not turn
@@ -510,7 +516,7 @@ func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 		lo, hi := math.Inf(1), math.Inf(-1)
 
 		for h := range 24 {
-			ctx := coord.NewContext(at.Add(unit.Days(float64(h)/24)), site, noRefraction)
+			ctx := mustContext(t, at.Add(unit.Days(float64(h)/24)), site, noRefraction)
 
 			rv := ctx.TopocentricRadialVelocity(pos, atRest).KmPerSec()
 			lo, hi = math.Min(lo, rv), math.Max(hi, rv)
@@ -543,7 +549,7 @@ func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 // schedule rather than failing.
 func TestTopocentricRadialVelocityHandlesAZeroLineOfSight(t *testing.T) {
 	site := equatorSite(t)
-	ctx := coord.NewContext(
+	ctx := mustContext(t,
 		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC), site, noRefraction)
 
 	rv := ctx.TopocentricRadialVelocity(ctx.ObsVec(), vector.V3(0.01, 0, 0)).KmPerSec()

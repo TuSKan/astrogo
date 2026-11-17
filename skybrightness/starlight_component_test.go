@@ -339,7 +339,7 @@ func TestIntegratedStarlightHonorsTheMapFrame(t *testing.T) {
 		t.Fatalf("both frames were sampled at %v; the galactic rotation was not applied", asked[true])
 	}
 
-	frame := coord.NewContext(
+	frame := mustContext(t,
 		time.FromGo(scene.Time), scene.Observer, scene.Atmosphere.Refraction())
 
 	icrs, err := frame.AltAzToICRS(dir)

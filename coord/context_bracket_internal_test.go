@@ -28,7 +28,10 @@ func bracketFixture(t *testing.T) (*Geodetic, atmosphere.Refraction, time.Time) 
 func TestSetTimeEvaluatesTheSeriesOnceADay(t *testing.T) {
 	site, atm, base := bracketFixture(t)
 
-	ctx := NewContext(base, site, atm)
+	ctx, err := NewContext(base, site, atm)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var at []time.Time
 
@@ -67,7 +70,11 @@ func TestSetTimeEvaluatesTheSeriesOnceADay(t *testing.T) {
 func TestSetTimeHoldsAQuarterHour(t *testing.T) {
 	site, atm, base := bracketFixture(t)
 
-	ctx := NewContext(base, site, atm)
+	ctx, err := NewContext(base, site, atm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ctx.SetTime(base.Add(holdFor))
 	ctx.SetTime(base.Add(-holdFor))
 

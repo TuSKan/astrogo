@@ -22,7 +22,7 @@ func itrsContext(t *testing.T) *coord.Context {
 
 	site := coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635) // Paranal
 
-	return coord.NewContext(
+	return mustContext(t,
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		site,
 		atmosphere.Refraction{},
@@ -194,7 +194,7 @@ func TestTheObserverRotatesOntoItsOwnSite(t *testing.T) {
 }
 
 func BenchmarkICRSToITRS(b *testing.B) {
-	ctx := coord.NewContext(
+	ctx := mustContext(b,
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
 		atmosphere.Refraction{},

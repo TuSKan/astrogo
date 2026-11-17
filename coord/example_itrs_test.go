@@ -17,11 +17,16 @@ import (
 func ExampleContext_ICRSToITRS() {
 	site := coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635) // Paranal
 
-	ctx := coord.NewContext(
+	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		site,
 		atmosphere.Refraction{},
 	)
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
 
 	// Where the station is, in meters from the geocenter.
 	ecef := site.ToECEF(coord.WGS84())
@@ -46,11 +51,16 @@ func ExampleContext_ICRSToITRS() {
 // The rotation is not a constant: a direction fixed in the sky sweeps through
 // Earth-fixed longitude as the planet turns beneath it.
 func ExampleContext_ICRSToITRS_earthRotation() {
-	ctx := coord.NewContext(
+	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
 		coord.MustGeodetic(angle.Deg(0), angle.Deg(0), 0),
 		atmosphere.Refraction{},
 	)
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
 
 	star := coord.NewICRS(angle.Deg(101.2871), angle.Deg(-16.7161)).ToUnitVector() // Sirius
 

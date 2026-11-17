@@ -274,7 +274,11 @@ func TestKS91GeometryMatchesTheEphemeris(t *testing.T) {
 	for _, o := range ks91Table1 {
 		at := time.FromGo(o.when)
 		in := eph.At(eph.Default(), at)
-		ctx := coord.NewContext(at, loc, geometric)
+
+		ctx, err := coord.NewContext(at, loc, geometric)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		apparent, err := in.Apparent(eph.Moon, eph.Site(ctx))
 		if err != nil {

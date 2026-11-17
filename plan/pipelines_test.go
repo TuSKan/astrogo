@@ -50,7 +50,11 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 	// geometry rather than one point on one pass.
 	for minute := 0; minute < 180; minute += 10 {
 		when := time.Date(2026, time.April, 19, 12, minute, 0, 0, time.LocationUTC)
-		ctx := coord.NewContext(when, site.Location(), site.Refraction())
+
+		ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		eval, err := plan.IsObservable(iss, when, site, plan.Altitude{Threshold: angle.Deg(0)})
 		if err != nil {
@@ -139,8 +143,15 @@ func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	var checked, sawRiseOrSet, sawTransit int
 
 	for _, e := range events {
-		refracted := coord.NewContext(e.Time, site.Location(), site.Refraction())
-		geometric := coord.NewContext(e.Time, site.Location(), atmosphere.Refraction{})
+		refracted, err := coord.NewContext(e.Time, site.Location(), site.Refraction())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		geometric, err := coord.NewContext(e.Time, site.Location(), atmosphere.Refraction{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		vec, err := moon.GeocentricVec(e.Time)
 		if err != nil {

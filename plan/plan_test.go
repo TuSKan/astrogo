@@ -555,14 +555,14 @@ func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
 
 	atEpoch, err := Scorer{
 		Site:    site,
-		Context: coord.NewContext(tm, loc, site.Refraction()),
+		Context: mustContext(t, tm, loc, site.Refraction()),
 	}.Score(obj, tm)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "score with a Context at the scoring epoch", atEpoch, fresh, 1e-9)
 
 	sixHoursEarlier, err := Scorer{
 		Site:    site,
-		Context: coord.NewContext(tm.Add(unit.Days(-0.25)), loc, site.Refraction()),
+		Context: mustContext(t, tm.Add(unit.Days(-0.25)), loc, site.Refraction()),
 	}.Score(obj, tm)
 	testutil.AssertNoError(t, err)
 
@@ -641,7 +641,7 @@ func TestScorerMeritTerms(t *testing.T) {
 		// itself included.
 		// The Moon as the site sees it, which is what the merit measures from.
 		moon, err := topocentricPosition(NewMoon(eph.Default()), tm,
-			coord.NewContext(tm, site.Location(), site.Refraction()))
+			mustContext(t, tm, site.Location(), site.Refraction()))
 		testutil.AssertNoError(t, err)
 
 		// 15° away along the meridian is half the default 30° threshold, so

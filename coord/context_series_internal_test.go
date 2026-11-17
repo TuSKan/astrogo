@@ -55,7 +55,10 @@ func TestNewContextKeepsItsMatrix(t *testing.T) {
 	}
 
 	for _, epoch := range epochs {
-		ctx := NewContext(epoch, loc, atm)
+		ctx, err := NewContext(epoch, loc, atm)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		tt1, tt2 := epoch.UTC().TT().JDParts()
 		if want := gofaext.C2i06a(tt1, tt2); ctx.rc2i != want {

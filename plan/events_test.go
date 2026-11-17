@@ -174,7 +174,7 @@ func TestMoonEvents(t *testing.T) {
 
 	for _, e := range events {
 		if e.Kind == EventRise || e.Kind == EventSet {
-			d, err := AngularDiameter(moon, e.Time, coord.NewContext(e.Time, loc, atmosphere.Refraction{}))
+			d, err := AngularDiameter(moon, e.Time, mustContext(t, e.Time, loc, atmosphere.Refraction{}))
 			testutil.AssertNoError(t, err)
 
 			testutil.AssertNear(t, "moonrise/set upper limb", e.GeometricAltitude.Degrees()+d.Degrees()/2,

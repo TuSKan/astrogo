@@ -165,7 +165,7 @@ func TestGeometricSunsetIsTheSunOnTheHorizon(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	g, err := crescentGeometryAt(coord.NewContext(r.GeometricSunset, site.Location(), atmosphere.Refraction{}), prov)
+	g, err := crescentGeometryAt(mustContext(t, r.GeometricSunset, site.Location(), atmosphere.Refraction{}), prov)
 	if err != nil {
 		t.Fatalf("crescentGeometryAt: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
 		t.Fatalf("sunset: found %v, err %v", found, err)
 	}
 
-	ctx := coord.NewContext(e.Time, site.Location(), atmosphere.Refraction{})
+	ctx := mustContext(t, e.Time, site.Location(), atmosphere.Refraction{})
 
 	geometric, err := geometricSunset(ctx, e.Time, site, prov)
 	if err != nil {
@@ -215,7 +215,7 @@ func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
 	}
 
 	noon := time.Date(2025, 6, 21, 11, 0, 0, 0, time.LocationUTC)
-	if _, err := geometricSunset(coord.NewContext(noon, site.Location(), atmosphere.Refraction{}), noon, site, prov); !errors.Is(err, errNoSunset) {
+	if _, err := geometricSunset(mustContext(t, noon, site.Location(), atmosphere.Refraction{}), noon, site, prov); !errors.Is(err, errNoSunset) {
 		t.Errorf("under the midnight Sun: err = %v, want errNoSunset", err)
 	}
 }
@@ -250,7 +250,8 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 			return id == eph.Sun && c.fails(e.Time, at)
 		}}
 
-		ctx := coord.NewContext(e.Time, c.site.Location(), atmosphere.Refraction{})
+		ctx := mustContext(t, e.Time, c.site.Location(), atmosphere.Refraction{})
+
 		if _, err := geometricSunset(ctx, e.Time, c.site, failing); !errors.Is(err, errFailingWhen) {
 			t.Errorf("%s: err = %v, want the lookup's error", c.name, err)
 		}
@@ -308,7 +309,7 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 			t.Fatalf("%s: CrescentVisibility: %v", c.name, err)
 		}
 
-		g, err := crescentGeometryAt(coord.NewContext(r.Sunset, c.site.Location(), atmosphere.Refraction{}), prov)
+		g, err := crescentGeometryAt(mustContext(t, r.Sunset, c.site.Location(), atmosphere.Refraction{}), prov)
 		if err != nil {
 			t.Fatalf("%s: crescentGeometryAt: %v", c.name, err)
 		}

@@ -74,7 +74,10 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx := coord.NewContext(sample, site.Location(), atmosphere.Refraction{Pressure: 0})
+		ctx, err := coord.NewContext(sample, site.Location(), atmosphere.Refraction{Pressure: 0})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		return ctx.GeocentricToObserved(vec).Alt().Degrees() + 18
 	}

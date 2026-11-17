@@ -54,7 +54,8 @@ func TestSetTimeAcrossALeapSecond(t *testing.T) {
 		{"forward across the leap", before, after},
 		{"backward across the leap", after, before},
 	} {
-		ctx := coord.NewContext(c.base, site, atm)
+		ctx := mustContext(t, c.base, site, atm)
+
 		ctx.SetTime(c.at)
 
 		derived, err := ctx.ICRSToAltAz(star)
@@ -62,7 +63,7 @@ func TestSetTimeAcrossALeapSecond(t *testing.T) {
 			t.Fatalf("%s: derived ICRSToAltAz: %v", c.name, err)
 		}
 
-		full, err := coord.NewContext(c.at, site, atm).ICRSToAltAz(star)
+		full, err := mustContext(t, c.at, site, atm).ICRSToAltAz(star)
 		if err != nil {
 			t.Fatalf("%s: full ICRSToAltAz: %v", c.name, err)
 		}
