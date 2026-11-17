@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -52,10 +53,19 @@ func main() {
 		log.Fatalf("events: %v", err)
 	}
 
-	fmt.Printf("Events for %s from %s over 24 hours from %s:\n\n",
-		target.Name(), site.Name(), start.Format("2006-01-02 15:04 MST"))
+	show.Title("Rise, transit and set: "+target.Name(),
+		site.Name()+", 24 hours from "+start.Format("2006-01-02 15:04 MST"))
 
+	tab := show.NewTable(show.Left("Event"), show.Left("Time"), show.Right("Altitude"), show.Right("Azimuth"))
 	for _, e := range events {
-		fmt.Printf("- %-10s at %s  (Alt=%s, Az=%s)\n", e.Kind, e.Time.Format("2006-01-02 15:04:05 MST"), e.Altitude.DMSString(0), e.Azimuth.DMSString(0))
+		tab.Row(e.Kind.String(), e.Time.Format("2006-01-02 15:04:05 MST"),
+			fmt.Sprintf("%.2f°", e.Altitude.Degrees()), fmt.Sprintf("%.1f°", e.Azimuth.Degrees()))
 	}
+
+	fmt.Println()
+	tab.Print()
+	fmt.Println()
+	show.Note("Rise and set are on the almanac horizon, which lies below the true one",
+		"by 34′ of standard refraction plus the dip from the site's height, so",
+		"their altitude reads a little below zero.")
 }

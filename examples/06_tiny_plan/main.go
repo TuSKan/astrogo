@@ -4,8 +4,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -74,14 +76,25 @@ func main() {
 	}
 
 	// 5. Print out the generated timeline
-	fmt.Println("Observing Schedule:")
-	fmt.Println("===================")
+	show.Title("Observing schedule", "Quinta Calixto, "+start.Format("2006-01-02")+" from 19:00, priority first")
+
+	tab := show.NewTable(show.Right("#"), show.Left("Block"), show.Left("Filter"),
+		show.Left("Start"), show.Left("End"), show.Right("Setup"))
 
 	for i, b := range schedule.Blocks {
-		fmt.Printf("%d. %-15s | Start: %s | Setup: %ds\n",
-			i+1,
+		tab.Row(
+			strconv.Itoa(i+1),
 			b.Block.ID,
-			b.Window.Start.Format("15:04"),
-			int(b.SetupTime.Seconds()))
+			b.Block.Config.Filter,
+			b.Window.Start.In(tz).Format("15:04"),
+			b.Window.End.In(tz).Format("15:04"),
+			fmt.Sprintf("%.0f s", b.SetupTime.Seconds()),
+		)
 	}
+
+	fmt.Println()
+	tab.Print()
+	fmt.Println()
+	show.Note("Setup is the overhead charged before each block: the first",
+		"pointing, or the slew and filter change from the block before.")
 }
