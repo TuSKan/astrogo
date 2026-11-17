@@ -32,8 +32,11 @@ func main() {
 	// point of this example. See README "Data downloads & offline usage".
 	remote.EnableDownloads(0, remote.NAIFSPK)
 	remote.EnableDownloads(0, remote.NAIFLSK)
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation: like every online example, this one imports
+	// remote/eop and consents to the IERS bulletin. No bulletin covers the
+	// first century, though (it begins in 1973), so astrogo uses zero EOP
+	// here and says so once. What sets the accuracy is Delta T, the drift of
+	// the Earth's rotation, from the Espenak & Meeus (2006) model.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
@@ -106,7 +109,7 @@ func main() {
 		fmt.Printf("  Maximum (UTC):       %s\n", e.Time.FormatJulian("15:04:05"))
 		fmt.Printf("  Type:                %s (umbral magnitude %.3f)\n", e.Kind, e.Magnitude)
 		fmt.Printf("  Ecliptic latitude:   %.3f°\n", e.EclipticLatitude.Degrees())
-		fmt.Printf("  Gamma (centrality):  %.3f (0=central, 1=penumbral edge)\n", e.Gamma)
+		fmt.Printf("  Gamma:               %+.4f Earth radii from the shadow axis (+ north)\n", e.Gamma)
 	}
 
 	// ── Moon Illumination at moonrise ──
@@ -177,7 +180,7 @@ func main() {
 			passover = "★ Near Passover"
 		}
 
-		fmt.Printf("  %-22s  %-10s  %6.3f   %s\n",
+		fmt.Printf("  %-22s  %-10s  %+7.4f  %s\n",
 			e.Time.FormatJulian("2006-01-02 15:04 MST"),
 			e.Kind,
 			e.Gamma,

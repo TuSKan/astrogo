@@ -103,4 +103,17 @@ var (
 	// refused because the two advisory errors above promise a state that
 	// exists, and a NaN is not one.
 	ErrNotFinite = errors.New("sgp4: time or state is not finite")
+
+	// ErrBeyondHillSphere indicates a propagated position beyond the Earth's
+	// Hill sphere, about 1.5 million km, where the Sun rather than the Earth
+	// governs a body's motion and an Earth-orbit theory does not apply. Both
+	// vectors are zero.
+	//
+	// None of the model's own checks catch this. Run thousands of years from
+	// its epoch, an element set's secular drag terms carry the orbit outward
+	// without bound, decaying in neither eccentricity nor semi-major axis
+	// (#1131). It does not catch a position merely stale, a plausible orbit a
+	// year from its epoch: only a validity window could, and the right one
+	// depends on the orbit.
+	ErrBeyondHillSphere = errors.New("sgp4: the propagated position is beyond the Earth's Hill sphere")
 )

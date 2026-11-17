@@ -130,37 +130,41 @@ go get github.com/TuSKan/astrogo
 
 ## Examples
 
-Every one is a runnable `main` package. `go -C examples run ./<name>` — the ones marked
-offline need no network and no downloads.
+Every one is a runnable `main` package. `go -C examples run ./<name>` — the Network
+column says what each one fetches. A kernel or catalog fetched once is cached, so a
+second run needs no network; "live" means every run asks the service. Most examples
+that use the network also fetch the IERS Earth-orientation bulletin (3.8 MB) once; the
+rest choose zero Earth orientation, and say in a comment what that costs them.
 
 `examples/` is [its own module](examples/go.mod), which is why the command carries
 `-C examples` rather than a path. It keeps 32 demo programs out of the library's
 package listing while still building against the working tree, so an API change that
-breaks an example fails CI.
+breaks an example fails CI. CI also runs every example whose Network column says
+none, so a crash, or a "none" that reaches the network, fails it too.
 
-| | What it answers | Offline |
-| :--- | :--- | :---: |
-| [`01_where_is_mars`](examples/01_where_is_mars/) | Where is a planet right now, in alt/az from my site? | ✓ |
-| [`02_target_visibility`](examples/02_target_visibility/) | Is this target observable tonight, and how well? | ✓ |
-| [`03_rise_transit_set`](examples/03_rise_transit_set/) | When does it rise, transit and set? | ✓ |
-| [`04_angular_separation`](examples/04_angular_separation/) | How far apart are two objects on the sky? | ✓ |
-| [`05_resolve_name`](examples/05_resolve_name/) | Turn "M31" or "Betelgeuse" into coordinates | |
-| [`06_tiny_plan`](examples/06_tiny_plan/) | The smallest end-to-end planning workflow | ✓ |
-| [`07_slew_time`](examples/07_slew_time/) | How long does the mount take to get there? | ✓ |
-| [`08_convert_coords`](examples/08_convert_coords/) | ICRS ↔ Galactic ↔ Ecliptic ↔ AltAz, and batch transforms | ✓ |
-| [`09_geometry_events`](examples/09_geometry_events/) | Moon phases, eclipses, conjunctions, apsides, seasons | ✓ |
-| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against Skyfield | |
-| [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | |
-| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | ✓ |
-| [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | ✓ |
-| [`15_target_details`](examples/15_target_details/) | Everything the engine knows about one target at one instant | ✓ |
-| [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | |
-| [`19_offline_setup`](examples/19_offline_setup/) | Pre-seeding data for an air-gapped deployment | ✓ |
-| [`20_whats_visible_tonight`](examples/20_whats_visible_tonight/) | What can I see tonight brighter than magnitude X? | |
-| [`22_kepler_propagator`](examples/22_kepler_propagator/) | Six orbital elements and an epoch, no kernel, no network | ✓ |
-| [`23_radial_velocity_correction`](examples/23_radial_velocity_correction/) | Remove Earth's own orbital motion from a measured RV | ✓ |
-| [`24_optics`](examples/24_optics/) | Magnification, field of view, exit pupil, plate scale | ✓ |
-| [`25_sky_brightness_compare`](examples/25_sky_brightness_compare/) | Does the model matter? Does the air? | |
+| | What it answers | Network |
+| :--- | :--- | :--- |
+| [`01_where_is_mars`](examples/01_where_is_mars/) | Where is a planet at a given moment, in alt/az from my site? | none |
+| [`02_target_visibility`](examples/02_target_visibility/) | Is this target observable tonight, and if not, why not? | none |
+| [`03_rise_transit_set`](examples/03_rise_transit_set/) | When does it rise, transit and set? | none |
+| [`04_angular_separation`](examples/04_angular_separation/) | How far apart are two objects on the sky? | none |
+| [`05_resolve_name`](examples/05_resolve_name/) | Turn "M31" or "Betelgeuse" into coordinates | SIMBAD and MAST, live; OpenNGC, once |
+| [`06_tiny_plan`](examples/06_tiny_plan/) | The smallest end-to-end planning workflow | none |
+| [`07_slew_time`](examples/07_slew_time/) | How long does the mount take to get there? | none |
+| [`08_convert_coords`](examples/08_convert_coords/) | ICRS ↔ Galactic ↔ Ecliptic ↔ AltAz, and batch transforms | none |
+| [`09_geometry_events`](examples/09_geometry_events/) | Conjunctions, greatest elongations, eclipses and apsides over a year | DE442 kernel (115 MB), once |
+| [`11_skyfield_verify`](examples/11_skyfield_verify/) | Cross-check the ephemeris against JPL Horizons, as Skyfield's `observe()` does | DE440 kernel (114 MB), once |
+| [`12_satellite_tracking`](examples/12_satellite_tracking/) | ISS passes from live NORAD elements — AOS, max elevation, LOS | CelesTrak, live |
+| [`13_crescent_visibility`](examples/13_crescent_visibility/) | Will the new crescent be seen, by which of 18 criteria? | none |
+| [`14_target_scoring`](examples/14_target_scoring/) | Composite scoring with configurable constraint weights | none |
+| [`15_target_details`](examples/15_target_details/) | Everything the engine knows about one target at one instant | DE442 kernel and OpenNGC, once; SIMBAD and CelesTrak, live |
+| [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | sky-brightness datasets, once |
+| [`19_offline_setup`](examples/19_offline_setup/) | Pre-seeding data for an air-gapped deployment | none |
+| [`20_whats_visible_tonight`](examples/20_whats_visible_tonight/) | What can I see tonight brighter than magnitude X? | catalogs, live; kernels, once |
+| [`22_kepler_propagator`](examples/22_kepler_propagator/) | Six orbital elements from JPL SBDB, propagated with no kernel | JPL SBDB, live |
+| [`23_radial_velocity_correction`](examples/23_radial_velocity_correction/) | Remove Earth's own orbital motion from a measured RV | none |
+| [`24_optics`](examples/24_optics/) | Magnification, field of view, exit pupil, plate scale | none |
+| [`25_sky_brightness_compare`](examples/25_sky_brightness_compare/) | Does the model matter? Does the air? | sky-brightness datasets, once |
 
 The [Showcases](#showcases) above are the long-form versions: narrative write-ups with
 tables you can check against published references.
@@ -176,7 +180,7 @@ tables you can check against published references.
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
 | **Magnitude** | Planets (Mallama & Hilton 2018), asteroids (HG/HG1G2/**sHG1G2**), comets, satellites, stars — planets and comets held to JPL Horizons (0.02 and 0.001 mag), sHG1G2 to the FINK/ZTF production pipeline (every one of 186 observations within 0.025 mag); see [`docs/VALIDATION.md`](docs/VALIDATION.md) for each |
-| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, Arrow caching, retry/backoff |
+| **Catalogs** | Unified `resolve.Provider` over SIMBAD, MAST, Gaia, VizieR, JPL Horizons & SBDB, OpenNGC, NORAD, FINK — streaming `iter.Seq2`, an in-memory answer cache per provider, retry/backoff |
 | **FITS & WCS** | Image/BinTable/ASCII HDUs, gzip streams, mmap, TAN projection, Arrow export |
 | **Sky Brightness** | Spectral all-sky radiance `L_λ(λ, direction, observer, time, atmosphere)` in W·m⁻²·sr⁻¹·nm⁻¹, kept spectral until projection — integrated starlight, diffuse galactic light, extragalactic background, zodiacal light (Leinert 1998), airglow, scattered moonlight (Kieffer & Stone 2005 ROLO + Winkler 2022), and artificial skyglow in clear air or under cloud (Kocifaj) — natural sky within **0.3 mag** of GAMBONS in every altitude band, and moonlight within 0.13 mag of Krisciunas & Schaefer (1991)'s measured moonlit sky |
 | **Planning** | Sub-second Chandrupatla/Brent boundary refinement, constraint-based scoring, `Greedy`/`Priority`/`SwapOptimized` scheduling strategies |
@@ -250,7 +254,7 @@ tables you can check against published references.
 ### Catalogs & Data Services (`catalog/resolve`)
 - Unified `resolve.Provider` interfaces (`ObjectResolver`, `ConeSearcher`, `BrightObjectSearcher` — bulk-list every object a provider knows brighter than a magnitude bound; implemented by SIMBAD, OpenNGC, and SBDB)
 - `resolve.KindInterstellar` — classification for bodies confidently on a hyperbolic/parabolic orbit (1I/'Oumuamua, 2I/Borisov, ...), decoded from `catalog/sbdb`'s orbit-classification data with an eccentricity margin that excludes near-parabolic long-period comets from false-positiving as interstellar
-- Hardware-optimized native caching via **Apache Arrow** columnar batches
+- Each provider caches its answers in memory (`resolve.MapCache`), so a repeated query is not sent to the service again
 - Modern Go 1.23 streaming `iter.Seq2` iteration for memory-safe big data fetching
 - Resilient network layers with exponential backoff retry
 - Production-grade bindings:
@@ -428,7 +432,7 @@ be able to break an API until 1.0 says otherwise.
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
 | `ephemeris/satellite` | SGP4 propagation, TEME→GCRS, look angles, ground track |
 | `ephemeris/satellite/sgp4` | The SGP4/SDP4 model itself — element sets, TLE parsing, TEME states |
-| `catalog/resolve` | Provider interface, HTTP client, Arrow cache |
+| `catalog/resolve` | Provider interfaces, query types, the in-memory answer cache |
 | `catalog/{simbad,mast,gaia,sbdb,openngc,norad,fink}` | Fully-implemented catalog providers |
 | `catalog/vizier` | ConeSearch against any registered VizieR table (2MASS, Hipparcos, Gaia DR3; extensible via `tables.go`) |
 | `catalog/horizons` | Horizons name resolution — ambiguous major/small-body match tables and unambiguous exact matches |
@@ -773,6 +777,8 @@ Sub-arcsecond topocentric accuracy and sub-second UT1 timing require IERS EOP da
 | Rise/set timing | ≤0.6 min vs USNO | ≤0.7 min vs USNO |
 
 The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the 28th CGPM (2026) makes UTC continuous from 2027-05-20, with |UT1−UTC| allowed to reach an hour, so after that date only EOP data says where UT1 is.
+
+The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
 The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 

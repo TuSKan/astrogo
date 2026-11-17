@@ -11,28 +11,21 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
 )
 
 func main() {
-	// The NGC targets below resolve against OpenNGC alone (no SIMBAD
-	// fallback), so its catalog data needs to actually be populated.
-	// Enabling downloads here is enough — catalog.NewResolver's first use
-	// of catalog.OpenNGC below fetches it automatically (content-checked,
-	// so a re-run only costs a HEAD probe once cached).
-	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
+	// This example runs offline, so it uses no Earth-orientation data
+	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
+	// to 13.5 arcsec, which changes no score at the precision printed. For
+	// full accuracy, blank-import remote/eop and consent to the IERS
+	// bulletin, as 09_geometry_events does.
+	time.RegisterModel(time.ZeroModel{})
 
 	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
 	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
@@ -40,7 +33,7 @@ func main() {
 		log.Fatalf("site: %v", err)
 	}
 
-	// ── Observation epoch: 2026-04-15 at local midnight ──────────────────
+	// ── Observation epoch: 2026-04-16 at local midnight ──────────────────
 	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
@@ -48,38 +41,16 @@ func main() {
 
 	tm := time.Date(2026, 4, 16, 0, 0, 0, 0, tz)
 
-	// ── Targets (resolved from catalogs) ────────────────────────────────
-	ngc := catalog.NewResolver(catalog.OpenNGC)
-	simbad := catalog.NewResolver(catalog.SIMBAD)
-
-	type lookup struct {
-		resolver *catalog.Resolver
-		name     string
-	}
-
-	lookups := []lookup{
-		{ngc, "NGC 5139"},   // Omega Centauri
-		{ngc, "NGC 3372"},   // Carina Nebula
-		{simbad, "Sgr A*"},  // Galactic center
-		{simbad, "Canopus"}, // Alpha Carinae
-	}
-
-	targets := make([]plan.Observable, 0, len(lookups))
-	for _, l := range lookups {
-		t, err := l.resolver.Resolve(context.Background(), l.name)
-		if err != nil {
-			fmt.Printf("  ⚠ Could not resolve %q: %v\n", l.name, err)
-			continue
-		}
-
-		obj, err := plan.FromCatalog(t, nil)
-		if err != nil {
-			log.Printf("skipping %s: %v", t.Name, err)
-
-			continue
-		}
-
-		targets = append(targets, obj)
+	// ── Targets, at their J2000 positions from SIMBAD ───────────────────
+	// 05_resolve_name shows how to look a name up in a catalog instead.
+	targets := []plan.Observable{
+		plan.NewDeepSkyObject("Omega Centauri", angle.Deg(201.697000), angle.Deg(-47.479472)),
+		plan.NewDeepSkyObject("Carina Nebula", angle.Deg(161.259292), angle.Deg(-59.699944)),
+		plan.NewDeepSkyObject("Sgr A*", angle.Deg(266.416817), angle.Deg(-29.007825)),
+		plan.NewStar("Canopus", angle.Deg(95.987958), angle.Deg(-52.695661),
+			plan.WithProperMotion(angle.Arcsec(0.01993), angle.Arcsec(0.02324)),
+			plan.WithParallax(angle.Arcsec(0.01055)),
+			plan.WithStarMagnitude(-0.74)),
 	}
 
 	// ── Constraints ──────────────────────────────────────────────────────
@@ -90,16 +61,16 @@ func main() {
 
 	// ── Scoring profiles ─────────────────────────────────────────────────
 	profiles := []struct {
-		cfg  *plan.ScoreConfig
+		cfg  plan.ScoreConfig
 		name string
 	}{
-		{nil, "Default (balanced)"}, // uses DefaultScoreConfig()
-		{&plan.ScoreConfig{
+		{plan.ScoreConfig{}, "Default (balanced)"}, // the zero value means DefaultScoreConfig()
+		{plan.ScoreConfig{
 			AltitudeWeight: 1.0,
 			UrgencyWeight:  0.0,
 			MoonWeight:     0.0,
 		}, "Altitude-only"},
-		{&plan.ScoreConfig{
+		{plan.ScoreConfig{
 			AltitudeWeight:  0.2,
 			UrgencyWeight:   0.7,
 			MoonWeight:      0.1,
@@ -128,7 +99,7 @@ func main() {
 		for _, obj := range targets {
 			score, err := plan.Scorer{
 				Site:        site,
-				Config:      *profile.cfg,
+				Config:      profile.cfg,
 				Constraints: constraints,
 			}.Score(obj, tm)
 			if err != nil {

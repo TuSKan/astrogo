@@ -118,7 +118,7 @@ func main() {
 
 	// ── Part 2: Planetary Positions at Civil Dusk ──────────────────────
 	fmt.Println("\n── Planetary Positions at Civil Dusk ──────────────────────────")
-	fmt.Printf("  Time: %s UTC\n\n", civilDusk.Time.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Time: %s\n\n", civilDusk.Time.In(brtz).Format("2006-01-02 15:04:05 MST"))
 	fmt.Println("  Planet    │ Ecl. λ   │ Alt      │ Az       │ Airmass")
 	fmt.Println("  ──────────┼──────────┼──────────┼──────────┼────────")
 
@@ -177,8 +177,8 @@ func main() {
 	fmt.Println()
 
 	tStart := sunset.Time
-	for i := range 76 {
-		t := tStart.Add(unit.Minutes(float64(i)))
+	for minutes := 0; minutes <= 75; minutes += 5 {
+		t := tStart.Add(unit.Minutes(float64(minutes)))
 		c := coord.NewContext(t, loc, atm)
 
 		fmt.Printf("  %s │", t.In(brtz).Format("15:04"))

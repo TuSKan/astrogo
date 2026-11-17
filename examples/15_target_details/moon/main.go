@@ -20,19 +20,10 @@ import (
 )
 
 func main() {
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760.0)
-	if err != nil {
-		log.Fatalf("failed to create location: %v", err)
-	}
-
-	tz, err := time.LoadLocation("UTC")
-	if err != nil {
-		log.Fatalf("tz: %v", err)
-	}
-
-	t := time.Date(2026, 4, 25, 20, 0, 0, 0, tz)
-	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
-
+	// Consent first, before anything reads a time: NewContext below reads
+	// the instant's Earth orientation, and with an empty cache an EOP load
+	// that runs before this consent is denied for the whole run (#1178).
+	//
 	// JPL kernel downloads are opt-in — see README "Data downloads &
 	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
 	remote.EnableDownloads(200<<20, remote.NAIFSPK)
@@ -40,6 +31,19 @@ func main() {
 	// Earth orientation, for where the site is on the turning Earth:
 	// the IERS bulletin, which the remote/eop import above fetches.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
+
+	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760.0)
+	if err != nil {
+		log.Fatalf("failed to create location: %v", err)
+	}
+
+	tz, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		log.Fatalf("tz: %v", err)
+	}
+
+	t := time.Date(2026, 4, 25, 17, 0, 0, 0, tz) // 20:00 UTC
+	ctx := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {

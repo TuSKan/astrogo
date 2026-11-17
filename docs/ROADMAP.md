@@ -290,7 +290,7 @@ Parallactic angle vs. time for targets — critical for slit-spectroscopy and
 atmospheric dispersion compensator planning.
 
 - [ ] `plot.ParallacticAngle(targets, site, night)` → SVG/PNG
-- [ ] Parallactic angle calculation (already available via coord pipeline)
+- [ ] Parallactic angle calculation, from the observed place's hour angle and declination; nothing computes it yet
 - [ ] Optimal slit rotation overlay
 
 **Inspiration:** astroplan `plot_parallactic`.

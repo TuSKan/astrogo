@@ -211,6 +211,16 @@ func logEOPUnavailable(mjd float64, cause error) {
 	// The cause says which step failed: no loader registered, no cached
 	// bulletin and no consent to fetch one, or a bulletin that does not reach
 	// this epoch. It is what lets a caller tell the remedy apart from the rest.
+	//
+	// Before the bulletin begins no download can help, and the remedy says
+	// so; before 1960 there was no UTC to differ from UT1 at all, and the
+	// notice is a different one (#1141).
+	if mjd < mjd1960 {
+		logBeforeUTC(mjd)
+
+		return
+	}
+
 	causeText := "unknown"
 	if cause != nil {
 		causeText = cause.Error()
@@ -218,10 +228,23 @@ func logEOPUnavailable(mjd float64, cause error) {
 
 	topocentric, ut1 := "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
 		"up to 0.9 s, the bound leap seconds kept |UT1-UTC| inside"
-	if mjd >= continuousUTC {
+	remedy := `import _ "github.com/TuSKan/astrogo/remote/eop", then ` +
+		"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, " +
+		"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
+
+	switch {
+	case mjd >= continuousUTC:
 		topocentric, ut1 = "15 arcsec for every second UT1-UTC has drifted, which no leap second bounds",
 			"whatever |UT1-UTC| has drifted to: UTC is continuous from 2027-05-20, "+
 				"and the limit is 3600 s (CGPM 2026 Resolution 5)"
+	case mjd < mjd1972:
+		topocentric, ut1 = "15 arcsec for every second of it",
+			"a fraction of a second: before 1972 UTC was steered toward UT2 by rate offsets and fractional steps"
+	}
+
+	if mjd < bulletinFirstMJD {
+		remedy = "none from the IERS bulletin, which begins on 1973-01-02: " +
+			"RegisterModel with a model that covers this epoch, or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
 	}
 
 	logging.Warn("EOP unavailable, using zero DUT1 and polar motion",
@@ -229,9 +252,40 @@ func logEOPUnavailable(mjd float64, cause error) {
 		"cause", causeText,
 		"topocentric_error", topocentric,
 		"ut1_error", ut1,
-		"remedy", `import _ "github.com/TuSKan/astrogo/remote/eop", then `+
-			"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, "+
-			"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately")
+		"remedy", remedy)
+}
+
+const (
+	// mjd1960 is 1960-01-01, when UTC began: [jd1960] as an MJD.
+	mjd1960 = jd1960 - 2400000.5
+
+	// mjd1972 is 1972-01-01, the first day of whole leap seconds.
+	mjd1972 = 41317
+
+	// bulletinFirstMJD is 1973-01-02, the first day the IERS finals2000A
+	// bulletin covers, and so the earliest epoch a download can supply.
+	bulletinFirstMJD = 41684
+)
+
+// logBeforeUTC writes the notice for an epoch before 1960, apart from
+// [logEOPUnavailable]'s because nothing there is missing in the same sense.
+// UTC did not exist, so a UTC label is read as UT1 by definition, as
+// [DeltaT] reads it, and a zero DUT1 is exact rather than an approximation.
+// What sets the accuracy is ΔT itself, from the Espenak & Meeus (2006) model,
+// and no measurement exists to fetch.
+//
+// The warning this replaced said the error was "up to 0.9 s, the bound leap
+// seconds kept |UT1-UTC| inside" and advised a download, for an epoch two
+// thousand years before either (#1141).
+func logBeforeUTC(mjd float64) {
+	year := 2000 + (mjd-51544.5)/365.25 // decimal year, from J2000
+
+	logging.Warn("no Earth orientation before 1960: UTC labels read as UT1, polar motion zero",
+		"mjd", mjd,
+		"ut1", fmt.Sprintf("from the Espenak & Meeus (2006) ΔT model, uncertain by about %.3g s at this epoch",
+			deltaTUncertaintyHistorical(year)),
+		"remedy", "nothing to fetch, since no measurement covers this epoch; "+
+			"RegisterModel(ZeroModel{}) chooses this deliberately and silences the notice")
 }
 
 // lookupEOP is the single place that attempts an automatic lazy load
