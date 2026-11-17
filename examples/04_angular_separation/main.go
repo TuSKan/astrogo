@@ -6,22 +6,26 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 )
 
 func main() {
-	// 1. Coordinates for the first star (e.g., Alcor in Ursa Major)
+	// 1. Coordinates for the first star (Alcor, in Ursa Major)
 	// RA: 13h 25m 13.5s, Dec: +54° 59′ 16″
 	alcor := coord.NewICRS(angle.Hour(13.4204), angle.Deg(54.9878))
 
-	// 2. Coordinates for the second star (e.g., Mizar in Ursa Major)
+	// 2. Coordinates for the second star (Mizar, its neighbor)
 	// RA: 13h 23m 55.5s, Dec: +54° 55′ 31″
 	mizar := coord.NewICRS(angle.Hour(13.3987), angle.Deg(54.9253))
 
-	// 3. Compute Angular Separation
+	// 3. Compute the angular separation: the great-circle angle between them
 	sep := coord.Separation(alcor, mizar)
 
-	fmt.Printf("Alcor coordinates: %s\n", alcor)
-	fmt.Printf("Mizar coordinates: %s\n\n", mizar)
-
-	fmt.Printf("These two stars are %.2f arcminutes (%.4f degrees) apart in the sky.\n", sep.Arcminutes(), sep.Degrees())
+	show.Title("Angular separation", "Mizar and Alcor, in the handle of the Big Dipper")
+	fmt.Println()
+	show.Fields(
+		show.KV("Alcor", "RA %s   Dec %s", alcor.RA().HMSString(1), alcor.Dec().DMSString(0)),
+		show.KV("Mizar", "RA %s   Dec %s", mizar.RA().HMSString(1), mizar.Dec().DMSString(0)),
+		show.KV("Separation", "%.2f arcmin (%.4f°)", sep.Arcminutes(), sep.Degrees()),
+	)
 }

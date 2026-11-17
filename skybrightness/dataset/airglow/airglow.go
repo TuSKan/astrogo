@@ -26,7 +26,6 @@ import (
 	"math"
 	"net/url"
 	"path"
-	"strings"
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/fits"
@@ -773,24 +772,18 @@ func releaseTmpDir(ctx context.Context, client *remote.Client, tmpdir string) {
 	_ = body.Close()
 }
 
-// floatColumn reads a column whatever case the service wrote its name in.
+// floatColumn reads one of the service's columns.
 //
-// ESO's documentation names these columns LAM, FLUX_AEL and FLUX_ARC. The
-// service writes lam, flux_ael and flux_arc. Asking for the documented spelling
-// finds nothing, and the failure looks like "no binary table in the response"
-// rather than "wrong case", which is why this tries both rather than trusting
-// either.
+// ESO's documentation names these columns LAM, FLUX_AEL and FLUX_ARC, and the
+// service writes lam, flux_ael and flux_arc. Either spelling finds them: a
+// FITS column name matches without regard to case.
 func floatColumn(table *fits.BintableHDU, name string) ([]float64, error) {
 	v, err := table.GetFloatColumn(name)
-	if err == nil {
-		return v, nil
+	if err != nil {
+		return nil, fmt.Errorf("%w: column %q: %w", ErrService, name, err)
 	}
 
-	if upper, upErr := table.GetFloatColumn(strings.ToUpper(name)); upErr == nil {
-		return upper, nil
-	}
-
-	return nil, fmt.Errorf("%w: column %q: %w", ErrService, name, err)
+	return v, nil
 }
 
 // columns pulls the wavelength and the two airglow terms out of the table.

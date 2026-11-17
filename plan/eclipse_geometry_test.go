@@ -56,7 +56,7 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 
-		got, _, _ := g.lunarMagnitudes()
+		got, _ := g.lunarMagnitudes()
 		if math.Abs(got-c.magnitude) > tolMagnitude {
 			t.Errorf("%s: penumbral magnitude %.4f, NASA gives %.4f", c.name, got, c.magnitude)
 		}
@@ -124,8 +124,8 @@ func TestSolarPenumbraMarginSeesTheFlattenedLimb(t *testing.T) {
 	at := time.J2000()
 	sun := vector.Vec3{X: -auKm}
 
-	toPole, _ := eclipseGeometry{sun: sun, moon: vector.Vec3{X: -moonKm, Z: offsetKm}}.solarPenumbraMargin(at)
-	toEquator, _ := eclipseGeometry{sun: sun, moon: vector.Vec3{X: -moonKm, Y: offsetKm}}.solarPenumbraMargin(at)
+	toPole := eclipseGeometry{sun: sun, moon: vector.Vec3{X: -moonKm, Z: offsetKm}}.solarPenumbraMargin(at)
+	toEquator := eclipseGeometry{sun: sun, moon: vector.Vec3{X: -moonKm, Y: offsetKm}}.solarPenumbraMargin(at)
 
 	f := constants.Derived.WGS84Flattening.Value
 	if got := toEquator - toPole; math.Abs(got-f) > 1e-6 {
@@ -186,8 +186,9 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 		at   time.Time
 		want bool
 	}{
-		// NASA: 09553, type Ne, penumbral magnitude 0.0135, greatest eclipse
-		// 04:00:15 TD. Latitude at the syzygy 1.580°, just past the old limit.
+		// NASA: 09553, type Ne, penumbral magnitude 0.0135, gamma -1.5380,
+		// greatest eclipse 04:00:15 TD. Latitude at the syzygy 1.580°, just
+		// past the old limit.
 		{"1958-04-04 penumbral lunar eclipse", LunarEclipses, time.Date(1958, 4, 4, 4, 0, 15, 0, time.LocationUTC), true},
 		// Latitude 1.546°: inside the old limit, outside the penumbra by 0.12
 		// of the Moon's diameter.
@@ -220,8 +221,10 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 			t.Errorf("%s: greatest eclipse at %v, %.2f minutes from NASA's", c.name, e.Time, off)
 		}
 
-		if e.Gamma <= 0.9 || e.Gamma >= 1 {
-			t.Errorf("%s: Gamma %.4f, want just under 1 for an eclipse of magnitude 0.0135", c.name, e.Gamma)
+		// 0.0006 off on the analytical ephemeris; see
+		// TestEclipseGammaIsTheCanons for why the bound is 0.0015.
+		if math.Abs(e.Gamma-(-1.5380)) > 0.0015 {
+			t.Errorf("%s: Gamma %.4f, NASA gives -1.5380", c.name, e.Gamma)
 		}
 	}
 }

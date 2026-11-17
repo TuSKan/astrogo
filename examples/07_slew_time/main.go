@@ -11,6 +11,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -84,17 +85,25 @@ func main() {
 
 	slew := total - model.FilterChangePenalty
 
-	fmt.Printf("Telescope slew estimate, %s\n\n", t.Format("2006-01-02 15:04 MST"))
-	fmt.Printf("From  %-9s (%s)   alt %5.1f°   az %5.1f°\n",
-		blockA.Target.Name(), blockA.Config.Filter, tr.FromAltAz.Alt().Degrees(), tr.FromAltAz.Az().Degrees())
-	fmt.Printf("To    %-9s (%s)   alt %5.1f°   az %5.1f°\n\n",
-		blockB.Target.Name(), blockB.Config.Filter, tr.ToAltAz.Alt().Degrees(), tr.ToAltAz.Az().Degrees())
-	fmt.Printf("Axis moves      altitude %.1f°, azimuth %.1f°\n", dAlt, dAz)
-	fmt.Printf("Slew            %s sets it: %.1f° at %.1f°/s = %.0f s\n",
-		slowest, move, model.SlewRate.DegreesPerSec(), slew.Seconds())
-	fmt.Printf("Filter change   %s -> %s: %.0f s\n",
-		blockA.Config.Filter, blockB.Config.Filter, model.FilterChangePenalty.Seconds())
-	fmt.Printf("Total           %.0f s\n\n", total.Seconds())
-	fmt.Printf("The night's first block has nothing to slew from, and is charged\n")
-	fmt.Printf("BaseSetup (%.0f s) instead.\n", model.BaseSetup.Seconds())
+	show.Title("Telescope slew estimate", site.Name()+", "+t.Format("2006-01-02 15:04 MST"))
+
+	tab := show.NewTable(show.Left(""), show.Left("Target"), show.Left("Filter"), show.Right("Altitude"), show.Right("Azimuth"))
+	tab.Row("from", blockA.Target.Name(), blockA.Config.Filter,
+		fmt.Sprintf("%.1f°", tr.FromAltAz.Alt().Degrees()), fmt.Sprintf("%.1f°", tr.FromAltAz.Az().Degrees()))
+	tab.Row("to", blockB.Target.Name(), blockB.Config.Filter,
+		fmt.Sprintf("%.1f°", tr.ToAltAz.Alt().Degrees()), fmt.Sprintf("%.1f°", tr.ToAltAz.Az().Degrees()))
+
+	fmt.Println()
+	tab.Print()
+
+	show.Section("What the move costs")
+	show.Fields(
+		show.KV("Axis moves", "altitude %.1f°, azimuth %.1f°", dAlt, dAz),
+		show.KV("Slew", "%s sets it: %.1f° at %.1f°/s = %.0f s", slowest, move, model.SlewRate.DegreesPerSec(), slew.Seconds()),
+		show.KV("Filter change", "%s to %s: %.0f s", blockA.Config.Filter, blockB.Config.Filter, model.FilterChangePenalty.Seconds()),
+		show.KV("Total", "%.0f s", total.Seconds()),
+	)
+	fmt.Println()
+	show.Note("The night's first block has nothing to slew from, and is charged",
+		fmt.Sprintf("BaseSetup (%.0f s) instead.", model.BaseSetup.Seconds()))
 }
