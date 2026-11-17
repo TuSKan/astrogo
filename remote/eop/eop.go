@@ -33,6 +33,10 @@
 // remote.EnableDownloads(0, remote.IERSFinals2000A). Pre-seeding
 // finals2000A.data into the cache is therefore the whole configuration an
 // air-gapped deployment needs.
+//
+// The lazy load cannot say it failed. A program that needs to know calls
+// time.LoadEOP(ctx) after granting consent: the same two steps, fetch then
+// cache, under its context, with an error when neither gives a bulletin.
 package eop
 
 import (

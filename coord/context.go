@@ -55,6 +55,12 @@ type Context struct {
 	astrom gofaext.ASTROM
 	eop    time.EOP // cached for AltAzToICRS reuse
 
+	// eopSource and eopCovered are what the current instant was placed with,
+	// for [Context.EOPSource]: where the Earth orientation model came from,
+	// and whether the instant lies inside the loaded bulletin.
+	eopSource  string
+	eopCovered bool
+
 	// Precomputed geocentric reduction fields (for GeocentricToObserved).
 	// These avoid rebuilding the C2t06a matrix + observer vector per call.
 	mat    [3][3]float64 // ICRS → ITRS rotation matrix; see [Context.ICRSToITRS]
@@ -351,6 +357,19 @@ func (ctx *Context) Time() time.Time { return ctx.t }
 // Site returns the encapsulated observation geodetic location.
 func (ctx *Context) Site() *Geodetic { return ctx.site }
 
+// EOPSource reports the Earth orientation this Context's current instant was
+// placed with: where the model came from, as [time.EOPSource] names it
+// ("network", "cache", "explicit" or "zero"), and whether the instant lies
+// inside the loaded bulletin's coverage.
+//
+// "zero" and false is a Context built with no bulletin loaded. Its places
+// carry no DUT1 or polar motion, which can put a topocentric place 13.5″ off;
+// [time.LoadEOP] loads a bulletin, and says when it cannot. A source of
+// "network" or "cache" with covered false is an instant past the bulletin's
+// end, where DUT1 is held as [time.DeltaT] describes. Until #1187 a Context
+// could not say which of these it was built with.
+func (ctx *Context) EOPSource() (source string, covered bool) { return ctx.eopSource, ctx.eopCovered }
+
 // Refraction returns the encapsulated refraction configuration. Renamed
 // from Atmosphere alongside atmosphere.Atmosphere/Refraction's own swap
 // (see atmosphere/doc.go) — this has always returned the refraction-input
@@ -629,6 +648,13 @@ func (ctx *Context) place(t time.Time, n *node) {
 	// a day that ends in a leap second that date's fraction is of 86401
 	// seconds, and the sum would misplace Earth's rotation by up to a second.
 	ut1, ut2 := t.UT1Using(t.EOP().DUT1).JDParts()
+
+	// What the lookup above was answered from, read after it, since the lookup
+	// may have loaded the bulletin.
+	ctx.eopSource = time.EOPSource()
+	lo, hi, loaded := time.Coverage()
+	mjd := t.MJD()
+	ctx.eopCovered = loaded && mjd >= lo && mjd <= hi
 	era := gofaext.Era00(ut1, ut2)
 	site := ctx.site
 

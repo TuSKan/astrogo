@@ -670,6 +670,23 @@ It is a package of its own rather than part of `remote` for a plain reason: the
 loader needs `remote.GetFile`, so it has to sit one import *below* `remote`,
 which cannot then import it back. Naming it is what turns EOP on.
 
+The lazy load cannot report a failure, since `Time.EOP` returns no error: a
+missing import, or consent granted after the first lookup, costs every result up
+to 13.5″ with only a log line to say so. To load the bulletin when you choose,
+under your context, and learn whether it worked, call `time.LoadEOP`:
+
+```go
+remote.EnableDownloads(0, remote.IERSFinals2000A) // or pre-seed finals2000A.data
+if err := time.LoadEOP(ctx); err != nil {
+    log.Fatal(err) // no loader imported, no consent and nothing cached, or the IERS unreachable
+}
+```
+
+It takes the network step when consent allows and falls back to a cached
+bulletin, and what it loads stays the model. A `coord.Context` then reports what
+its places were built with: `ctx.EOPSource()` gives `"network"` or `"cache"`, and
+whether the instant is inside the bulletin, or `"zero"` when nothing was loaded.
+
 A program that imports `astrogo/time` without it links no network stack at
 all — measured with go1.27 on windows/amd64, a binary computing a Julian date is
 **3.0 MB rather than 6.3 MB** — and degrades to zero EOP with a one-time warning,
