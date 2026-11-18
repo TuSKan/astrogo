@@ -28,9 +28,7 @@ type Constellation struct {
 // The target is named for the constellation matched, wherever its point
 // falls. Two points fall outside their constellation (see
 // constellation.Centroid): Eridanus's in Fornax, which it winds around, and
-// Serpens's in Ophiuchus, which splits it in two. Naming the target from
-// the constellation its point fell in called those two Fornax and Ophiuchus
-// (#640).
+// Serpens's in Ophiuchus, which splits it in two.
 func NewConstellation(name string) (*Constellation, error) {
 	pos, err := constellation.Centroid(name)
 	if err != nil {

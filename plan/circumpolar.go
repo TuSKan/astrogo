@@ -37,12 +37,8 @@ func WithHorizonAltitude(minAlt angle.Angle) CircumpolarOption {
 // The horizon reference defaults to site.RiseSetThreshold(), the almanac
 // horizon a star rises and sets on: 34′ of refraction plus the site's dip,
 // below the geometric horizon. The altitudes it is compared with are
-// geometric. WithHorizonAltitude replaces it.
-//
-// Until #568 the default left the refraction out and WithRefraction put it
-// back. The refraction is now the default, as it is for VisibilityEvents,
-// and the option is gone: the two disagreed about the same star at the
-// boundary unless a caller knew to ask.
+// geometric, as they are for VisibilityEvents, so the two agree about a star
+// at the boundary. WithHorizonAltitude replaces it.
 func IsCircumpolar(dec angle.Angle, site *Site, opts ...CircumpolarOption) bool {
 	minAlt, _ := circumpolarExtremes(dec, site)
 

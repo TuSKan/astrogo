@@ -539,9 +539,7 @@ const crescentCodeWidth = len("Optical/Naked")
 // criterion's answer with the quantities it read.
 //
 // The verdict or zone sits in a column as wide as the widest code a criterion
-// returns, and a zone row names its code once, then its label and value. The
-// column was a character narrower than Odeh's "Optical/Naked", which pushed
-// that row out of line, and a zone row repeated its code (#1167).
+// returns, and a zone row names its code once, then its label and value.
 func (r CrescentResult) String() string {
 	var b strings.Builder
 

@@ -40,12 +40,8 @@ type TargetDetails struct {
 	// "pc" for a fixed target placed by its parallax, "a.u." for a
 	// solar-system body, "km" for a satellite.
 	//
-	// It is a rendering choice, not the unit Distance is in. It used to be
-	// both — Distance was a bare float64 and this string was the only record
-	// of what its number meant, so a caller reading Distance without reading
-	// this alongside it got parsecs, au or kilometers depending on the target
-	// and no way to tell. Distance now carries its own unit and this only
-	// decides which one to print.
+	// It is a rendering choice, not the unit Distance is in: Distance carries
+	// its own unit, and this decides only which one to print.
 	DistanceUnit string
 
 	// Distance is the target's distance: from the observer for a
@@ -462,18 +458,6 @@ func fillAliasProps(d *TargetDetails, aliases []string) {
 // DetailOverrides carries what this package cannot compute — a human
 // description, where the numbers came from — and replaces what it can, for a
 // caller who has a better answer.
-//
-// # Why a struct and not the key/value pairs it replaces
-//
-// GetDetails used to take `props ...string` read two at a time. Three ways to
-// get that wrong, all silent:
-//
-//   - An odd count dropped the last argument, because the loop ran to
-//     len(props)-1.
-//   - A misspelled key did not fail; it landed in ExtraProps, and the field it
-//     meant to override kept its computed value. A key one letter away from
-//     "Description" was just as valid, with an entirely different effect.
-//   - A key and a value could be swapped with nothing to notice.
 //
 // The zero value overrides nothing, which is the common case and what a caller
 // with nothing to add should pass.

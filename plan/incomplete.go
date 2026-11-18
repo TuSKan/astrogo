@@ -10,17 +10,10 @@ import (
 
 // ErrIncomplete marks a result that is usable but shorter than it should be.
 //
-// # Why a result and an error together
-//
 // [VisibleTonight] queries several catalogs and fetches an ephemeris per
-// candidate, and any of those can fail on its own. Failing the whole query
-// because one kernel could not be fetched would be worse than useless — a
-// night's plan is still a night's plan without one asteroid, and the caller
-// asked for what is visible, not for a transaction.
-//
-// So it keeps skipping, and returns what it found. What it no longer does is
-// keep quiet: a skip caused by a failure is collected, and the call returns a
-// non-nil error wrapping this sentinel alongside the results.
+// candidate, and any of those can fail on its own. It skips a candidate it
+// could not evaluate and returns what it found, with a non-nil error wrapping
+// this sentinel that names each skip and why:
 //
 //	objects, err := plan.VisibleTonight(ctx, site, night, 6.0, sources, prov)
 //	if errors.Is(err, plan.ErrIncomplete) {
@@ -29,20 +22,13 @@ import (
 //	    // nothing usable came back
 //	}
 //
-// A caller who ignores the error gets exactly what they got before. A caller
-// who checks it can tell a sky with two visible planets from a sky with two
-// visible planets and an unreachable JPL — which reading the slice alone
-// cannot.
-//
-// This replaces reporting the skips only through the logger. A log line tells
-// a human something happened; it does not let the program decide, and deciding
-// is the caller's job. #177 fixed six predicates that answered "no" when they
-// meant "could not tell"; this is the same defect one layer up, where the
-// answer was a short list.
+// The results returned with it are valid. The error is what tells a sky with
+// two visible planets from a sky with two visible planets and an unreachable
+// JPL, which the slice alone cannot.
 //
 // It is [resolve.ErrIncomplete], the value catalog.Resolver.Search returns
 // with partial matches too, so one errors.Is check covers a short result from
-// either package (#1143).
+// either package.
 var ErrIncomplete = resolve.ErrIncomplete
 
 // skips collects the reasons a result came back short.
