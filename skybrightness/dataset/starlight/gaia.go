@@ -610,7 +610,7 @@ func aggregationClient(id remote.EndpointID) *remote.Client {
 
 // fetchChunkWithRetry runs one chunk, re-attempting a transient failure.
 //
-// The client already retries the statuses resty classifies as retriable; what
+// The client already retries the statuses its retry policy names; what
 // it cannot retry is a request whose own timeout expired, because by then the
 // context is done. That is the failure a long build actually hits, so it is
 // retried here with a fresh deadline and a backoff.

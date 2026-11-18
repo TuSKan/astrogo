@@ -16,8 +16,8 @@
 // # The kernel sources need one blank import
 //
 // [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels,
-// which means files, a cache and a network: remote, and through it net/http,
-// crypto/tls and resty. A build that only asks SOFA where Mars is has no use
+// which means files, a cache and a network: remote, and through it net/http
+// and crypto/tls. A build that only asks SOFA where Mars is has no use
 // for any of it, and used to link all of it because one branch of
 // [NewProvider] mentioned the type.
 //
