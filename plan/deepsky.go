@@ -38,8 +38,8 @@ func WithDSOKind(kind string) DSOOption {
 //
 // For an extragalactic object this is the headline measurement: SIMBAD
 // carries it for essentially every galaxy, and it is what a redshift is
-// usually quoted as. It was fetched and discarded until now, because
-// FromCatalog read HasRadialVelocity in the star branch only.
+// usually quoted as. FromCatalog sets it from a catalog target that carries
+// one.
 func WithDSORadialVelocity(rv unit.Velocity) DSOOption {
 	return func(d *DeepSkyObject) { d.radialVelocity = rv; d.hasRV = true }
 }

@@ -442,16 +442,8 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 
 // Scorer ranks targets by a configurable merit function.
 //
-// A zero Config uses DefaultScoreConfig().
-//
-// # Why a struct rather than six parameters
-//
-// This was ScoreObservable(obj, t, site, cfg, ctx, constraints...), and the two
-// pointers in the middle were nil at nearly every call site — including the
-// README's. Positional nils say nothing about what they are declining, and two
-// adjacent ones of different types can be transposed without the compiler
-// noticing. Named fields say which is which, and the ones a caller does not set
-// are the ones they did not have to think about.
+// Site is required. A zero Config uses DefaultScoreConfig(), and Context and
+// Constraints may be left unset.
 //
 // A Scorer is safe to reuse across targets and times; Score holds no state.
 type Scorer struct {
@@ -609,11 +601,10 @@ func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
 // composite observability score at a specific time and site.
 // Objects are evaluated concurrently.
 //
-// They share one [coord.Context], built for the instant: the ~100 µs Apco13
-// solve is the same for every target, and was paid once for each (#916). So is
-// the bracket a target's urgency is estimated across, which each target built
-// again (#951). A [ConstraintCtx] is handed it from every goroutine at once, so
-// it must only read it; see that interface.
+// They share one [coord.Context], built for the instant, since the ~100 µs
+// Apco13 solve is the same for every target, and one bracket to estimate each
+// target's urgency across. A [ConstraintCtx] is handed the Context from every
+// goroutine at once, so it must only read it; see that interface.
 func RankObservables(
 	objs []Observable,
 	t time.Time,

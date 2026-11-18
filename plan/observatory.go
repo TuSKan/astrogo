@@ -273,11 +273,11 @@ func WithHorizonRefraction(air atmosphere.Refraction) SiteOption {
 // or of a mountain above the plain it overlooks. Without it there is no dip,
 // as USNO and the almanacs assume.
 //
-// It is not the site's height above the ellipsoid, which the dip used to be
-// taken from, always. A city on a plateau looks out on the plateau, not down
-// on a horizon 1,600 m below: Denver entered at its real height rose the Sun
-// 7.1 minutes before USNO, Madrid at 667 m 4.7 minutes, for a dip their
-// horizons do not have (#1185). For the old rule, pass the site's height.
+// It is not the site's height above the ellipsoid. A city on a plateau looks
+// out on the plateau, not down on a horizon 1,600 m below: a dip from
+// Denver's height above the ellipsoid would rise the Sun 7.1 minutes before
+// USNO does. A site that does look down on a sea or a plain from its own
+// height passes that height.
 func WithHorizonHeight(h unit.Length) SiteOption {
 	return func(s *Site) { s.horizonHeight = h }
 }
@@ -503,11 +503,6 @@ func (s *Site) Height() unit.Length { return s.location.Height() }
 // using the ICAO International Standard Atmosphere barometric formula.
 // Pressure and temperature are reduced for altitude; humidity, wavelength,
 // and the refraction model are inherited from the sea-level standard.
-//
-// Renamed from Atmosphere alongside atmosphere.Atmosphere/Refraction's own
-// swap (see atmosphere/doc.go) — this method has always returned the small
-// refraction-input struct, never the package's richer atmospheric-state
-// type, so the new name matches what it actually returns.
 func (s *Site) Refraction() atmosphere.Refraction {
 	return atmosphere.AtAltitude(s.location.Height())
 }
@@ -546,10 +541,6 @@ const standardRefraction = 0.5667
 //
 // With [WithHorizonRefraction] the 34′ is instead the refraction of the air
 // the site names, here and in the Sun's and Moon's thresholds.
-//
-// Until #568 it was the dip alone, with no refraction, so a star rose 2.4
-// to 7 minutes after the almanacs' rise at the latitudes tested there, and
-// set as much before theirs.
 func (s *Site) RiseSetThreshold() angle.Angle {
 	return angle.Deg(-s.horizonRefraction() - s.HorizonDip().Degrees())
 }
@@ -586,7 +577,7 @@ func (s *Site) SunRiseSetThreshold() angle.Angle {
 // threshold is off by up to 1.3′, and a moonrise against it by up to 28 s
 // at 60°N. [MoonEvents] uses [Site.RiseSetThreshold] with
 // [EventSpec.UpperLimb], which takes the semi-diameter at each instant;
-// this is for a check at one instant that can carry that error (#693).
+// this is for a check at one instant that can carry that error.
 func (s *Site) MoonRiseSetThreshold() angle.Angle {
 	const moonSemiDiameter = 0.2583 // degrees, ~15.5 arcmin (mean)
 

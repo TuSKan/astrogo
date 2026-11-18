@@ -29,13 +29,10 @@ var (
 	// ErrNoSecondaryTarget indicates a geometry event requires a secondary target.
 	ErrNoSecondaryTarget = errors.New("geometry requires a secondary target")
 	// ErrReversedInterval is returned for a search interval whose end is before
-	// its start. Until #418 such a call panicked, inside a sampler that sized
-	// its buffer from the interval's length.
+	// its start.
 	ErrReversedInterval = errors.New("plan: interval ends before it starts")
 	// ErrNonFiniteInterval is returned for a search interval whose start or
-	// end is a NaN or infinite time. Such a time compares false both ways, so
-	// it passed the reversed-interval check, and until #996 most searches then
-	// panicked sizing their sample buffer from the interval's length.
+	// end is a NaN or infinite time.
 	ErrNonFiniteInterval = errors.New("plan: interval start or end is not a finite time")
 	// ErrFamilyNotImpl indicates an event solver for the given family is not implemented.
 	ErrFamilyNotImpl = errors.New("event solver for family is not implemented")
@@ -58,12 +55,9 @@ var (
 	// ErrNoCoordinates indicates a catalog target that resolves to no
 	// position at all, which cannot become a fixed Observable.
 	//
-	// The zero value of a missing coordinate is RA 0, Dec 0 — a real point
-	// in Pisces, and a target built on it will rise, transit, set and
-	// schedule without complaint. FromCatalog used to substitute it
-	// silently; a resolver returning an object with no position now fails
-	// loudly instead, which is the only safe direction for a library that
-	// points telescopes.
+	// FromCatalog returns it rather than place the target at the zero value
+	// of a missing coordinate, RA 0, Dec 0: a real point in Pisces, where a
+	// target would rise, transit, set and schedule like any other.
 	ErrNoCoordinates = errors.New("catalog target has no coordinates")
 
 	// ErrNoRadialVelocity indicates a target with no radial velocity to
@@ -74,7 +68,7 @@ var (
 
 	// ErrSlewTime marks a slew whose time a time.Duration cannot hold: a
 	// NaN slew rate, a NaN slew distance, or a slew longer than about 292
-	// years, which a rate below 2e-8 deg/s makes of a 180° slew (#1121).
+	// years, which a rate below 2e-8 deg/s makes of a 180° slew.
 	ErrSlewTime = errors.New("plan: slew time is not a finite time.Duration")
 
 	// ErrStepNotPositive indicates a non-positive time step.
@@ -85,11 +79,10 @@ var (
 	ErrNotObservable = errors.New("object does not implement Observable")
 	// ErrNilSite indicates a nil *Site where one is needed: IsObservable,
 	// a constraint's Check, or the Horizon constraint, which reads the site's
-	// horizon. They used to panic on it (#1186).
+	// horizon.
 	ErrNilSite = errors.New("plan: site must not be nil")
 	// ErrNilTarget indicates a nil Observable where a constraint or
-	// IsObservable needs a target's position. They used to panic on it
-	// (#1186).
+	// IsObservable needs a target's position.
 	ErrNilTarget = errors.New("plan: target must not be nil")
 
 	// ErrBracketingViolated indicates f(a) and f(b) have the same sign in root finding.
@@ -105,11 +98,7 @@ var (
 	//
 	// The best estimate found is returned alongside it, so a caller who is
 	// content with an approximation can check for this sentinel and keep the
-	// value. What is no longer possible is mistaking one for the other: the
-	// solver used to return its best effort with a nil error, so a caller
-	// doing the ordinary Go thing could not tell a converged root from an
-	// iteration budget that ran out. For an interactive display that is
-	// defensible; for anything that points a telescope it is not.
+	// value. A nil error always means a converged root.
 	ErrNoConvergence = errors.New("solver: did not converge within MaxIter")
 	// ErrEventNotFound indicates no event was found in the search window.
 	ErrEventNotFound = errors.New("no event found in search window")

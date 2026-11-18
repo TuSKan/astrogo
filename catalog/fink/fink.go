@@ -1,13 +1,13 @@
 package fink
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,10 +15,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/internal/parquetcol"
 	"github.com/TuSKan/astrogo/remote"
-
-	"github.com/apache/arrow-go/v18/parquet/file"
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 )
 
 // defaultVersion is the SSOFT release to query. The API defaults to the
@@ -551,42 +549,25 @@ func (p *Provider) downloadSSOFT(ctx context.Context) (_ []ssoRecord, err error)
 		return nil, fmt.Errorf("%w: size=%d", ErrInvalidParquet, len(data))
 	}
 
-	// Write to temp file (parquet reader requires seekable input).
-	tmp, err := os.CreateTemp("", "astrogo-ssoft-*.parquet")
-	if err != nil {
-		return nil, fmt.Errorf("creating temp file: %w", err)
-	}
-
-	tmpName := tmp.Name()
-	defer func() {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-	}()
-
-	if _, err := tmp.Write(data); err != nil {
-		return nil, fmt.Errorf("writing temp parquet: %w", err)
-	}
-
-	return p.readParquet(ctx, tmpName)
+	return p.readParquet(ctx, data)
 }
 
-// readParquet extracts ssoRecords from a SSOFT parquet file.
+// readParquet extracts ssoRecords from a SSOFT parquet file held in data,
+// reading each column it needs with Parquet's own column readers.
 //
-// A panic inside Arrow's decoder is returned as an error wrapping
-// [ErrInvalidParquet]. The decoder sizes what it builds from what the file
-// declares, and a malformed file led it into "makeslice: cap out of range"
-// while parsing the schema (#1062); the file is FINK's bytes, so the failure is
-// the file's, as atmosphere/dataset/cams treats its HDF5 decoder's (#794). A
-// failed allocation is fatal in Go rather than a panic, and is not caught here.
-func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord, err error) {
-	// Registered first, so it runs last and covers the reader's Close too.
+// A file the Parquet decoder cannot read without panicking is an error
+// wrapping both [ErrInvalidParquet] and parquetcol.ErrMalformed: the decoder
+// sizes what it builds from what the file declares, and a malformed file led
+// it into "makeslice: cap out of range" while parsing the schema (#1062). The
+// file is FINK's bytes, so the failure is the file's.
+func (p *Provider) readParquet(ctx context.Context, data []byte) (_ []ssoRecord, err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%w: the parquet decoder failed: %v", ErrInvalidParquet, r)
+		if errors.Is(err, parquetcol.ErrMalformed) {
+			err = fmt.Errorf("%w: %w", ErrInvalidParquet, err)
 		}
 	}()
 
-	rdr, err := file.OpenParquetFile(path, false)
+	rdr, err := parquetcol.Open(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("opening parquet: %w", err)
 	}
@@ -598,158 +579,131 @@ func (p *Provider) readParquet(ctx context.Context, path string) (_ []ssoRecord,
 		}
 	}()
 
-	arrowRdr, err := pqarrow.NewFileReader(rdr, pqarrow.ArrowReadProperties{}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating arrow reader: %w", err)
-	}
+	cols := make(map[string]*parquetcol.Column, len(ssoftColumns))
+	rows := 0
 
-	tbl, err := arrowRdr.ReadTable(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reading table: %w", err)
-	}
-	defer tbl.Release()
-
-	nRows := int(tbl.NumRows())
-	schema, _ := arrowRdr.Schema()
-
-	// Build column name → index map.
-	colIdx := make(map[string]int, schema.NumFields())
-	for i, f := range schema.Fields() {
-		colIdx[f.Name] = i
-	}
-
-	// Helper to read float64 column values.
-	getF64 := func(colName string, row int) float64 {
-		idx, ok := colIdx[colName]
-		if !ok {
-			return math.NaN()
+	for _, name := range ssoftColumns {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("reading parquet: %w", err)
 		}
 
-		col := tbl.Column(idx)
-		for _, chunk := range col.Data().Chunks() {
-			if row < chunk.Len() {
-				if chunk.IsNull(row) {
-					return math.NaN()
-				}
-
-				v := chunk.GetOneForMarshal(row)
-				switch fv := v.(type) {
-				case float64:
-					return fv
-				case float32:
-					return float64(fv)
-				case json.Number:
-					f, _ := fv.Float64()
-					return f
-				}
-
-				return math.NaN()
-			}
-
-			row -= chunk.Len()
+		c, err := parquetcol.Read(rdr, name)
+		if errors.Is(err, parquetcol.ErrNoColumn) || errors.Is(err, parquetcol.ErrUnsupportedType) {
+			// A column FINK did not send, or of a type no SSOFT column has
+			// had: its rows read as null.
+			continue
 		}
 
-		return math.NaN()
+		if err != nil {
+			return nil, fmt.Errorf("reading column %q: %w", name, err)
+		}
+
+		cols[name] = c
+		rows = max(rows, c.Len())
 	}
 
-	getInt := func(colName string, row int) int64 {
-		idx, ok := colIdx[colName]
-		if !ok {
-			return 0
+	at := func(name string, row int) ssoftValue {
+		if c, ok := cols[name]; ok {
+			return ssoftValue(c.At(row))
 		}
 
-		col := tbl.Column(idx)
-		for _, chunk := range col.Data().Chunks() {
-			if row < chunk.Len() {
-				if chunk.IsNull(row) {
-					return 0
-				}
-
-				// FINK chooses the column types, not this reader. In SSOFT
-				// 2025.04 sso_number is a string column and fit, status and
-				// n_obs are doubles; a reader that knew only the integer
-				// types read every asteroid's number as 0 (#596).
-				v := chunk.GetOneForMarshal(row)
-				switch iv := v.(type) {
-				case string:
-					// 32 bits: an asteroid number, a fit flag or an
-					// observation count fits with room to spare, and the
-					// bound is what makes the int conversions of fit, status
-					// and n_obs below safe on a 32-bit platform.
-					n, err := strconv.ParseInt(strings.TrimSpace(iv), 10, 32)
-					if err != nil {
-						return 0
-					}
-
-					return n
-				case int32:
-					return int64(iv)
-				case int64:
-					return iv
-				case float64:
-					return int64(iv)
-				}
-
-				return 0
-			}
-
-			row -= chunk.Len()
-		}
-
-		return 0
+		return ssoftValue{}
 	}
 
-	getStr := func(colName string, row int) string {
-		idx, ok := colIdx[colName]
-		if !ok {
-			return ""
-		}
-
-		col := tbl.Column(idx)
-		for _, chunk := range col.Data().Chunks() {
-			if row < chunk.Len() {
-				if chunk.IsNull(row) {
-					return ""
-				}
-
-				v := chunk.GetOneForMarshal(row)
-				if s, ok := v.(string); ok {
-					return s
-				}
-
-				return fmt.Sprintf("%v", v)
-			}
-
-			row -= chunk.Len()
-		}
-
-		return ""
-	}
-
-	records := make([]ssoRecord, nRows)
-	for i := range nRows {
+	records := make([]ssoRecord, rows)
+	for i := range rows {
 		records[i] = ssoRecord{
-			Name:   getStr("sso_name", i),
-			Number: getInt("sso_number", i),
-			H1:     getF64("H_1", i),
-			H2:     getF64("H_2", i),
-			ErrH1:  getF64("err_H_1", i),
-			ErrH2:  getF64("err_H_2", i),
-			G1_1:   getF64("G1_1", i),
-			G1_2:   getF64("G1_2", i),
-			G2_1:   getF64("G2_1", i),
-			G2_2:   getF64("G2_2", i),
-			R:      getF64("R", i),
-			Alpha0: getF64("alpha0", i),
-			Delta0: getF64("delta0", i),
-			AB:     getF64("a_b", i),
-			AC:     getF64("a_c", i),
-			Fit:    int(getInt("fit", i)),
-			Status: int(getInt("status", i)),
-			NObs:   int(getInt("n_obs", i)),
-			RMS:    getF64("rms", i),
+			Name:   at("sso_name", i).str(),
+			Number: at("sso_number", i).int(),
+			H1:     at("H_1", i).float(),
+			H2:     at("H_2", i).float(),
+			ErrH1:  at("err_H_1", i).float(),
+			ErrH2:  at("err_H_2", i).float(),
+			G1_1:   at("G1_1", i).float(),
+			G1_2:   at("G1_2", i).float(),
+			G2_1:   at("G2_1", i).float(),
+			G2_2:   at("G2_2", i).float(),
+			R:      at("R", i).float(),
+			Alpha0: at("alpha0", i).float(),
+			Delta0: at("delta0", i).float(),
+			AB:     at("a_b", i).float(),
+			AC:     at("a_c", i).float(),
+			Fit:    int(at("fit", i).int()),
+			Status: int(at("status", i).int()),
+			NObs:   int(at("n_obs", i).int()),
+			RMS:    at("rms", i).float(),
 		}
 	}
 
 	return records, nil
+}
+
+// ssoftColumns are the SSOFT columns a record is built from.
+var ssoftColumns = []string{
+	"sso_name", "sso_number", "H_1", "H_2", "err_H_1", "err_H_2", "G1_1", "G1_2",
+	"G2_1", "G2_2", "R", "alpha0", "delta0", "a_b", "a_c", "fit", "status", "n_obs", "rms",
+}
+
+// ssoftValue is one value of a SSOFT column, read as a record needs it.
+type ssoftValue parquetcol.Value
+
+// float reads a value as a number: NaN for a null or a string.
+func (v ssoftValue) float() float64 {
+	switch v.Kind { //nolint:exhaustive // a null and a string are both NaN
+	case parquetcol.Float:
+		return v.F
+	case parquetcol.Int:
+		return float64(v.I)
+	case parquetcol.Uint:
+		return float64(v.U)
+	default:
+		return math.NaN()
+	}
+}
+
+// int reads a value as an integer, 0 for a null. FINK chooses the column
+// types, not this reader: in SSOFT 2025.04 sso_number is a string column and
+// fit, status and n_obs are doubles, and a reader that knew only the integer
+// types read every asteroid's number as 0 (#596). A string is read to 32
+// bits: an asteroid number, a fit flag or an observation count fits with room
+// to spare, and the bound keeps the int conversions of fit, status and n_obs
+// safe on a 32-bit platform.
+func (v ssoftValue) int() int64 {
+	switch v.Kind {
+	case parquetcol.String:
+		n, err := strconv.ParseInt(strings.TrimSpace(v.S), 10, 32)
+		if err != nil {
+			return 0
+		}
+
+		return n
+	case parquetcol.Int:
+		return v.I
+	case parquetcol.Uint:
+		return int64(min(v.U, math.MaxInt64))
+	case parquetcol.Float:
+		return int64(v.F)
+	case parquetcol.Null:
+		return 0
+	}
+
+	return 0
+}
+
+// str reads a value as text, "" for a null.
+func (v ssoftValue) str() string {
+	switch v.Kind {
+	case parquetcol.String:
+		return v.S
+	case parquetcol.Float:
+		return strconv.FormatFloat(v.F, 'g', -1, 64)
+	case parquetcol.Int:
+		return strconv.FormatInt(v.I, 10)
+	case parquetcol.Uint:
+		return strconv.FormatUint(v.U, 10)
+	case parquetcol.Null:
+		return ""
+	}
+
+	return ""
 }

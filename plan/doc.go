@@ -132,6 +132,18 @@
 // ([ErrNoConvergence], [ErrNonFiniteEvaluation]), and a result that is only
 // partial ([ErrIncomplete]). The index lists them all under Variables.
 //
+// # Concurrency
+//
+// A [Site], and every [Observable] and [Constraint] this package builds, is
+// never changed by a query, so one value may serve any number of goroutines at
+// once; so may a [Scorer]. [Planner.FilterObservable],
+// [Planner.RankObservable] and [RankObservables] evaluate their targets on
+// several goroutines, so an Observable, Constraint or ephemeris provider
+// written elsewhere and handed to them must be safe for concurrent use too. A
+// [coord.Context] is not safe for concurrent use: a [ConstraintCtx] handed one
+// must only read it, and a goroutine that needs another instant moves a copy
+// of its own.
+//
 // # Related packages
 //
 //   - [github.com/TuSKan/astrogo/fits/fitsplan] builds a [Site] and targets
