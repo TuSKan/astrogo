@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -90,7 +91,7 @@ func TestAStarAtRestWithRespectToTheSunMovesWithIt(t *testing.T) {
 	f := coord.DefaultGalactocentricFrame()
 
 	atRest := coord.NewICRSWithKinematics(
-		angle.Deg(123.4), angle.Deg(-35.6), 0, 0, angle.Arcsec(0.020), 0)
+		angle.Deg(123.4), angle.Deg(-35.6), 0, 0, angle.Arcsec(0.020), 0, time.J2000())
 
 	g := f.FromICRS(atRest, coord.ParallaxDistance(angle.Arcsec(0.020)))
 
@@ -143,6 +144,7 @@ func TestTheVelocityRoundTripsThroughTheFrame(t *testing.T) {
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
 			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
+			time.J2000(),
 		)
 
 		distance := coord.ParallaxDistance(angle.Arcsec(tc.px))
@@ -198,7 +200,7 @@ func TestNoParallaxMeansAPositionWithoutAVelocity(t *testing.T) {
 			name: "proper motion but no parallax to scale it",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4)),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4), time.J2000()),
 		},
 	} {
 		g := f.FromICRS(tc.star, unit.Pc(1000))
@@ -236,7 +238,7 @@ func TestNewGalactocentricWithVelocityIsIndistinguishableFromAComputedOne(t *tes
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), unit.KmPerSec(-110.6))
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6), time.J2000())
 
 	computed := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.54698)))
 
@@ -275,7 +277,7 @@ func TestBarnardsStarGalactocentricVelocityIsPlausible(t *testing.T) {
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
-		angle.Arcsec(0.54698), unit.KmPerSec(-110.6))
+		angle.Arcsec(0.54698), unit.KmPerSec(-110.6), time.J2000())
 
 	g := f.FromICRS(star, coord.ParallaxDistance(angle.Arcsec(0.54698)))
 
@@ -336,7 +338,7 @@ func TestTheGalacticBasisIsOrthonormal(t *testing.T) {
 		star := coord.NewICRSWithKinematics(
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
-			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv))
+			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv), time.J2000())
 
 		bary, ok := coord.SpaceVelocity(star)
 		if !ok {

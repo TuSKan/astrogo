@@ -113,8 +113,7 @@ func TestICRSRoundTrip(t *testing.T) {
 	for i, c := range cases {
 		v := c.ToUnitVector()
 
-		var back coord.ICRS
-		back.FromUnitVector(v)
+		back := coord.ICRSFromUnitVector(v)
 
 		label := testutil.CaseLabel(i, "ICRS round-trip")
 		testutil.AssertNear(t, label+" RA", back.RA().Degrees(), c.RA().Wrap360().Degrees(), 1e-10)
@@ -207,15 +206,6 @@ func TestAltAzEqual(t *testing.T) {
 }
 
 func TestSetters(t *testing.T) {
-	// ICRS
-	ic := coord.NewICRS(angle.Deg(10), angle.Deg(20))
-	ic.SetRA(angle.Deg(30))
-	ic.SetDec(angle.Deg(40))
-	ic.SetDist(unit.AU(5.0))
-	testutil.AssertNear(t, "ICRS RA", ic.RA().Degrees(), 30.0, 1e-10)
-	testutil.AssertNear(t, "ICRS Dec", ic.Dec().Degrees(), 40.0, 1e-10)
-	testutil.AssertNear(t, "ICRS Dist", ic.Dist().AU(), 5.0, 1e-10)
-
 	// AltAz
 	aa := coord.NewAltAz(angle.Deg(10), angle.Deg(20))
 	aa.SetAlt(angle.Deg(30))
@@ -372,16 +362,16 @@ func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 
 	later := time.J2000().Add(unit.JulianYears(50))
 
-	out, err := coord.PropagateEpoch(c, time.J2000(), later)
+	out, err := coord.PropagateEpoch(c, later)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "RA unchanged with no kinematics", out.RA().Degrees(), c.RA().Degrees(), 1e-12)
 	testutil.AssertNear(t, "Dec unchanged with no kinematics", out.Dec().Degrees(), c.Dec().Degrees(), 1e-12)
 }
 
 func TestPropagateEpoch_SameEpochIsNoOp(t *testing.T) {
-	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, time.J2000())
 
-	out, err := coord.PropagateEpoch(c, time.J2000(), time.J2000())
+	out, err := coord.PropagateEpoch(c, time.J2000())
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "RA unchanged at same epoch", out.RA().Degrees(), c.RA().Degrees(), 1e-15)
 }
@@ -390,11 +380,11 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 	// dec=0 so cos(dec)=1: coordinate-angle pmRA of 1 arcsec/yr over 10
 	// years should shift RA by ~10 arcsec, to within a small tolerance for
 	// the relativistic/parallax correction Pmsafe also applies.
-	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, time.J2000())
 
 	later := time.J2000().Add(unit.JulianYears(10))
 
-	out, err := coord.PropagateEpoch(c, time.J2000(), later)
+	out, err := coord.PropagateEpoch(c, later)
 	testutil.AssertNoError(t, err)
 
 	shiftArcsec := (out.RA().Degrees() - c.RA().Degrees()) * 3600
@@ -402,17 +392,19 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 }
 
 func TestPropagateEpoch_ZeroEpochDefaultsToJ2000(t *testing.T) {
-	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0)
+	at := func(epoch time.Time) coord.ICRS {
+		return coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, epoch)
+	}
 
 	later := time.J2000().Add(unit.JulianYears(10))
 
-	explicit, err := coord.PropagateEpoch(c, time.J2000(), later)
+	explicit, err := coord.PropagateEpoch(at(time.J2000()), later)
 	testutil.AssertNoError(t, err)
 
-	implicit, err := coord.PropagateEpoch(c, time.Time{}, later)
+	implicit, err := coord.PropagateEpoch(at(time.Time{}), later)
 	testutil.AssertNoError(t, err)
 
-	testutil.AssertNear(t, "zero fromEpoch matches explicit J2000", implicit.RA().Degrees(), explicit.RA().Degrees(), 1e-15)
+	testutil.AssertNear(t, "zero epoch matches explicit J2000", implicit.RA().Degrees(), explicit.RA().Degrees(), 1e-15)
 }
 
 func TestMoreRoundTrips(t *testing.T) {

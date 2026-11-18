@@ -88,6 +88,10 @@ type ICRS struct {
 	parallax angle.Angle // Stellar parallax
 	rv       unit.Velocity
 
+	// epoch is the instant the position holds at, for a position with
+	// kinematics; zero reads as J2000.0.
+	epoch time.Time
+
 	// hasKinematics records whether a caller supplied kinematics, as distinct
 	// from their happening to be zero.
 	//
@@ -135,6 +139,11 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // SOFA uses these to compute rigorous space-motion propagation, annual parallax,
 // and aberration coupling internally via Atcoq/Atciq.
 //
+// epoch is the instant the position holds at, as the catalog states it:
+// J2016.0 for a Gaia DR3 row, J2000.0 for SIMBAD or Hipparcos. Every
+// transform moves the star from there, so a row passed in as it was published
+// lands where the star is. A zero epoch is J2000.0.
+//
 // pmRA is mu_alpha* = dRA/dt · cos(dec) — the rate the star moves across the
 // sky, which is the pmra column Gaia, SIMBAD and Hipparcos all publish and
 // what astropy calls pm_ra_cosdec. Pass a catalog's value straight in.
@@ -144,13 +153,22 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // and happens at the one boundary where SOFA is called. Handed to SOFA
 // directly, a catalog value would lose a factor of cos(dec), which is 30% at
 // δ = 45° and 83% at δ = 80°.
-func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) ICRS {
+func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity, epoch time.Time) ICRS {
 	return ICRS{
 		ra: ra, dec: dec,
 		pmRA: pmRA, pmDec: pmDec,
 		parallax: parallax, rv: rv,
+		epoch:         epoch,
 		hasKinematics: true,
 	}
+}
+
+// ICRSFromUnitVector is the direction of v, a vector on ICRS axes, with no
+// distance and no kinematics.
+func ICRSFromUnitVector(v vector.Vec3) ICRS {
+	lon, lat := v.ToSpherical()
+
+	return ICRS{ra: angle.Rad(lon), dec: angle.Rad(lat)}
 }
 
 // NewAltAz creates a new AltAz coordinate.
@@ -218,30 +236,21 @@ func (c ICRS) Parallax() angle.Angle { return c.parallax }
 // RV returns the radial velocity of the ICRS coordinate.
 func (c ICRS) RV() unit.Velocity { return c.rv }
 
-// SetRA sets the right ascension of the ICRS coordinate.
-func (c *ICRS) SetRA(a angle.Angle) { c.ra = a }
-
-// SetDec sets the declination of the ICRS coordinate.
-func (c *ICRS) SetDec(a angle.Angle) { c.dec = a }
-
-// SetDist sets the distance of the ICRS coordinate.
-func (c *ICRS) SetDist(d unit.Length) { c.dist = d }
-
-// SetProperMotion sets the proper motion of the ICRS coordinate.
-func (c *ICRS) SetProperMotion(pmRA, pmDec angle.Angle) { c.pmRA = pmRA; c.pmDec = pmDec }
-
-// SetParallax sets the parallax of the ICRS coordinate.
-func (c *ICRS) SetParallax(a angle.Angle) { c.parallax = a }
-
-// SetRV sets the radial velocity of the ICRS coordinate.
-func (c *ICRS) SetRV(rv unit.Velocity) { c.rv = rv }
+// Epoch returns the instant the position holds at, as
+// [NewICRSWithKinematics] was given it. It is zero, read as J2000.0, for a
+// position with no kinematics, which holds at every instant alike.
+func (c ICRS) Epoch() time.Time { return c.epoch }
 
 // IsZero reports whether this ICRS is the zero value (no coordinates set).
 func (c ICRS) IsZero() bool { return c.ra == 0 && c.dec == 0 && c.dist == 0 }
 
-// Astrometric returns a copy of this ICRS position as an Astrometric catalog entry,
-// carrying any attached kinematics (proper motion, parallax, radial velocity).
+// Astrometric returns this ICRS position as an Astrometric catalog entry at
+// J2000.0, the epoch SOFA's catalog routines take, carrying any attached
+// kinematics (proper motion, parallax, radial velocity). A position at
+// another epoch is moved to J2000.0 first.
 func (c ICRS) Astrometric() Astrometric {
+	c = c.atJ2000()
+
 	return Astrometric{
 		ra: c.ra, dec: c.dec,
 		pmRA: c.pmRA, pmDec: c.pmDec,
@@ -520,13 +529,6 @@ func (c *CIRS) FromUnitVector(v vector.Vec3) {
 }
 
 // FromUnitVector converts the unit vector to the coordinate.
-func (c *ICRS) FromUnitVector(v vector.Vec3) {
-	lon, lat := v.ToSpherical()
-	c.ra = angle.Rad(lon)
-	c.dec = angle.Rad(lat)
-}
-
-// FromUnitVector converts the unit vector to the coordinate.
 func (c *Galactic) FromUnitVector(v vector.Vec3) {
 	lon, lat := v.ToSpherical()
 	c.l = angle.Rad(lon)
@@ -667,19 +669,19 @@ func PositionAngle(from, to ICRS) angle.Angle {
 
 // PropagateEpoch applies rigorous SOFA space-motion propagation (proper
 // motion, parallax, light-time/relativistic correction via Pmsafe) to move
-// an ICRS position with kinematics from fromEpoch to toEpoch. If c has no
-// proper motion, parallax, or radial velocity, the position is returned
-// unchanged — propagation over any interval is a no-op for a motionless
-// point. A zero fromEpoch or toEpoch (time.Time{}) is treated as
-// time.J2000(), matching the epoch convention most catalogs cross-matched
-// against assume when they don't report one explicitly.
+// an ICRS position with kinematics from its own [ICRS.Epoch] to to, and the
+// result holds at to. If c has no proper motion, parallax, or radial
+// velocity, the position is returned unchanged — propagation over any
+// interval is a no-op for a motionless point. A zero epoch, c's or to, is
+// J2000.0.
 //
 // This is rigorous relativistic space-motion propagation (good to
 // sub-milliarcsecond over the years-to-decades spans catalog cross-matching
 // needs) — a different problem from Context.SetTime's O(1) approximate
 // short-span Earth-rotation update, which re-derives observer-frame state,
 // not a star's own kinematics.
-func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
+func PropagateEpoch(c ICRS, to time.Time) (ICRS, error) {
+	fromEpoch, toEpoch := c.epoch, to
 	if fromEpoch.IsZero() {
 		fromEpoch = time.J2000()
 	}
@@ -711,8 +713,27 @@ func PropagateEpoch(c ICRS, fromEpoch, toEpoch time.Time) (ICRS, error) {
 		angle.Rad(ra2), angle.Rad(dec2),
 		pmRACosDec(pmr2, angle.Rad(dec2)), angle.Rad(pmd2),
 		angle.Arcsec(px2), unit.KmPerSec(rv2),
+		toEpoch,
 	)
-	out.SetDist(c.Dist())
+	out.dist = c.dist
 
 	return out, nil
+}
+
+// atJ2000 is c moved to J2000.0, where SOFA's catalog routines take a star,
+// or c itself when it has no kinematics or is already there.
+//
+// Pmsafe fails only with SOFA's "system error, should not occur"; c is
+// returned as it is then, since this has no error to report it through.
+func (c ICRS) atJ2000() ICRS {
+	if !c.hasKinematics || c.epoch.IsZero() || c.epoch.Equal(time.J2000()) {
+		return c
+	}
+
+	moved, err := PropagateEpoch(c, time.J2000())
+	if err != nil {
+		return c
+	}
+
+	return moved
 }

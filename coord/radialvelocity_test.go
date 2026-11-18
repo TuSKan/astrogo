@@ -147,8 +147,7 @@ func TestBarycentricRVCorrection_PerpendicularTargetIsZero(t *testing.T) {
 	// plane), so this is safe without a parallelism check.
 	perp := vUnit.Cross(vector.V3(0, 0, 1)).Unit()
 
-	var target coord.ICRS
-	target.FromUnitVector(perp)
+	target := coord.ICRSFromUnitVector(perp)
 
 	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 	testutil.AssertNear(t, "perpendicular-target correction", corr, 0, 1e-9)
@@ -167,8 +166,7 @@ func TestBarycentricRVCorrection_AntipodalTargetsFlipSign(t *testing.T) {
 
 	target := coord.NewICRS(angle.Deg(37), angle.Deg(-12))
 
-	var antipodal coord.ICRS
-	antipodal.FromUnitVector(target.ToUnitVector().MulScalar(-1))
+	antipodal := coord.ICRSFromUnitVector(target.ToUnitVector().MulScalar(-1))
 
 	corr := ctx.BarycentricRVCorrection(target).KmPerSec()
 	antipodalCorr := ctx.BarycentricRVCorrection(antipodal).KmPerSec()

@@ -45,14 +45,13 @@ type ConeRequest struct {
 	// unchanged. Providers that don't support table selection ignore this
 	// field entirely.
 	Table string
-	// Center is the coordinate to search around.
-	Center coord.ICRS
-	// Epoch is the epoch Center is given at, the zero Time meaning J2000.
-	// A provider whose catalog is at another epoch searches around Center
+	// Center is the coordinate to search around, at its own epoch. A
+	// provider whose catalog is at another epoch searches around Center
 	// moved there by Center's own proper motion, so a moving star is
 	// sought where that catalog has it: Barnard's star is 166″ from its
-	// J2000 position in Gaia DR3. A Center without one is searched as given.
-	Epoch time.Time
+	// J2000 position in Gaia DR3. A Center without kinematics is searched
+	// as given.
+	Center coord.ICRS
 	// Radius is the search radius.
 	Radius angle.Angle
 	// Limit is the maximum number of results to return.

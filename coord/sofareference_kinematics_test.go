@@ -93,7 +93,7 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 				pmRA, pmDec := angle.Arcsec(st.pmRAmas/1000), angle.Arcsec(st.pmDecmas/1000)
 				px := angle.Arcsec(st.pxmas / 1000)
 
-				got, err := ctx.ICRSToAltAz(coord.NewICRSWithKinematics(ra, dec, pmRA, pmDec, px, unit.KmPerSec(st.rvKmS)))
+				got, err := ctx.ICRSToAltAz(coord.NewICRSWithKinematics(ra, dec, pmRA, pmDec, px, unit.KmPerSec(st.rvKmS), time.J2000()))
 				if err != nil {
 					t.Fatalf("%s: ICRSToAltAz: %v", st.name, err)
 				}
