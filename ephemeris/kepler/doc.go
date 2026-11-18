@@ -19,9 +19,9 @@
 // [FromPerihelion] takes a perihelion distance and time, the form the Minor
 // Planet Center publishes comets in, and accepts any e >= 0. [FromState]
 // takes a state vector instead, any conic, about whatever center it is given. That matters
-// because the comets people observe are near-parabolic: 118 of the 959 in
-// the MPC's comet file had e >= 1 when #374 counted them, among them
-// C/2023 A3, C/2022 E3 and C/2021 A1.
+// because the comets people observe are near-parabolic: in one count of the
+// MPC's comet file, 118 of 959 had e >= 1, among them C/2023 A3, C/2022 E3
+// and C/2021 A1.
 //
 // A set built by FromPerihelion is propagated by universal variables from its
 // perihelion state, one path for the ellipse, the parabola and the hyperbola
@@ -62,7 +62,7 @@
 // is wrong by 12% at Pluto.
 //
 // A heliocentric set given to [Provider.Register] can be stored about the
-// Solar System barycenter instead (#803). Far from the Sun the planets pull
+// Solar System barycenter instead. Far from the Sun the planets pull
 // the Sun about as hard as they pull the body, and a two-body fit about the
 // barycenter, with the Sun and every planet inside the body's distance as its
 // mass, leaves out far less. Measured against Horizons 30 days from the

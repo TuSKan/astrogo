@@ -32,10 +32,8 @@ var ErrPropagation = errors.New("satellite: sgp4 propagation failed")
 // ErrUnexpectedID indicates Locate was asked for a body other than the
 // satellite this provider tracks. A *Satellite is single-purpose (one
 // instance = one object), so id must be its own, [Satellite.ID]; any other
-// id — including a real NAIF ID like a Sun/Moon lookup — used to be silently
-// ignored and answered with this satellite's own state instead of an error,
-// which is exactly what made plan.Satellite.ApparentMagnitudeCtx's
-// Sun-position bug possible (see CHANGELOG).
+// id, a Sun or Moon lookup included, is this error rather than this
+// satellite's own state.
 var ErrUnexpectedID = errors.New("satellite: state queried for an id other than the tracked satellite's own")
 
 // ErrMalformedTLE indicates a two-line element set that is not well formed:
@@ -127,8 +125,7 @@ func NewFromTLE(name, line1, line2 string) (*Satellite, error) {
 }
 
 // ID is the satellite's NAIF code, −100000 − its NORAD catalog number: the
-// one id it locates. It used to answer for zero, which is the
-// Solar System barycenter's code now that an ID is a NAIF code (#809).
+// one id it locates.
 func (s *Satellite) ID() core.ID { return s.id }
 
 // Propagator returns the underlying SGP4 model.
@@ -227,11 +224,8 @@ func (s *Satellite) OrbitalPeriod() unit.Duration {
 // centimeters — so the TEME position gives the same height as any
 // Earth-fixed one.
 //
-// It used to be rotated first, by GAST. That bought nothing for the height,
-// cost a UT1 lookup (and with it a possible EOP load) and a full IAU
-// 2006/2000A nutation series per call, and was the wrong rotation besides:
-// TEME is on the mean equinox, so its Earth-fixed counterpart is GMST away,
-// not GAST (#512).
+// It is not rotated first: a rotation buys nothing for the height, and would
+// cost a UT1 lookup and a nutation series per call.
 func (s *Satellite) Altitude(t time.Time) (unit.Length, error) {
 	pos, _, err := s.propagateECI(t)
 	if err != nil {
@@ -269,21 +263,9 @@ func (s *Satellite) Altitude(t time.Time) (unit.Length, error) {
 // None of this validates the orbit. It establishes that the element set
 // arrived as it was sent, which is the part SGP4 cannot tell for itself.
 //
-// # What this used to be
-//
-// Eighty lines reproducing the old backend's own column slices and string
-// surgery, field for field, because that backend parsed them through helpers
-// that called log.Fatal on a parse error — os.Exit(1), from inside a library,
-// taking the caller's whole process with it. A program that fed one bad
-// element set into a batch of ten thousand simply stopped. Another forty lines
-// predicted a panic in its day-of-year arithmetic, which a fuzzer found in
-// about two seconds.
-//
-// None of that is needed now. [sgp4.ParseTLE] returns errors, names the field
-// that failed, and cannot exit anybody's process, so this is the two calls it
-// takes to ask both questions — and the reason it is still one function is
-// that "did this arrive intact" is exactly the question a caller reading a
-// network feed wants answered in one place.
+// It is [sgp4.VerifyTLEChecksums] and [sgp4.ParseTLE], which names the field
+// that failed, in one function, because "did this arrive intact" is the
+// question a caller reading a network feed wants answered in one place.
 func ValidateTLE(line1, line2 string) error {
 	if err := sgp4.VerifyTLEChecksums(line1, line2); err != nil {
 		return fmt.Errorf("%w: %w", ErrMalformedTLE, err)

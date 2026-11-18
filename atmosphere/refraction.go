@@ -64,11 +64,8 @@ type Refraction struct {
 // pressure set it resolves to [RefractionSOFA], and only a zero pressure means
 // a vacuum.
 //
-// That convention used to live in coord, which read Model == nil and reached
-// for SOFA's constants itself. atmosphere had no such default, so the meaning
-// of a zero value depended on which package consumed it, and anyone following
-// the documented pluggable-model API into env.Model.RefractFromTrue got a nil
-// dereference. The convention belongs here, with the type it describes.
+// The convention belongs here, with the type it describes, so a zero value
+// means the same in every package that reads it.
 func (r Refraction) EffectiveModel() RefractionModel {
 	switch {
 	case r.Model != nil:
@@ -88,12 +85,10 @@ const standardWavelength = 0.55
 // refraction is computed at, which is never zero.
 //
 // A zero Wavelength is the visual default, [StandardRefraction]'s 0.55 µm, as
-// a nil Model is the default model ([Refraction.EffectiveModel]). Until #904
-// a zero reached SOFA's iauRefco as given, which clamps a wavelength to its
-// domain of 0.1 µm and up: deep ultraviolet, where dry air refracts twice as
-// much as in the visible. Every [Builder]-made Atmosphere carried that zero,
-// so its refraction was twice the real one from 10° to the zenith, while
-// [RefractionBennett] read the same zero as its own 0.50169 µm.
+// a nil Model is the default model ([Refraction.EffectiveModel]). Passed to
+// SOFA's iauRefco as given, a zero would be clamped to its domain of 0.1 µm
+// and up: deep ultraviolet, where dry air refracts twice as much as in the
+// visible.
 func (r Refraction) EffectiveWavelength() float64 {
 	if r.Wavelength == 0 {
 		return standardWavelength
@@ -116,12 +111,11 @@ var ErrRefraction = errors.New("atmosphere: refraction needs a finite pressure o
 // # Why air that fails it refracts as NaN
 //
 // SOFA's iauRefco clamps each input to its domain with a comparison, and NaN
-// fails every comparison, so a NaN came out as the clamp's bound: a NaN
-// temperature refracted as −150 °C, 2.35 times the real refraction at 20°, a
-// NaN wavelength as 0.1 µm, an infinite pressure as 10,000 hPa. Each was a
-// finite, plausible, wrong number (#903). Refraction's own methods and the
-// models here now return NaN for air that fails Validate, so a bad input
-// cannot pass for a real one; a constructor that can return an error, such as
+// fails every comparison, so a NaN would come out as the clamp's bound: a NaN
+// temperature refracting as −150 °C, 2.35 times the real refraction at 20°, a
+// NaN wavelength as 0.1 µm, an infinite pressure as 10,000 hPa. Refraction's
+// own methods and the models here return NaN for air that fails Validate, so
+// a bad input cannot pass for a real one; a constructor that can return an error, such as
 // coord.NewContext, plan.NewSite for its horizon air or [Builder.Build],
 // refuses it instead.
 // Finite values inside these bounds but outside SOFA's domain, such as
@@ -299,9 +293,9 @@ func (RefractionSOFA) RefractFromApparent(obsAlt angle.Angle, env Refraction) an
 // [AtAltitude] at zero height.
 //
 // It is a function returning a fresh value, not a var, so that no importer
-// can change it for every other one in the process (#537): as a var, one
-// `atmosphere.StandardRefraction.Model = nil` anywhere in a program switched
-// every caller's refraction model.
+// can change it for every other one in the process: as a var, one
+// `atmosphere.StandardRefraction.Model = nil` anywhere in a program would
+// switch every caller's refraction model.
 func StandardRefraction() Refraction {
 	return Refraction{
 		Pressure:    1013.25,

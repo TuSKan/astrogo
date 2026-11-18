@@ -440,10 +440,10 @@ func cellString(v any) string {
 // kind with more candidates than that gives its 50 brightest followed by an
 // error wrapping [resolve.ErrTruncated], never a short list that looks
 // complete, and only a complete list is cached. queryBright sorts
-// server-side by H/M1 ascending before this cap is applied, so the
-// candidates kept are the lowest-H ones among those that could reach the
-// bound. Sorted without that bound, they were not: the lowest-H asteroids are
-// trans-Neptunian, and Juno, Hebe and Iris were cut at every bound (#779).
+// server-side by H/M1 ascending, among the objects that could reach the
+// bound, before this cap is applied, so the candidates kept are the lowest-H
+// of those. Sorted without the bound, the lowest-H asteroids would be
+// trans-Neptunian, and Juno, Hebe and Iris would be cut at every bound.
 func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) resolve.SeqIterator[resolve.Target] {
 	cacheKey := fmt.Sprintf("bright:%f:%d", req.MaxVMag, req.Limit)
 	if dated := !req.At.IsZero(); dated {

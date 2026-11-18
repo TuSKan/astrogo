@@ -84,12 +84,12 @@ const searchLimit = 10
 //
 // Horizons also searches its major bodies first and looks no further once
 // anything there matches, so an asteroid whose name occurs inside a major
-// body's never surfaced: "Eros" came back as Pluto's moon Kerberos and
+// body's would never surface: "Eros" comes back as Pluto's moon Kerberos and
 // "Hebe" as Jupiter's Thebe, each as an unambiguous single match. When no
 // target carries the query as a whole word, Search asks again with a
 // trailing semicolon, Horizons' own syntax for small bodies only, and keeps
-// that answer when it has one (#618). A query that does name a major body,
-// "Juno" for the spacecraft, is answered as it was.
+// that answer when it has one. A query that does name a major body, "Juno"
+// for the spacecraft, is answered with that body.
 func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, error) {
 	targets, err := p.drain(ctx, query)
 	if err != nil {

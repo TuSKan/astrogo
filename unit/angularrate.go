@@ -24,9 +24,8 @@ var (
 // AngularRate is an angular speed, stored in radians per second.
 //
 // A mount slews in degrees per second and a satellite's mean motion is
-// counted in revolutions per day, and both crossed the API as bare float64
-// with the unit in a doc comment (#130). The two differ from radians per
-// second by factors of 57 and 13751.
+// counted in revolutions per day, and the two differ from radians per second
+// by factors of 57 and 13751.
 //
 // There is no AngularRateFrom: a radian is dimensionless in this package's
 // table, so radians per second is dimensionally a frequency, and a

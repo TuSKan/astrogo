@@ -92,8 +92,7 @@ func (u Unit) String() string {
 // They stay vars rather than accessors because they appear in composite
 // literals and arithmetic all through the module, where unit.Meter() would
 // read worse for no gain in a value nothing in astrogo assigns. docsguard's
-// inventory of exported vars lists this family and why it is one (#537);
-// this comment used to call them immutable, which they are not.
+// inventory of exported vars lists this family and why it is one.
 var (
 	// Meter is the SI base unit of length.
 	Meter = Unit{Dimension: dim.Length, ScaleFactor: 1.0, Name: "meter", Symbol: "m"}

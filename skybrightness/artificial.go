@@ -87,10 +87,7 @@ var (
 // distant city come out brighter than a near one — by two orders of
 // magnitude at 80 km against 20 km under ordinary aerosol loading. Applying
 // the transmission that belongs with it restores the expected fall-off, as
-// TestKocifaj2022Eq2FallsWithDistance checks. An earlier revision of this
-// package withdrew the kernel over exactly that behavior before the
-// contract was understood; the equation was right and the reading of it
-// was wrong.
+// TestKocifaj2022Eq2FallsWithDistance checks.
 //
 // The removable singularity at M_S = M(z) — looking at the horizon in the
 // source's azimuth, where the two airmasses coincide — is evaluated as

@@ -69,7 +69,7 @@ func New(opts ...Option) *Provider {
 // them first. A Provider with id already registered silently overwrites
 // the prior entry — the same last-write-wins semantics a plain map has.
 //
-// It also chooses the center the orbit is fitted about (#803). A
+// It also chooses the center the orbit is fitted about. A
 // heliocentric set is kept about the Sun, or refit through its state at the
 // osculation epoch about the Solar System barycenter, with the Sun and every
 // planet inside the body's distance as the central mass, whichever leaves the
@@ -104,8 +104,6 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // ([Elements.CentralBody]). A body with no elements registered is the base
 // provider's to locate.
 //
-// It used to answer geocentric, placing a heliocentric orbit against the
-// base's Sun, and before #810 against SOFA's Epv00 whatever the base was.
 // Located about its own center, the orbit meets the Earth, the Sun and any
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
@@ -150,8 +148,8 @@ func (p *Provider) Close() error { return nil }
 // 1800-2050, so the orbit they describe about the Sun is the approximation,
 // and their state at J2000 is not Pluto's. [Provider.Register] keeps them
 // about the Sun for that reason. Refit about the barycenter through that
-// state, as a far body's osculating set would be, they missed DE440 by up to
-// 1.96 AU over the window, against 0.14 about the Sun (#877).
+// state, as a far body's osculating set would be, they would miss DE440 by up
+// to 1.96 AU over the window, against 0.14 about the Sun.
 //
 // They live here rather than a layer up because the default base needs them:
 // SOFA has no analytical Pluto, and without one a satellite registered about
@@ -159,7 +157,7 @@ func (p *Provider) Close() error { return nil }
 // satellite through its parent.
 //
 // It returns a copy, not a var, so that no importer can change Pluto's orbit
-// for every other one in the process (#537).
+// for every other one in the process.
 func PlutoElements() Elements { return plutoElements }
 
 // plutoElements is the value PlutoElements returns, built once.

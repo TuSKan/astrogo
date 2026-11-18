@@ -74,7 +74,7 @@ import (
 // an early break, so a caller taking the first fifty rows of the 317 MB file
 // pays for fifty rows.
 //
-// A copy that cannot be read is not kept (#1014). A download is read in full
+// A copy that cannot be read is not kept. A download is read in full
 // before it is cached, and one that [Read] cannot finish, or that holds no
 // orbit row at all (an error page served in its place reads as nothing but
 // skipped lines), is refused: its error is this call's, and the MPC's copy is

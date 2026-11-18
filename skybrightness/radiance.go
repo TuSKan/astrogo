@@ -95,8 +95,7 @@ type Component interface {
 //
 // The zero value is no flags and an unknown uncertainty. That default is the
 // point: a component that says nothing about its uncertainty reports an
-// unknown one, never a perfectly certain one, which is what the budget held
-// before #911.
+// unknown one, never a perfectly certain one.
 type Contribution struct {
 	// Flags are the quality flags that apply to what was just computed.
 	Flags Flag

@@ -28,22 +28,18 @@ type File interface {
 //
 // # Why astrogo defines these at all
 //
-// This package's doc comment used to say, correctly, that "io/fs has no write
-// contract by design (golang/go#45757), and os.Root settled on the same 'read
-// via fs.FS, write via a concrete type' shape; this package does not invent
-// one." That was right while writes went through *blob.Bucket's own concrete
-// methods.
-//
-// It stops being available once the concrete type goes. astrogo picks a backend
-// by URL scheme at run time, so the thing the registry returns has to be
-// writable polymorphically or not at all — and "not at all" would mean the
-// cache could not be written, which is the entire point of the layer.
+// io/fs has no write contract, by design (golang/go#45757), and os.Root
+// settled on reading through fs.FS and writing through a concrete type. That
+// is not available here: astrogo picks a backend by URL scheme at run time,
+// so the thing the registry returns has to be writable polymorphically or not
+// at all — and "not at all" would mean the cache could not be written, which
+// is the entire point of the layer.
 //
 // So these are defined, and the shape of them is the standard library's own
 // idiom rather than an invention: small, single-method, discovered by type
 // assertion, exactly as [fs.StatFS], [fs.ReadDirFS] and [fs.SubFS] are. They
-// are local to astrogo and make no claim to be the general answer #45757 is
-// still looking for. github.com/wolfeidau/s3iofs reaches the same two
+// are local to astrogo and make no claim to be the general answer
+// golang/go#45757 is still looking for. github.com/wolfeidau/s3iofs reaches the same two
 // conclusions independently, with the same names for two of them.
 type (
 	// CreateFS is a filesystem that can be written to, one stream at a time.
@@ -63,15 +59,7 @@ type (
 	// on, and the reason it is a separate interface from [CreateFS] is that
 	// exclusivity is a real capability a backend either has or has not.
 	//
-	// # This is stronger than what it replaces
-	//
-	// The lock used to be gocloud's WriterOptions.IfNotExist, described in
-	// astrogo's own code as "on S3 a genuinely atomic conditional PUT, on
-	// fileblob a Stat-then-Rename that is best-effort and can admit a second
-	// holder". The residual race was tracked as #241 and papered over by a
-	// double-check after acquiring.
-	//
-	// There is no need to concede it. O_CREATE|O_EXCL is atomic in the kernel
+	// O_CREATE|O_EXCL is atomic in the kernel
 	// on every platform astrogo supports, and [os.Root] provides it inside a
 	// confined tree, so the local backend's implementation is exact rather than
 	// best-effort. A backend that cannot offer the guarantee does not implement

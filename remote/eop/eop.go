@@ -9,11 +9,9 @@
 //
 // # Why it is a separate package
 //
-// The dependency between time and remote runs backwards here, and has to.
-// astrogo/time used to import remote to fetch EOP data, which meant that
-// computing a Julian date linked gocloud, gRPC and protobuf — about 17 MB
-// of binary for arithmetic that touches none of it. So remote registers a
-// loader into time rather than time reaching for remote.
+// The dependency between time and remote runs backwards here, and has to:
+// computing a Julian date must link no storage or network stack, so remote
+// registers a loader into time rather than time reaching for remote.
 //
 // That registration is an init(), and an init() has to belong to some
 // package. It cannot be remote's own: this code needs remote.GetFile and

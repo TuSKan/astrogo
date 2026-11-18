@@ -9,8 +9,8 @@ import "errors"
 // the attempts ran out or were disabled. It is what lets a caller tell a
 // transient outage from a request that will never succeed.
 //
-// It lives here rather than in the parent because this package no longer
-// imports it — that is what lets the parent import this one and be the single
+// It lives here rather than in the parent because this package does not
+// import the parent — that is what lets the parent import this one and be the single
 // door a caller knocks on. [github.com/TuSKan/astrogo/remote] re-exports it
 // under its own name, so an errors.Is against remote.ErrRetriable keeps
 // matching and no caller learns this package exists.
