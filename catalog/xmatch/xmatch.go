@@ -28,8 +28,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Pair is one cross-matched pair of Targets, one from each of Match's two
@@ -53,8 +51,9 @@ const defaultPositionMatchThresholdArcsec = 2.0
 
 // WithPositionMatchThreshold sets the maximum angular separation, at a
 // common epoch, at which two Targets sharing no alias or ID are still
-// considered the same object. See Match for which epoch that is.
-// Default: 2 arcsec.
+// considered the same object, where either publishes no position error. See
+// Match for which epoch that is, and for how two Targets that both publish
+// one are compared. Default: 2 arcsec.
 func WithPositionMatchThreshold(threshold angle.Angle) Option {
 	return func(c *config) { c.positionMatchThreshold = threshold }
 }
@@ -90,10 +89,15 @@ type item struct {
 //     candidate in the other slice at a common epoch, carrying each
 //     Target's own proper motion: J2000 when both move, the unmoving one's
 //     own epoch when only one does, since a row that publishes no motion
-//     cannot be moved, and as given when neither does. Pairs within
-//     WithPositionMatchThreshold are accepted closest first, each group
-//     pairing at most once, so the result does not depend on the order of
-//     either slice.
+//     cannot be moved, and as given when neither does. Two Targets that both
+//     publish their position errors, as resolve.AstrometricError holds them,
+//     are a candidate pair when D² = Δᵀ(C₁+C₂)⁻¹Δ is at most 11.83, the
+//     99.73% point of a χ² with two degrees of freedom: Δ is their offset on
+//     the plane tangent at the first, and C₁ and C₂ their covariances at
+//     that epoch. Two others are a candidate pair within
+//     WithPositionMatchThreshold. Candidate pairs are accepted closest
+//     first, each group pairing at most once, so the result does not depend
+//     on the order of either slice.
 //
 // A Target matching more than one candidate via the alias pass (e.g. a
 // duplicate row within one input slice) produces one Pair per cross-slice
@@ -182,10 +186,10 @@ func unpairedIndices(items []item, uf *unionFind) []int {
 }
 
 // unionByPosition pairs still-unpaired, trustworthy-coord items across the
-// two slices by position, compared at a common epoch (posmatch.Separation),
-// closest pair first: every cross-slice pair within threshold is a
-// candidate, and a candidate is accepted unless either side's group has
-// already been paired. Each group is therefore paired with at most one group
+// two slices by position, compared at a common epoch, closest pair first:
+// every cross-slice pair that may be one object, as posmatch.Compare decides
+// it, is a candidate, and a candidate is accepted unless either side's group
+// has already been paired. Each group is therefore paired with at most one group
 // from the other slice, and the result does not depend on input order.
 //
 // Until #728 each item in turn took its nearest partner not yet taken, so an
@@ -197,24 +201,12 @@ func unpairedIndices(items []item, uf *unionFind) []int {
 // bulk all-sky cross-match), the same reasoning catalog.go's own
 // unionByPosition documents.
 func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
-	// Each position carries its Target's own motion, which providers keep in
-	// the Target's fields rather than in Coord; see posmatch.Coord (#726).
-	type positioned struct {
-		idx   int
-		c     coord.ICRS
-		epoch time.Time
-	}
-
-	var side [2][]positioned
+	var side [2][]int
 
 	for _, i := range unpairedIndices(items, uf) {
-		t := items[i].target
-		if !trustworthyCoord(t) {
-			continue
+		if trustworthyCoord(items[i].target) {
+			side[items[i].origin] = append(side[items[i].origin], i)
 		}
-
-		o := items[i].origin
-		side[o] = append(side[o], positioned{idx: i, c: posmatch.Coord(t), epoch: t.Epoch})
 	}
 
 	type candidate struct {
@@ -224,14 +216,14 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 
 	var candidates []candidate
 
-	for _, pa := range side[0] {
-		for _, pb := range side[1] {
-			sep, err := posmatch.Separation(pa.c, pa.epoch, pb.c, pb.epoch)
-			if err != nil || sep > threshold {
+	for _, ia := range side[0] {
+		for _, ib := range side[1] {
+			ev, ok, err := posmatch.Compare(items[ia].target, items[ib].target, threshold)
+			if err != nil || !ok {
 				continue
 			}
 
-			candidates = append(candidates, candidate{a: pa.idx, b: pb.idx, sep: sep})
+			candidates = append(candidates, candidate{a: ia, b: ib, sep: ev.Separation})
 		}
 	}
 

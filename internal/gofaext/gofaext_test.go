@@ -20,6 +20,15 @@ func TestDtdb(t *testing.T) {
 	testutil.AssertNear(t, "Dtdb", got, -0.1280368005936998991e-2, 1e-15)
 }
 
+// TestTpxes is SOFA's own test vector (t_sofa_c.c, t_tpxes): the star at
+// (1.3, 1.55) projected about the tangent point (2.3, 1.5).
+func TestTpxes(t *testing.T) {
+	xi, eta, status := gofaext.Tpxes(1.3, 1.55, 2.3, 1.5)
+	testutil.AssertEqual(t, "status", status, 0)
+	testutil.AssertNear(t, "xi", xi, -0.01753200983236980595, 1e-15)
+	testutil.AssertNear(t, "eta", eta, 0.05962940005778712891, 1e-15)
+}
+
 func TestGofaExtWrappers(t *testing.T) {
 	// Dtf2d
 	d1, d2, st := gofaext.Dtf2d("UTC", 2000, 1, 1, 12, 0, 0.0)

@@ -134,10 +134,11 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	dec := strconv.FormatFloat(center.Dec().Degrees(), 'f', -1, 64)
 	radius := strconv.FormatFloat(rad, 'f', -1, 64)
 
-	// Query gaia source for ra, dec, pmra, pmdec, parallax
+	// Query gaia source for ra, dec, pmra, pmdec, parallax, the errors of
+	// the position and proper motion and their correlations.
 	// Ordered by an alias rather than by the DISTANCE expression itself, which
 	// ADQL 2.0 does not allow in ORDER BY.
-	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, radius)
+	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, ra_error, dec_error, pmra_error, pmdec_error, ra_dec_corr, ra_pmra_corr, ra_pmdec_corr, dec_pmra_corr, dec_pmdec_corr, pmra_pmdec_corr, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, radius)
 
 	// The archive is part of the key. Two providers over one cache would
 	// otherwise serve each other's answers, and the whole point of holding
@@ -373,14 +374,19 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 		return resolve.Target{}, false
 	}
 
+	// The designation is Gaia's own, as its designation column spells it,
+	// and the identity key every other catalog's cross-identification of
+	// the source carries: SIMBAD lists Barnard's star as "Gaia DR3
+	// 4472832130942575872". A bare source ID is in no naming scheme.
 	t := resolve.Target{
-		ID:       id,
-		Name:     "Gaia DR3 " + id,
-		Kind:     resolve.KindStar,
-		Coord:    coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
-		HasCoord: true,
-		Epoch:    gaiaDR3Epoch,
-		Catalog:  "Gaia DR3",
+		ID:          id,
+		Name:        "Gaia DR3 " + id,
+		Designation: "Gaia DR3 " + id,
+		Kind:        resolve.KindStar,
+		Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
+		HasCoord:    true,
+		Epoch:       gaiaDR3Epoch,
+		Catalog:     "Gaia DR3",
 	}
 
 	if v, ok := number("pmra"); ok {
@@ -394,6 +400,8 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 	if v, ok := number("parallax"); ok {
 		t.Parallax = angle.Arcsec(v / 1000.0)
 	}
+
+	t.AstrometricError = astrometricError(number)
 
 	// Johnson V from Gaia G and the BP−RP color.
 	gMag, okG := number("phot_g_mean_mag")
@@ -423,4 +431,32 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 	t.HasVMag = true
 
 	return t, true
+}
+
+// astrometricError reads a row's position and proper-motion errors, in mas
+// and mas/yr, and their correlations, through number. A cell the row does
+// not have is left zero, which AstrometricError reads as unpublished.
+func astrometricError(number func(string) (float64, bool)) resolve.AstrometricError {
+	mas := func(name string) angle.Angle {
+		v, _ := number(name)
+
+		return angle.Arcsec(v / 1000)
+	}
+
+	corr := func(name string) float64 {
+		v, _ := number(name)
+
+		return v
+	}
+
+	return resolve.AstrometricError{
+		RA: mas("ra_error"), Dec: mas("dec_error"),
+		PmRA: mas("pmra_error"), PmDec: mas("pmdec_error"),
+		RADec:     corr("ra_dec_corr"),
+		RAPmRA:    corr("ra_pmra_corr"),
+		RAPmDec:   corr("ra_pmdec_corr"),
+		DecPmRA:   corr("dec_pmra_corr"),
+		DecPmDec:  corr("dec_pmdec_corr"),
+		PmRAPmDec: corr("pmra_pmdec_corr"),
+	}
 }

@@ -89,8 +89,8 @@ type (
 
 // defaultPositionMatchThreshold is the maximum angular separation (after
 // epoch normalization) at which two Targets from different providers,
-// sharing no alias or ID, are still considered the same physical object.
-// 2 arcsec is generous against typical SIMBAD/OpenNGC/MAST-relayed position
+// sharing no alias or ID, are still considered the same physical object,
+// where either publishes no position error. 2 arcsec is generous against typical SIMBAD/OpenNGC/MAST-relayed position
 // precision, and tight against typical inter-object separation in dense
 // fields — see Resolver.PositionMatchThreshold to override it.
 var defaultPositionMatchThreshold = angle.Arcsec(2)
@@ -215,8 +215,12 @@ func (r *Resolver) Limit(n int) *Resolver {
 }
 
 // PositionMatchThreshold sets the maximum angular separation (after epoch
-// normalization) at which two Targets are considered the same object
-// (default 2 arcsec) and returns r for chaining.
+// normalization) at which two Targets sharing no identifier are considered
+// the same object, where either publishes no position error (default 2
+// arcsec), and returns r for chaining. Two Targets that both publish one
+// are compared by D² against their errors instead, as
+// [resolve.Association]'s D2 describes; a Target that matches two records
+// of one provider either way is matched with neither.
 func (r *Resolver) PositionMatchThreshold(threshold angle.Angle) *Resolver {
 	r.cfg.positionMatchThreshold = threshold
 	return r
@@ -445,10 +449,11 @@ func incompleteSearch(query string, failed, asked int, failures []error) error {
 func (r *Resolver) reconcile(ctx context.Context, candidates []candidate) []Target {
 	uf := newUnionFind(len(candidates))
 	links := unionByAlias(candidates, uf)
-	links = append(links, unionByPosition(candidates, uf, r.cfg.positionMatchThreshold)...)
+	joined, ambiguous := unionByPosition(candidates, uf, r.cfg.positionMatchThreshold)
+	links = append(links, joined...)
 
 	groups := groupCandidates(candidates, uf)
-	attachAssociations(groups, candidates, uf, links)
+	attachAssociations(groups, candidates, uf, links, ambiguous)
 
 	if len(r.coneSearchers) > 0 {
 		groups = r.bridgeConeSearch(ctx, groups)
@@ -469,9 +474,11 @@ type group struct {
 	associations []resolve.Association
 }
 
-// attachAssociations gives each group the evidence of the links inside it.
-// The groups are in groupCandidates' order, first-seen root first.
-func attachAssociations(groups []group, candidates []candidate, uf *unionFind, links []link) {
+// attachAssociations gives each group the evidence of the links inside it,
+// and each record of an ambiguous link the evidence of the record it was kept
+// apart from. The groups are in groupCandidates' order, first-seen root
+// first.
+func attachAssociations(groups []group, candidates []candidate, uf *unionFind, links, ambiguous []link) {
 	index := make(map[int]int, len(groups))
 
 	for i := range candidates {
@@ -483,6 +490,13 @@ func attachAssociations(groups []group, candidates []candidate, uf *unionFind, l
 	for _, l := range links {
 		g := index[uf.find(l.a)]
 		groups[g].associations = append(groups[g].associations, associationOf(candidates, l, resolve.Accepted))
+	}
+
+	for _, l := range ambiguous {
+		for _, end := range [2]int{l.a, l.b} {
+			g := index[uf.find(end)]
+			groups[g].associations = append(groups[g].associations, associationOf(candidates, l, resolve.Ambiguous))
+		}
 	}
 }
 
@@ -614,19 +628,23 @@ func singletonIndices(candidates []candidate, uf *unionFind) []int {
 	return out
 }
 
-// unionByPosition unions every pair of still-singleton, trustworthy-coord
-// candidates whose positions, compared at a common epoch (see
-// posmatch.Separation), lie within threshold. O(M²) over the
-// remaining singletons M, which is bounded by provider count (not catalog
-// size) at this point in the pipeline — appropriate at this scale; see
-// catalog/doc.go for the fuller justification against a spatial index.
+// unionByPosition joins still-singleton, trustworthy-coord candidates from
+// different providers whose positions may be one object, as posmatch.Compare
+// decides it: by D² where both publish their position errors, and within
+// threshold where either publishes none. O(M²) over the remaining singletons
+// M, which is bounded by what the providers answered one query with, not by
+// catalog size, so a spatial index would buy nothing here.
 //
-// It returns one link for each join it makes, with the separation.
-func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angle) []link {
-	var (
-		eligible []int
-		links    []link
-	)
+// A join that would make one object of two records from one provider is not
+// made, whether directly or through other records: every compatible pair
+// among the records such joins would connect is ambiguous instead, and each
+// of those records stays its own Target. A Gaia row within reach of a SIMBAD
+// star and of its companion is evidence of neither.
+//
+// It returns one link for each join it makes, and one for each pair it left
+// ambiguous, with the evidence of each.
+func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angle) (joined, ambiguous []link) {
+	var eligible []int
 
 	for _, i := range singletonIndices(candidates, uf) {
 		if trustworthyCoord(candidates[i].target, candidates[i].provider) {
@@ -634,24 +652,64 @@ func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angl
 		}
 	}
 
+	var compatible []link
+
 	for a := range eligible {
 		for b := a + 1; b < len(eligible); b++ {
 			i, j := eligible[a], eligible[b]
-			if uf.find(i) == uf.find(j) {
+			if candidates[i].provider == candidates[j].provider {
 				continue
 			}
 
-			sep, err := posmatch.Separation(
-				posmatch.Coord(candidates[i].target), candidates[i].target.Epoch,
-				posmatch.Coord(candidates[j].target), candidates[j].target.Epoch)
-			if err == nil && sep <= threshold {
-				uf.union(i, j)
-				links = append(links, link{a: i, b: j, sep: sep})
+			ev, ok, err := posmatch.Compare(candidates[i].target, candidates[j].target, threshold)
+			if err == nil && ok {
+				compatible = append(compatible, positionalLink(i, j, ev))
 			}
 		}
 	}
 
-	return links
+	// The records the compatible pairs connect, and whether any two of them
+	// come from one provider.
+	connected := newUnionFind(len(candidates))
+	for _, l := range compatible {
+		connected.union(l.a, l.b)
+	}
+
+	type member struct {
+		root     int
+		provider string
+	}
+
+	count := make(map[member]int, len(eligible))
+	split := make(map[int]bool)
+
+	for _, i := range eligible {
+		m := member{connected.find(i), candidates[i].provider}
+
+		count[m]++
+		if count[m] > 1 {
+			split[m.root] = true
+		}
+	}
+
+	for _, l := range compatible {
+		if split[connected.find(l.a)] {
+			ambiguous = append(ambiguous, l)
+
+			continue
+		}
+
+		uf.union(l.a, l.b)
+		joined = append(joined, l)
+	}
+
+	return joined, ambiguous
+}
+
+// positionalLink is the link between candidates i and j that a positional
+// comparison found.
+func positionalLink(i, j int, ev posmatch.Evidence) link {
+	return link{a: i, b: j, sep: ev.Separation, d2: ev.D2, hasD2: ev.HasD2}
 }
 
 // groupCandidates assembles union-find groups, preserving first-seen-root
@@ -686,10 +744,11 @@ func groupCandidates(candidates []candidate, uf *unionFind) []group {
 
 // ── ConeSearch bridge (Gaia/VizieR) ──────────────────────────────────────
 
-// anchorCoord returns the first trustworthy position in g, if any, at
-// J2000 and carrying its proper motion — the center a ConeSearch bridge
-// query is built around, which each catalog moves to its own epoch.
-func anchorCoord(g group) (coord.ICRS, bool) {
+// anchor returns the first candidate in g with a trustworthy position that
+// can be moved to J2000, and that position, carrying its proper motion: the
+// center a ConeSearch bridge query is built around, which each catalog moves
+// to its own epoch.
+func anchor(g group) (candidate, coord.ICRS, bool) {
 	for _, c := range g.candidates {
 		if !trustworthyCoord(c.target, c.provider) {
 			continue
@@ -700,10 +759,10 @@ func anchorCoord(g group) (coord.ICRS, bool) {
 			continue
 		}
 
-		return propagated, true
+		return c, propagated, true
 	}
 
-	return coord.ICRS{}, false
+	return candidate{}, coord.ICRS{}, false
 }
 
 // bridgeConeSearch fires a ConeSearch against every registered
@@ -720,8 +779,8 @@ func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group
 	var jobs []job
 
 	for i, g := range groups {
-		if anchor, ok := anchorCoord(g); ok {
-			jobs = append(jobs, job{i, anchor})
+		if _, center, ok := anchor(g); ok {
+			jobs = append(jobs, job{i, center})
 		}
 	}
 
@@ -780,52 +839,110 @@ func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group
 	return groups
 }
 
-// foldConeSearchResults filters newCandidates (a bridge query's raw
-// results, retrieved within the wider coneSearchRadiusFactor radius) down
-// to those genuinely within threshold of g's own anchor, and appends them
-// to g.
+// foldConeSearchResults adds to g the results of a bridge query that are
+// g's object. newCandidates were retrieved within the wider
+// coneSearchRadiusFactor radius.
+//
+// A result carrying one of g's identity keys is g's object by that
+// identifier. A result carrying none is compared with g's anchor record by
+// position, as posmatch.Compare decides it, and is g's object when the two
+// may be one. Either is added to g, unless g already holds that very record,
+// or adding it would make one object of two records from one provider: g
+// already holds a record from the result's provider, or another result from
+// that provider is g's object too. Such a result stays out of g, and the
+// association is kept as ambiguous. A close binary's two Gaia rows within
+// reach of one SIMBAD star are not both that star.
 func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.Angle) group {
-	anchor, ok := anchorCoord(g)
+	anchorCand, _, ok := anchor(g)
 	if !ok {
 		return g
 	}
 
+	held := make(map[resolve.SourceRecord]bool, len(g.candidates))
+	heldProvider := make(map[string]bool, len(g.candidates))
+	keyHolder := make(map[string]candidate)
+
+	for _, c := range g.candidates {
+		held[sourceOf(c)] = true
+		heldProvider[c.provider] = true
+
+		for _, k := range resolve.IdentityKeys(c.target) {
+			if _, ok := keyHolder[k]; !ok {
+				keyHolder[k] = c
+			}
+		}
+	}
+
+	type found struct {
+		nc candidate
+		as resolve.Association
+	}
+
+	var (
+		order    []string
+		matches  = make(map[string][]found)
+		inResult = make(map[resolve.SourceRecord]bool)
+	)
+
 	for _, nc := range newCandidates {
-		if !trustworthyCoord(nc.target, nc.provider) {
+		src := sourceOf(nc)
+		if held[src] || inResult[src] {
 			continue
 		}
 
-		sep, err := posmatch.Separation(anchor, time.J2000(), posmatch.Coord(nc.target), nc.target.Epoch)
-		if err != nil {
-			continue
+		var as resolve.Association
+
+		if holder, key, ok := sharedKey(nc.target, keyHolder); ok {
+			as = associationOf([]candidate{holder, nc}, link{a: 0, b: 1, key: key}, resolve.Accepted)
+		} else {
+			if !trustworthyCoord(nc.target, nc.provider) {
+				continue
+			}
+
+			ev, ok, err := posmatch.Compare(anchorCand.target, nc.target, threshold)
+			if err != nil || !ok {
+				continue
+			}
+
+			as = associationOf([]candidate{anchorCand, nc}, positionalLink(0, 1, ev), resolve.Accepted)
 		}
 
-		if sep <= threshold {
-			g.associations = append(g.associations, resolve.Association{
-				From:         anchorSource(g),
-				To:           sourceOf(nc),
-				Relationship: resolve.SameObject,
-				Separation:   sep,
-				Authority:    "astrogo",
-				Status:       resolve.Accepted,
-			})
-			g.candidates = append(g.candidates, nc)
+		if _, seen := matches[nc.provider]; !seen {
+			order = append(order, nc.provider)
+		}
+
+		matches[nc.provider] = append(matches[nc.provider], found{nc, as})
+		inResult[src] = true
+	}
+
+	for _, provider := range order {
+		ms := matches[provider]
+		ambiguous := heldProvider[provider] || len(ms) > 1
+
+		for _, m := range ms {
+			if ambiguous {
+				m.as.Status = resolve.Ambiguous
+			} else {
+				g.candidates = append(g.candidates, m.nc)
+			}
+
+			g.associations = append(g.associations, m.as)
 		}
 	}
 
 	return g
 }
 
-// anchorSource is the source record of the candidate anchorCoord takes the
-// group's position from.
-func anchorSource(g group) resolve.SourceRecord {
-	for _, c := range g.candidates {
-		if trustworthyCoord(c.target, c.provider) {
-			return sourceOf(c)
+// sharedKey returns the first of t's identity keys that keyHolder holds, and
+// the record holding it.
+func sharedKey(t Target, keyHolder map[string]candidate) (candidate, string, bool) {
+	for _, k := range resolve.IdentityKeys(t) {
+		if c, ok := keyHolder[k]; ok {
+			return c, k, true
 		}
 	}
 
-	return resolve.SourceRecord{}
+	return candidate{}, "", false
 }
 
 // ── Field-level precedence merge ─────────────────────────────────────────
@@ -1035,6 +1152,11 @@ astrometry:
 			if c.target.PmDec != 0 {
 				merged.PmDec = c.target.PmDec
 				setProvenance(&merged, "PmDec", provider)
+			}
+
+			if e := c.target.AstrometricError; e.RA != 0 || e.Dec != 0 || e.PmRA != 0 || e.PmDec != 0 {
+				merged.AstrometricError = e
+				setProvenance(&merged, "AstrometricError", provider)
 			}
 
 			break astrometry

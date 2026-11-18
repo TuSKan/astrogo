@@ -178,6 +178,15 @@ func G2icrs(gl, gb float64) (ra, dec float64) {
 	return ra, dec
 }
 
+// Tpxes projects the direction (a, b) onto the plane tangent to the sphere
+// at (a0, b0), all in radians: xi points east and eta north, in radians of
+// the plane. status is SOFA's: 0 for a direction in front of the tangent
+// point, and nonzero for one too far from it, or behind it, to project.
+func Tpxes(a, b, a0, b0 float64) (xi, eta float64, status int) {
+	status = gofa.Tpxes(a, b, a0, b0, &xi, &eta)
+	return xi, eta, status
+}
+
 // Eceq06 converts Ecliptic to ICRS equatorial coordinates (IAU 2006).
 //
 // The direction is the one SOFA's name states - ecliptic to equatorial - and

@@ -173,6 +173,8 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 					t.HasRadialVelocity = true
 				}
 			}
+
+			t.AstrometricError = astrometricError(row, colIdx)
 			// V-band magnitude from allfluxes table. The column name is
 			// "V" (uppercase) in SIMBAD's live TAP response — confirmed
 			// directly against the real service, not "v".
@@ -321,6 +323,8 @@ func parseBright(r io.Reader) ([]resolve.Target, []int64, error) {
 					t.HasRadialVelocity = true
 				}
 			}
+
+			t.AstrometricError = astrometricError(row, colIdx)
 		}
 
 		// BuildBrightQuery aliases allfluxes.V to vmag (see its doc comment
