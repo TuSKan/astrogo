@@ -125,7 +125,7 @@ func main() {
 		log.Fatalf("NewContext: %v", err)
 	}
 
-	altaz, err := plan.LookAngle(prov, sat.ID(), ctx)
+	altaz, err := plan.LookAngle(sat, sat.ID(), ctx)
 	if err != nil {
 		log.Fatalf("LookAngle failed: %v", err)
 	}
@@ -154,7 +154,7 @@ func main() {
 		log.Fatalf("loc: %v", err)
 	}
 
-	passes, err := plan.SatellitePasses(prov, sat.ID(), target.Name, start, end, observer, minEl)
+	passes, err := plan.SatellitePasses(sat, sat.ID(), target.Name, start, end, observer, minEl)
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}
