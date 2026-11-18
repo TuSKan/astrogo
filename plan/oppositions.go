@@ -37,12 +37,10 @@ import (
 // it is within the solver's tolerance. The scan places both bodies to first
 // order in the light time, which leaves its alignment within a fraction of a
 // second of the apparent opposition, and two evaluations of the apparent
-// places then bracket that to the tolerance.
-//
-// Until #787 this sampled the apparent places of both bodies once a day.
-// Over 2000–2040 the two find the same oppositions of Mars, Jupiter, Saturn,
-// Uranus and Neptune, and over 2000–2004 the same Full Moons, within 0.3 s:
-// see TestOppositionsMatchADailyScan.
+// places then bracket that to the tolerance. Over 2000–2040 it finds the
+// oppositions of Mars, Jupiter, Saturn, Uranus and Neptune that a daily scan
+// of the apparent places finds, and over 2000–2004 its Full Moons, within
+// 0.3 s.
 func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,

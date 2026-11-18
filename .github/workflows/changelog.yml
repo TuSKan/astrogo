@@ -80,6 +80,12 @@ jobs:
       # is by what the pull request does, not only by its branch name: a
       # chore/release-vX.Y.Z branch that changes anything other than
       # CHANGELOG.md and fragment deletions still needs its own fragment.
+      #
+      # It also renders the week's results into docs/VALIDATION.md's generated
+      # accuracy table (docs/RELEASING.md, #1199). That is exempt only while
+      # everything outside the table's markers is as the base has it: the
+      # prose around the table states claims, and a change to a claim needs a
+      # fragment like any other.
       - name: Require a changelog fragment naming this pull request
         shell: bash
         env:
@@ -116,12 +122,19 @@ jobs:
             other=$(git diff --name-status --no-renames "$BASE_SHA" HEAD |
               grep -vE '^M[[:space:]]+CHANGELOG\.md$|^D[[:space:]]+docs/changelog\.d/[0-9]+-[^/]+\.md$' || true)
 
+            outside_table() { sed '/^<!-- BEGIN GENERATED ACCURACY/,/^<!-- END GENERATED ACCURACY -->$/d'; }
+
+            if grep -qE '^M[[:space:]]+docs/VALIDATION\.md$' <<<"$other" &&
+              cmp -s <(git show "$BASE_SHA:docs/VALIDATION.md" | outside_table) <(outside_table < docs/VALIDATION.md); then
+              other=$(grep -vE '^M[[:space:]]+docs/VALIDATION\.md$' <<<"$other" || true)
+            fi
+
             if [[ -z "$other" ]]; then
-              echo "Release pull request: it folds the fragments into CHANGELOG.md and adds none."
+              echo "Release pull request: it folds the fragments into CHANGELOG.md and adds none, and changes nothing else but the generated accuracy table."
               exit 0
             fi
 
-            echo "A release branch, but it changes more than CHANGELOG.md and fragment deletions:"
+            echo "A release branch, but it changes more than CHANGELOG.md, fragment deletions and the generated accuracy table:"
             echo "$other"
           fi
 

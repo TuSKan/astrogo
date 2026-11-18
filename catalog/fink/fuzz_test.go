@@ -17,8 +17,7 @@ import (
 // JSON and the SSOFT Parquet table, which arrive from the same endpoint and are
 // told apart by what was asked for. Resolve tries the first and falls back to
 // the second, so what the fuzzer decodes reaches the JSON field readers, the
-// staged Parquet file, Arrow's decoder, the column readers and the record
-// filter (#1057).
+// Parquet decoder, the column conversions and the record filter (#1057).
 //
 // The property is the one every parser of someone else's bytes here is held
 // to: it returns, and never panics. A target it resolves always has an ID, and

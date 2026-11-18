@@ -358,8 +358,8 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 // geocenter.
 //
 // The phase angle i is the Sun–Moon–Earth angle: 0° at full, near 180° at new.
-// It is not the elongation ψ, the Sun–Earth–Moon angle, which this returned in
-// its place until #416. The triangle's third angle, at the Sun, reaches 0.15°,
+// It is not the elongation ψ, the Sun–Earth–Moon angle. The triangle's third
+// angle, at the Sun, reaches 0.15°,
 // so i falls short of 180° − ψ by up to that much. The fraction is
 // k = (1 + cos i)/2 (Meeus, Astronomical Algorithms, 2nd ed., eq. 48.1), which
 // at first quarter is 0.5013, not 0.5.
@@ -594,15 +594,12 @@ type EclipseEvent struct {
 	// radii: for the Sun, the shadow axis's distance from Earth's center; for
 	// the Moon, the distance of the Moon's center from the axis of Earth's
 	// shadow. It is positive when the axis passes north of Earth's center, or
-	// the Moon north of the axis, and negative south. Until #1165 it was that
-	// distance as a fraction of the one at which the eclipse would just graze,
-	// with no sign: a different number under the canon's name.
+	// the Moon north of the axis, and negative south.
 	Gamma float64
 
 	// Kind is the eclipse's kind, decided as the canon decides it: for the
 	// Moon by the umbral magnitude, for the Sun by whether the umbra or the
-	// antumbra reaches the Earth, and where. Until #405 there was none, and
-	// callers guessed it from EclipticLatitude, which cannot know it.
+	// antumbra reaches the Earth, and where.
 	Kind EclipseKind
 
 	// Magnitude is the canon's eclipse magnitude at greatest eclipse.
@@ -651,10 +648,6 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 // canon the two agree on every one. Time is greatest eclipse, when the Moon's
 // center passes closest to the shadow axis, and Gamma is that closest distance
 // as the canon gives it. EclipticLatitude is the Moon's, at greatest eclipse.
-//
-// Until #401 an eclipse was any Full Moon within a fixed 1.58° of ecliptic
-// latitude, which is not a property of the shadow: it reported eclipses that
-// do not happen and missed some that do.
 func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	if prov == nil {
 		prov = eph.Default()
@@ -733,9 +726,6 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 // eclipse, when the shadow's axis passes closest to Earth's center, and Gamma
 // is that closest distance as the canon gives it. EclipticLatitude is the
 // Moon's, at greatest eclipse.
-//
-// Until #401 an eclipse was any New Moon within a fixed 1.58° of ecliptic
-// latitude, which reported eclipses that do not happen.
 func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
 	if prov == nil {
 		prov = eph.Default()

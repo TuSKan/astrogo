@@ -28,11 +28,10 @@ const meanSolarLongitudeDegPerDay = 360.0 / 365.25
 // and year-independent (a calendar date drifts by up to a day year to
 // year).
 //
-// IMO gives every solar longitude "for the equinox 2000.0", so that is
-// what they are compared with (sunLongitudeJ2000). Until #415 they were
-// compared with the Sun's longitude of date, 0.37° further on in 2026 by
-// general precession, and every window and peak came about 9 hours early,
-// drifting 20 minutes further each year.
+// IMO gives every solar longitude for the equinox 2000.0, so they are
+// compared with the Sun's J2000 longitude, not its longitude of date, which
+// general precession carries 0.37° further on by 2026: about 9 hours of the
+// Sun's motion.
 type MeteorShower struct {
 	// Name is the shower's common name (e.g. "Perseids").
 	Name string
@@ -359,9 +358,6 @@ func (m MeteorShower) Radiant(t time.Time, prov eph.Provider) (*Star, error) {
 // ZHRAt returns m's zenithal hourly rate at time t: m.ZHR, the rate at the
 // maximum, times m.Activity at the Sun's J2000 longitude, and zero outside
 // [m.ActiveStartSolarLon, m.ActiveEndSolarLon].
-//
-// Until #572 nothing used the date: ObservedRate gave the maximum rate on
-// every night of the year, 97 Perseids an hour on 1 March from 45°N.
 func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
 	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
