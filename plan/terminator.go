@@ -60,11 +60,10 @@ func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // the Moon's apparent position (see coord.SubPoint), taken to first order as
 // SubsolarPoint's is.
 //
-// Until #579 it was the point whose normal was merely parallel to the
-// Moon's geocentric direction, which treats the Moon as infinitely far. At
-// 60 Earth radii it is not: the Moon there sat up to about 10″ from the
-// zenith, 0.3 km from the point returned now, and 4.3″ in latitude from
-// Skyfield's subpoint_of on 2026-03-20.
+// It is not the point whose normal is merely parallel to the Moon's
+// geocentric direction, which treats the Moon as infinitely far: at 60 Earth
+// radii that leaves the Moon up to about 10″ from the zenith, 0.3 km from
+// this point.
 func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()

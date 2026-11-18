@@ -41,9 +41,6 @@ type SwapOptimizedStrategy struct {
 	// TabuTenure is the number of passes a swap pair stays tabu. Zero, the
 	// zero value, means the default of 3; a negative value disables tabu
 	// search.
-	//
-	// Until #733 this said "Set to 0 to disable tabu search", which no value
-	// could do: zero and every negative value both became 3.
 	TabuTenure int
 }
 

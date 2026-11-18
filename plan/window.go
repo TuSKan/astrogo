@@ -11,9 +11,8 @@ import (
 // A window whose End is before its Start holds no instant, and every function
 // here treats it as empty: it overlaps nothing, Union drops it, and so
 // Intersect, Subtract and TotalDuration, which all normalize through Union,
-// act as if it were not there. Until #421 it was subtracted from as if whole,
-// counted as negative time, and returned by Union beside a window it
-// overlapped. Only Duration still reports it, as a negative length.
+// act as if it were not there. Only Duration reports it, as a negative
+// length.
 type Window struct {
 	Start time.Time
 	End   time.Time

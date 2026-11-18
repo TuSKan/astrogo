@@ -22,14 +22,9 @@ const defaultLimMagRamp = 0.5
 // SkyDepth reports how faint a source can be at a pointing and an instant and
 // still be detected.
 //
-// # Why this interface is declared here rather than imported
-//
-// Because it is the whole of what a constraint needs, and declaring it here
-// means the planning engine depends on no sky-brightness code at all — not
-// the engine, not its datasets, not a photometric system. An earlier version
-// of this constraint took a concrete sky-brightness type and needed a bespoke
-// import test to keep that dependency from spreading; this needs no test,
-// because there is no import to police.
+// It is the whole of what a constraint needs, declared here so that plan
+// depends on no sky-brightness code: not the engine, not its datasets, not a
+// photometric system.
 //
 // It also leaves the hard part where it belongs. A limiting magnitude is not
 // a property of the sky: it is a threshold against the sky, and it depends on

@@ -67,9 +67,9 @@ func (r ssoftRow) numberText() string {
 // FINK never sends, so every test passed while every asteroid in the real
 // table was read as number 0 (#596).
 //
-// Written through the same Arrow parquet stack the reader uses, so a schema the
-// writer accepts is one the reader can open — the alternative, a hand-rolled
-// byte fixture, would test this package against a file format nobody produces.
+// Written with arrow-go's Parquet writer, so the file is one a real writer
+// produces — the alternative, a hand-rolled byte fixture, would test this
+// package against a file format nobody produces.
 func ssoftParquet(tb testing.TB, rows []ssoftRow) []byte {
 	tb.Helper()
 
