@@ -164,7 +164,7 @@ func TestSourceSelection(t *testing.T) {
 	})
 
 	t.Run("Unsupported", func(t *testing.T) {
-		unsupported := []core.Source{core.Satellites, core.Stations}
+		unsupported := []core.Source{"satellites", "stations", "nonsense"}
 		for _, s := range unsupported {
 			_, err := jpl.NewProvider(context.Background(), s, "")
 			if err == nil {

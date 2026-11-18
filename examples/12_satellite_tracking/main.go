@@ -64,29 +64,23 @@ func main() {
 	// ═══════════════════════════════════════════════════════════════════════
 	// 2. Create Provider from Target TLE
 	// ═══════════════════════════════════════════════════════════════════════
-	prov, err := eph.NewProvider(context.Background(), eph.Satellites, target.Name,
-		eph.WithTLE(target.TLELine1, target.TLELine2))
+	// A *satellite.Satellite is a provider of its own position. Its ID is its
+	// NAIF code, -100000 minus the NORAD catalog number, and the one id it
+	// answers for.
+	sat, err := satellite.NewFromTLE(target.Name, target.TLELine1, target.TLELine2)
 	if err != nil {
 		log.Fatalf("Failed to create satellite provider: %v", err)
 	}
 	defer func() {
-		err := prov.Close()
+		err := sat.Close()
 		if err != nil {
 			log.Printf("failed to close provider: %v", err)
 		}
 	}()
 
-	// A Satellites provider is a *satellite.Satellite. Its ID is its NAIF
-	// code, -100000 minus the NORAD catalog number, and the one id it
-	// answers for.
-	sat, ok := prov.(*satellite.Satellite)
-	if !ok {
-		log.Fatalf("a Satellites provider should be a *satellite.Satellite, got %T", prov)
-	}
-
 	// The same composition as for JPL planets: the satellite about the Earth,
 	// at one instant.
-	state, err := eph.At(prov, now).Geometric(sat.ID(), eph.Earth)
+	state, err := eph.At(sat, now).Geometric(sat.ID(), eph.Earth)
 	if err != nil {
 		log.Fatalf("Geometric failed: %v", err)
 	}
@@ -131,7 +125,7 @@ func main() {
 		log.Fatalf("NewContext: %v", err)
 	}
 
-	altaz, err := plan.LookAngle(prov, sat.ID(), ctx)
+	altaz, err := plan.LookAngle(sat, sat.ID(), ctx)
 	if err != nil {
 		log.Fatalf("LookAngle failed: %v", err)
 	}
@@ -160,7 +154,7 @@ func main() {
 		log.Fatalf("loc: %v", err)
 	}
 
-	passes, err := plan.SatellitePasses(prov, sat.ID(), target.Name, start, end, observer, minEl)
+	passes, err := plan.SatellitePasses(sat, sat.ID(), target.Name, start, end, observer, minEl)
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}

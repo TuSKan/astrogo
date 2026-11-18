@@ -110,23 +110,14 @@ const (
 	Asteroids = core.Asteroids
 	// Comets is the source for comets.
 	Comets = core.Comets
-	// Satellites is the source for satellites.
-	Satellites = core.Satellites
-	// Stations is the source for stations.
-	Stations = core.Stations
 	// Moons is the source for natural planetary satellites (e.g. Io,
-	// Titan, Triton) — distinct from Satellites above, which is artificial
-	// (TLE/SGP4-based) satellites.
+	// Titan, Triton).
 	Moons = core.Moons
 )
 
 // ── Sentinel errors ──────────────────────────────────────────────────────────
 
 var (
-	// ErrTLERequired is the error for when TLE data is required.
-	ErrTLERequired = errors.New("eph: Satellites source requires WithTLE option")
-	// ErrNotImplemented is the error for when a source is not yet implemented.
-	ErrNotImplemented = errors.New("eph: source not yet implemented")
 	// ErrUnknownSource is the error for when an unknown source is provided.
 	ErrUnknownSource = errors.New("eph: unknown source")
 	// ErrZeroVector is the error for when a near-zero vector is provided.
@@ -245,9 +236,6 @@ type Option func(*config)
 type config struct {
 	Start        time.Time
 	End          time.Time
-	TLEName      string
-	TLELine1     string
-	TLELine2     string
 	ExtraKernels []string
 }
 
@@ -264,22 +252,21 @@ func WithKernel(name string) Option {
 	return func(c *config) { c.ExtraKernels = append(c.ExtraKernels, name) }
 }
 
-// WithTLE provides raw TLE lines for satellite construction.
-func WithTLE(line1, line2 string) Option {
-	return func(c *config) {
-		c.TLELine1 = line1
-		c.TLELine2 = line2
-	}
-}
-
 // ─── Factory ─────────────────────────────────────────────────────────────────
 
-// NewProvider creates an ephemeris provider for the given source and kernel.
+// NewProvider creates a kernel-backed ephemeris provider for the given
+// source and kernel.
 //
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 //	p, err := eph.NewProvider(ctx, eph.SmallBody, "433", eph.WithTimeInterval(start, end))
-//	p, err := eph.NewProvider(ctx, eph.Satellites, "ISS", eph.WithTLE(l1, l2))
+//
+// It returns the Provider interface: the kernel backend registers itself
+// from ephemeris/jpl, so a build that never loads a kernel links no network
+// stack. A caller who needs the kernel provider's own methods calls
+// jpl.NewProvider, which returns *jpl.Provider. An artificial satellite is
+// not a source: satellite.NewFromTLE builds one from its element set and
+// returns *satellite.Satellite.
 func NewProvider(ctx context.Context, source Source, kernel string, opts ...Option) (Provider, error) {
 	var cfg config
 	for _, opt := range opts {
@@ -308,23 +295,6 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 		}
 
 		return p, nil
-
-	case Satellites:
-		if cfg.TLELine1 == "" || cfg.TLELine2 == "" {
-			return nil, ErrTLERequired
-		}
-
-		cfg.TLEName = kernel
-
-		sat, err := satellite.NewFromTLE(cfg.TLEName, cfg.TLELine1, cfg.TLELine2)
-		if err != nil {
-			return nil, fmt.Errorf("ephemeris: new TLE: %w", err)
-		}
-
-		return sat, nil
-
-	case Stations:
-		return nil, fmt.Errorf("%w: Stations", ErrNotImplemented)
 
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, source)

@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
@@ -34,8 +34,8 @@ func main() {
 		log.Fatalf("failed to resolve ISS: %v", err)
 	}
 
-	// For satellites, we create an ephemeris provider using TLE strings
-	prov, err := eph.NewProvider(context.Background(), eph.Satellites, catTarget.Name, eph.WithTLE(catTarget.TLELine1, catTarget.TLELine2))
+	// A satellite is a provider of its own position, built from its TLE.
+	prov, err := satellite.NewFromTLE(catTarget.Name, catTarget.TLELine1, catTarget.TLELine2)
 	if err != nil {
 		log.Fatalf("failed to create satellite provider: %v", err)
 	}

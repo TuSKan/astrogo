@@ -723,8 +723,7 @@ Measured with go1.27 on windows/amd64, a program asking `eph.Default()` where Ma
 is comes to **4.6 MB and 107 packages without the import, and 11.0 MB and 231 with
 it**. (When #112 introduced the registration the storage layer was `gocloud.dev`, and
 the import cost 13.9 MB and 424 packages, 64 of them gRPC.) Without the import those
-five sources return an error naming it; `Satellites` and everything on SOFA are
-unaffected.
+five sources return an error naming it; everything on SOFA is unaffected.
 
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network via
