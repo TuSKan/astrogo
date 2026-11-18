@@ -21,7 +21,6 @@ import (
 
 // Sentinel errors for JPL provider.
 var (
-	ErrNotImplemented        = errors.New("jpl: source not implemented")
 	ErrUnknownSource         = errors.New("jpl: unknown source")
 	ErrRecursionDepth        = errors.New("jpl: recursion depth exceeded")
 	ErrNilKernel             = errors.New("jpl: kernel is nil")
@@ -226,10 +225,6 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 		if err := p.addKernelPath(k, spkKey); err != nil {
 			return nil, fmt.Errorf("jpl: failed to load satellite kernel: %w", err)
 		}
-	case core.Satellites:
-		return nil, fmt.Errorf("%w: satellites", ErrNotImplemented)
-	case core.Stations:
-		return nil, fmt.Errorf("%w: stations", ErrNotImplemented)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, p.source)
 	}

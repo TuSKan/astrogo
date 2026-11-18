@@ -48,9 +48,9 @@
 //	// Multi-kernel (deep historical + modern)
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 //
-//	// NORAD satellite (ISS)
-//	sat, err := eph.NewProvider(ctx, eph.Satellites, "ISS",
-//	    eph.WithTLE(line1, line2))
+//	// NORAD satellite (ISS), from its element set: a provider of its own
+//	// position, not a kernel source
+//	sat, err := satellite.NewFromTLE("ISS", line1, line2)
 //
 // # Default Provider
 //

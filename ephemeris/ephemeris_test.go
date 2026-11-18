@@ -304,8 +304,9 @@ func TestNewProviderRejectsWhatItCannotBuild(t *testing.T) {
 		opts   []Option
 		want   error
 	}{
-		{"satellites without a TLE", core.Satellites, nil, ErrTLERequired},
-		{"stations", core.Stations, nil, ErrNotImplemented},
+		// An artificial satellite is satellite.NewFromTLE's, not a source.
+		{"satellites", Source("satellites"), nil, ErrUnknownSource},
+		{"stations", Source("stations"), nil, ErrUnknownSource},
 		{"a source that does not exist", Source("nonsense"), nil, ErrUnknownSource},
 	}
 
@@ -319,10 +320,9 @@ func TestNewProviderRejectsWhatItCannotBuild(t *testing.T) {
 	}
 }
 
-// TestNewProviderBuildsASatelliteOffline is the one NewProvider branch that
-// needs no download, so it is the one that can assert the factory actually
-// produces a working provider rather than only that it rejects bad input.
-func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
+// TestASatelliteIsAProviderOffline: satellite.NewFromTLE builds a working
+// Provider from an element set alone, with no download, and At places it.
+func TestASatelliteIsAProviderOffline(t *testing.T) {
 	// ISS (ZARYA), 2026-08-29 — the elements astrogo's own catalog/norad
 	// live test logged, used here as a fixed fixture rather than fetched.
 	const (
@@ -330,21 +330,16 @@ func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
 		line2 = "2 25544  51.6317 298.3548 0005039  86.9077 273.2487 15.48926826583086"
 	)
 
-	p, err := NewProvider(context.Background(), core.Satellites, "ISS", WithTLE(line1, line2))
+	sat, err := satellite.NewFromTLE("ISS", line1, line2)
 	if err != nil {
-		t.Fatalf("NewProvider(Satellites): %v", err)
+		t.Fatalf("NewFromTLE: %v", err)
 	}
+
+	var p Provider = sat
 
 	defer func() { _ = p.Close() }()
 
 	when := time.FromJD(2461281.5, time.UTC)
-
-	// A *satellite.Satellite, which is what gives a caller the height above
-	// the ellipsoid: examples/12_satellite_tracking asserts this type.
-	sat, ok := p.(*satellite.Satellite)
-	if !ok {
-		t.Fatalf("NewProvider(Satellites) returned %T, want *satellite.Satellite", p)
-	}
 
 	// State with the satellite's own NAIF code: a satellite provider tracks
 	// exactly one object and refuses any other id, so that a Sun lookup
@@ -362,15 +357,6 @@ func TestNewProviderBuildsASatelliteOffline(t *testing.T) {
 	// catches a height left in AU or measured from the geocenter.
 	if km := alt.Km(); km < 300 || km > 600 {
 		t.Errorf("ISS altitude = %.1f km, want roughly 400", km)
-	}
-}
-
-// TestWithTLERequiresBothLines: one line is not half a TLE, it is not a TLE.
-func TestWithTLERequiresBothLines(t *testing.T) {
-	_, err := NewProvider(context.Background(), core.Satellites, "ISS",
-		WithTLE("1 25544U 98067A   26241.27263584  .00006962  00000-0  13475-3 0  9998", ""))
-	if !errors.Is(err, ErrTLERequired) {
-		t.Fatalf("NewProvider with one TLE line = %v, want ErrTLERequired", err)
 	}
 }
 
