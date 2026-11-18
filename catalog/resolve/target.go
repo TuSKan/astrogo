@@ -232,6 +232,14 @@ type Target struct {
 	// (Provider.Name(), never Target.Catalog) that contributed its value
 	// in a merged Target. Nil for a Target sourced from a single provider.
 	Provenance map[string]string
+	// Sources are the provider records this Target was built from: one for
+	// a provider's own Target, one for each record merged into it.
+	Sources []SourceRecord
+	// Associations are the evidence that joined those records, and any
+	// association left unacted on: an ambiguous one names the other
+	// provider's record this one was kept apart from. Nil for a Target no
+	// identifier joined to another.
+	Associations []Association
 }
 
 // ICRS implements coord.Object for a static catalog Target.
