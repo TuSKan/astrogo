@@ -73,7 +73,7 @@ func pinEOP(b *testing.B, mode string) {
 // BenchmarkNewContextEOP is one Context built, with Earth orientation absent
 // and present: the ~91 µs Apco13 solve and, in "table", the lookup feeding it.
 func BenchmarkNewContextEOP(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func BenchmarkNewContextEOP(b *testing.B) {
 // BenchmarkSetTimeEOP is BenchmarkSetTime's two walks, run with Earth
 // orientation absent and present: moving a Context reads it at every step.
 func BenchmarkSetTimeEOP(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func BenchmarkSetTimeEOP(b *testing.B) {
 // time is wall time across GOMAXPROCS goroutines, and falls as cores are added
 // unless the moves contend; before #953 every lookup took shared locks.
 func BenchmarkSetTimeEOPParallel(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	if err != nil {
 		b.Fatal(err)
 	}

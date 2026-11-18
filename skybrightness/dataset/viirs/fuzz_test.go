@@ -40,7 +40,7 @@ func FuzzOpen(f *testing.F) {
 
 		for _, lat := range []float64{-89, -45, 0, 45, 89} {
 			for _, lon := range []float64{-179, -90, 0, 90, 179} {
-				_, _ = r.RadianceAt(angle.Deg(lon), angle.Deg(lat))
+				_, _ = r.RadianceAt(angle.LatDeg(lat), angle.LonDeg(lon))
 			}
 		}
 

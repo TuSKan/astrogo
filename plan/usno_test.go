@@ -434,7 +434,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 					t.Fatalf("Failed to load timezone: %v", err)
 				}
 
-				geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
+				geodetic, err := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), unit.Meters(loc.Height))
 				if err != nil {
 					t.Fatalf("Failed to create geodetic: %v", err)
 				}
@@ -932,7 +932,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 
 			// Even for locations with a named timezone, we use UTC for the
 			// computation interval to match the USNO query (tz=0).
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
+			geodetic, err := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1001,12 +1001,12 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			}
 
 			// Build sites at sea level AND at summit
-			geodetic0, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), 0)
+			geodetic0, _ := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), 0)
 			site0, _ := plan.NewSite(loc.Name+" (0m)", geodetic0, plan.WithTimeZone(tz))
 
 			// The summit looks down on a horizon far below it, so it says so:
 			// a height above the ellipsoid alone dips nothing (#1185).
-			geodetic, _ := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
+			geodetic, _ := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), unit.Meters(loc.Height))
 			site, _ := plan.NewSite(loc.Name+" (8849m)", geodetic, plan.WithTimeZone(tz),
 				plan.WithHorizonHeight(unit.Meters(loc.Height)))
 
@@ -1156,7 +1156,7 @@ func TestUSNO_Equator(t *testing.T) {
 				t.Fatalf("parsing the fixture date: %v", err)
 			}
 
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
+			geodetic, err := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1269,7 +1269,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 				}
 			}
 
-			geodetic, err := coord.NewGeodetic(angle.Deg(loc.Lon), angle.Deg(loc.Lat), unit.Meters(loc.Height))
+			geodetic, err := coord.NewGeodetic(angle.LatDeg(loc.Lat), angle.LonDeg(loc.Lon), unit.Meters(loc.Height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}
@@ -1323,7 +1323,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 
 	for _, ac := range altCases {
 		t.Run(ac.name, func(t *testing.T) {
-			geodetic, err := coord.NewGeodetic(angle.Deg(86.925), angle.Deg(27.9881), unit.Meters(ac.height))
+			geodetic, err := coord.NewGeodetic(angle.LatDeg(27.9881), angle.LonDeg(86.925), unit.Meters(ac.height))
 			if err != nil {
 				t.Fatalf("Failed to create geodetic: %v", err)
 			}

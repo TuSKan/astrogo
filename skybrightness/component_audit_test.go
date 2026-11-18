@@ -19,7 +19,7 @@ import (
 func auditScene(t *testing.T) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -85,7 +85,7 @@ func auditComponents(t *testing.T, grid unit.SpectralGrid) map[string]skybrightn
 	out["zodiacal"] = skybrightness.NewZodiacalLight()
 	out["extragalactic"] = skybrightness.NewExtragalacticBackground()
 
-	city, err := coord.NewGeodetic(angle.Deg(-70.1), angle.Deg(-24.4), 2000)
+	city, err := coord.NewGeodetic(angle.LatDeg(-24.4), angle.LonDeg(-70.1), 2000)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

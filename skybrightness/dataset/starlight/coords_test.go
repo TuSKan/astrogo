@@ -41,7 +41,7 @@ func TestRadianceAtClosesAtTheRAWrap(t *testing.T) {
 	m := patternedMap(t)
 
 	at := func(raDeg, decDeg float64) float64 {
-		v, err := m.RadianceAt("V", angle.Deg(raDeg), angle.Deg(decDeg))
+		v, err := m.RadianceAt("V", angle.LatDeg(decDeg), angle.LonDeg(raDeg))
 		if err != nil {
 			t.Fatalf("RadianceAt(%.3f, %.3f): %v", raDeg, decDeg, err)
 		}
@@ -86,12 +86,12 @@ func TestRadianceAtThePolesIsStableAndLocal(t *testing.T) {
 		seen := map[float64]int{}
 
 		for _, ra := range []float64{0, 30, 45, 90, 137, 180, 225, 271, 315, 359.99} {
-			first, err := m.RadianceAt("V", angle.Deg(ra), angle.Deg(dec))
+			first, err := m.RadianceAt("V", angle.LatDeg(dec), angle.LonDeg(ra))
 			if err != nil {
 				t.Fatalf("RadianceAt(%.2f, %+.0f): %v", ra, dec, err)
 			}
 
-			again, err := m.RadianceAt("V", angle.Deg(ra), angle.Deg(dec))
+			again, err := m.RadianceAt("V", angle.LatDeg(dec), angle.LonDeg(ra))
 			if err != nil {
 				t.Fatalf("RadianceAt repeat: %v", err)
 			}
@@ -130,7 +130,7 @@ func TestEveryDirectionResolvesToAPixel(t *testing.T) {
 		for raStep := range 121 {
 			ra := float64(raStep) * 3
 
-			v, err := m.RadianceAt("V", angle.Deg(ra), angle.Deg(dec))
+			v, err := m.RadianceAt("V", angle.LatDeg(dec), angle.LonDeg(ra))
 			if err != nil {
 				t.Fatalf("RA %.1f dec %+.1f fell outside the map: %v", ra, dec, err)
 			}
@@ -153,14 +153,14 @@ func TestRadianceAtRejectsOrClampsImpossibleDeclinations(t *testing.T) {
 	m := patternedMap(t)
 
 	for _, dec := range []float64{90.001, 120, 180, -90.001, -120} {
-		v, err := m.RadianceAt("V", angle.Deg(10), angle.Deg(dec))
+		v, err := m.RadianceAt("V", angle.LatDeg(dec), angle.LonDeg(10))
 		if err != nil {
 			continue // rejected, which is a fine answer
 		}
 
 		// Accepted, so it must at least have clamped to the pole rather than
 		// wrapped to some unrelated part of the sky.
-		pole, poleErr := m.RadianceAt("V", angle.Deg(10), angle.Deg(math.Copysign(90, dec)))
+		pole, poleErr := m.RadianceAt("V", angle.LatDeg(math.Copysign(90, dec)), angle.LonDeg(10))
 		if poleErr != nil {
 			t.Fatalf("pole lookup: %v", poleErr)
 		}
@@ -181,7 +181,7 @@ func TestRadianceAtRejectsAnUnknownBand(t *testing.T) {
 
 	m := patternedMap(t)
 
-	if _, err := m.RadianceAt("R", angle.Deg(10), angle.Deg(10)); err == nil {
+	if _, err := m.RadianceAt("R", angle.LatDeg(10), angle.LonDeg(10)); err == nil {
 		t.Error("a band the map does not hold returned a value")
 	}
 }

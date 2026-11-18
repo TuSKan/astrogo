@@ -29,14 +29,14 @@ func TestSampleBilinearRefusesANaNLocation(t *testing.T) {
 		{math.NaN(), math.NaN()},
 		{math.Inf(1), 1.5},
 	} {
-		v, err := g.SampleBilinear(angle.Deg(c.lon), angle.Deg(c.lat))
+		v, err := g.SampleBilinear(angle.LatDeg(c.lat), angle.LonDeg(c.lon))
 		if !errors.Is(err, ErrOutOfCoverage) {
 			t.Errorf("SampleBilinear(%v, %v) = %v, %v; want ErrOutOfCoverage", c.lon, c.lat, v, err)
 		}
 	}
 
 	// A finite location inside the grid still samples.
-	if v, err := g.SampleBilinear(angle.Deg(1.5), angle.Deg(1.5)); err != nil || v != 10 {
+	if v, err := g.SampleBilinear(angle.LatDeg(1.5), angle.LonDeg(1.5)); err != nil || v != 10 {
 		t.Errorf("SampleBilinear(1.5, 1.5) = %v, %v; want 10 and no error", v, err)
 	}
 }

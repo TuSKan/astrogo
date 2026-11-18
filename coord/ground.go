@@ -117,5 +117,5 @@ func Offset(from *Geodetic, bearing angle.Angle, distance unit.Length) (*Geodeti
 
 	lon2 := lon1 + math.Atan2(sinB*sinD*cosLat1, cosD-sinLat1*sinLat2)
 
-	return NewGeodetic(angle.Rad(lon2).WrapPi(), angle.Rad(lat2), from.Height())
+	return NewGeodetic(angle.Latitude{Angle: angle.Rad(lat2)}, angle.Longitude{Angle: angle.Rad(lon2).WrapPi()}, from.Height())
 }

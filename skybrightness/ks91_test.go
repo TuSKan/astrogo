@@ -88,9 +88,9 @@ func ks91NanoLamberts(v float64) float64 {
 func ks91Site(t *testing.T) *coord.Geodetic {
 	t.Helper()
 
-	loc, err := coord.NewEarthLocation(19.761, -155.456, 2800)
+	loc, err := coord.NewGeodetic(angle.LatDeg(19.761), angle.LonDeg(-155.456), unit.Meters(2800))
 	if err != nil {
-		t.Fatalf("NewEarthLocation: %v", err)
+		t.Fatalf("NewGeodetic: %v", err)
 	}
 
 	return loc

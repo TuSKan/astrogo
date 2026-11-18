@@ -134,7 +134,7 @@ func horizonsRangeRate(t *testing.T, command, tlistJD string) float64 {
 func TestMovingBodyRadialVelocityAgainstHorizons(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, err := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

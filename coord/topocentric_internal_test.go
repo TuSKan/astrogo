@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -19,7 +20,7 @@ import (
 func TestTopocentricToObservedIsSOFAsCIRSToObserved(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewEarthLocation(-24.6272, -70.4045, 2635)
+	site, err := NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -184,12 +184,12 @@ func TestRadianceAtFollowsTheGrid(t *testing.T) {
 	}
 
 	for pixel := range m.Grid().NumPixels() {
-		lon, lat, err := m.Grid().Center(pixel)
+		lat, lon, err := m.Grid().Center(pixel)
 		if err != nil {
 			t.Fatalf("Center(%d): %v", pixel, err)
 		}
 
-		got, err := m.RadianceAt("V", lon, lat)
+		got, err := m.RadianceAt("V", lat, lon)
 		if err != nil {
 			t.Fatalf("RadianceAt: %v", err)
 		}
@@ -208,7 +208,7 @@ func TestMapRejectsBadRequests(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if _, err := m.RadianceAt("K", 0, 0); !errors.Is(err, starlight.ErrBand) {
+	if _, err := m.RadianceAt("K", angle.Latitude{}, angle.Longitude{}); !errors.Is(err, starlight.ErrBand) {
 		t.Errorf("unknown band: err = %v, want ErrBand", err)
 	}
 
@@ -286,7 +286,7 @@ func BenchmarkRadianceAt(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		if _, err := m.RadianceAt("V", lon, lat); err != nil {
+		if _, err := m.RadianceAt("V", angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon}); err != nil {
 			b.Fatal(err)
 		}
 	}

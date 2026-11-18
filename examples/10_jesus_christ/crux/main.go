@@ -17,6 +17,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -62,7 +63,7 @@ func main() {
 	}()
 
 	// Jerusalem: 31.7683°N, 35.2137°E, 754m
-	jerusalem, err := coord.NewEarthLocation(31.7683, 35.2137, 754)
+	jerusalem, err := coord.NewGeodetic(angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(754))
 	if err != nil {
 		log.Fatalf("jerusalem: %v", err)
 	}

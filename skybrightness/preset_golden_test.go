@@ -96,7 +96,7 @@ const goldenTol = 1e-12
 func presetGoldenScene(tb testing.TB, p skybrightness.Preset) *skybrightness.Scene {
 	tb.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}

@@ -245,7 +245,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 	// No known site exists at high latitude — hour-angle-to-azimuth
 	// projection is most extreme there, making it a useful probe for the
 	// crossTrack hypothesis independent of the three real observatories.
-	polarLoc, err := coord.NewGeodetic(angle.Zero(), angle.Deg(78.0), 0)
+	polarLoc, err := coord.NewGeodetic(angle.LatDeg(78.0), angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("polar site geodetic: %v", err)
 	}

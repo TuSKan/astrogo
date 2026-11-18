@@ -167,13 +167,13 @@ func (m *Map) Bands() []string {
 // are cells of a piecewise-constant map, and smoothing across them would
 // blur structure the map is there to represent — most visibly the edge of
 // the Milky Way.
-func (m *Map) RadianceAt(band string, lon, lat angle.Angle) (float64, error) {
+func (m *Map) RadianceAt(band string, lat angle.Latitude, lon angle.Longitude) (float64, error) {
 	values, ok := m.bands[band]
 	if !ok {
 		return 0, fmt.Errorf("%w: %q", ErrBand, band)
 	}
 
-	pixel := m.grid.PixelOf(lon, lat)
+	pixel := m.grid.PixelOf(lat, lon)
 	if pixel < 0 || pixel >= int64(len(values)) {
 		// Wrapped with both sentinels: ErrPixelRange for a caller of this
 		// package, and skybrightness.ErrNoCoverage so IntegratedStarlight can
@@ -423,8 +423,8 @@ func (m *Map) Band(name string) (skybrightness.StarMap, error) {
 }
 
 // RadianceAt implements [skybrightness.StarMap].
-func (b bandView) RadianceAt(lon, lat angle.Angle) (float64, error) {
-	return b.m.RadianceAt(b.band, lon, lat)
+func (b bandView) RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, error) {
+	return b.m.RadianceAt(b.band, lat, lon)
 }
 
 // Galactic implements [skybrightness.StarMap].

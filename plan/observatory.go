@@ -91,7 +91,7 @@ func KnownSiteNames() []string {
 var knownSites = map[string]*Site{
 	"greenwich": {
 		name:     "Greenwich",
-		location: coord.MustGeodetic(angle.Zero(), angle.Deg(51.4772), 45),
+		location: coord.MustGeodetic(angle.LatDeg(51.4772), angle.Longitude{}, 45),
 		timeZone: time.MustLocation("Europe/London"),
 		mpcCode:  "000",
 		aliases:  []string{"Royal Observatory"},
@@ -99,7 +99,7 @@ var knownSites = map[string]*Site{
 	},
 	"mauna_kea": {
 		name:     "Mauna Kea",
-		location: coord.MustGeodetic(angle.Deg(-155.47441), angle.Deg(19.8263), 4145),
+		location: coord.MustGeodetic(angle.LatDeg(19.8263), angle.LonDeg(-155.47441), 4145),
 		timeZone: time.MustLocation("Pacific/Honolulu"),
 		mpcCode:  "568",
 		aliases:  []string{"Keck", "W. M. Keck Observatory"},
@@ -107,7 +107,7 @@ var knownSites = map[string]*Site{
 	},
 	"paranal": {
 		name:     "Paranal",
-		location: coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
+		location: coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "309",
 		aliases:  []string{"VLT", "Cerro Paranal", "Very Large Telescope"},
@@ -115,7 +115,7 @@ var knownSites = map[string]*Site{
 	},
 	"la_palma": {
 		name:     "La Palma",
-		location: coord.MustGeodetic(angle.Deg(-17.8947), angle.Deg(28.7636), 2396),
+		location: coord.MustGeodetic(angle.LatDeg(28.7636), angle.LonDeg(-17.8947), 2396),
 		timeZone: time.MustLocation("Atlantic/Canary"),
 		mpcCode:  "950",
 		aliases:  []string{"Roque de los Muchachos", "ORM"},
@@ -123,7 +123,7 @@ var knownSites = map[string]*Site{
 	},
 	"cerro_tololo": {
 		name:     "Cerro Tololo",
-		location: coord.MustGeodetic(angle.Deg(-70.80639), angle.Deg(-30.16917), 2207),
+		location: coord.MustGeodetic(angle.LatDeg(-30.16917), angle.LonDeg(-70.80639), 2207),
 		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "807",
 		aliases:  []string{"CTIO"},
@@ -131,7 +131,7 @@ var knownSites = map[string]*Site{
 	},
 	"kitt_peak": {
 		name:     "Kitt Peak",
-		location: coord.MustGeodetic(angle.Deg(-111.5967), angle.Deg(31.9583), 2096),
+		location: coord.MustGeodetic(angle.LatDeg(31.9583), angle.LonDeg(-111.5967), 2096),
 		timeZone: time.MustLocation("America/Phoenix"),
 		mpcCode:  "695",
 		aliases:  []string{"KPNO"},
@@ -139,7 +139,7 @@ var knownSites = map[string]*Site{
 	},
 	"la_silla": {
 		name:     "La Silla",
-		location: coord.MustGeodetic(angle.Deg(-70.7375), angle.Deg(-29.2575), 2400),
+		location: coord.MustGeodetic(angle.LatDeg(-29.2575), angle.LonDeg(-70.7375), 2400),
 		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "809",
 		aliases:  []string{"ESO La Silla"},
@@ -147,7 +147,7 @@ var knownSites = map[string]*Site{
 	},
 	"siding_spring": {
 		name:     "Siding Spring",
-		location: coord.MustGeodetic(angle.Deg(149.06444), angle.Deg(-31.27333), 1165),
+		location: coord.MustGeodetic(angle.LatDeg(-31.27333), angle.LonDeg(149.06444), 1165),
 		timeZone: time.MustLocation("Australia/Sydney"),
 		mpcCode:  "413",
 		aliases:  []string{"SSO"},
@@ -155,7 +155,7 @@ var knownSites = map[string]*Site{
 	},
 	"palomar": {
 		name:     "Palomar",
-		location: coord.MustGeodetic(angle.Deg(-116.865), angle.Deg(33.3564), 1712),
+		location: coord.MustGeodetic(angle.LatDeg(33.3564), angle.LonDeg(-116.865), 1712),
 		timeZone: time.MustLocation("America/Los_Angeles"),
 		mpcCode:  "675",
 		aliases:  []string{"Palomar Mountain", "Palomar Observatory"},
@@ -163,7 +163,7 @@ var knownSites = map[string]*Site{
 	},
 	"cerro_pachon": {
 		name:     "Cerro Pachón",
-		location: coord.MustGeodetic(angle.Deg(-70.74942), angle.Deg(-30.24464), 2647),
+		location: coord.MustGeodetic(angle.LatDeg(-30.24464), angle.LonDeg(-70.74942), 2647),
 		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "X05",
 		aliases:  []string{"Rubin Observatory", "Vera C. Rubin Observatory", "LSST"},
@@ -344,25 +344,6 @@ func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error
 	return s, nil
 }
 
-// NewSiteEarthLocation builds a Site directly from decimal-degree
-// latitude/longitude and a height in meters — a thin convenience over
-// coord.NewEarthLocation + NewSite so a caller building a site from plain
-// numbers doesn't need to import coord just for that one call.
-//
-// It keeps plain float64 parameters for the same reason
-// [coord.NewEarthLocation] does: the numbers it exists to accept are copied
-// off a GPS or a mapping service, where they are always degrees and meters,
-// and the parameter names say so. Everywhere else in this package a length is
-// a [unit.Length] — [Site.Height] returns one.
-func NewSiteEarthLocation(name string, latDeg, lonDeg, heightMeters float64, opts ...SiteOption) (*Site, error) {
-	loc, err := coord.NewEarthLocation(latDeg, lonDeg, heightMeters)
-	if err != nil {
-		return nil, fmt.Errorf("plan: %w", err)
-	}
-
-	return NewSite(name, loc, opts...)
-}
-
 // geocodeResult is one row of a Nominatim /search response — only the
 // fields NewSiteEarthAddress uses are decoded.
 type geocodeResult struct {
@@ -380,14 +361,14 @@ type elevationResponse struct {
 
 // NewSiteEarthAddress builds a Site by geocoding a free-text address (e.g.
 // "Quinta Calixto, Extrema, MG, Brazil") via OpenStreetMap's Nominatim API
-// (remote.Nominatim) — for when a site's coordinates aren't already known,
-// unlike NewSiteEarthLocation. Nominatim doesn't report elevation, so the
+// (remote.Nominatim) — for when a site's coordinates aren't already known.
+// Nominatim doesn't report elevation, so the
 // resolved latitude/longitude is then looked up against the Open-Elevation
 // API (remote.OpenElevation) to fill in height above sea level. Like every
 // other remote.KindAPI endpoint, both are reachable by default; disable
 // one with remote.DisableEndpoint or remote.SetOffline(true) if that's
 // undesired — a caller who already knows a site's coordinates and height
-// should use NewSiteEarthLocation instead, which needs neither.
+// builds it with [NewSite] and [coord.NewGeodetic], which need neither.
 func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...SiteOption) (*Site, error) {
 	lat, lon, err := geocodeAddress(ctx, address)
 	if err != nil {
@@ -399,7 +380,12 @@ func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...Site
 		return nil, err
 	}
 
-	return NewSiteEarthLocation(name, lat, lon, heightMeters, opts...)
+	loc, err := coord.NewGeodetic(angle.LatDeg(lat), angle.LonDeg(lon), unit.Meters(heightMeters))
+	if err != nil {
+		return nil, fmt.Errorf("plan: %w", err)
+	}
+
+	return NewSite(name, loc, opts...)
 }
 
 // geocodeAddress resolves address to decimal-degree latitude/longitude via
@@ -505,10 +491,10 @@ func (s *Site) TimeZone() *time.Location {
 }
 
 // Longitude returns the site's geodetic longitude.
-func (s *Site) Longitude() angle.Angle { return s.location.Lon() }
+func (s *Site) Longitude() angle.Longitude { return s.location.Lon() }
 
 // Latitude returns the site's geodetic latitude.
-func (s *Site) Latitude() angle.Angle { return s.location.Lat() }
+func (s *Site) Latitude() angle.Latitude { return s.location.Lat() }
 
 // Height returns the site's height above the reference ellipsoid.
 func (s *Site) Height() unit.Length { return s.location.Height() }

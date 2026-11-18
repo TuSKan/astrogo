@@ -266,7 +266,7 @@ func (f GalactocentricFrame) ToICRS(g Galactocentric) (c ICRS, distance unit.Len
 
 	lon, lat := v.ToSpherical()
 
-	out := GalacticToICRS(NewGalactic(angle.Rad(lon).Wrap360(), angle.Rad(lat)))
+	out := GalacticToICRS(NewGalactic(angle.Latitude{Angle: angle.Rad(lat)}, angle.Longitude{Angle: angle.Rad(lon).Wrap360()}))
 	distance = unit.Meters(v.Norm())
 
 	// A velocity, if there is one, comes back as catalog kinematics: the

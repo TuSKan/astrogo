@@ -108,14 +108,14 @@ func TestWantedPixelsSkipsWhatIsHeld(t *testing.T) {
 	}
 
 	// Cache the first, and it drops out.
-	have[grid.PixelOf(dirs[0].RA(), dirs[0].Dec())] = 1e-9
+	have[grid.PixelOf(angle.Latitude{Angle: dirs[0].Dec()}, angle.Longitude{Angle: dirs[0].RA()})] = 1e-9
 
 	if want = wantedPixels(grid, dirs, have); len(want) != 1 {
 		t.Errorf("got %d pixels, want 1 after caching the other", len(want))
 	}
 
 	// Cache both and nothing is left to ask for, so Fetch makes no request.
-	have[grid.PixelOf(dirs[1].RA(), dirs[1].Dec())] = 1e-9
+	have[grid.PixelOf(angle.Latitude{Angle: dirs[1].Dec()}, angle.Longitude{Angle: dirs[1].RA()})] = 1e-9
 
 	if want = wantedPixels(grid, dirs, have); len(want) != 0 {
 		t.Errorf("got %d pixels, want none when everything is cached", len(want))

@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -38,7 +41,7 @@ func main() {
 	}
 
 	for _, n := range nights {
-		site, err := plan.NewSiteEarthLocation(n.name, n.lat, n.lon, n.height)
+		site, err := plan.NewSite(n.name, coord.MustGeodetic(angle.LatDeg(n.lat), angle.LonDeg(n.lon), unit.Meters(n.height)))
 		if err != nil {
 			log.Fatalf("site: %v", err)
 		}

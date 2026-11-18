@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The ISS, so a satellite's altitude is exercised offline. Its own package's
@@ -32,9 +33,9 @@ const (
 func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("pipelines", -23.5, -46.6, 800)
+	site, err := plan.NewSite("pipelines", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	prov, err := satellite.NewFromTLE("ISS (ZARYA)", issLine1, issLine2)
@@ -118,9 +119,9 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("pipelines", -23.5, -46.6, 800)
+	site, err := plan.NewSite("pipelines", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	prov := eph.Default()

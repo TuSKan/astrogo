@@ -6,12 +6,14 @@ import (
 	"log"
 	"math"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -23,7 +25,7 @@ func main() {
 	time.RegisterModel(time.ZeroModel{})
 
 	// 1. Define the observer's location (Quinta Calixto, Brazil)
-	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		log.Fatal(err)
 	}

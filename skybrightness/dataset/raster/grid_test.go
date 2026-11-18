@@ -45,7 +45,7 @@ func TestGridValid(t *testing.T) {
 
 	// A malformed grid must say so on sampling rather than panic.
 	bad := northUpGrid(2, 2, []float64{1}, 0, 0)
-	if _, err := bad.SampleBilinear(angle.Deg(0.5), angle.Deg(-0.5)); !errors.Is(err, ErrInvalidGrid) {
+	if _, err := bad.SampleBilinear(angle.LatDeg(-0.5), angle.LonDeg(0.5)); !errors.Is(err, ErrInvalidGrid) {
 		t.Errorf("SampleBilinear on a malformed grid = %v, want ErrInvalidGrid", err)
 	}
 }
@@ -55,7 +55,7 @@ func TestGridOutOfCoverage(t *testing.T) {
 
 	g := northUpGrid(2, 2, []float64{1, 2, 3, 4}, 0, 0)
 
-	if _, err := g.SampleBilinear(angle.Deg(45), angle.Deg(45)); !errors.Is(err, ErrOutOfCoverage) {
+	if _, err := g.SampleBilinear(angle.LatDeg(45), angle.LonDeg(45)); !errors.Is(err, ErrOutOfCoverage) {
 		t.Errorf("far outside the extent = %v, want ErrOutOfCoverage", err)
 	}
 }
@@ -69,7 +69,7 @@ func TestGridNoData(t *testing.T) {
 	nan := math.NaN()
 
 	all := northUpGrid(2, 2, []float64{nan, nan, nan, nan}, 0, 0)
-	if _, err := all.SampleBilinear(angle.Deg(0.5), angle.Deg(-0.5)); !errors.Is(err, ErrNoData) {
+	if _, err := all.SampleBilinear(angle.LatDeg(-0.5), angle.LonDeg(0.5)); !errors.Is(err, ErrNoData) {
 		t.Errorf("all-NaN grid = %v, want ErrNoData", err)
 	}
 
@@ -77,7 +77,7 @@ func TestGridNoData(t *testing.T) {
 	sentinel := northUpGrid(2, 2, []float64{-9999, -9999, -9999, -9999}, 0, 0)
 	sentinel.NoData, sentinel.HasNoData = -9999, true
 
-	if _, err := sentinel.SampleBilinear(angle.Deg(0.5), angle.Deg(-0.5)); !errors.Is(err, ErrNoData) {
+	if _, err := sentinel.SampleBilinear(angle.LatDeg(-0.5), angle.LonDeg(0.5)); !errors.Is(err, ErrNoData) {
 		t.Errorf("all-sentinel grid = %v, want ErrNoData", err)
 	}
 
@@ -85,7 +85,7 @@ func TestGridNoData(t *testing.T) {
 	// missing neighbors dropped rather than treated as zero.
 	partial := northUpGrid(2, 2, []float64{10, nan, nan, nan}, 0, 0)
 
-	got, err := partial.SampleBilinear(angle.Deg(0.5), angle.Deg(-0.5))
+	got, err := partial.SampleBilinear(angle.LatDeg(-0.5), angle.LonDeg(0.5))
 	if err != nil {
 		t.Fatalf("partial no-data: %v", err)
 	}
@@ -115,11 +115,11 @@ func TestGridLonLat(t *testing.T) {
 
 	g := northUpGrid(2, 2, []float64{1, 2, 3, 4}, 10, 50)
 
-	lon, lat := g.LonLat(0, 0)
+	lat, lon := g.LatLon(0, 0)
 	testutil.AssertNear(t, "center lon", lon.Degrees(), 10.5, 1e-12)
 	testutil.AssertNear(t, "center lat", lat.Degrees(), 49.5, 1e-12)
 
-	lon, lat = g.LonLat(1, 1)
+	lat, lon = g.LatLon(1, 1)
 	testutil.AssertNear(t, "next center lon", lon.Degrees(), 11.5, 1e-12)
 	testutil.AssertNear(t, "next center lat", lat.Degrees(), 48.5, 1e-12)
 }
@@ -140,7 +140,7 @@ func TestGridBilinear(t *testing.T) {
 		{0.5, -1.5, 20},
 		{1.5, -1.5, 30},
 	} {
-		got, err := g.SampleBilinear(angle.Deg(tc.lon), angle.Deg(tc.lat))
+		got, err := g.SampleBilinear(angle.LatDeg(tc.lat), angle.LonDeg(tc.lon))
 		if err != nil {
 			t.Fatalf("SampleBilinear(%v, %v): %v", tc.lon, tc.lat, err)
 		}
@@ -149,7 +149,7 @@ func TestGridBilinear(t *testing.T) {
 	}
 
 	// Halfway between the two top pixels.
-	got, err := g.SampleBilinear(angle.Deg(1.0), angle.Deg(-0.5))
+	got, err := g.SampleBilinear(angle.LatDeg(-0.5), angle.LonDeg(1.0))
 	if err != nil {
 		t.Fatalf("SampleBilinear: %v", err)
 	}

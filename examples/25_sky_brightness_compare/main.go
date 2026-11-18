@@ -320,8 +320,7 @@ func illustrativeTown() *skybrightness.UniformEmitter {
 		degPerKM   = 1 / 111.195
 	)
 
-	at, err := coord.NewEarthLocation(
-		latDeg+distanceKM*degPerKM, lonDeg, 50)
+	at, err := coord.NewGeodetic(angle.LatDeg(latDeg+distanceKM*degPerKM), angle.LonDeg(lonDeg), unit.Meters(50))
 	if err != nil {
 		log.Fatalf("town: %v", err)
 	}
@@ -366,7 +365,7 @@ func brightness(
 
 // siteAt is the fixed coordinates at a chosen elevation.
 func siteAt(h float64) *coord.Geodetic {
-	site, err := coord.NewEarthLocation(latDeg, lonDeg, h)
+	site, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.LonDeg(lonDeg), unit.Meters(h))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

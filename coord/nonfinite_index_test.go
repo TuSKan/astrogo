@@ -42,7 +42,7 @@ func TestCompassDirectionOfANonFiniteAzimuthIsEmpty(t *testing.T) {
 func TestSmallCircleRefusesANonFiniteRadius(t *testing.T) {
 	t.Parallel()
 
-	center, err := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 0)
+	center, err := coord.NewGeodetic(angle.LatDeg(20), angle.LonDeg(10), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

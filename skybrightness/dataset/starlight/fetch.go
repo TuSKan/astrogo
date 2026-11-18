@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -142,7 +143,7 @@ func wantedPixels(grid coord.HEALPix, directions []coord.ICRS, have []float64) [
 	out := make([]int64, 0, len(directions))
 
 	for _, dir := range directions {
-		pixel := grid.PixelOf(dir.RA(), dir.Dec())
+		pixel := grid.PixelOf(angle.Latitude{Angle: dir.Dec()}, angle.Longitude{Angle: dir.RA()})
 
 		if pixel < 0 || pixel >= int64(len(have)) {
 			continue

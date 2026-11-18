@@ -120,7 +120,7 @@ import "github.com/TuSKan/astrogo/plan"
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de442")
 defer prov.Close()
 
-loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+loc, _ := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760))
 site, _ := plan.NewSite("São Paulo", loc, plan.WithTimeZone(brtz))
 
 day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)

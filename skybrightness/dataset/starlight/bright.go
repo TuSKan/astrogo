@@ -141,7 +141,7 @@ func AddBrightStars(m *Map, name string, band magnitude.Passband, stars []Bright
 			return fmt.Errorf("%w: HIP %d has %s = %v", ErrBrightStar, s.HIP, name, mag)
 		}
 
-		pixel := grid.PixelOf(s.RA, s.Dec)
+		pixel := grid.PixelOf(angle.Latitude{Angle: s.Dec}, angle.Longitude{Angle: s.RA})
 		if pixel < 0 || pixel >= int64(len(values)) {
 			return fmt.Errorf("%w: HIP %d falls on pixel %d, outside [0, %d)",
 				ErrBrightStar, s.HIP, pixel, len(values))
@@ -247,5 +247,5 @@ func hasCounterpart(ra, dec angle.Angle, gaiaRA, gaiaDec []angle.Angle, radius a
 // pixelOfStar is used by the tests to check placement without exporting the
 // grid arithmetic.
 func pixelOfStar(grid coord.HEALPix, s BrightStar) int64 {
-	return grid.PixelOf(s.RA, s.Dec)
+	return grid.PixelOf(angle.Latitude{Angle: s.Dec}, angle.Longitude{Angle: s.RA})
 }

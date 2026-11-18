@@ -48,7 +48,7 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 	t.Parallel()
 
 	for _, o := range yallopTable4 {
-		loc, err := coord.NewGeodetic(angle.Deg(o.lon), angle.Deg(o.lat), 0)
+		loc, err := coord.NewGeodetic(angle.LatDeg(o.lat), angle.LonDeg(o.lon), 0)
 		if err != nil {
 			t.Fatalf("NewGeodetic: %v", err)
 		}

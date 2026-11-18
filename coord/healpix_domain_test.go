@@ -29,17 +29,17 @@ func TestPixelOfRejectsDirectionsOffTheSphere(t *testing.T) {
 	}
 
 	for _, lat := range []float64{90.0001, 100, 120, 180, 270, -90.0001, -120, -180} {
-		if got := grid.PixelOf(angle.Deg(10), angle.Deg(lat)); got >= 0 {
+		if got := grid.PixelOf(angle.LatDeg(lat), angle.LonDeg(10)); got >= 0 {
 			t.Errorf("latitude %+.4f returned pixel %d; it is not on the sphere", lat, got)
 		}
 	}
 
 	for _, bad := range []angle.Angle{angle.Rad(math.NaN())} {
-		if got := grid.PixelOf(angle.Deg(10), bad); got >= 0 {
+		if got := grid.PixelOf(angle.Latitude{Angle: bad}, angle.LonDeg(10)); got >= 0 {
 			t.Errorf("a NaN latitude returned pixel %d", got)
 		}
 
-		if got := grid.PixelOf(bad, angle.Deg(10)); got >= 0 {
+		if got := grid.PixelOf(angle.LatDeg(10), angle.Longitude{Angle: bad}); got >= 0 {
 			t.Errorf("a NaN longitude returned pixel %d", got)
 		}
 	}
@@ -58,7 +58,7 @@ func TestPixelOfAcceptsThePolesAndTheEquator(t *testing.T) {
 
 	for _, lat := range []float64{90, -90, 0, 89.9999, -89.9999} {
 		for _, lon := range []float64{0, 90, 180, 270, 359.999, -45, 720} {
-			got := grid.PixelOf(angle.Deg(lon), angle.Deg(lat))
+			got := grid.PixelOf(angle.LatDeg(lat), angle.LonDeg(lon))
 			if got < 0 || got >= grid.NumPixels() {
 				t.Errorf("lon %.3f lat %+.4f gave pixel %d, outside [0, %d)",
 					lon, lat, got, grid.NumPixels())
@@ -79,10 +79,10 @@ func TestPixelOfWrapsLongitudeOnly(t *testing.T) {
 
 	for _, lat := range []float64{-60, -20, 0, 20, 60} {
 		for _, lon := range []float64{0, 37, 180, 300} {
-			base := grid.PixelOf(angle.Deg(lon), angle.Deg(lat))
+			base := grid.PixelOf(angle.LatDeg(lat), angle.LonDeg(lon))
 
 			for _, turns := range []float64{-720, -360, 360, 720} {
-				if got := grid.PixelOf(angle.Deg(lon+turns), angle.Deg(lat)); got != base {
+				if got := grid.PixelOf(angle.LatDeg(lat), angle.LonDeg(lon+turns)); got != base {
 					t.Errorf("lon %.0f%+.0f lat %+.0f gave pixel %d, want %d",
 						lon, turns, lat, got, base)
 				}

@@ -46,7 +46,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 		name     string
 		lat, lon float64
 	}{{"London", 51.5074, -0.1278}, {"60N", 60, 10}} {
-		loc, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), 0)
+		loc, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), 0)
 		if err != nil {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
@@ -125,7 +125,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 func TestUpperLimbNeedsABody(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

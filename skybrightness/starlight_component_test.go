@@ -25,15 +25,17 @@ type uniformSky struct {
 	galactic bool
 }
 
-func (u uniformSky) RadianceAt(_, _ angle.Angle) (float64, error) { return u.value, nil }
-func (u uniformSky) Galactic() bool                               { return u.galactic }
+func (u uniformSky) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return u.value, nil
+}
+func (u uniformSky) Galactic() bool { return u.galactic }
 
 // emptySky covers nothing, which is how a real map behaves outside its
 // footprint.
 type emptySky struct{}
 
-func (emptySky) RadianceAt(_, _ angle.Angle) (float64, error) { return 0, nil }
-func (emptySky) Galactic() bool                               { return true }
+func (emptySky) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) { return 0, nil }
+func (emptySky) Galactic() bool                                                  { return true }
 
 // spySky records the coordinates it was asked for.
 type spySky struct {
@@ -41,8 +43,8 @@ type spySky struct {
 	lon, lat angle.Angle
 }
 
-func (s *spySky) RadianceAt(lon, lat angle.Angle) (float64, error) {
-	s.lon, s.lat = lon, lat
+func (s *spySky) RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, error) {
+	s.lon, s.lat = lon.Angle, lat.Angle
 
 	return 1e-9, nil
 }
@@ -53,7 +55,7 @@ func (s *spySky) Galactic() bool { return s.galactic }
 func starlightScene(t *testing.T) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -352,7 +354,7 @@ func TestIntegratedStarlightHonorsTheMapFrame(t *testing.T) {
 	}
 
 	want := coord.ICRSToGalactic(icrs)
-	if d := math.Abs((asked[true][1] - want.B()).Degrees()); d > 1e-9 {
+	if d := math.Abs((asked[true][1] - want.B().Angle).Degrees()); d > 1e-9 {
 		t.Errorf("galactic map was asked for latitude %v, want %v", asked[true][1], want.B())
 	}
 }
@@ -613,7 +615,7 @@ func TestDiffuseGalacticLightUncoveredSightlineIsNotCappedToZero(t *testing.T) {
 type failingSky struct{}
 
 func (failingSky) Galactic() bool { return false }
-func (failingSky) RadianceAt(_, _ angle.Angle) (float64, error) {
+func (failingSky) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
 	return 0, errSkyUnavailable
 }
 
@@ -624,7 +626,7 @@ var errSkyUnavailable = errors.New("starlight_component_test: the map could not 
 type uncoveredSky struct{}
 
 func (uncoveredSky) Galactic() bool { return false }
-func (uncoveredSky) RadianceAt(_, _ angle.Angle) (float64, error) {
+func (uncoveredSky) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
 	return 0, fmt.Errorf("%w: pixel out of range", skybrightness.ErrNoCoverage)
 }
 

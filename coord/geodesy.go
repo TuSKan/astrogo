@@ -40,9 +40,15 @@ type Geodetic struct {
 	height unit.Length // Height above the ellipsoid
 }
 
-// NewGeodetic creates a new Geodetic coordinate with validation.
-// Latitude must be in [-90, 90] degrees. All values must be finite.
-func NewGeodetic(lon, lat angle.Angle, height unit.Length) (*Geodetic, error) {
+// NewGeodetic is the point at latitude lat, longitude lon and height above
+// the ellipsoid. The latitude must be in [-90, 90] degrees, else
+// [ErrLatitudeRange], and every value finite, else [ErrNotFinite].
+//
+// Degrees and meters as a map service gives them go in through the typed
+// constructors, which name each number's role:
+//
+//	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760)) // São Paulo
+func NewGeodetic(lat angle.Latitude, lon angle.Longitude, height unit.Length) (*Geodetic, error) {
 	h := height.Meters()
 	if math.IsNaN(lon.Radians()) || math.IsInf(lon.Radians(), 0) ||
 		math.IsNaN(lat.Radians()) || math.IsInf(lat.Radians(), 0) ||
@@ -54,12 +60,12 @@ func NewGeodetic(lon, lat angle.Angle, height unit.Length) (*Geodetic, error) {
 		return nil, fmt.Errorf("geodetic: %w", ErrLatitudeRange)
 	}
 
-	return &Geodetic{lon: lon, lat: lat, height: height}, nil
+	return &Geodetic{lon: lon.Angle, lat: lat.Angle, height: height}, nil
 }
 
-// MustGeodetic creates a Geodetic coordinate, panicking if parameters are out of range.
-func MustGeodetic(lon, lat angle.Angle, height unit.Length) *Geodetic {
-	g, err := NewGeodetic(lon, lat, height)
+// MustGeodetic is [NewGeodetic], panicking where it returns an error.
+func MustGeodetic(lat angle.Latitude, lon angle.Longitude, height unit.Length) *Geodetic {
+	g, err := NewGeodetic(lat, lon, height)
 	if err != nil {
 		panic(err)
 	}
@@ -67,33 +73,14 @@ func MustGeodetic(lon, lat angle.Angle, height unit.Length) *Geodetic {
 	return g
 }
 
-// NewEarthLocation creates a Geodetic coordinate from latitude, longitude
-// (in degrees) and height above the ellipsoid (in meters).
-//
-// This is a convenience wrapper around [NewGeodetic] that accepts plain
-// float64 values in the natural (lat, lon) order used by GPS receivers
-// and mapping services (Google Maps, OpenStreetMap, etc.).
-//
-// It keeps plain float64 parameters on purpose, where [NewGeodetic] takes
-// typed ones: the numbers it exists to accept are copied straight off such a
-// service, where they are always degrees and meters, and the parameter names
-// say so. Elsewhere in astrogo a length is a [unit.Length].
-//
-// Example:
-//
-//	loc, _ := coord.NewEarthLocation(-23.5505, -46.6333, 760) // São Paulo
-func NewEarthLocation(latDeg, lonDeg, heightMeters float64) (*Geodetic, error) {
-	return NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), unit.Meters(heightMeters))
-}
-
 // Lon returns the longitude of the geodetic coordinate.
-func (g *Geodetic) Lon() angle.Angle {
-	return g.lon
+func (g *Geodetic) Lon() angle.Longitude {
+	return angle.Longitude{Angle: g.lon}
 }
 
 // Lat returns the latitude of the geodetic coordinate.
-func (g *Geodetic) Lat() angle.Angle {
-	return g.lat
+func (g *Geodetic) Lat() angle.Latitude {
+	return angle.Latitude{Angle: g.lat}
 }
 
 // Height returns the height above the ellipsoid.
@@ -207,7 +194,7 @@ func FromECEF(v vector.Vec3, e Ellipsoid) (*Geodetic, error) {
 			ErrInvalidEllipsoid, e.A.Meters(), e.F, status)
 	}
 
-	return NewGeodetic(angle.Rad(lon).WrapPi(), angle.Rad(lat), unit.Meters(h))
+	return NewGeodetic(angle.Latitude{Angle: angle.Rad(lat)}, angle.Longitude{Angle: angle.Rad(lon).WrapPi()}, unit.Meters(h))
 }
 
 // String returns a DMS representation of the geodetic coordinate.

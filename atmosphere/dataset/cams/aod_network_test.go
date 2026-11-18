@@ -43,7 +43,7 @@ func siteAt(tb testing.TB, lonDeg, latDeg float64) *coord.Geodetic {
 	tb.Helper()
 	requireS3(tb)
 
-	g, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), 0)
+	g, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.LonDeg(lonDeg), 0)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}

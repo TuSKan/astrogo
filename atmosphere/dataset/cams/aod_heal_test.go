@@ -137,7 +137,7 @@ func putAOD(t *testing.T, fsys remote.FS, key string, b []byte) {
 func aodSite(t *testing.T) *coord.Geodetic {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

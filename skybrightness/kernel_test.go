@@ -18,7 +18,7 @@ import (
 func kernelScene(tb testing.TB) *Scene {
 	tb.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635) // Paranal
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635) // Paranal
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}

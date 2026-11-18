@@ -302,7 +302,7 @@ func (t *Reader) ReadGrid() (*Grid, error) {
 // SampleBilinear interpolates the sample at a
 // longitude/latitude by reading only the strips/tiles covering the four
 // neighboring pixels — the windowed path that never loads the whole atlas.
-func (t *Reader) SampleBilinear(lon, lat angle.Angle) (float64, error) {
+func (t *Reader) SampleBilinear(lat angle.Latitude, lon angle.Longitude) (float64, error) {
 	var ioErr error
 
 	at := func(col, row int) (float64, bool) {

@@ -14,7 +14,7 @@ import (
 // galacticCenter is the ICRS direction the frame is built around: Galactic
 // l = 0, b = 0, which is where the IAU convention puts the Galactic center.
 func galacticCenter() coord.ICRS {
-	return coord.GalacticToICRS(coord.NewGalactic(0, 0))
+	return coord.GalacticToICRS(coord.NewGalactic(angle.Latitude{}, angle.Longitude{}))
 }
 
 // TestSunSitsWhereTheFrameParametersPutIt is the frame's own definition read
@@ -133,7 +133,7 @@ func TestAxesPointWhereTheDocumentationSays(t *testing.T) {
 			exactInY: true,
 		},
 	} {
-		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(tc.l), angle.Deg(tc.b)))
+		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(tc.b), angle.LonDeg(tc.l)))
 		got := f.FromICRS(icrs, unit.Pc(d))
 
 		dx := (got.X() - sun.X()).Pc()
@@ -262,7 +262,7 @@ func TestAstropysDefaultFrameIsReproducible(t *testing.T) {
 	// astropy's roll0 rotates its intermediate frame's Z onto the north
 	// Galactic pole. Measured from the Galactic center, that is the pole's
 	// position angle taken the other way round the circle.
-	ngp := coord.GalacticToICRS(coord.NewGalactic(0, angle.Deg(90)))
+	ngp := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(90), angle.Longitude{}))
 
 	roll := 360 - coord.PositionAngle(gc, ngp).Wrap360().Degrees()
 	if diff := math.Abs(roll-astropyRoll0) * 3600; diff > 0.5 {
@@ -400,7 +400,7 @@ func TestAPositionEnteredByHandIsIndistinguishableFromAComputedOne(t *testing.T)
 
 	f := coord.DefaultGalactocentricFrame()
 
-	star := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(45), angle.Deg(-20)))
+	star := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(-20), angle.LonDeg(45)))
 	computed := f.FromICRS(star, unit.Pc(3000))
 
 	rebuilt := coord.NewGalactocentric(computed.X(), computed.Y(), computed.Z())

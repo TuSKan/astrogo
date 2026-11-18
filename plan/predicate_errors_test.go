@@ -48,7 +48,7 @@ func (unreachableTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*Targe
 func predicateSite(t *testing.T) *Site {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

@@ -46,7 +46,7 @@ import (
 // TestCachedContextTransformsDoNotAllocate pins the zero-allocation claim on
 // the transforms a hot loop repeats.
 func TestCachedContextTransformsDoNotAllocate(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestCachedContextTransformsDoNotAllocate(t *testing.T) {
 // existing: the caller supplies the output slice, so the transform itself has
 // nothing to allocate however many targets it is given.
 func TestBatchTransformDoesNotAllocate(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestBatchTransformDoesNotAllocate(t *testing.T) {
 // costs one allocation but that it quietly starts costing many, which is how
 // a per-epoch cost turns into a per-target one.
 func TestNewContextAllocationIsBounded(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestNewContextAllocationIsBounded(t *testing.T) {
 // inside the hour and the rebuild beyond it, which writes the new epoch into
 // the Context it already has.
 func TestSetTimeDoesNotAllocate(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

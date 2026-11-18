@@ -29,7 +29,7 @@ func cityAt(tb testing.TB, bearingDeg, distanceKM, radiance float64) *skybrightn
 	lat := -24.6 + distanceKM*degPerKM*math.Cos(bearing)
 	lon := -70.4 + distanceKM*degPerKM*math.Sin(bearing)/math.Cos(-24.6*math.Pi/180)
 
-	at, err := coord.NewGeodetic(angle.Deg(lon), angle.Deg(lat), 2000)
+	at, err := coord.NewGeodetic(angle.LatDeg(lat), angle.LonDeg(lon), 2000)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}
@@ -50,7 +50,7 @@ func cityAt(tb testing.TB, bearingDeg, distanceKM, radiance float64) *skybrightn
 func artificialScene(t *testing.T) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestArtificialSkyglowProvenance(t *testing.T) {
 }
 
 func BenchmarkArtificialSkyglow(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -439,7 +439,7 @@ func BenchmarkArtificialSkyglow(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	city, err := coord.NewGeodetic(angle.Deg(-70.1), angle.Deg(-24.4), 2000)
+	city, err := coord.NewGeodetic(angle.LatDeg(-24.4), angle.LonDeg(-70.1), 2000)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -494,7 +494,7 @@ func BenchmarkArtificialSkyglow(b *testing.B) {
 func TestArtificialSkyglowPhaseWeighting(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

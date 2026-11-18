@@ -23,7 +23,7 @@ import (
 func TestHoursUntilSetInterpolatesBetweenProbes(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

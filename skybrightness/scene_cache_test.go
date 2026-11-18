@@ -62,7 +62,7 @@ func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 	// never hit the cache however identical they are. A caller modeling one
 	// site under changing weather reuses the site, which is when the cache is
 	// live and a key that omits the atmosphere matters.
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestSceneResultsDoNotDependOnEvaluationOrder(t *testing.T) {
 // arcminute returns a different radiance.
 type gradientSky struct{}
 
-func (gradientSky) RadianceAt(lon, lat angle.Angle) (float64, error) {
+func (gradientSky) RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, error) {
 	// Steep enough that refraction-scale shifts are visible, smooth enough that
 	// the value stays an ordinary radiance.
 	return 1e-9 * (1 + 0.5*lon.Sin() + 0.5*lat.Sin()), nil

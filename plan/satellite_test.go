@@ -72,9 +72,9 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Error("Provider() did not return the constructor-supplied provider")
 	}
 
-	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	ctx, err := coord.NewContext(tm, site.Location(), site.Refraction())
@@ -104,9 +104,9 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Error("expected ApparentMagnitude to fail without observer context")
 	}
 
-	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	ctx, err := coord.NewContext(tm, site.Location(), site.Refraction())
@@ -130,7 +130,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 func TestLookAngle_ISS(t *testing.T) {
 	prov := newISSProvider(t)
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), 835.05)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestSatellitePasses_ISS(t *testing.T) {
 
 	prov := newISSProvider(t)
 
-	loc, err := coord.NewGeodetic(angle.Deg(-46.473002), angle.Deg(-22.528478), 835.05)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), 835.05)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

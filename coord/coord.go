@@ -158,14 +158,14 @@ func NewAltAz(alt, az angle.Angle) AltAz {
 	return AltAz{alt: alt, az: az}
 }
 
-// NewGalactic creates a new Galactic coordinate.
-func NewGalactic(l, b angle.Angle) Galactic {
-	return Galactic{l: l, b: b}
+// NewGalactic is the direction at galactic latitude b and longitude l.
+func NewGalactic(b angle.Latitude, l angle.Longitude) Galactic {
+	return Galactic{l: l.Angle, b: b.Angle}
 }
 
-// NewEcliptic creates a new Ecliptic coordinate.
-func NewEcliptic(lon, lat angle.Angle) Ecliptic {
-	return Ecliptic{lon: lon, lat: lat}
+// NewEcliptic is the direction at ecliptic latitude lat and longitude lon.
+func NewEcliptic(lat angle.Latitude, lon angle.Longitude) Ecliptic {
+	return Ecliptic{lon: lon.Angle, lat: lat.Angle}
 }
 
 // NewAstrometric creates a new Astrometric coordinate.
@@ -178,9 +178,10 @@ func NewCIRS(ra, dec angle.Angle) CIRS {
 	return CIRS{ra: ra, dec: dec}
 }
 
-// NewObserversLocation creates a new ObserversLocation.
-func NewObserversLocation(lon, lat angle.Angle, height unit.Length) ObserversLocation {
-	return ObserversLocation{lon: lon, lat: lat, height: height}
+// NewObserversLocation is the observer at latitude lat, longitude lon and
+// height above the ellipsoid.
+func NewObserversLocation(lat angle.Latitude, lon angle.Longitude, height unit.Length) ObserversLocation {
+	return ObserversLocation{lon: lon.Angle, lat: lat.Angle, height: height}
 }
 
 // ── Accessors ─────────────────────────────────────────────────────────────────
@@ -309,10 +310,10 @@ func (c *AltAz) SetAz(a angle.Angle) { c.az = a }
 func (c *AltAz) SetDist(d unit.Length) { c.dist = d }
 
 // L returns the longitude of the Galactic coordinate.
-func (c Galactic) L() angle.Angle { return c.l }
+func (c Galactic) L() angle.Longitude { return angle.Longitude{Angle: c.l} }
 
 // B returns the latitude of the Galactic coordinate.
-func (c Galactic) B() angle.Angle { return c.b }
+func (c Galactic) B() angle.Latitude { return angle.Latitude{Angle: c.b} }
 
 // Dist returns the distance of the Galactic coordinate.
 func (c Galactic) Dist() unit.Length { return c.dist }
@@ -327,10 +328,10 @@ func (c *Galactic) SetB(a angle.Angle) { c.b = a }
 func (c *Galactic) SetDist(d unit.Length) { c.dist = d }
 
 // Lon returns the longitude of the Ecliptic coordinate.
-func (c Ecliptic) Lon() angle.Angle { return c.lon }
+func (c Ecliptic) Lon() angle.Longitude { return angle.Longitude{Angle: c.lon} }
 
 // Lat returns the latitude of the Ecliptic coordinate.
-func (c Ecliptic) Lat() angle.Angle { return c.lat }
+func (c Ecliptic) Lat() angle.Latitude { return angle.Latitude{Angle: c.lat} }
 
 // Dist returns the distance of the Ecliptic coordinate.
 func (c Ecliptic) Dist() unit.Length { return c.dist }
@@ -391,10 +392,10 @@ func (c *CIRS) SetRA(a angle.Angle) { c.ra = a }
 func (c *CIRS) SetDec(a angle.Angle) { c.dec = a }
 
 // Lon returns the longitude of the ObserversLocation coordinate.
-func (c ObserversLocation) Lon() angle.Angle { return c.lon }
+func (c ObserversLocation) Lon() angle.Longitude { return angle.Longitude{Angle: c.lon} }
 
 // Lat returns the latitude of the ObserversLocation coordinate.
-func (c ObserversLocation) Lat() angle.Angle { return c.lat }
+func (c ObserversLocation) Lat() angle.Latitude { return angle.Latitude{Angle: c.lat} }
 
 // Height returns the height of the ObserversLocation coordinate.
 func (c ObserversLocation) Height() unit.Length { return c.height }

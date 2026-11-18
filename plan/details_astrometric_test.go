@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -28,7 +29,7 @@ func TestDetailsRADecAreTheAstrometricPlaceFromTheSite(t *testing.T) {
 
 	p := eph.Default()
 
-	site, err := coord.NewEarthLocation(41.3874, 2.1686, 0)
+	site, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}

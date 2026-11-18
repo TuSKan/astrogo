@@ -84,7 +84,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 
 	t.Cleanup(time.ResetEOP)
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
 	t.Cleanup(time.ResetEOP)
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -287,7 +287,7 @@ func altAzSeparationArcsec(a, b coord.AltAz) float64 {
 func TestObserverVectorRotatesWithUT1(t *testing.T) {
 	t.Cleanup(time.ResetEOP)
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -374,7 +374,7 @@ func wrapArcsec(d float64) float64 {
 func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
 	t.Cleanup(time.ResetEOP)
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

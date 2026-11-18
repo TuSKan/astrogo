@@ -66,7 +66,7 @@ func assertExecutable(t *testing.T, sched *Schedule, model TransitionModel) {
 func TestSwapOptimizedLeavesTimeForEverySlew(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

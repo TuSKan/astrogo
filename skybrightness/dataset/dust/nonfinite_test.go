@@ -34,7 +34,7 @@ func TestIntensityAtRefusesANonFiniteDirection(t *testing.T) {
 			m := NewMap()
 			m.values[cellOf(d.L, d.B)] = 1
 
-			v, err := m.IntensityAt(d.L, d.B)
+			v, err := m.IntensityAt(angle.Latitude{Angle: d.B}, angle.Longitude{Angle: d.L})
 			if !errors.Is(err, ErrNoCoverage) {
 				t.Errorf("IntensityAt(l=%v, b=%v) = %v, %v; want ErrNoCoverage",
 					d.L.Degrees(), d.B.Degrees(), v, err)
@@ -46,7 +46,7 @@ func TestIntensityAtRefusesANonFiniteDirection(t *testing.T) {
 	m := NewMap()
 	m.values[cell{l: 0, b: 0}] = 2
 
-	if v, err := m.IntensityAt(angle.Zero(), angle.Zero()); err != nil || v != 2 {
+	if v, err := m.IntensityAt(angle.Latitude{}, angle.Longitude{}); err != nil || v != 2 {
 		t.Errorf("IntensityAt(0, 0) = %v, %v; want 2 and no error", v, err)
 	}
 }

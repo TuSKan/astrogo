@@ -15,7 +15,7 @@ import (
 // coordinates make the round trip: geodetic to Earth-fixed, out to the
 // celestial frame, and back.
 func ExampleContext_ICRSToITRS() {
-	site := coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635) // Paranal
+	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635) // Paranal
 
 	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
@@ -53,7 +53,7 @@ func ExampleContext_ICRSToITRS() {
 func ExampleContext_ICRSToITRS_earthRotation() {
 	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
-		coord.MustGeodetic(angle.Deg(0), angle.Deg(0), 0),
+		coord.MustGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0),
 		atmosphere.Refraction{},
 	)
 	if err != nil {

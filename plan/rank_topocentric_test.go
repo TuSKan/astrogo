@@ -43,7 +43,7 @@ func TestAsObjectKeepsMovingBody(t *testing.T) {
 func TestRankObservableScoresTheMoonFromTheObserver(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2400)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2400)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

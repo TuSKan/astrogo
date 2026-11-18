@@ -63,7 +63,7 @@ func TestHEALPixMatchesAstropyHEALPix(t *testing.T) {
 		{4096, 233.3, -89.4, 167773047},
 		{4096, 266.4051, -28.936, 118088310},
 	} {
-		if got := healpix(t, c.nside).PixelOf(angle.Deg(c.lon), angle.Deg(c.lat)); got != c.want {
+		if got := healpix(t, c.nside).PixelOf(angle.LatDeg(c.lat), angle.LonDeg(c.lon)); got != c.want {
 			t.Errorf("nside %d, (%g°, %g°): pixel %d, astropy-healpix %d", c.nside, c.lon, c.lat, got, c.want)
 		}
 	}

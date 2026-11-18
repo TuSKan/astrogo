@@ -64,19 +64,19 @@ func TestHEALPixKeepsThePolesAtEveryResolution(t *testing.T) {
 				for k := range nr {
 					pixel, lat := polarRingPixel(nside, nr, k, north)
 
-					lon, gotLat, err := h.Center(pixel)
+					gotLat, lon, err := h.Center(pixel)
 					if err != nil {
 						t.Fatalf("nside 2^%d: Center(%d): %v", order, pixel, err)
 					}
 
 					worst = max(worst, math.Abs(gotLat.Radians()-lat)/width)
 
-					if got := h.PixelOf(lon, angle.Rad(lat)); got != pixel {
+					if got := h.PixelOf(angle.Latitude{Angle: angle.Rad(lat)}, lon); got != pixel {
 						t.Fatalf("nside 2^%d, ring %d from the %s pole: PixelOf(%.12f°, %.15f°) = %d, want %d",
 							order, nr, poleName(north), lon.Degrees(), angle.Rad(lat).Degrees(), got, pixel)
 					}
 
-					if got := h.PixelOf(lon, gotLat); got != pixel {
+					if got := h.PixelOf(gotLat, lon); got != pixel {
 						t.Fatalf("nside 2^%d: pixel %d's center (%.12f°, %.15f°) maps back to %d",
 							order, pixel, lon.Degrees(), gotLat.Degrees(), got)
 					}

@@ -31,7 +31,7 @@ func (c failsBefore) Check(_ Observable, t time.Time, _ *Site) (Result, error) {
 func unscheduledFixture(t *testing.T) (*Planner, Window) {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

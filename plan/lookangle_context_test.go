@@ -31,7 +31,7 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

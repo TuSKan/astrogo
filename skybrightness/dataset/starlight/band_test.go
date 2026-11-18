@@ -25,17 +25,17 @@ func TestBandMatchesTheMap(t *testing.T) {
 	}
 
 	for pixel := range m.Grid().NumPixels() {
-		lon, lat, err := m.Grid().Center(pixel)
+		lat, lon, err := m.Grid().Center(pixel)
 		if err != nil {
 			t.Fatalf("Center(%d): %v", pixel, err)
 		}
 
-		want, err := m.RadianceAt("V", lon, lat)
+		want, err := m.RadianceAt("V", lat, lon)
 		if err != nil {
 			t.Fatalf("RadianceAt: %v", err)
 		}
 
-		got, err := view.RadianceAt(lon, lat)
+		got, err := view.RadianceAt(lat, lon)
 		if err != nil {
 			t.Fatalf("Band RadianceAt: %v", err)
 		}

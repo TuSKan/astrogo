@@ -101,7 +101,7 @@ func SupergalacticToICRS(c Supergalactic) ICRS {
 
 	gal.FromUnitVector(supergalacticToGalacticVec(c.ToUnitVector()))
 
-	return GalacticToICRS(NewGalactic(gal.L().Wrap360(), gal.B()))
+	return GalacticToICRS(NewGalactic(gal.B(), angle.Longitude{Angle: gal.L().Wrap360()}))
 }
 
 // galacticToSupergalacticVec rotates a Galactic unit vector into the

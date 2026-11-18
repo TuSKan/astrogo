@@ -72,7 +72,7 @@ func (b badComponent) Provenance() skybrightness.Provenance { return skybrightne
 func testScene(t *testing.T) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635) // Paranal
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635) // Paranal
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -405,7 +405,7 @@ func TestNumericalStabilityAcrossGeometry(t *testing.T) {
 
 	for _, s := range sites {
 		for _, d := range directions {
-			loc, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
+			loc, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(s.heightM))
 			if err != nil {
 				t.Fatalf("NewGeodetic(%s): %v", s.name, err)
 			}

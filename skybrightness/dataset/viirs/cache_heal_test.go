@@ -245,7 +245,7 @@ func openReading(t *testing.T, want float64) error {
 
 	defer func() { _ = closer.Close() }()
 
-	got, err := r.RadianceAt(angle.Deg(-90), angle.Deg(45))
+	got, err := r.RadianceAt(angle.LatDeg(45), angle.LonDeg(-90))
 	if err != nil {
 		t.Fatalf("RadianceAt: %v", err)
 	}

@@ -17,7 +17,7 @@ import (
 // site geometry, and refraction parameters.
 
 func BenchmarkNewContext(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -29,7 +29,7 @@ func BenchmarkNewContext(b *testing.B) {
 }
 
 func BenchmarkNewContext_SeaLevel(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	atm := atmosphere.StandardRefraction()
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -46,7 +46,7 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 // so this is the cost of a move alone; BenchmarkAltitudeCurve counts the
 // series evaluations a fresh Context makes over a day.
 func BenchmarkSetTime(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	start := time.FromJD(2461056.25, time.UTC)
 
 	for _, c := range []struct {
@@ -79,7 +79,7 @@ func BenchmarkSetTime(b *testing.B) {
 // others, at three tick spacings. Per curve, so the series evaluations a day
 // of movement makes are counted in it rather than amortized away.
 func BenchmarkAltitudeCurve(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(15), angle.Deg(50), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(50), angle.LonDeg(15), 0)
 	start := time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
 	m31 := coord.NewICRS(angle.Hour(0.7122), angle.Deg(41.269))
 	atm := atmosphere.StandardRefraction()
@@ -116,7 +116,7 @@ func BenchmarkAltitudeCurve(b *testing.B) {
 // transformation. This is what every IsVisible / constraint check calls.
 
 func BenchmarkICRSToAltAz(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4)) // Orion
@@ -132,7 +132,7 @@ func BenchmarkICRSToAltAz(b *testing.B) {
 // transform cost when the Context is pre-built (amortized).
 // This is the "cached context" scenario the user asked about.
 func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -150,7 +150,7 @@ func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 // reusing one (which is technically incorrect but shows the cost ratio).
 
 func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -172,7 +172,7 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 }
 
 func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -197,7 +197,7 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 // Full topocentric reduction (ICRS → TIRS → topocentric → AltAz + refraction).
 
 func BenchmarkReducer(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 	// Simulate a geocentric Moon-like vector (in AU)
@@ -216,7 +216,7 @@ func BenchmarkReducer(b *testing.B) {
 // BenchmarkReducer_Cached measures Reduce() with a reused Reducer,
 // demonstrating the lazy Context caching introduced to fix the cache asymmetry.
 func BenchmarkReducer_Cached(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
@@ -236,7 +236,7 @@ func BenchmarkReducer_Cached(b *testing.B) {
 // ── Parallel Batch ───────────────────────────────────────────────────────────
 
 func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 
@@ -266,7 +266,7 @@ func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 }
 
 func BenchmarkReduceBatch_10k(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	t := time.FromJD(2460000.5, time.UTC)
 

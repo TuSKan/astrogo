@@ -67,7 +67,7 @@ func TestParallacticAngleIsSOFAs(t *testing.T) {
 	var east, west int
 
 	for _, s := range sites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
+		site, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
@@ -142,7 +142,7 @@ func TestParallacticAngleIsSOFAs(t *testing.T) {
 func TestParallacticAngleOnTheMeridian(t *testing.T) {
 	t.Parallel()
 
-	site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.4778), unit.Meters(46))
+	site, err := coord.NewGeodetic(angle.LatDeg(51.4778), angle.LonDeg(0), unit.Meters(46))
 	if err != nil {
 		t.Fatal(err)
 	}
