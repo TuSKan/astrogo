@@ -18,10 +18,9 @@ import (
 
 // TestPostBodiesSurviveAnEarlyAnswer: a server that answers a POST before
 // reading its body leaves net/http writing the body after RoundTrip has
-// returned. resty used to hand that body's pooled buffer back to its pool at
-// exactly that point (#1107). The write still in progress would then read a
-// buffer another request had taken, and could send that request's bytes or
-// empty them.
+// returned. A body buffer shared or reused at that point lets the write
+// still in progress read a buffer another request had taken, and send that
+// request's bytes or empty them (#1107).
 //
 // Three kinds of request go at once:
 //   - early ones, answered 400 by a server that never reads them, so their only

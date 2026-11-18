@@ -37,12 +37,8 @@ func countingServer(t *testing.T, status, failures int) (*httptest.Server, *atom
 	return srv, &hits
 }
 
-// TestDefaultRetryPolicyDecides pins the rule that used to be three of resty's
-// own predicates wired directly into the client.
-//
-// Naming it, exporting it and giving it a signature a caller can implement is
-// the whole point of the change; this is the table that says the behavior did
-// not move while the shape did.
+// TestDefaultRetryPolicyDecides pins the default rule: 429, any 5xx but 501,
+// and no answer at all are retried; nothing else is.
 func TestDefaultRetryPolicyDecides(t *testing.T) {
 	t.Parallel()
 
@@ -157,7 +153,7 @@ func TestWithRetryPolicyReplacesTheDefault(t *testing.T) {
 }
 
 // TestRetryPolicySeesTheAttemptNumber covers the field a backoff-shaped policy
-// is written around, and the one that is read off resty rather than computed.
+// is written around.
 func TestRetryPolicySeesTheAttemptNumber(t *testing.T) {
 	srv, hits := countingServer(t, http.StatusServiceUnavailable, 10)
 	base := srv.URL

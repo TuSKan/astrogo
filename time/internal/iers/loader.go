@@ -79,8 +79,8 @@ func GetLoader() Loader {
 //
 // It serves the deployment that pre-seeds EOP data and wants no network
 // dependency: astrogo/remote/eop's loader offers the same cache read, but
-// linking it costs net/http, crypto/tls and resty — measured with go1.27 on
-// windows/amd64, a Julian-date program goes from 3.0 MB to 6.3 MB. The
+// linking it costs net/http and crypto/tls — measured with go1.27 on
+// windows/amd64, a Julian-date program goes from 2.8 MB to 5.8 MB. The
 // filesystem is the caller's, which is what keeps an OS path out of
 // astrogo's API: a directory on disk is os.DirFS(dir), written at the
 // caller's own call site, and a remote.FS works unchanged. Fetch always

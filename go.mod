@@ -12,7 +12,6 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/sync v0.25.0
 	golang.org/x/tools v0.52.0
-	resty.dev/v3 v3.0.0-rc.4
 )
 
 require (

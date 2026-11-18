@@ -1,9 +1,12 @@
 package api
 
 import (
+	"math/rand/v2"
 	"net/http"
+	"strconv"
+	"strings"
 
-	"resty.dev/v3"
+	"github.com/TuSKan/astrogo/time"
 )
 
 // Attempt describes one HTTP attempt a [RetryPolicy] is asked to judge.
@@ -30,14 +33,10 @@ type Attempt struct {
 
 // RetryPolicy reports whether a failed attempt should be retried.
 //
-// # What it does not decide
-//
-// How long to wait. That is already handled better than a policy would: resty
-// honors a 429 or 503 response's own Retry-After header — in both the seconds
-// and the HTTP-date forms — and otherwise backs off exponentially with jitter,
-// bounded by the client's retry count. A server that says when to come back is
-// obeyed, and one that does not gets a well-behaved client anyway, so there is
-// nothing left for a caller to improve by hand.
+// It does not decide how long to wait. A 429 or 503 answer's Retry-After
+// header, in seconds or as an HTTP date, says that; otherwise the wait
+// doubles from 100 ms to at most 2 s, jittered. A wait that would end past
+// the call's timeout ends the retries instead.
 //
 // A policy is installed per [Client], with [WithRetryPolicy]. Varying retry
 // behavior by endpoint means constructing a client per endpoint, which is what
@@ -93,36 +92,50 @@ func WithRetryPolicy(p RetryPolicy) Option {
 	}
 }
 
-// retryCondition adapts a [RetryPolicy] to the shape resty wants.
-//
-// This is the only place a resty type meets the policy, which is what keeps
-// the promise that no resty type escapes this package: a caller writing a
-// policy never sees *resty.Response.
-func retryCondition(p RetryPolicy) resty.RetryConditionFunc {
-	return func(res *resty.Response, err error) bool { return p(attemptOf(res, err)) }
+// The wait between attempts with no Retry-After to go by: doubling from
+// minRetryWait to maxRetryWait.
+const (
+	minRetryWait = 100 * time.Millisecond
+	maxRetryWait = 2 * time.Second
+)
+
+// retryWait is how long to wait after a failed attempt before the next: the
+// answer's Retry-After for a 429 or 503 that carries one, otherwise the
+// attempt's backoff, jittered across its upper half so clients that failed
+// together do not retry together.
+func retryWait(resp *http.Response, attempt int) time.Duration {
+	if resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable) {
+		if d, ok := retryAfter(resp.Header.Get("Retry-After")); ok {
+			return d
+		}
+	}
+
+	backoff := maxRetryWait
+	if attempt < 6 {
+		backoff = min(maxRetryWait, minRetryWait<<(attempt-1))
+	}
+
+	half := backoff / 2
+
+	return half + time.Duration(rand.Int64N(int64(half)+1)) //nolint:gosec // jitter spreads retries; it guards nothing
 }
 
-// attemptOf reads an [Attempt] out of a resty exchange.
-//
-// Shared by the retry condition and by Client.body, so the question "would this
-// have been retried" is answered by one reading of the response in both places
-// rather than by two that can drift.
-//
-// A nil response means the request never produced one, which resty reports
-// separately from the error — so status and attempt number both fall back
-// rather than being read off it.
-func attemptOf(res *resty.Response, err error) Attempt {
-	a := Attempt{Number: 1, Err: err}
-
-	if res == nil {
-		return a
+// retryAfter reads a Retry-After header: a number of seconds, or an HTTP
+// date. A date already past is no wait.
+func retryAfter(v string) (time.Duration, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0, false
 	}
 
-	a.StatusCode = res.StatusCode()
-
-	if res.Request != nil {
-		a.Number = res.Request.Attempt
+	if secs, err := strconv.Atoi(v); err == nil && secs >= 0 {
+		return time.Duration(secs) * time.Second, true
 	}
 
-	return a
+	at, err := http.ParseTime(v)
+	if err != nil {
+		return 0, false
+	}
+
+	return max(0, time.Until(at)), true
 }
