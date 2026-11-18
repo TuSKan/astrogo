@@ -19,7 +19,7 @@ func (m mockConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error
 }
 
 func TestSchedulerAndStrategies(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 
 	site, err := NewSite("TestSite", loc)
 	if err != nil {

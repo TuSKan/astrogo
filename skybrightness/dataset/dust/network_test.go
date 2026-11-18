@@ -38,12 +38,12 @@ func TestFetchAgainstTheRealService(t *testing.T) {
 		t.Fatalf("Fetch: %v", err)
 	}
 
-	center, err := m.IntensityAt(angle.Deg(0), angle.Deg(0))
+	center, err := m.IntensityAt(angle.LatDeg(0), angle.LonDeg(0))
 	if err != nil {
 		t.Fatalf("center: %v", err)
 	}
 
-	pole, err := m.IntensityAt(angle.Deg(0), angle.Deg(90))
+	pole, err := m.IntensityAt(angle.LatDeg(90), angle.LonDeg(0))
 	if err != nil {
 		t.Fatalf("pole: %v", err)
 	}

@@ -36,7 +36,7 @@ func TestGridIndexRefusesANonFiniteSite(t *testing.T) {
 	// refusing everything. Which cell is TestAODOrientationIsSane's business:
 	// Paranal's latitude row sits on a rounding boundary, 286.5 on paper and
 	// 286.49999999999997 in floating point, so it is not pinned here.
-	paranal, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	paranal, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

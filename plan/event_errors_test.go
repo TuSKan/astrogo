@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -26,7 +28,7 @@ import (
 func TestEventSearchesReturnEveryProviderFailure(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
+	site, err := NewSite("Barcelona", coord.MustGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,7 @@ import (
 // ICRSToGalactic converts ICRS coordinates to Galactic coordinates.
 func ICRSToGalactic(c ICRS) Galactic {
 	l, b := gofaext.Icrs2g(c.RA().Radians(), c.Dec().Radians())
-	return NewGalactic(angle.Rad(l).Wrap360(), angle.Rad(b))
+	return NewGalactic(angle.Latitude{Angle: angle.Rad(b)}, angle.Longitude{Angle: angle.Rad(l).Wrap360()})
 }
 
 // GalacticToICRS converts Galactic coordinates to ICRS coordinates.
@@ -31,7 +31,7 @@ func ICRSToEcliptic(c ICRS, t time.Time) Ecliptic {
 	jd1, jd2 := t.TT().JDParts()
 	lon, lat := gofaext.Eqec06(jd1, jd2, c.RA().Radians(), c.Dec().Radians())
 
-	return NewEcliptic(angle.Rad(lon).Wrap360(), angle.Rad(lat))
+	return NewEcliptic(angle.Latitude{Angle: angle.Rad(lat)}, angle.Longitude{Angle: angle.Rad(lon).Wrap360()})
 }
 
 // EclipticToICRS converts Geocentric Ecliptic coordinates of the given date

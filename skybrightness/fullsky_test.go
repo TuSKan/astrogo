@@ -20,7 +20,9 @@ import (
 // so the diffuse-galactic term is exercised without needing the SFD product.
 type uniformDust float64
 
-func (u uniformDust) IntensityAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+func (u uniformDust) IntensityAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return float64(u), nil
+}
 
 // assembleSky builds a Model holding every component the module has, over a
 // scene at Paranal. It is the thing the engine exists to do, and until this
@@ -30,7 +32,7 @@ func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrig
 
 	grid := skybrightness.DefaultOpticalGrid()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -67,7 +69,7 @@ func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrig
 		t.Fatalf("NewAirglow: %v", err)
 	}
 
-	city, err := coord.NewGeodetic(angle.Deg(-70.1), angle.Deg(-24.4), 2000)
+	city, err := coord.NewGeodetic(angle.LatDeg(-24.4), angle.LonDeg(-70.1), 2000)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

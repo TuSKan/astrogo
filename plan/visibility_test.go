@@ -29,7 +29,7 @@ func (m mockObject) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDeta
 
 func TestIsVisible(t *testing.T) {
 	// Site at lat 45
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestIsVisible(t *testing.T) {
 }
 
 func TestVisibleIntervals(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestVisibleIntervals(t *testing.T) {
 }
 
 func TestVisibleIntervals_StepTooLarge(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
@@ -90,7 +90,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 }
 
 func TestNeverVisible(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.5, time.UTC)
@@ -108,7 +108,7 @@ func TestNeverVisible(t *testing.T) {
 }
 
 func TestTransitEstimate(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 
 	start := time.FromJD(2460000.0, time.UTC)
@@ -150,7 +150,7 @@ func TestTransitEstimate(t *testing.T) {
 func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	site, err := NewSite("equator", loc)
@@ -240,7 +240,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.Add(unit.Days(1))

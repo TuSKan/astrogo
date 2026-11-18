@@ -14,18 +14,18 @@ import (
 
 func TestNewGeodetic(t *testing.T) {
 	// Valid coordinate
-	g, err := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	g, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "Lon degrees", g.Lon().Degrees(), 10, 1e-15)
 	testutil.AssertNear(t, "Lat degrees", g.Lat().Degrees(), 45, 1e-15)
 
 	// Invalid latitude
-	_, err = coord.NewGeodetic(angle.Deg(0), angle.Deg(91), 0)
+	_, err = coord.NewGeodetic(angle.LatDeg(91), angle.LonDeg(0), 0)
 	testutil.AssertError(t, err)
 	testutil.AssertErrorIs(t, err, coord.ErrLatitudeRange)
 
 	// Non-finite
-	_, err = coord.NewGeodetic(angle.Rad(math.NaN()), angle.Deg(0), 0)
+	_, err = coord.NewGeodetic(angle.LatDeg(0), angle.Longitude{Angle: angle.Rad(math.NaN())}, 0)
 	testutil.AssertError(t, err)
 }
 
@@ -33,14 +33,14 @@ func TestECEF_EquatorAndPoles(t *testing.T) {
 	wgs84 := coord.WGS84()
 
 	// Equator, Lon 0
-	g1, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	g1, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	v1 := g1.ToECEF(wgs84)
 	testutil.AssertNear(t, "Equator X", v1.X, wgs84.A.Meters(), 1e-1)
 	testutil.AssertNear(t, "Equator Y", v1.Y, 0, 1e-1)
 	testutil.AssertNear(t, "Equator Z", v1.Z, 0, 1e-1)
 
 	// North Pole
-	g2, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
+	g2, _ := coord.NewGeodetic(angle.LatDeg(90), angle.LonDeg(0), 0)
 	v2 := g2.ToECEF(wgs84)
 	b := wgs84.A.Meters() * (1 - wgs84.F)
 
@@ -63,7 +63,7 @@ func TestECEFRoundTrip(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		g, _ := coord.NewGeodetic(c.lon, c.lat, unit.Meters(c.h))
+		g, _ := coord.NewGeodetic(angle.Latitude{Angle: c.lat}, angle.Longitude{Angle: c.lon}, unit.Meters(c.h))
 		v := g.ToECEF(wgs84)
 		g2, err := coord.FromECEF(v, wgs84)
 
@@ -84,7 +84,7 @@ func TestECEF_ZeroVector(t *testing.T) {
 }
 
 func TestGeodetic_Interface(t *testing.T) {
-	g, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 30)
+	g, _ := coord.NewGeodetic(angle.LatDeg(20), angle.LonDeg(10), 30)
 
 	testutil.AssertEqual(t, "Name", g.Name(), "Geodetic")
 	testutil.AssertNoError(t, g.Validate())
@@ -93,8 +93,8 @@ func TestGeodetic_Interface(t *testing.T) {
 	testutil.AssertEqual(t, "String", s, "Lon=+10°00'00\", Lat=+20°00'00\", H=30.0m")
 
 	// Equal
-	g2, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 30)
-	g3, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(20), 40)
+	g2, _ := coord.NewGeodetic(angle.LatDeg(20), angle.LonDeg(10), 30)
+	g3, _ := coord.NewGeodetic(angle.LatDeg(20), angle.LonDeg(10), 40)
 
 	if !g.Equal(g2) {
 		t.Error("expected equal")
@@ -106,7 +106,7 @@ func TestGeodetic_Interface(t *testing.T) {
 
 	// UnitVectors
 	v := g.ToUnitVector()
-	g4, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	g4, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	g4.FromUnitVector(v)
 	testutil.AssertNear(t, "FromUnitVector Lon", g4.Lon().Degrees(), 10.0, 1e-10)
 	testutil.AssertNear(t, "FromUnitVector Lat", g4.Lat().Degrees(), 20.0, 1e-10)
@@ -138,7 +138,7 @@ func TestFromECEFHoldsFromTheGroundToTheMoon(t *testing.T) {
 		var worstH, worstLat float64
 
 		for lat := -90.0; lat <= 90.0; lat += 0.25 {
-			g, err := coord.NewGeodetic(angle.Deg(30), angle.Deg(lat), unit.Meters(h))
+			g, err := coord.NewGeodetic(angle.LatDeg(lat), angle.LonDeg(30), unit.Meters(h))
 			testutil.AssertNoError(t, err)
 
 			back, err := coord.FromECEF(g.ToECEF(wgs84), wgs84)

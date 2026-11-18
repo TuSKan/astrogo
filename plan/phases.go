@@ -639,7 +639,7 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 
 	ecl := coord.ICRSToEcliptic(moonICRS, t.TDB())
 
-	return ecl.Lat(), nil
+	return ecl.Lat().Angle, nil
 }
 
 // LunarEclipses returns the lunar eclipses in [start, end]: every Full Moon at

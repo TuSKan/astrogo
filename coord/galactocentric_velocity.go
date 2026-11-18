@@ -151,8 +151,8 @@ type galacticAxes struct {
 // Galactic pole, +y completing a right-handed set and so pointing toward
 // l = 90°.
 func computeGalacticBasis() galacticAxes {
-	center := GalacticToICRS(NewGalactic(0, 0)).ToUnitVector()
-	z := GalacticToICRS(NewGalactic(0, angle.Deg(90))).ToUnitVector()
+	center := GalacticToICRS(NewGalactic(angle.Latitude{}, angle.Longitude{})).ToUnitVector()
+	z := GalacticToICRS(NewGalactic(angle.LatDeg(90), angle.Longitude{})).ToUnitVector()
 
 	// Gram-Schmidt against the pole rather than trusting the two directions to
 	// be exactly perpendicular. They are defined to be, and they arrive here

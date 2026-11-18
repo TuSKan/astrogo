@@ -154,7 +154,7 @@ func TestScientificStability(t *testing.T) {
 			t.Fatalf("%s: %v", e.key(), err)
 		}
 
-		site, err := coord.NewGeodetic(angle.Deg(cs.Lon), angle.Deg(cs.Lat), unit.Meters(cs.Height))
+		site, err := coord.NewGeodetic(angle.LatDeg(cs.Lat), angle.LonDeg(cs.Lon), unit.Meters(cs.Height))
 		if err != nil {
 			t.Fatalf("%s: %v", cs.Name, err)
 		}

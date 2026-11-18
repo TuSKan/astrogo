@@ -49,7 +49,7 @@ func FuzzOpen(f *testing.F) {
 		// read from the file are trusted; the three points fall inside,
 		// on the edge of and outside the seeds' extent.
 		for _, ll := range [][2]float64{{-9.9, 39.9}, {-9, 39}, {170, -80}} {
-			_, _ = r.SampleBilinear(angle.Deg(ll[0]), angle.Deg(ll[1]))
+			_, _ = r.SampleBilinear(angle.LatDeg(ll[1]), angle.LonDeg(ll[0]))
 		}
 
 		// ReadGrid is sized by the image's dimensions, which come from the

@@ -370,7 +370,7 @@ func evaluate(p *jpl.Provider, target int32, et float64) (vector.Vec3, error) {
 func barcelona(b *testing.B) *coord.Geodetic {
 	b.Helper()
 
-	g, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), unit.Meters(0))
+	g, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), unit.Meters(0))
 	if err != nil {
 		b.Fatalf("site: %v", err)
 	}
@@ -524,7 +524,7 @@ func BenchmarkSatellite(b *testing.B) {
 	// with the precession-nutation the Context holds. The pass moves one
 	// Context minute by minute, rebuilding it each hour, as plan's pass search
 	// does.
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		b.Fatalf("site: %v", err)
 	}

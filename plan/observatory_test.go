@@ -20,7 +20,7 @@ import (
 )
 
 func TestNewSite(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	tz, _ := time.LoadLocation("Europe/Rome")
 	horizon := angle.Deg(20)
 
@@ -35,26 +35,16 @@ func TestNewSite(t *testing.T) {
 	testutil.AssertEqual(t, "TimeZone", site.TimeZone().String(), "Europe/Rome")
 }
 
-// TestNewSiteEarthLocation confirms the plain lat/lon/height convenience
-// constructor produces the same Site a caller would get by hand-building a
-// coord.Geodetic via coord.NewEarthLocation + NewSite — the whole point is
-// that a caller no longer needs to import coord for this common case.
-func TestNewSiteEarthLocation(t *testing.T) {
-	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+// TestNewSiteKeepsItsLocation: a Site reports the latitude, longitude and
+// height of the location it was built from.
+func TestNewSiteKeepsItsLocation(t *testing.T) {
+	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
 	testutil.AssertEqual(t, "Latitude", site.Latitude().Degrees(), -22.528478)
 	testutil.AssertEqual(t, "Longitude", site.Longitude().Degrees(), -46.473002)
 	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
-}
-
-// TestNewSiteEarthLocation_InvalidLatitude confirms the underlying
-// coord.NewEarthLocation validation error still surfaces (not swallowed).
-func TestNewSiteEarthLocation_InvalidLatitude(t *testing.T) {
-	if _, err := NewSiteEarthLocation("Bad", 200, 0, 0); err == nil {
-		t.Error("expected an error for a latitude outside [-90, 90]")
-	}
 }
 
 // TestNewSiteEarthAddress_Offline confirms remote.SetOffline's ErrOffline
@@ -186,14 +176,14 @@ func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
 }
 
 func TestDefaultTimeZone(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	site, _ := NewSite("UTC Site", loc)
 
 	testutil.AssertEqual(t, "Default TZ", site.TimeZone().String(), "UTC")
 }
 
 func TestInvalidHorizon(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	_, err := NewSite("Bad Horizon", loc, WithHorizon(angle.Deg(100)))
 	if !errors.Is(err, ErrInvalidHorizon) {
@@ -214,7 +204,7 @@ func TestNilLocation(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
 
 	s := site.String()
@@ -224,7 +214,7 @@ func TestString(t *testing.T) {
 }
 
 func TestSiteEqual(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	a, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
 	b, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
 	c, _ := NewSite("Other", loc, WithHorizon(angle.Deg(20)))
@@ -239,7 +229,7 @@ func TestSiteEqual(t *testing.T) {
 }
 
 func TestWithHorizon(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 
 	s2, err := site.WithHorizon(angle.Deg(15))
@@ -255,7 +245,7 @@ func TestWithHorizon(t *testing.T) {
 // scalar Horizon() at every azimuth when no profile was set — the
 // zero-value (nil HorizonProfile) case every existing Site already has.
 func TestHorizonAt_FallsBackToScalar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(12)))
 
 	if site.HorizonProfile() != nil {
@@ -273,7 +263,7 @@ func TestHorizonAt_FallsBackToScalar(t *testing.T) {
 // TestHorizonAt_ProfileWinsOverScalar confirms a set profile takes
 // precedence over the scalar Horizon() wherever HorizonAt is consulted.
 func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	// A ridge blocking the eastern sky to 30°, clear (0°) everywhere else.
 	profile := func(az angle.Angle) angle.Angle {
@@ -306,7 +296,7 @@ func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
 // and WithTimeZone (a hand-copied struct literal) must carry the profile
 // forward.
 func TestHorizonProfile_SurvivesCopyConstructors(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	profile := func(angle.Angle) angle.Angle { return angle.Deg(7) }
 
 	site, _ := NewSite("Test", loc, WithHorizonProfile(profile))
@@ -337,7 +327,7 @@ func TestHorizonProfile_SurvivesCopyConstructors(t *testing.T) {
 // right at the 0°/360° azimuth wrap boundary — a plausible off-by-wrap bug
 // site for any future CSV/DEM-backed profile implementation to trip on.
 func TestHorizonProfile_AzimuthWrap(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	// Blocked due north (a wrap-straddling band from 350° through 10°).
 	profile := func(az angle.Angle) angle.Angle {
@@ -365,7 +355,7 @@ func TestHorizonProfile_AzimuthWrap(t *testing.T) {
 func TestLocalSiderealTime(t *testing.T) {
 	// Greenwich (lon=0) at J2000.0 (2000-01-01 12:00:00 UTC = JD 2451545.0)
 	// GAST at J2000.0 is approximately 18.697 hours = 280.46 degrees
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0) // Greenwich
+	loc, _ := coord.NewGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), 0) // Greenwich
 	site, _ := NewSite("Greenwich", loc)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -576,9 +566,9 @@ func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
 		{786, 0.822, 0.899},
 		{8849, 2.759, 3.016},
 	} {
-		site, err := NewSiteEarthLocation("dip", 0, 0, 0, WithHorizonHeight(unit.Meters(c.height)))
+		site, err := NewSite("dip", coord.MustGeodetic(angle.LatDeg(0), angle.LonDeg(0), unit.Meters(0)), WithHorizonHeight(unit.Meters(c.height)))
 		if err != nil {
-			t.Fatalf("NewSiteEarthLocation: %v", err)
+			t.Fatalf("NewSite: %v", err)
 		}
 
 		if dip := site.HorizonDip().Degrees(); math.Abs(dip-c.apparent) > 5e-4 {

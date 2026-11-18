@@ -218,7 +218,7 @@ func TestSFDPicksTheHemisphere(t *testing.T) {
 	}{
 		{45, false}, {0.1, false}, {0, false}, {-0.1, true}, {-45, true},
 	} {
-		got, err := s.IntensityAt(angle.Deg(120), angle.Deg(c.bDeg))
+		got, err := s.IntensityAt(angle.LatDeg(c.bDeg), angle.LonDeg(120))
 		if err != nil {
 			t.Fatalf("b = %g: %v", c.bDeg, err)
 		}
@@ -236,11 +236,11 @@ func TestSFDRefusesBeforeOpen(t *testing.T) {
 
 	var s *SFD
 
-	if _, err := s.IntensityAt(angle.Deg(0), angle.Deg(0)); err == nil {
+	if _, err := s.IntensityAt(angle.LatDeg(0), angle.LonDeg(0)); err == nil {
 		t.Error("a nil map answered")
 	}
 
-	if _, err := (&SFD{}).IntensityAt(angle.Deg(0), angle.Deg(0)); err == nil {
+	if _, err := (&SFD{}).IntensityAt(angle.LatDeg(0), angle.LonDeg(0)); err == nil {
 		t.Error("an empty map answered")
 	}
 }

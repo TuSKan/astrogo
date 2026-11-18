@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // siriusICRS is Sirius at its ICRS J2000 position, used by both examples so the
@@ -16,7 +17,7 @@ var siriusICRS = coord.NewAstrometric(angle.Deg(101.287155), angle.Deg(-16.71611
 // quintaCalixto returns the site both examples observe from: 22.53° S,
 // 46.47° W, 835 m.
 func quintaCalixto() *coord.Geodetic {
-	site, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
+	site, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		panic(err)
 	}

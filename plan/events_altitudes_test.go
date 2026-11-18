@@ -54,7 +54,7 @@ var _ MovingBody = errMovingBody{}
 func TestAltitudesAtReportsFailureRatherThanAGuess(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestAltitudesAtReportsFailureRatherThanAGuess(t *testing.T) {
 func TestAltitudesAtSeparatesTheTwoAtmospheres(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

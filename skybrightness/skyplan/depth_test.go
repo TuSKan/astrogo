@@ -66,13 +66,17 @@ type localSky struct {
 // a second variable competing with the one under test.
 type uniformStars float64
 
-func (u uniformStars) RadianceAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+func (u uniformStars) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return float64(u), nil
+}
 
 func (uniformStars) Galactic() bool { return true }
 
 type uniformDust float64
 
-func (u uniformDust) IntensityAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+func (u uniformDust) IntensityAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return float64(u), nil
+}
 
 func newLocalSky(t *testing.T) *localSky {
 	t.Helper()
@@ -207,7 +211,7 @@ func testBand() magnitude.Passband {
 func testSpec(t *testing.T, sky skyplan.Sky) skyplan.Spec {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

@@ -64,7 +64,7 @@ func (h HEALPix) NumPixels() int64 { return 12 * h.nside * h.nside }
 func (h HEALPix) PixelArea() float64 { return 4 * math.Pi / float64(h.NumPixels()) }
 
 // PixelOf returns the nested pixel index containing a direction, given as
-// longitude and latitude on whatever sphere the map is defined over —
+// latitude and longitude on whatever sphere the map is defined over —
 // galactic, equatorial or horizontal. The pixelation itself is
 // frame-agnostic; keeping the frames straight is the caller's job, and
 // getting it wrong rotates the entire Milky Way across the sky.
@@ -80,7 +80,7 @@ func (h HEALPix) PixelArea() float64 { return 4 * math.Pi / float64(h.NumPixels(
 // direction "120 degrees of latitude" actually means 60 degrees at the
 // longitude 180 away. The answer was a real direction, plausible in every
 // downstream check, and not the one asked for.
-func (h HEALPix) PixelOf(lon, lat angle.Angle) int64 {
+func (h HEALPix) PixelOf(lat angle.Latitude, lon angle.Longitude) int64 {
 	const outsideTheSphere = -1
 
 	degrees := lat.Degrees()
@@ -112,10 +112,10 @@ func (h HEALPix) PixelOf(lon, lat angle.Angle) int64 {
 	return face*h.nside*h.nside + interleave(ix, iy)
 }
 
-// Center returns the longitude and latitude of a pixel's center.
-func (h HEALPix) Center(pixel int64) (lon, lat angle.Angle, err error) {
+// Center returns the latitude and longitude of a pixel's center.
+func (h HEALPix) Center(pixel int64) (lat angle.Latitude, lon angle.Longitude, err error) {
 	if pixel < 0 || pixel >= h.NumPixels() {
-		return 0, 0, fmt.Errorf("%w: %d not in [0, %d)", ErrHEALPixPixel, pixel, h.NumPixels())
+		return angle.Latitude{}, angle.Longitude{}, fmt.Errorf("%w: %d not in [0, %d)", ErrHEALPixPixel, pixel, h.NumPixels())
 	}
 
 	nside2 := h.nside * h.nside
@@ -165,7 +165,7 @@ func (h HEALPix) Center(pixel int64) (lon, lat angle.Angle, err error) {
 
 	phi := (float64(jp) - float64(kshift+1)*0.5) * (math.Pi / 2 / float64(nr))
 
-	return angle.Rad(phi).Wrap2Pi(), angle.Rad(math.Atan2(z, sinTheta)), nil
+	return angle.Latitude{Angle: angle.Rad(math.Atan2(z, sinTheta))}, angle.Longitude{Angle: angle.Rad(phi).Wrap2Pi()}, nil
 }
 
 // polarPixel handles the polar caps, |z| > 2/3, where the boundaries curve.

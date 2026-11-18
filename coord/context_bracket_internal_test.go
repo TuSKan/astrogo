@@ -12,7 +12,7 @@ import (
 func bracketFixture(t *testing.T) (*Geodetic, atmosphere.Refraction, time.Time) {
 	t.Helper()
 
-	site, err := NewGeodetic(angle.Deg(15), angle.Deg(50), 0)
+	site, err := NewGeodetic(angle.LatDeg(50), angle.LonDeg(15), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

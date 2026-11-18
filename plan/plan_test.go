@@ -16,7 +16,7 @@ import (
 
 func TestPlanner(t *testing.T) {
 	// North Pole makes Alt = Dec (independent of LST)
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(90), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc)
 	constraints := []Constraint{
 		Altitude{Threshold: angle.Deg(30)},
@@ -41,7 +41,7 @@ func TestPlanner(t *testing.T) {
 }
 
 func TestObservableWindows_Fixed(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 
 	// Target at zenith at Greenwich J2000 (LST ~18.69h)
@@ -73,7 +73,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 }
 
 func TestObservableWindows_Moving(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 
 	sun := NewSun(eph.Default())
@@ -110,7 +110,7 @@ func (f *flipConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, erro
 }
 
 func TestObservableWindows_Grouping(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
@@ -139,7 +139,7 @@ func TestObservableWindows_Grouping(t *testing.T) {
 }
 
 func TestIsObservable(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	// Equinox 2000 noon
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -207,7 +207,7 @@ func TestIsObservable(t *testing.T) {
 }
 
 func TestScorer(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon (LST ~18.69h)
 
@@ -278,7 +278,7 @@ type prioritizedTarget struct {
 func (p prioritizedTarget) Priority() float64 { return p.priority }
 
 func TestRankObservables(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	tm := time.FromJD(2451545.0, time.UTC)
 
@@ -323,7 +323,7 @@ func TestRankObservables(t *testing.T) {
 // unreachable dead code with zero production callers. A plain *Star must
 // now rank successfully.
 func TestPlannerRankObservable(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 
 	p, err := NewPlanner(site, nil)
@@ -374,7 +374,7 @@ func (erroringCoordObject) ICRS(time.Time) (coord.ICRS, error) {
 }
 
 func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Deg(45), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 
 	p, err := NewPlanner(site, nil)
@@ -394,7 +394,7 @@ func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
 }
 
 func TestObservableWindows_StepTooLarge(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
@@ -415,7 +415,7 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 }
 
 func TestObservableWindows_StepNotPositive(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc)
 	obj := NewStar("T", angle.Zero(), angle.Zero())
 
@@ -497,7 +497,7 @@ func TestScoreConfig_Defaults(t *testing.T) {
 func TestScorerConfigIsUsed(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	site, err := NewSite("Test", loc)
@@ -541,7 +541,7 @@ func TestScorerConfigIsUsed(t *testing.T) {
 func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	site, err := NewSite("Test", loc)
@@ -583,7 +583,7 @@ func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
 func TestScorerMeritTerms(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	site, err := NewSite("Test", loc)
@@ -675,7 +675,7 @@ func TestScorerMeritTerms(t *testing.T) {
 func TestScorerReportsFailureRatherThanZero(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	site, err := NewSite("Test", loc)

@@ -16,7 +16,7 @@ import (
 func paranal(t *testing.T) *coord.Geodetic {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), unit.Meters(2635))
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

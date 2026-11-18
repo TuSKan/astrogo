@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestStringPrintsTimesWithDateAndZone: String printed each event time as
@@ -15,7 +16,7 @@ import (
 // local ones and a set after midnight read as the same day's (#1133). Each
 // time now carries both, in the Context time's display zone.
 func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760))
 	testutil.AssertNoError(t, err)
 
 	// São Paulo's offset as a fixed zone, so the test needs no time zone

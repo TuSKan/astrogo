@@ -54,7 +54,7 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 		time.ResetEOP()
 	})
 
-	site := coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635)
+	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635)
 	inside := time.FromJD(61050.5+2400000.5, time.UTC) // 2026-01-10
 	past := time.FromJD(61400.5+2400000.5, time.UTC)
 

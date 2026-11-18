@@ -151,7 +151,7 @@ func (s SourceSpectrum) scale() ([]float64, error) {
 // emitter-building logic is testable against an in-memory grid and does not
 // require a multi-gigabyte download.
 type sampler interface {
-	SampleBilinear(lon, lat angle.Angle) (float64, error)
+	SampleBilinear(lat angle.Latitude, lon angle.Longitude) (float64, error)
 }
 
 // Raster is a VIIRS annual composite, sampled by longitude and latitude.
@@ -172,8 +172,8 @@ func (r *Raster) Year() int { return r.year }
 
 // RadianceAt returns the upward DNB radiance at a location, in
 // nW cm^-2 sr^-1.
-func (r *Raster) RadianceAt(lon, lat angle.Angle) (float64, error) {
-	v, err := r.src.SampleBilinear(lon, lat)
+func (r *Raster) RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, error) {
+	v, err := r.src.SampleBilinear(lat, lon)
 	if err != nil {
 		return 0, fmt.Errorf("viirs: sample at %.4f°, %.4f°: %w", lon.Degrees(), lat.Degrees(), err)
 	}

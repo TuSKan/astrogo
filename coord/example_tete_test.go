@@ -14,7 +14,7 @@ import (
 func ExampleContext_CIRSToTETE() {
 	ctx, err := coord.NewContext(
 		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
-		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
+		coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		atmosphere.Refraction{},
 	)
 	if err != nil {

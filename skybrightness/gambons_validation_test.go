@@ -323,7 +323,7 @@ func TestAgainstGAMBONS(t *testing.T) {
 func gambonsScene(t *testing.T) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(gambonsLonDeg), angle.Deg(gambonsLatDeg), gambonsElevM)
+	loc, err := coord.NewGeodetic(angle.LatDeg(gambonsLatDeg), angle.LonDeg(gambonsLonDeg), gambonsElevM)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

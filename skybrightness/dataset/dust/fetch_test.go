@@ -109,12 +109,12 @@ func TestFetchServesASecondSessionFromDisk(t *testing.T) {
 	}
 
 	for _, d := range dirs {
-		want, err := first.IntensityAt(d.L, d.B)
+		want, err := first.IntensityAt(angle.Latitude{Angle: d.B}, angle.Longitude{Angle: d.L})
 		if err != nil {
 			t.Fatalf("first map is missing l=%v b=%v: %v", d.L, d.B, err)
 		}
 
-		got, err := second.IntensityAt(d.L, d.B)
+		got, err := second.IntensityAt(angle.Latitude{Angle: d.B}, angle.Longitude{Angle: d.L})
 		if err != nil {
 			t.Errorf("second map is missing l=%v b=%v: %v", d.L, d.B, err)
 			continue
@@ -368,7 +368,7 @@ func TestFetchAddsToAnExistingMap(t *testing.T) {
 		t.Errorf("map holds %d directions, want 2 — the second Fetch started over instead of adding", m.Len())
 	}
 
-	if _, err := m.IntensityAt(first.L, first.B); err != nil {
+	if _, err := m.IntensityAt(angle.Latitude{Angle: first.B}, angle.Longitude{Angle: first.L}); err != nil {
 		t.Errorf("the first direction was lost from the map: %v", err)
 	}
 }

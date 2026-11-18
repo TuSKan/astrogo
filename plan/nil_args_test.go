@@ -38,7 +38,7 @@ func noPanic(call func() error) (err error) {
 func TestConstraintsRefuseANilSiteOrTarget(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("Paranal", -24.6272, -70.4045, 2635)
+	site, err := plan.NewSite("Paranal", coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestConstraintsRefuseANilSiteOrTarget(t *testing.T) {
 func TestSearchesRefuseANilSiteOrTarget(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("Paranal", -24.6272, -70.4045, 2635)
+	site, err := plan.NewSite("Paranal", coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635)))
 	if err != nil {
 		t.Fatal(err)
 	}

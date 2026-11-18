@@ -124,12 +124,12 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 	streak := int64(0)
 
 	for pixel := range grid.NumPixels() {
-		lon, lat, err := grid.Center(pixel)
+		lat, lon, err := grid.Center(pixel)
 		if err != nil {
 			t.Fatalf("Center(%d): %v", pixel, err)
 		}
 
-		if want(coord.ICRSToGalactic(coord.NewICRS(lon, lat)).B()) {
+		if want(coord.ICRSToGalactic(coord.NewICRS(lon.Angle, lat.Angle)).B().Angle) {
 			streak++
 			if streak == int64(n) {
 				return pixel - int64(n) + 1

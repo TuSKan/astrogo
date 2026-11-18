@@ -51,7 +51,7 @@ func TestSkyOffsetPlacesTheOriginAtZero(t *testing.T) {
 
 			// A non-zero rotation must not move the origin either — it turns
 			// the frame about that point, it does not shift it.
-			lon, lat := coord.NewSkyOffset(origin, angle.Deg(37)).FromICRS(origin)
+			lat, lon := coord.NewSkyOffset(origin, angle.Deg(37)).FromICRS(origin)
 
 			testutil.AssertNear(t, "lon of the origin",
 				lon.Radians(), 0, exactTolerance)
@@ -102,14 +102,14 @@ func TestSkyOffsetAgreesWithSeparationAndPositionAngle(t *testing.T) {
 						where := fmt.Sprintf("%s, sep %g deg, pa %g deg, rotation %g deg",
 							tc.name, sepDeg, paDeg, rot)
 
-						c := f.ToICRS(lon, lat)
+						c := f.ToICRS(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon})
 
 						testutil.AssertNear(t, "separation at "+where,
 							coord.Separation(origin, c).Radians(), sep, exactTolerance)
 
 						// The offsets have to survive the trip back, or the
 						// frame is not a frame.
-						gotLon, gotLat := f.FromICRS(c)
+						gotLat, gotLon := f.FromICRS(c)
 
 						testutil.AssertNear(t, "lat at "+where,
 							gotLat.Radians(), lat.Radians(), exactTolerance)
@@ -117,7 +117,7 @@ func TestSkyOffsetAgreesWithSeparationAndPositionAngle(t *testing.T) {
 						// Every longitude names the same point at the frame's
 						// own poles, so there is nothing there to compare.
 						if math.Abs(lat.Degrees()) < 90-1e-9 {
-							assertAngle(t, gotLon, lon, exactTolerance, "lon at "+where)
+							assertAngle(t, gotLon.Angle, lon, exactTolerance, "lon at "+where)
 						}
 
 						// PositionAngle divides by the cosine of the origin's
@@ -166,12 +166,12 @@ func TestSkyOffsetRoundTrips(t *testing.T) {
 
 			lon, lat := angle.Deg(tc.lon), angle.Deg(tc.lat)
 
-			gotLon, gotLat := f.FromICRS(f.ToICRS(lon, lat))
+			gotLat, gotLon := f.FromICRS(f.ToICRS(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon}))
 
 			// At the frame's own pole every longitude names the same point, so
 			// only the latitude is meaningful there.
 			if math.Abs(tc.lat) < 90 {
-				assertAngle(t, gotLon, lon, exactTolerance, "lon")
+				assertAngle(t, gotLon.Angle, lon, exactTolerance, "lon")
 			}
 
 			testutil.AssertNear(t, "lat",
@@ -212,11 +212,11 @@ func TestSkyOffsetSignsPointEastAndNorth(t *testing.T) {
 			sep := angle.Deg(0.5).Radians()
 
 			c := f.ToICRS(
-				angle.Rad(math.Atan2(math.Sin(pa)*math.Sin(sep), math.Cos(sep))),
-				angle.Rad(math.Asin(math.Sin(sep)*math.Cos(pa))),
+				angle.Latitude{Angle: angle.Rad(math.Asin(math.Sin(sep) * math.Cos(pa)))},
+				angle.Longitude{Angle: angle.Rad(math.Atan2(math.Sin(pa)*math.Sin(sep), math.Cos(sep)))},
 			)
 
-			lon, lat := f.FromICRS(c)
+			lat, lon := f.FromICRS(c)
 
 			if !tc.wantLon(lon.Degrees()) || !tc.wantLat(lat.Degrees()) {
 				t.Errorf("half a degree %s of the origin reads as lon %v, lat %v",
@@ -238,7 +238,7 @@ func TestSkyOffsetRotationAimsLatAtThePositionAngle(t *testing.T) {
 		f := coord.NewSkyOffset(origin, angle.Deg(rot))
 
 		// A point one degree along the frame's +lat axis.
-		c := f.ToICRS(0, angle.Deg(1))
+		c := f.ToICRS(angle.LatDeg(1), angle.Longitude{})
 
 		got := coord.PositionAngle(origin, c)
 		want := angle.Deg(rot).Wrap360()
@@ -281,7 +281,7 @@ func TestSubtractingCoordinatesIsNotAnOffset(t *testing.T) {
 		origin := coord.NewICRS(angle.Deg(120), angle.Deg(tc.dec))
 		f := coord.NewSkyOffset(origin, 0)
 
-		c := f.ToICRS(angle.Deg(1), 0)
+		c := f.ToICRS(angle.Latitude{}, angle.LonDeg(1))
 
 		// The frame's own answer is exactly right, which is the control: the
 		// numbers below are the shortcuts being wrong, not this being wrong.
@@ -336,7 +336,7 @@ func BenchmarkSkyOffsetFromICRS(b *testing.B) {
 	b.ReportAllocs()
 
 	for range b.N {
-		lon, lat := f.FromICRS(c)
+		lat, lon := f.FromICRS(c)
 		_, _ = lon, lat
 	}
 }

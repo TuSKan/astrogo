@@ -19,7 +19,7 @@ import (
 func paranalMoonScene(t *testing.T, hh, mm int) *Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

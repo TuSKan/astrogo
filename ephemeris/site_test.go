@@ -34,7 +34,7 @@ func TestSiteApparentIsSOFAsTopocentricPlace(t *testing.T) {
 
 	p := eph.Default()
 
-	site, err := coord.NewEarthLocation(41.3874, 2.1686, 0)
+	site, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestSiteIsTheContextsObserver(t *testing.T) {
 
 	p := eph.Default()
 
-	site, err := coord.NewEarthLocation(-24.6272, -70.4045, 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		t.Fatal(err)
 	}

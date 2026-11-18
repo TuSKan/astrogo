@@ -46,7 +46,7 @@ func TestEclipticRoundTrip(t *testing.T) {
 }
 
 func TestAltAzRoundTrip(t *testing.T) {
-	site, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	site, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	tm := time.FromJD(2460000.5, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(100), angle.Deg(20))
 
@@ -77,7 +77,7 @@ func TestGalacticPole(t *testing.T) {
 }
 
 func TestAltAzEdgeCases(t *testing.T) {
-	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	tm := time.FromJD(2451545.0, time.UTC)
 
 	// Zenith test
@@ -169,7 +169,7 @@ func TestEclipticExtremes(t *testing.T) {
 }
 
 func TestICRSToHourAngle(t *testing.T) {
-	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	tm := time.FromJD(2451545.0, time.UTC)
 	icrs := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
@@ -187,7 +187,7 @@ func TestICRSToHourAngle(t *testing.T) {
 }
 
 func TestRefractionModes(t *testing.T) {
-	site, _ := coord.NewGeodetic(angle.Deg(45.0), angle.Deg(45.0), 100.0)
+	site, _ := coord.NewGeodetic(angle.LatDeg(45.0), angle.LonDeg(45.0), 100.0)
 
 	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
 
@@ -265,7 +265,7 @@ func TestAstrometricToCIRS(t *testing.T) {
 	// Calculate apparent position 10 years later (2010.0)
 	obsTime := time.Date(2010, 1, 1, 12, 0, 0, 0, time.LocationUTC)
 
-	site, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	ctx, err := coord.NewContext(obsTime, site, atmosphere.StandardRefraction())
 	if err != nil {
@@ -294,7 +294,7 @@ func TestAstrometricToCIRS(t *testing.T) {
 func TestCIRSToObserved(t *testing.T) {
 	// Zenith star in CIRS right on local meridian (Hour Angle = 0)
 	// At observer's latitude, if Declination == Latitude and LST == RA, star is exactly at Zenith.
-	site, err := coord.NewGeodetic(angle.Deg(45.0), angle.Deg(-90.0), 100.0)
+	site, err := coord.NewGeodetic(angle.LatDeg(-90.0), angle.LonDeg(45.0), 100.0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestCIRSToObserved(t *testing.T) {
 }
 
 func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
-	site, err := coord.NewGeodetic(angle.Deg(45.0), angle.Deg(-90.0), 0.0)
+	site, err := coord.NewGeodetic(angle.LatDeg(-90.0), angle.LonDeg(45.0), 0.0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestTransformNearPole(t *testing.T) {
 	tm := fixedEpoch()
 
 	// Star at zenith from North Pole
-	locN, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(90), 0)
+	locN, err := coord.NewGeodetic(angle.LatDeg(90), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -374,7 +374,7 @@ func TestTransformNearPole(t *testing.T) {
 	}
 
 	// Star at horizon from South Pole
-	locS, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(-90), 0)
+	locS, err := coord.NewGeodetic(angle.LatDeg(-90), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestTransformNearPole(t *testing.T) {
 }
 
 func TestTransformBoundaryRA(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -419,12 +419,12 @@ func TestTransformBoundaryRA(t *testing.T) {
 
 func TestNegativeLongitude(t *testing.T) {
 	// Lon -45 should be same as Lon 315
-	loc1, err := coord.NewGeodetic(angle.Deg(-45), angle.Deg(0), 0)
+	loc1, err := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(-45), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	loc2, err := coord.NewGeodetic(angle.Deg(315), angle.Deg(0), 0)
+	loc2, err := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(315), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestNegativeLongitude(t *testing.T) {
 }
 
 func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	tm := time.FromJD(2460000.5, time.UTC)
 
@@ -487,7 +487,7 @@ func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 }
 
 func TestReduceBatchParallel_Correctness(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
 	tm := time.FromJD(2460000.5, time.UTC)
 

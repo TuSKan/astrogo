@@ -46,9 +46,9 @@ func (m *mockBrightSource) SearchBright(_ context.Context, req resolve.BrightReq
 func quintaCalixtoSite(t *testing.T) *plan.Site {
 	t.Helper()
 
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	return site

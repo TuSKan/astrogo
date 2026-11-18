@@ -30,7 +30,7 @@ func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error 
 
 	prov := eph.Default()
 
-	site, err := plan.NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
+	site, err := plan.NewSite("Barcelona", coord.MustGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestEveryIntervalSearchRefusesANonFiniteInterval(t *testing.T) {
 func TestAnEmptyIntervalIsNotReversed(t *testing.T) {
 	at := time.Date(2026, 9, 24, 12, 0, 0, 0, time.LocationUTC)
 
-	site, err := plan.NewSiteEarthLocation("Barcelona", 41.39, 2.17, 0)
+	site, err := plan.NewSite("Barcelona", coord.MustGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}

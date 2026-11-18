@@ -11,7 +11,7 @@ import (
 
 func ExampleScheduler_BuildSchedule() {
 	// Setup observatory and planner constraints
-	loc, _ := coord.NewEarthLocation(0, 0, 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), unit.Meters(0))
 	site, _ := NewSite("Greenwich", loc)
 	planner, _ := NewPlanner(site, []Constraint{Altitude{Threshold: angle.Deg(30)}})
 

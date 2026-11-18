@@ -20,7 +20,7 @@ import (
 func eblScene(t *testing.T) *Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(2.11), angle.Deg(41.38), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.38), angle.LonDeg(2.11), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

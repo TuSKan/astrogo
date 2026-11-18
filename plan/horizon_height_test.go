@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -63,7 +64,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 		{"Denver", 39.7392, -104.9903, 1609, at(13, 44), at(23, 45), 6},
 		{"Madrid", 40.4168, -3.7038, 667, at(7, 0), at(16, 58), 4},
 	} {
-		loc, err := coord.NewEarthLocation(c.latDeg, c.lonDeg, c.heightM)
+		loc, err := coord.NewGeodetic(angle.LatDeg(c.latDeg), angle.LonDeg(c.lonDeg), unit.Meters(c.heightM))
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -115,7 +116,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewEarthLocation(19.8263, -155.47441, 4145)
+	loc, err := coord.NewGeodetic(angle.LatDeg(19.8263), angle.LonDeg(-155.47441), unit.Meters(4145))
 	if err != nil {
 		t.Fatal(err)
 	}

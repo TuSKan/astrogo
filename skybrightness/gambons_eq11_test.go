@@ -70,7 +70,7 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 
 	band := johnsonVFromTable1()
 
-	site, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(table2LatDeg), table2ElevM)
+	site, err := coord.NewGeodetic(angle.LatDeg(table2LatDeg), angle.LonDeg(0), table2ElevM)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

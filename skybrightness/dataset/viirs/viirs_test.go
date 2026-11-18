@@ -412,7 +412,7 @@ func TestRadianceAt(t *testing.T) {
 		t.Errorf("Year() = %d, want 2024", r.Year())
 	}
 
-	got, err := r.RadianceAt(angle.Deg(-70.4), angle.Deg(-24.6))
+	got, err := r.RadianceAt(angle.LatDeg(-24.6), angle.LonDeg(-70.4))
 	if err != nil {
 		t.Fatalf("RadianceAt: %v", err)
 	}
@@ -441,7 +441,7 @@ func uniformGrid(radiance float64) *raster.Grid {
 func paranal(t *testing.T) *coord.Geodetic {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

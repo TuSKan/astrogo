@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -27,7 +29,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSiteEarthLocation("Madrid", 40.4168, -3.7038, 0)
+	site, err := plan.NewSite("Madrid", coord.MustGeodetic(angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +106,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 
 	prov := eph.Default()
 
-	london, err := plan.NewSiteEarthLocation("London", 51.5, 0, 0)
+	london, err := plan.NewSite("London", coord.MustGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +150,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 			before.Sunset, before.Sunrise, before.Nautical, first.Astronomical.Dusk)
 	}
 
-	longyearbyen, err := plan.NewSiteEarthLocation("Longyearbyen", 78.2232, 15.6267, 0)
+	longyearbyen, err := plan.NewSite("Longyearbyen", coord.MustGeodetic(angle.LatDeg(78.2232), angle.LonDeg(15.6267), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +171,7 @@ func TestTonightPlacesTheMoon(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSiteEarthLocation("Madrid", 40.4168, -3.7038, 0)
+	site, err := plan.NewSite("Madrid", coord.MustGeodetic(angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0)))
 	if err != nil {
 		t.Fatal(err)
 	}

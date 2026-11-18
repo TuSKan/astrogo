@@ -72,7 +72,7 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	east := coord.NewAltAz(angle.Zero(), angle.Deg(90))
 
 	for _, s := range diurnalSites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
+		site, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
@@ -168,7 +168,7 @@ func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4042), angle.Deg(-24.6272), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

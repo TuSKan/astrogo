@@ -54,7 +54,7 @@ import (
 //
 // # What this does not catch
 //
-// An untyped constant converts silently, so `NewGeodetic(lon, lat, 2635)`
+// An untyped constant converts silently, so `NewGeodetic(lat, lon, 2635)`
 // compiles and means 2635 meters. That is the right answer there, and it is
 // the wrong one wherever the number was written in some other unit: a literal
 // `1000` handed to a parsec-scale API is a kilometer, not a kiloparsec, and

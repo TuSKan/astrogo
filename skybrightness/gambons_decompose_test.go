@@ -97,7 +97,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 		t.Fatalf("Band: %v", err)
 	}
 
-	islExtra, err := stars.RadianceAt(icrs.RA(), icrs.Dec())
+	islExtra, err := stars.RadianceAt(angle.Latitude{Angle: icrs.Dec()}, angle.Longitude{Angle: icrs.RA()})
 	if err != nil {
 		t.Fatalf("RadianceAt: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	// Cross-check the interface lookup against the raw pixel, so a frame or
 	// index mistake in the adapter cannot hide behind a plausible number.
 	hpx := skyMap.Grid()
-	pixel := hpx.PixelOf(icrs.RA(), icrs.Dec())
+	pixel := hpx.PixelOf(angle.Latitude{Angle: icrs.Dec()}, angle.Longitude{Angle: icrs.RA()})
 
 	raw, err := skyMap.Pixel("V", pixel)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	// ── the dust the DGL rests on ───────────────────────────────────────────
 	dustMap := gambonsDust(t)
 
-	i100, err := dustMap.IntensityAt(gal.L(), gal.B())
+	i100, err := dustMap.IntensityAt(gal.B(), gal.L())
 	if err != nil {
 		t.Fatalf("IntensityAt: %v", err)
 	}

@@ -29,7 +29,7 @@ func TestTransitionStaysComparable(t *testing.T) {
 func transitionSite(t *testing.T) *Site {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -161,7 +161,7 @@ func fullContextAltAz(t *testing.T, b *Block, at time.Time, site *Site) coord.Al
 // in the measurement: on main before #485 the slew's own Contexts were ~86% of
 // it.
 func BenchmarkGreedyStrategy_10Slew(b *testing.B) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Bench", loc)
 	planner, _ := NewPlanner(site, nil)
 	tm := &BasicTransitionModel{BaseSetup: 0, SlewRate: unit.DegreesPerSec(2)}

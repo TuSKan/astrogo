@@ -114,9 +114,9 @@ func main() {
 	// 4. Look Angle via coord.Context (same API for ISS (Zarya) and Mars)
 	// ═══════════════════════════════════════════════════════════════════════
 	// Observer: Quinta Calixto (-22.528478°, -46.473002°, 835.05m)
-	observer, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05)
+	observer, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
-		log.Fatalf("NewEarthLocation failed: %v", err)
+		log.Fatalf("NewGeodetic failed: %v", err)
 	}
 
 	// Build the observation context (caches SOFA matrices for this time+site).

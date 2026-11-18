@@ -4,11 +4,13 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestObsVelIsTheVelocityApcoAberratesWith: the Context's astrometry holds the
@@ -32,7 +34,7 @@ func TestObsVelIsTheVelocityApcoAberratesWith(t *testing.T) {
 		{"Paranal", -24.6272, -70.4045, 2635},
 		{"near the pole", 89.9, 120, 0},
 	} {
-		site, err := coord.NewEarthLocation(s.lat, s.lon, s.alt)
+		site, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(s.alt))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,7 +87,7 @@ func TestObsVelIsTheVelocityApcoAberratesWith(t *testing.T) {
 func TestObsVelIsPerpendicularToTheAxis(t *testing.T) {
 	t.Parallel()
 
-	site, err := coord.NewEarthLocation(-24.6272, -70.4045, 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		t.Fatal(err)
 	}

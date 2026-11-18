@@ -14,7 +14,7 @@ import (
 func moreSite(t *testing.T) *Site {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -246,7 +246,7 @@ func ridgeProfile(az angle.Angle) angle.Angle {
 func ridgeSite(t *testing.T, opts ...SiteOption) *Site {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

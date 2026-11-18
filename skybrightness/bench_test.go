@@ -26,7 +26,7 @@ import (
 func benchScene(b *testing.B) *skybrightness.Scene {
 	b.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		b.Fatalf("NewGeodetic: %v", err)
 	}

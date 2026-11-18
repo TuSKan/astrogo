@@ -18,7 +18,7 @@ import (
 func TestGeocentricToObservedCarriesTheTopocentricDistance(t *testing.T) {
 	t.Parallel()
 
-	site, err := coord.NewGeodetic(angle.Deg(39.83), angle.Deg(21.42), 0)
+	site, err := coord.NewGeodetic(angle.LatDeg(21.42), angle.LonDeg(39.83), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

@@ -70,7 +70,7 @@ func TestSFDMatchesIRSA(t *testing.T) {
 			continue
 		}
 
-		got, err := sfd.IntensityAt(c.L, c.B)
+		got, err := sfd.IntensityAt(angle.Latitude{Angle: c.B}, angle.Longitude{Angle: c.L})
 		if err != nil {
 			t.Fatalf("l=%.3f b=%.3f: %v", c.L.Degrees(), c.B.Degrees(), err)
 		}

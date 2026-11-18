@@ -236,7 +236,7 @@ func pixels(img *fits.ImageHDU) ([]float64, error) {
 
 // IntensityAt returns the 100 micron intensity toward a galactic direction, in
 // MJy sr^-1, satisfying [github.com/TuSKan/astrogo/skybrightness.DustMap].
-func (s *SFD) IntensityAt(l, b angle.Angle) (float64, error) {
+func (s *SFD) IntensityAt(b angle.Latitude, l angle.Longitude) (float64, error) {
 	if s == nil || s.north == nil || s.south == nil {
 		return 0, fmt.Errorf("%w: not opened", ErrSFD)
 	}
@@ -250,7 +250,7 @@ func (s *SFD) IntensityAt(l, b angle.Angle) (float64, error) {
 		h = s.north
 	}
 
-	return h.at(l, b)
+	return h.at(l.Angle, b.Angle)
 }
 
 // at samples one hemisphere, interpolating between pixels.
