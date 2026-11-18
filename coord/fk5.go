@@ -179,7 +179,7 @@ func FK5ToICRS(c FK5) ICRS {
 // answer: a star at rest in ICRS is not at rest in FK5.
 //
 // Which branch runs depends on whether the caller recorded kinematics, not on
-// whether they happen to be zero — see ICRS.hasKinematics and #278. Both return
+// whether they happen to be zero, as for [ICRSToFK4]. Both return
 // the spin motion here; the difference is that the six-element route also
 // carries parallax and radial velocity through.
 //
@@ -194,8 +194,8 @@ func FK5ToICRS(c FK5) ICRS {
 // J2000.0. So the six-element route answers at J2000.0 whatever jepoch says,
 // and [FK5.Epoch] reports [J2000Epoch] rather than echoing the argument.
 //
-// This is the same limitation [ICRSToFK4] has at B1950.0, for the same reason,
-// and #330 recorded it only for FK4 — it is here too. Use [PropagateEpoch] to
+// This is the same limitation [ICRSToFK4] has at B1950.0, for the same
+// reason. Use [PropagateEpoch] to
 // move a star to another epoch, which is a different operation from a frame
 // conversion and is kept separate on purpose.
 func ICRSToFK5(c ICRS, jepoch float64) FK5 {

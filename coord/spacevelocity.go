@@ -22,8 +22,8 @@ import (
 // one unit, on one set of axes.
 //
 // It is what Galactic UVW velocities, cluster membership tests, moving-group
-// searches and orbit integrations all start from. astrogo had no such function
-// before #335, which is why [GalactocentricFrame] carries positions only.
+// searches and orbit integrations all start from. [GalactocentricFrame]
+// carries positions only.
 //
 // # The frame, and what has not been removed
 //
@@ -31,10 +31,10 @@ import (
 // orbit is gone, and nothing else is. In particular the **Sun's** motion is
 // still in it, so two stars with identical Galactic velocities on opposite
 // sides of the sky have space velocities differing by twice the solar motion.
-// [LSRCorrection] is the radial-velocity analog of removing that, and the
-// full three-dimensional version is what #335 tracks.
+// [LSRCorrection] is the radial-velocity analog of removing that; there is no
+// three-dimensional version.
 //
-// # Why a parallax is required here, when [ICRSToFK5] no longer needs one
+// # Why a parallax is required here, when [ICRSToFK5] needs none
 //
 // Those two look inconsistent and are not, and the difference is worth stating
 // because getting it backwards produces a number that is wrong rather than
@@ -42,8 +42,8 @@ import (
 //
 // A frame conversion rotates the velocity. Rotations are linear and preserve
 // length, so the distance divides out of both sides and the proper motion
-// transforms on its own — which is exactly what #331's fix exploits, and why
-// those conversions are exact for a star with no parallax at all.
+// transforms on its own, which is why those conversions are exact for a star
+// with no parallax at all.
 //
 // A space velocity in km/s is not a rotation. It asks how many kilometers a
 // star covers in a second, and an angular rate answers that only once a
@@ -53,9 +53,8 @@ import (
 // that rather than substituting a distance and returning a plausible figure.
 //
 // Concretely, ok is false when SOFA's iauStarpv reports that it overrode the
-// distance or zeroed the speed — the same status [gofaext.Starpv] surfaces and
-// the same signal #331's dispatch turns on, used here to refuse instead of to
-// take another route, because here there is no other route.
+// distance or zeroed the speed: the signal the frame conversions take another
+// route on, used here to refuse, because here there is no other route.
 func SpaceVelocity(c ICRS) (v vector.Vec3, ok bool) {
 	if !c.hasKinematics {
 		return vector.Zero(), false

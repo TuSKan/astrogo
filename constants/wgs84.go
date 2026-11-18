@@ -9,9 +9,8 @@ import "github.com/TuSKan/astrogo/unit"
 // is a single active realization (NGA.STND.0036_1.0.0_WGS84, 2014) this
 // library targets, so there is no epoch-versioned family here.
 //
-// A second ellipsoid standard was eventually needed, exactly as this comment
-// used to predict: see [WGS72], which is the system every two-line element set
-// is expressed in.
+// [WGS72] is the other ellipsoid standard astrogo carries, the system every
+// two-line element set is expressed in.
 //
 // The derived flattening f = 1/(1/f) is not a value this standard
 // tabulates directly — see Derived.WGS84Flattening.

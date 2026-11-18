@@ -263,15 +263,12 @@ func (p SecularPrecession) rate() float64 {
 // [CentralBody.GM] to constants.Ephemeris.PlutoSystemGravitationalParameter
 // rather than taking the default here.
 //
-// An earlier version of this comment had that backwards, and said the system
-// parameter was the wrong one at Pluto. The period measurement settled it.
-//
 // Reports false for a body with no satellite system in the table — the Sun,
 // the Moon, Mercury and Venus.
 //
 // A planet's center and its system barycenter find the same GM — the
 // planet's — and the CentralBody keeps the id it was asked for, so an orbit
-// is placed about whichever of the two points the caller named (#809).
+// is placed about whichever of the two points the caller named.
 func CentralBodyFor(id core.ID) (CentralBody, bool) {
 	gm, ok := map[core.ID]float64{
 		core.Earth:   constants.Ephemeris.EarthGravitationalParameter.Value,
@@ -336,7 +333,7 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 // epoch is the osculation epoch the elements were published for: CometEls
 // and SBDB both carry it beside the perihelion time, which it usually is not.
 // It is near that epoch that two-body motion is closest to the real orbit, and
-// so where a refit about another center has to happen (#803); see this
+// so where a refit about another center has to happen; see this
 // package's doc comment. [Elements.Epoch] reports it, and
 // [Elements.MeanAnomaly] the mean anomaly there. An orbit published without
 // one, unperturbed, osculates at its perihelion time: pass that for both.
@@ -560,13 +557,6 @@ func (el Elements) Validate() error {
 //     the residual is evaluated as (1−e)·E + e·(E − sin E) − M near
 //     perihelion, where E − e·sin E − M would lose what 1 − e has.
 //   - E(−M) = −E(M) bit for bit, and E(±0) = ±0.
-//
-// It used to be Newton's method on the direct residual, answering in
-// [0, 2π), and measured in docs/kepler.md §3.2 it lost three ways: for M just
-// below zero E was a float64 near 2π, wrong as an angle by more than its own
-// size; reducing by the float64 2π gave a phase a hair past a revolution the
-// wrong sign; and near perihelion as e → 1 the direct residual's rounding
-// limits E to about ε·E/(1 − e·cos E).
 func SolveKepler(meanAnomaly angle.Angle, ecc float64) (angle.Angle, error) {
 	if !finite(ecc) || ecc < 0 || ecc >= 1 {
 		return angle.Zero(), fmt.Errorf("%w: eccentricity %v", ErrUnsupportedOrbit, ecc)

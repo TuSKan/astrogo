@@ -99,7 +99,7 @@ var (
 	// A non-finite time is refused before the model runs rather than left to
 	// fail inside it, because there it does not fail: the deep-space
 	// resonance integrator steps from epoch toward the requested time and
-	// never arrives at a NaN or an infinity (#1052). An overflowed state is
+	// never arrives at a NaN or an infinity. An overflowed state is
 	// refused because the two advisory errors above promise a state that
 	// exists, and a NaN is not one.
 	ErrNotFinite = errors.New("sgp4: time or state is not finite")
@@ -111,8 +111,8 @@ var (
 	//
 	// None of the model's own checks catch this. Run thousands of years from
 	// its epoch, an element set's secular drag terms carry the orbit outward
-	// without bound, decaying in neither eccentricity nor semi-major axis
-	// (#1131). It does not catch a position merely stale, a plausible orbit a
+	// without bound, decaying in neither eccentricity nor semi-major axis.
+	// It does not catch a position merely stale, a plausible orbit a
 	// year from its epoch: only a validity window could, and the right one
 	// depends on the orbit.
 	ErrBeyondHillSphere = errors.New("sgp4: the propagated position is beyond the Earth's Hill sphere")

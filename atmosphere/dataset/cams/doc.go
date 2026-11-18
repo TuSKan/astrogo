@@ -26,12 +26,10 @@
 //
 // # Why github.com/scigolib/hdf5, and what was verified before using it
 //
-// astrogo used to depend on this library, and dropped it when
-// skybrightness/atlas was deleted. Re-adopting it
-// here was gated on a live decision-gate spike against the real CAMS
-// files this package targets — not assumed to still work, and not
-// assumed to work at all for a 4-dimensional, chunked, deflate-compressed
-// NetCDF-4 layout the library's own docs don't mention by name:
+// Three of the library's capabilities this package relies on were checked
+// against the real CAMS files it targets, a 4-dimensional, chunked,
+// deflate-compressed NetCDF-4 layout the library's own docs don't mention by
+// name:
 //
 //  1. N-dimensional shape reporting. The public API has no structured
 //     Dims()/Shape() method — Dataset.Info() returns only a formatted
@@ -41,7 +39,7 @@
 //     and, unlike Info()'s string format, is a stable third-party
 //     convention this library didn't invent. It does read the string as
 //     a bound, before any read the decoder would size from the file, and
-//     fails closed if it cannot (#794; see "A malformed file" below).
+//     fails closed if it cannot (see "A malformed file" below).
 //  2. Chunked + deflate reads. Confirmed live: Dataset.Read() correctly
 //     decoded a full 182 MB, 4-dimensional, chunk=[1,1,451,900]
 //     deflate-level-1 aerosol tracer file (55,608,300 float64 values,
@@ -141,7 +139,7 @@
 // and a corrupt one is an error wrapping ErrMalformed, never the end of the
 // caller's process. That takes two guards, because the decoder sizes its
 // buffers from what the file declares and does not check it against the
-// file: one corrupted byte made it ask for 8.8 TB (#794).
+// file: one corrupted byte can make it ask for 8.8 TB.
 //
 //   - A bound before every read: a dataset cannot hold more values than the
 //     file has bytes, or for chunked data more than DEFLATE could inflate

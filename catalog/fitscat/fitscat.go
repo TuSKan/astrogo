@@ -186,9 +186,7 @@ func (p *Provider) Name() string {
 // Resolve attempts a precise match of a FITS target natively scanning ID or Name.
 //
 // ctx is accepted for [resolve.Provider] conformance only — the targets were
-// read from the file at construction and there is no I/O here to cancel. The
-// parameter was previously absent entirely, which meant this type could not
-// satisfy the interface it was written against.
+// read from the file at construction and there is no I/O here to cancel.
 func (p *Provider) Resolve(_ context.Context, query string) (resolve.Target, error) {
 	q := resolve.Normalize(query)
 	for _, t := range p.targets {

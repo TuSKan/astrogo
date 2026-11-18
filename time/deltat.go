@@ -24,12 +24,6 @@ import (
 // With no bulletin loaded, the second and third regimes read DUT1 as zero, as
 // the conversions do, and the one-time EOP warning says so.
 //
-// It used to be the model at every epoch, while the conversions used the
-// bulletin, and the two disagreed for one instant: by 6.2 s in 2026, where
-// the model, fitted before the Earth's rotation sped up, still rises at
-// 0.6 s a year and the measured ΔT has been flat since 2020; and by 134 s in
-// 2100, where the conversions held DUT1 at zero (#696).
-//
 // From 1960 the value comes from the EOP lookup, so it can trigger the same
 // lazy load [Time.EOP] does.
 func DeltaT(t Time) unit.Duration {
@@ -181,8 +175,7 @@ func deltaTModel(year float64) float64 {
 //	where N = years past the end, M = 2500, Q = 0.058 ms²/yr
 //
 // With no bulletin loaded, the record is taken to end in 2005, the end of the
-// observations the model was fitted to, which is where this used to start
-// every caller's random walk (#696).
+// observations the model was fitted to.
 //
 // References:
 //   - https://eclipse.gsfc.nasa.gov/LEcat5/uncertainty.html

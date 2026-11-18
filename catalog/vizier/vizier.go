@@ -58,10 +58,6 @@ func (p *Provider) Capabilities() []resolve.Capability {
 
 // Resolve reports [resolve.ErrUnsupported]: VizieR is reached here as a
 // cone-search provider and does not resolve names.
-//
-// This previously returned a bare false, which a Resolver could not tell from
-// "that object does not exist" — so a real target could be reported absent
-// because the provider asked happened to be one that never answers names.
 func (p *Provider) Resolve(_ context.Context, _ string) (resolve.Target, error) {
 	return resolve.Target{}, fmt.Errorf("%w: use ConeSearch", resolve.ErrUnsupported)
 }
@@ -83,8 +79,8 @@ func (p *Provider) Search(_ context.Context, _ string) ([]resolve.Target, error)
 // It returns the req.Limit sources nearest the center, nearest first, or the
 // 100 nearest when req.Limit is not set. Without the ordering a TAP service
 // returns the first rows it reaches, so a cone holding more sources than the
-// limit came back as an arbitrary subset of it, as likely from the edge as
-// from the center (#605).
+// limit would come back as an arbitrary subset of it, as likely from the edge
+// as from the center.
 func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) resolve.SeqIterator[resolve.Target] {
 	tableName := req.Table
 	if tableName == "" {

@@ -182,13 +182,7 @@ func (g Geodetic) ToECEF(e Ellipsoid) vector.Vec3 {
 // FromECEF converts an ECEF Cartesian vector, in meters, to geodetic
 // coordinates on the given ellipsoid, by SOFA's iauGc2gde: Fukushima's (2006)
 // method, which holds to a fraction of a micrometer from the ground out past
-// the Moon.
-//
-// It used Bowring's (1976) single step, which is exact enough on the ground
-// and degrades with altitude. Measured round trip, worst height error over
-// latitude: 1.5 mm at the ISS, 25 cm at GPS orbit, 31 cm at geostationary
-// orbit and 42 cm at the Moon's distance, against 2.2e-8 m at geostationary
-// orbit here (#526). It mattered once satellite.Altitude came to run here.
+// the Moon: a round trip at geostationary orbit closes to 2.2e-8 m.
 //
 // A point on the polar axis gets longitude 0. Returns [ErrNotFinite] for a
 // non-finite component and [ErrInvalidEllipsoid] for an ellipsoid SOFA

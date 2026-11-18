@@ -40,20 +40,13 @@ type Provider struct {
 //
 // # Why not at construction
 //
-// It used to be. New called fetch with context.Background(), which meant a
-// constructor that looked pure blocked for as long as the endpoint took: two
-// seconds against a warm cache, and a full timeout against an unreachable one,
-// with no way for the caller to cancel it or set a deadline. catalog.NewResolver
-// takes no context either, so a request-scoped deadline above it had no effect
-// on the network call below it. Every other network entry point in astrogo takes
-// a ctx first, and this one took none.
+// A fetch at construction would block for as long as the endpoint took, with
+// no context to cancel it or set a deadline by: catalog.NewResolver takes
+// none either.
 //
-// A failed load is also no longer permanent. It used to be recorded once and
-// replayed at every query for the life of the process, so a consent gate not yet
-// granted, or one bad fetch at start-up, made the whole NGC/IC catalog silently
-// absent while the provider looked healthy. That is worse than a per-query
-// failure precisely because it is invisible and cannot recover; a later query
-// now tries again.
+// A failed load is not remembered: a later query tries again, so a consent
+// gate granted later, or one bad fetch at start-up, does not leave the NGC/IC
+// catalog absent for the life of the process.
 func New() *Provider { return &Provider{} }
 
 // Name returns the provider identifier.

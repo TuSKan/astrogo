@@ -213,10 +213,8 @@ const (
 	//
 	// CIE publishes both as citable datasets under CC BY-SA 4.0, over https:
 	// DOI 10.25039/CIE.DS.dktna2s3 (photopic) and 10.25039/CIE.DS.gr6w4b5g
-	// (scotopic). Until #739 the registry pointed at a mirror, CVRL at UCL,
-	// on the premise that CIE sold them; that mirror served no TLS and was
-	// unreachable from 2026-10-10. Its tables and these hold the same values
-	// on the same wavelengths, to the last digit.
+	// (scotopic). CVRL at UCL holds the same values on the same wavelengths,
+	// to the last digit, but serves no TLS.
 	CIELuminosity EndpointID = "cie.lum"
 
 	// GaiaAIP is the Gaia mirror at Leibniz-Institut für Astrophysik Potsdam.
@@ -360,8 +358,7 @@ type Endpoint struct {
 	// on the server, as a TAP sync query or a JSON search does. Such a POST is
 	// retried under the client's RetryPolicy, as a GET is. False sends a POST
 	// once, which is right where a POST creates something: GaiaAIPAsync's UWS
-	// job, which a blind retry could start twice. Until #845 no POST was
-	// retried, whatever the policy said.
+	// job, which a blind retry could start twice.
 	IdempotentPost bool
 	// DownloadTimeout is the whole-transfer timeout (KindFile). Zero means
 	// DefaultDownloadTimeout.

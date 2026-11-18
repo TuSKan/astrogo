@@ -48,20 +48,13 @@ const (
 
 // Sentinels, aliased from resolve rather than redeclared.
 //
-// They used to be separate errors.New values carrying the same text, which
-// made errors.Is(err, resolve.ErrNotFound) false for an error this package
-// returned — while printing "target not found" either way, so nothing about
-// the message gave it away.
-//
 // That matters because [Provider] is itself an alias for [resolve.Provider],
 // and that interface's documentation is written entirely in terms of
 // resolve.ErrNotFound: a caller who reads the contract and follows it lands in
 // their "the catalogs could not be reached" branch for an object that simply
-// does not exist. Inverting #102 exactly — an ordinary negative read as an
-// outage instead of the other way round.
+// does not exist, unless the values are shared.
 //
-// Sharing the values makes errors.Is true against either spelling, so existing
-// code using catalog.ErrNotFound keeps working.
+// Sharing them makes errors.Is true against either spelling.
 var (
 	// ErrNotFound is returned when no catalog provider can resolve a query.
 	ErrNotFound = resolve.ErrNotFound
@@ -238,11 +231,9 @@ type candidate struct {
 // means at least one could not answer, and the returned error carries their
 // reasons joined together, tagged by provider name.
 //
-// The distinction is the point. This used to return ErrNotFound for a
-// canceled context, an exceeded deadline, offline mode and a CDS outage
-// alike, because the provider interface had nowhere to put a failure. A
-// pipeline resolving ten thousand names during an outage got ten thousand
-// confident "no such object" answers and no indication anything was wrong.
+// The distinction is the point: a pipeline resolving ten thousand names
+// during an outage gets the outage, not ten thousand confident "no such
+// object" answers.
 //
 // A provider that succeeds wins outright: if any provider resolved the query,
 // the failures of the others are not reported, because the question was
@@ -338,10 +329,7 @@ func (r *Resolver) Resolve(ctx context.Context, query string) (Target, error) {
 //	}
 //
 // Something is better than nothing, but only when the caller can tell it is
-// not everything. Until #1143 the failures were dropped whenever anything was
-// found, so during the CDS outage of November 2026 a search over SIMBAD and
-// OpenNGC returned OpenNGC's matches with a nil error, and SIMBAD's were
-// missing without a word.
+// not everything.
 //
 // When every provider fails, Search returns no results and an error that does
 // not wrap ErrIncomplete: there is nothing usable to be incomplete. An empty

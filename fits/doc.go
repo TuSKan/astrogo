@@ -46,13 +46,17 @@
 // Vector columns — a TFORM repeat above one, which is how a table carries a
 // spectrum or a covariance row — read and write as fixed-size lists.
 //
-// ASCII tables (XTENSION = 'TABLE') read and write as well. The reader used to
-// consume their payload without decoding it, so every one in every archive
-// arrived empty; it decodes now, with a blank field read as undefined rather
-// than as zero, which is that format's own way of saying "no value".
+// ASCII tables (XTENSION = 'TABLE') read and write as well, with a blank field
+// read as undefined rather than as zero, which is that format's own way of saying "no value".
 //
 // # What the writer does not do
 //
 // The variable-length P and Q descriptors are not written. A column declaring
 // one is read as its raw stored values.
+//
+// # Concurrency
+//
+// A [WCS] may be transformed through by any number of goroutines at once, and
+// its setters must not run beside them. A [Header] may be read from any number
+// of goroutines while nothing appends to it.
 package fits

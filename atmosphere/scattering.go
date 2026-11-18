@@ -62,13 +62,12 @@ var (
 // (2022) uses, shared with the artificial-skyglow model (Kocifaj, Bara &
 // Falchi 2022), so the two components propagate through one atmosphere.
 // The Rayleigh optical depth is Bodhaine et al. (1999), for both at once:
-// Winkler's own Eq. 13, a single power law after Dutton et al. (1994), read
-// 4.2% low at 330 nm (#592).
+// Winkler's own Eq. 13, a single power law after Dutton et al. (1994), reads
+// 4.2% low at 330 nm.
 const (
 	// StandardPressureHPa is the sea-level pressure Bodhaine et al. (1999)
 	// normalize the Rayleigh optical depth to, the standard atmosphere's
-	// 1013.25 hPa (equivalently millibars). It was Winkler's (2022)
-	// 1013.5 until #592.
+	// 1013.25 hPa (equivalently millibars).
 	StandardPressureHPa = 1013.25
 
 	// RayleighDepolarization is the air depolarization factor rho adopted
@@ -97,8 +96,8 @@ const (
 // exponent steepens toward the blue as the refractive index and the
 // depolarization of air both change with wavelength, which no single power
 // law follows. Winkler's (2022) Eq. 13, (P/1013.5)·1.229e10·λ^−4.05 after
-// Dutton et al. (1994), read 4.2% low at 330 nm, and its coefficient sits
-// 0.8% below the 0.00877 µm^4.05 Bodhaine quotes from Dutton (#592).
+// Dutton et al. (1994), reads 4.2% low at 330 nm, and its coefficient sits
+// 0.8% below the 0.00877 µm^4.05 Bodhaine quotes from Dutton.
 //
 // The pressure ratio scales the column with the mass of air above the site,
 // at the gravity of 45° and sea level. Bodhaine's own Mauna Loa column,

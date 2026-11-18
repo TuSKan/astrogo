@@ -119,15 +119,8 @@ func (c *Client) DataDir(ctx context.Context) (FS, error) {
 // somewhere to put bytes, which is a different question from whether GetFile
 // can fetch them: GetFile needs a filesystem URL and a name and so still requires
 // KindFile, but a decoded API payload is content this module is expected to
-// keep - [WriteFile] exists for exactly that - and it needs a place to go.
-//
-// This used to refuse KindAPI, which made that impossible and quietly
-// disabled the callers that had already been written for it. starlight asks
-// for esa.gaia's cache directory to checkpoint an hour-long Gaia aggregation
-// and resume it across sessions; both its read and its write sat behind a
-// "cache directory was available" branch that could never be taken, so the
-// aggregation restarted from nothing every time. Nothing reported it, because
-// a cache that cannot be reached is indistinguishable from a cold one.
+// keep - [WriteFile] exists for exactly that - and it needs a place to go:
+// starlight checkpoints an hour-long Gaia aggregation under esa.gaia's.
 func CacheDir(ctx context.Context, id EndpointID) (fsys FS, prefix string, err error) {
 	return Default().CacheDir(ctx, id)
 }
