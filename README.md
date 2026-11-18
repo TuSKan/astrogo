@@ -149,7 +149,7 @@ that use the network also fetch the IERS Earth-orientation bulletin (3.8 MB) onc
 rest choose zero Earth orientation, and say in a comment what that costs them.
 
 `examples/` is [its own module](examples/go.mod), which is why the command carries
-`-C examples` rather than a path. It keeps 33 demo programs out of the library's
+`-C examples` rather than a path. It keeps 34 demo programs out of the library's
 package listing while still building against the working tree, so an API change that
 breaks an example fails CI. CI also runs every example whose Network column says
 none, so a crash, or a "none" that reaches the network, fails it too.
@@ -173,6 +173,7 @@ none, so a crash, or a "none" that reaches the network, fails it too.
 | [`18_sky_brightness`](examples/18_sky_brightness/) | How dark is the sky here tonight? | sky-brightness datasets, once |
 | [`19_offline_setup`](examples/19_offline_setup/) | Pre-seeding data for an air-gapped deployment | none |
 | [`20_whats_visible_tonight`](examples/20_whats_visible_tonight/) | What can I see tonight brighter than magnitude X? | catalogs, live; kernels, once |
+| [`21_tonight`](examples/21_tonight/) | When does tonight get dark, and where is the Moon? | none |
 | [`22_kepler_propagator`](examples/22_kepler_propagator/) | Six orbital elements from JPL SBDB, propagated with no kernel | JPL SBDB, live |
 | [`23_radial_velocity_correction`](examples/23_radial_velocity_correction/) | Remove Earth's own orbital motion from a measured RV | none |
 | [`24_optics`](examples/24_optics/) | Magnification, field of view, exit pupil, plate scale | none |
@@ -326,7 +327,7 @@ Every component traces to primary literature: artificial skyglow follows Kocifaj
 - **Satellite Passes**: AOS/TCA/LOS prediction with Chandrupatla-refined rise/set boundaries (`SatellitePasses`)
 - **Relational Geometry**: Conjunction (RA), Conjunction (Ecliptic Longitude), Appulse, Opposition (Ecliptic Longitude), Greatest Elongation, Quadrature
 - **Eclipse Detection**: `LunarEclipses`, `SolarEclipses` via ecliptic latitude filter (Danjon limit)
-- **Convenience**: `SunriseSunset`, `NightOf`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
+- **Convenience**: `SunriseSunset`, `NightOf`, `TonightAt`, `VisibilityEvents`, `Conjunctions`, `ConjunctionsEcliptic`, `Appulses`, `Oppositions`, `GreatestElongations`
 
 ### Lunar Crescent Visibility
 - **18 Published Criteria (1910–2021)** — Fotheringham, Danjon, Yallop, Odeh, Caldwell, MABIMS, and more
