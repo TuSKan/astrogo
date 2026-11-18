@@ -31,6 +31,13 @@ type Record struct {
 // nebula and the star as eps Ori. Each record of such a group is returned as
 // it came, so an object can be listed twice but never lost.
 //
+// Every Target names what it was built from. Its Sources are its records'
+// [resolve.SourceRecord]s. A merged Target's Associations give, as accepted
+// [resolve.Association]s, the identifier that joined each record to the
+// group, and the provider that asserted it. A record of an ambiguous group
+// keeps its own source, with an ambiguous association to each record it was
+// kept apart from, naming the identifier that would have joined them.
+//
 // A record that matches no other is returned as it came. A group is merged
 // under the policy [Resolver.Resolve] applies to the records it cross-matches:
 //   - the ID, name, designation, SPK ID, catalog and kind from the first
@@ -59,7 +66,7 @@ func Consolidate(records []Record) []Target {
 	}
 
 	uf := newUnionFind(len(cands))
-	unionByAlias(cands, uf)
+	links := unionByAlias(cands, uf)
 
 	members := make(map[int][]int, len(cands))
 	for i := range cands {
@@ -73,12 +80,31 @@ func Consolidate(records []Record) []Target {
 		m := members[uf.find(i)]
 
 		switch {
-		case len(m) == 1 || ambiguous(cands, m):
-			out = append(out, c.target)
+		case len(m) == 1:
+			t := c.target
+			t.Sources = []resolve.SourceRecord{sourceOf(c)}
+			out = append(out, t)
+		case ambiguous(cands, m):
+			t := c.target
+			t.Sources = []resolve.SourceRecord{sourceOf(c)}
+
+			for _, l := range links {
+				if l.a == i || l.b == i {
+					t.Associations = append(t.Associations, associationOf(cands, l, resolve.Ambiguous))
+				}
+			}
+
+			out = append(out, t)
 		case m[0] == i:
 			g := group{candidates: make([]candidate, len(m))}
 			for k, j := range m {
 				g.candidates[k] = cands[j]
+			}
+
+			for _, l := range links {
+				if uf.find(l.a) == uf.find(i) {
+					g.associations = append(g.associations, associationOf(cands, l, resolve.Accepted))
+				}
 			}
 
 			out = append(out, mergeGroup(g))
