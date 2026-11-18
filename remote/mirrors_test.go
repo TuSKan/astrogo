@@ -231,8 +231,9 @@ func TestSetURLClearsTheMirrors(t *testing.T) {
 }
 
 // TestMirrorsAreOtherHostsOfAnAPI: every registered mirror belongs to an API
-// endpoint, is an https URL, and is on a host other than the endpoint's own
-// and the other mirrors', since a request is passed over by host.
+// endpoint that carries no token, is an https URL, and is on a host other
+// than the endpoint's own and the other mirrors', since a request is passed
+// over by host.
 func TestMirrorsAreOtherHostsOfAnAPI(t *testing.T) {
 	t.Parallel()
 
@@ -243,6 +244,12 @@ func TestMirrorsAreOtherHostsOfAnAPI(t *testing.T) {
 
 		if ep.Kind != KindAPI {
 			t.Errorf("%s: mirrors on a KindFile endpoint, which no request method serves", ep.ID)
+		}
+
+		// A mirror is asked through the endpoint's transport, token included.
+		if ep.TokenEnv != "" {
+			t.Errorf("%s: mirrors on an endpoint that carries a token (%s), which would reach the mirrors' hosts",
+				ep.ID, ep.TokenEnv)
 		}
 
 		hosts := map[string]bool{hostOf(ep.URL): true}
