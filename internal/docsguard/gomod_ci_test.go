@@ -111,8 +111,9 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	}
 
 	// A pin that stops matching is worse than a mismatched one: the guard
-	// keeps passing while guarding nothing. Twelve is the count today, and the
-	// thirteenth should arrive with this number updated. The tenth to twelfth
+	// keeps passing while guarding nothing. Thirteen is the count today, and the
+	// fourteenth should arrive with this number updated. The thirteenth is the
+	// Validation workflow's Accuracy Report job (#1199). The tenth to twelfth
 	// are govulncheck.yml's, release.yml's and codeql.yml's, which were there
 	// all along and uncounted until the guard read the whole directory (#929). The ninth was the
 	// benchmarks job's own setup for benchstat, when the benchmarks themselves
@@ -130,7 +131,7 @@ func TestWorkflowGoVersionTracksTheModuleDirective(t *testing.T) {
 	// eight pins were asserted as seven, and gone on passing while guarding one
 	// fewer than it claimed. Counting is what made two independently correct
 	// edits visibly incompatible.
-	const wantPins = 12
+	const wantPins = 13
 
 	if found != wantPins {
 		t.Errorf("found %d Go version pins across %v, want %d.\n"+
