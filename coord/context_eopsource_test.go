@@ -66,7 +66,7 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 		}
 	}
 
-	check("nothing loaded", coord.NewContext(inside, site, atmosphere.Refraction{}), "zero", false)
+	check("nothing loaded", mustContext(t, inside, site, atmosphere.Refraction{}), "zero", false)
 
 	time.RegisterEOPLoader(fetchedBulletin{start: 61041, n: 30})
 
@@ -74,12 +74,12 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 		t.Fatalf("LoadEOP: %v", err)
 	}
 
-	ctx := coord.NewContext(inside, site, atmosphere.Refraction{})
+	ctx := mustContext(t, inside, site, atmosphere.Refraction{})
 	check("inside the bulletin", ctx, "network", true)
 
 	ctx.SetTime(past)
 	check("moved past the bulletin", ctx, "network", false)
 
 	time.RegisterModel(time.ZeroModel{})
-	check("an explicit model", coord.NewContext(inside, site, atmosphere.Refraction{}), "explicit", false)
+	check("an explicit model", mustContext(t, inside, site, atmosphere.Refraction{}), "explicit", false)
 }
