@@ -67,7 +67,7 @@ func WithValidate(f func(io.Reader) error) ReadOption {
 //   - A download that would replace a copy already cached, a Mutable
 //     source's update, is read before it replaces that copy, so a refusal
 //     leaves the cached copy and its recorded ETag as they were, and an
-//     offline call is still served it (#1047). Such an update is read twice
+//     offline call is still served it. Such an update is read twice
 //     when it is accepted: staged, and then where GetFile returns it.
 //
 // The record is this client's and is never written to the cache. A rejection

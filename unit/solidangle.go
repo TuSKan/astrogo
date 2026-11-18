@@ -20,7 +20,7 @@ var SquareArcsecond = Unit{
 // SolidAngle is a solid angle, stored in steradians.
 //
 // A detector pixel's footprint on the sky and the area of sky a map sample
-// stands for were bare float64 steradians, named ...SR (#130). A solid angle
+// stands for are solid angles. A solid angle
 // is not an [Area] and not an angle squared by accident: the surface
 // brightness it divides is per steradian or per square arcsecond, and the two
 // differ by 4.25e10.

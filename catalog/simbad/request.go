@@ -140,9 +140,8 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 // last so an object with no V magnitude never displaces one that has it.
 //
 // Both sort keys are unqualified, as [BuildBrightQuery] explains: SIMBAD's
-// parser rejects a table.column in ORDER BY. The tie-break was written
-// basic.main_id, and every Search failed with an HTTP 400 for five weeks
-// (#705). main_id is unambiguous here, since only basic has one.
+// parser rejects a table.column in ORDER BY. main_id is unambiguous here,
+// since only basic has one.
 func BuildSearchQuery(req resolve.ObjectRequest) string {
 	limit := req.Limit
 	if limit <= 0 {
@@ -186,16 +185,14 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 //
 // With no req.Limit it asks for every object, which SearchBright's contract
 // promises, up to one row past brightRowCap so that SearchBright can tell a
-// complete list from a cut one. It used to take TOP 100 instead, so every
-// caller that set no limit, plan.VisibleTonight among them, saw SIMBAD's 100
-// brightest objects, down to V 2.46, whatever bound it asked for (#603).
+// complete list from a cut one.
 //
 // Objects with no position are left out: a bright-object listing exists to be
 // placed on the sky, and below V 8 SIMBAD holds 29 entries without one.
 //
 // So are transients, by type: a supernova's or a nova's catalog V is its
-// outburst's, and the outburst is over. SN 2009jb carries V 1.07, and
-// plan.VisibleTonight listed it as a naked-eye star in Hercules (#1137).
+// outburst's, and the outburst is over: SN 2009jb carries V 1.07, and is no
+// naked-eye star in Hercules.
 // Everything that is still in the sky stays, whatever its type: a galaxy, a
 // nebula, a supernova remnant, a cataclysmic binary. See [transientOtypes].
 func BuildBrightQuery(req resolve.BrightRequest) string {

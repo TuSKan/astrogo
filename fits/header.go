@@ -164,8 +164,7 @@ var errDataSize = errors.New("fits: unusable data size")
 //
 // The exponent letter may be D as well as E, as the FITS standard allows
 // (NOST §5.2.4, FITS 4.0 §4.2.4) and Fortran-derived writers use for double
-// precision: 1.5D-05. Until #409 that was refused, which the WCS reader then
-// took for an absent keyword.
+// precision: 1.5D-05.
 func (h *Header) GetFloat(keyword string) (float64, error) {
 	card, err := h.Get(keyword)
 	if err != nil {

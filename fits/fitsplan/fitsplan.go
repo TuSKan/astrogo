@@ -27,10 +27,6 @@ import (
 //     such as '-111 35 59', longitude east positive. SITEELEV is meters above
 //     sea level, taken as the ellipsoidal height, and zero when absent.
 //
-// Until #582 only the last of these was read, and only as numbers: a header
-// with the standard keywords, or with sexagesimal SITE keywords, was reported
-// as missing them.
-//
 // The site is named by OBSERVAT, or "FITS Site" without one.
 func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 	geodetic, err := siteLocation(h)
@@ -180,11 +176,6 @@ func has(h *fits.Header, key string) bool {
 //
 // A header with no celestial axes falls back to the non-standard RA_DEG and
 // DEC_DEG keywords, in degrees.
-//
-// Until #582 it returned CRVAL1 and CRVAL2 as right ascension and declination
-// whatever CTYPE said, documented as the frame's center: a reference pixel at
-// the corner of a 4096-pixel frame at 1″ put the target 0.57° off in each
-// coordinate, and the Galactic Center came back as RA 0, Dec 0.
 //
 // The target is named by OBJECT, else OBJNAME, else "FITS Target".
 func TargetFromFITS(h *fits.Header) (plan.Observable, error) {

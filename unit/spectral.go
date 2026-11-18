@@ -26,7 +26,7 @@ var (
 
 	// ErrSourceWavelength is returned when a curve's wavelength is not
 	// positive and finite. NaN passes every ordering check, so the order
-	// alone let one through (#900).
+	// alone would let one through.
 	ErrSourceWavelength = errors.New("unit: source wavelengths must be positive and finite")
 
 	// ErrGridMismatch is returned when an operation receives a value slice
@@ -230,8 +230,8 @@ func (g SpectralGrid) Resample(dst []float64, src []WavelengthNM, values []float
 // one a tabulated curve's own validation should apply, so that a curve is
 // refused where it is built rather than where it is first resampled. Order
 // alone is not enough: NaN fails every comparison, so a NaN wavelength
-// passed an ordering check, as did an infinite or negative one, and each
-// went on to give a NaN or a plausible-looking wrong answer (#900).
+// passes an ordering check, as does an infinite or negative one, and each
+// would go on to give a NaN or a plausible-looking wrong answer.
 func ValidateWavelengths(axis []WavelengthNM) error {
 	for i, w := range axis {
 		if !isPositiveFinite(float64(w)) {

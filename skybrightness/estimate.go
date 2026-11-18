@@ -62,7 +62,7 @@ func (e *Estimate) Component(id ComponentID) (SpectralRadiance, bool) {
 // Sorted because the components are held in a map, and Go randomizes a map's
 // iteration order on every range. Anything that sums over components in the
 // order this returns, as [Estimate.Composition] does, would otherwise get a
-// different rounding on each call; until #1066 it did.
+// different rounding on each call.
 func (e *Estimate) ComponentIDs() []ComponentID {
 	return slices.Sorted(maps.Keys(e.components))
 }
@@ -118,10 +118,6 @@ func (e *Estimate) ElectronRate(inst optics.Instrument) (unit.ElectronsPerPixelP
 // the error wraps [ErrUncertaintyUnknown] and names the ones without. A
 // component that contributes nothing, such as moonlight with the Moon below
 // the horizon, needs none: its share is zero whatever its uncertainty.
-//
-// Until #911 a missing entry counted as no uncertainty at all. No component
-// fills the budget yet, so every estimate reported 0, which reads as a
-// perfectly certain prediction rather than an unknown one.
 func (e *Estimate) TotalUncertainty() (float64, error) {
 	weights := make(map[ComponentID]unit.Radiance, len(e.components))
 

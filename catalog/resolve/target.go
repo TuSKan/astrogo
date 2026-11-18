@@ -251,22 +251,11 @@ func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
 //
 // # Why these return errors rather than a bool
 //
-// They used to be Resolve(ctx, query) (Target, bool) and
-// Search(ctx, query) []Target, which gave a failure nowhere to go. Every
-// outcome collapsed into "false": an object that genuinely does not exist, a
-// CDS outage, a canceled context, a deadline, a 429 after retries, a TLS
-// failure, and a provider that does not implement name resolution at all.
-// Measured against the old API, all three of these returned "target not
-// found":
-//
-//	offline mode      -> target not found
-//	canceled context -> target not found
-//	deadline exceeded -> target not found
-//
-// so errors.Is(err, context.Canceled) could never be true through this
-// package, and a scheduler asking "does NGC 5139 exist?" during an outage got
-// a confident no. The underlying error existed — it was written to the global
-// log package and discarded.
+// A bool gives a failure nowhere to go: an object that genuinely does not
+// exist, a CDS outage, a canceled context, a deadline, a 429 after retries, a
+// TLS failure and a provider that does not implement name resolution would
+// all be "false", and a scheduler asking "does NGC 5139 exist?" during an
+// outage would get a confident no.
 //
 // # The contract
 //
@@ -350,17 +339,9 @@ func Normalize(query string) string {
 // 1.0). Both sides are normalized first, so a caller may pass either a raw
 // query or one already put through [Normalize].
 //
-// It normalizes the query rather than requiring the caller to, because
-// requiring it did not work. Only the candidate used to be normalized, which
-// made a pre-normalized query an unstated precondition: catalog's resolver met
-// it and catalog/simbad's did not, passing the user's string through
-// untouched. The cost is not subtle. An exact match of "NGC 224" against
-// "NGC 224" scored 0.129 rather than 1.0, because the capitals and the space
-// pushed it out of the equality test and all the way down into the Levenshtein
-// term, whose ceiling is 0.3. "Messier 31" against "M31" scored 0.06. Every
-// candidate collapsing into the same narrow band leaves the ranking to decide
-// between near-identical numbers, which is not what a scorer with an
-// exact-match rung is for.
+// It normalizes the query as well as the candidate, so a caller passes the
+// string as typed: "NGC 224" against "NGC 224" is an exact match, 1.0, rather
+// than falling to the Levenshtein term, whose ceiling is 0.3.
 //
 // Normalize is idempotent, so normalizing here costs a caller that already did
 // it nothing but the call.

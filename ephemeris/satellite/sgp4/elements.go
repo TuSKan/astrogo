@@ -124,7 +124,7 @@ const (
 // eccentricity outside [0, 1) (SGP4 is an elliptical theory), an inclination
 // outside [0, pi] (the range the angle is defined on), a zero epoch (an element
 // set has to be *for* some time), and a NaN or an infinity in any field, which
-// no orbit has and which SGP4 would carry through to a NaN state (#1052).
+// no orbit has and which SGP4 would carry through to a NaN state.
 // Everything else is the propagator's to complain about, at the point where it
 // actually fails.
 //

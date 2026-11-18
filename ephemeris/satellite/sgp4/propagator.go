@@ -188,7 +188,7 @@ func New(el Elements, opts ...Option) (*Propagator, error) {
 //
 // A NaN or infinite tsince is refused with [ErrNotFinite] before the model
 // runs: on a resonant deep-space orbit the integrator would otherwise step
-// toward it forever (#1052).
+// toward it forever.
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 	if math.IsNaN(tsince) || math.IsInf(tsince, 0) {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: tsince is %g minutes", ErrNotFinite, tsince)
@@ -206,7 +206,7 @@ func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 //
 // A time whose Julian Date is NaN or infinite is refused with [ErrNotFinite].
 // Its UTC label would be the standard library's zero time, January 1st of the
-// year 1, and the model would answer for that instant instead (#1052).
+// year 1, and the model would answer for that instant instead.
 func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
 	if jd := t.JD(); !finite(jd) {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: the time's Julian Date is %g", ErrNotFinite, jd)

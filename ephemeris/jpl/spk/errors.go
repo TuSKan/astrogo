@@ -22,13 +22,10 @@ var (
 	// ErrHorizonsRefused is returned when Horizons answers a request and
 	// declines it, carrying the service's own explanation.
 	//
-	// It exists because a refusal used to arrive as an empty kernel list and
-	// a nil error, which reads as success: the provider carried on with only
-	// its planetary base, and the caller learned about it much later as a
-	// body that was simply missing. Horizons is specific about why — asked
-	// for 101955 Bennu it answers "SPK creation is not available for
-	// pre-computed objects in the major body index" — and discarding that
-	// left the caller to guess at designation syntax that was never wrong.
+	// It carries Horizons' own reason, which is specific: asked for 101955
+	// Bennu it answers "SPK creation is not available for pre-computed
+	// objects in the major body index", so a caller is not left to guess at
+	// designation syntax that was never wrong.
 	ErrHorizonsRefused = errors.New("jpl: horizons declined to generate an SPK")
 
 	// ErrHorizonsInternalFault is a refusal that is not about the request.
@@ -52,7 +49,7 @@ var (
 	//
 	// It is the one value every path to Horizons reports such a fault with,
 	// the name lookup in catalog/horizons included, so errors.Is recognizes the
-	// outage whichever path met it (#858). The phrases it is recognized by,
+	// outage whichever path met it. The phrases it is recognized by,
 	// and why matching a third party's text is safe here, are documented
 	// where they live, in astrogo's internal horizons package.
 	ErrHorizonsInternalFault = horizonsfault.ErrServerFault

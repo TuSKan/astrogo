@@ -226,11 +226,6 @@ type astrometric struct {
 // it, and the Sun to the observer at t, where it arrives; SOFA's iauLdsun
 // limiter keeps it finite inside the solar disc. The Sun's own light is not
 // deflected.
-//
-// Until #803 astrogo took the apparent place as the geocentric state at the
-// retarded epoch, which carries aberration to first order because the Earth
-// moves back with the target. Against Horizons' quantity 2 that scattered
-// 9.8 mas in right ascension, and SOFA's order 1.7 mas.
 func (in *Instant) Apparent(target ID, obs Observer) (State, error) {
 	return in.apparent(target, obs, true)
 }

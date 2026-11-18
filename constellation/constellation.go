@@ -125,8 +125,8 @@ var b1875Matrix = func() [3][3]float64 {
 // A position with a NaN or infinite component is refused with
 // [coord.ErrNotFinite]. The containment test is defined only for real
 // coordinates: a NaN crosses no boundary, and Ursa Minor's boundary encircles
-// the pole, so its inverted parity would call every such position Ursa Minor
-// (#1055).
+// the pole, so its inverted parity would call every such position Ursa
+// Minor.
 func Lookup(pos coord.ICRS) (name, abbreviation string, err error) {
 	if ra, dec := pos.RA().Radians(), pos.Dec().Radians(); !finite(ra) || !finite(dec) {
 		return "", "", fmt.Errorf("%w: RA %g, Dec %g degrees",

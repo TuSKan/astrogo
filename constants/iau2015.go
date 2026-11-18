@@ -30,7 +30,7 @@ import (
 // 6,356,800 m. It is 6,371 km, the WGS 84 ellipsoid's mean radius to the
 // kilometer: the radius of the sphere of equal volume, (a²b)^(1/3), is
 // 6,371,000.79 m, and the mean of the semi-axes, (2a+b)/3, 6,371,008.77 m.
-// Not Exact. Until #403 it cited B3 and claimed to be exact.
+// Not Exact.
 //
 // There is deliberately no EarthEquatorialRadius member — Earth's
 // equatorial radius is WGS84.SemiMajorAxis, 6,378,137 m, exact to the WGS 84

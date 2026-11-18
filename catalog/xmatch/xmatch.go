@@ -19,7 +19,7 @@
 // caller. A caller propagating a Pair's Target has to attach the Target's
 // own PmRA, PmDec, Parallax and RadialVelocity to its Coord first, as
 // coord.NewICRSWithKinematics does: providers keep the motion in those
-// fields, and coord.PropagateEpoch on a bare Coord moves nothing (#726).
+// fields, and coord.PropagateEpoch on a bare Coord moves nothing.
 package xmatch
 
 import (

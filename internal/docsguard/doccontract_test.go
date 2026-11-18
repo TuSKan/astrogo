@@ -12,22 +12,19 @@ import (
 	"testing"
 )
 
-// contractPackages are the packages whose exported doc comments state their
-// contract and cite no issue. A package joins the list when its doc comments
-// are rewritten that way (#1193), and the list goes when every package is on
-// it.
-var contractPackages = []string{
-	"plan",
-}
-
 // issueReference is an issue or pull request number as prose cites one: "#"
 // and digits, not inside a word or an HTML entity.
 var issueReference = regexp.MustCompile(`(?:^|[^\w&])(#[0-9]+)\b`)
 
-// TestExportedDocsCiteNoIssues holds the exported doc comments of
-// contractPackages, the documentation pkg.go.dev shows, to stating what the
-// code does: no issue or pull request number. What a change fixed, and which
-// issue reported it, belongs in the changelog and the pull request (#1193).
+// numberedReport is a document numbered the same way, Spacetrack Report #3,
+// which SGP4's doc comments cite by its title.
+var numberedReport = regexp.MustCompile(`Report\s+#[0-9]+`)
+
+// TestExportedDocsCiteNoIssues holds the exported doc comments of every
+// package outside internal/ and examples/, the documentation pkg.go.dev shows,
+// to stating what the code does: no issue or pull request number. What a
+// change fixed, and which issue reported it, belongs in the changelog and the
+// pull request (#1193).
 //
 // Unexported declarations and tests are not checked: a test's doc is where
 // this module records why a check exists, and that history is the point of
@@ -37,19 +34,61 @@ func TestExportedDocsCiteNoIssues(t *testing.T) {
 
 	root := filepath.Join("..", "..")
 
-	for _, pkg := range contractPackages {
-		docs := exportedDocs(t, filepath.Join(root, filepath.FromSlash(pkg)))
-		if len(docs) == 0 {
-			t.Errorf("%s: no exported doc comments found; the walk is not reaching the package", pkg)
-		}
+	dirs := publicPackageDirs(t, root)
+	if len(dirs) < 50 {
+		t.Fatalf("only %d packages found; the walk is not reaching the module", len(dirs))
+	}
 
-		for _, d := range docs {
-			if m := issueReference.FindStringSubmatch(d.text); m != nil {
+	for _, dir := range dirs {
+		for _, d := range exportedDocs(t, dir) {
+			if m := issueReference.FindStringSubmatch(numberedReport.ReplaceAllString(d.text, "")); m != nil {
 				t.Errorf("%s: %s's doc cites %s; state the contract, and leave the history to the changelog",
 					d.pos, d.name, m[1])
 			}
 		}
 	}
+}
+
+// publicPackageDirs is every directory under root holding a package's
+// non-test Go files, outside internal/ and examples/, which is its own module.
+func publicPackageDirs(t *testing.T, root string) []string {
+	t.Helper()
+
+	var dirs []string
+
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			switch d.Name() {
+			case "internal", "examples", "testdata", "docs":
+				return filepath.SkipDir
+			}
+
+			if path != root && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		name := d.Name()
+		if strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go") {
+			dir := filepath.Dir(path)
+			if len(dirs) == 0 || dirs[len(dirs)-1] != dir {
+				dirs = append(dirs, dir)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking %s: %v", root, err)
+	}
+
+	return dirs
 }
 
 // exportedDoc is one doc comment pkg.go.dev shows.

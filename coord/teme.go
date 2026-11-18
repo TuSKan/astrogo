@@ -33,7 +33,7 @@ import (
 // does. A look angle carries none of it: [Context.GeocentricToObserved] turns
 // GCRS back to Earth-fixed through the same matrix, so the two cancel and a
 // TEME vector reaches the horizon through GMST and polar motion alone, as it
-// should (#812).
+// should.
 func (ctx *Context) TEMEToGCRS(v vector.Vec3) vector.Vec3 {
 	tt1, tt2 := ctx.t.TT().JDParts()
 

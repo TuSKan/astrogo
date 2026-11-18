@@ -89,7 +89,7 @@ type BrightRequest struct {
 	// MaxVMag then; the zero Time asks for every object that could be at any
 	// time. A comet is bright for months around its perihelion and faint for
 	// the rest of its orbit, so for comets this is the difference between
-	// the ones in the sky now and every one that ever came close (#779).
+	// the ones in the sky now and every one that ever came close.
 	At time.Time
 }
 

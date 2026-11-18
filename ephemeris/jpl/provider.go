@@ -28,19 +28,12 @@ var (
 
 	// ErrUnsupportedFrame refuses a kernel holding a segment in a reference
 	// frame other than NAIF 1 (J2000), whose vectors would otherwise be summed
-	// into the ICRF chain unrotated (#813).
+	// into the ICRF chain unrotated.
 	ErrUnsupportedFrame = errors.New("jpl: segment in a reference frame other than J2000")
 
 	// ErrNoSmallBodyKernel indicates Horizons matched no small body for the
 	// requested designation, so the provider would carry only its planetary
 	// base kernel.
-	//
-	// It used to succeed. spk.CacheAPI returns an empty slice rather than an
-	// error when nothing matches, the loop over it did nothing, and the
-	// caller got a provider back with a nil error — for "Ceres", for
-	// "101955", and for "totally-not-a-body-xyz" alike. SupportedBodies then
-	// listed the eleven planetary bodies from the base kernel, which is
-	// exactly what a working provider looks like from the outside.
 	//
 	// Horizons wants its own designation syntax for small bodies: "433" and
 	// "433;" resolve to Eros while the name does not, and "DES=433;"
@@ -82,8 +75,8 @@ var ErrNoSegment = errors.New("jpl: no coverage for target at requested epoch")
 
 // ErrUnknownTarget is returned when no loaded kernel holds the target at all:
 // the Pluto center (999) from a planetary kernel, which has only the Pluto
-// barycenter (9). It used to be reported as ErrNoSegment, as if the kernel
-// covered the body at other epochs (#809).
+// barycenter (9). It is not [ErrNoSegment], which says a kernel covers the
+// body at other epochs.
 var ErrUnknownTarget = errors.New("jpl: no loaded kernel holds the target")
 
 // Kernel represents a single SPK file and its metadata.
@@ -279,11 +272,6 @@ func (p *Provider) Close() error {
 // Earth-Moon barycenter, a planet's barycenter about the Solar System
 // barycenter, a moon of Neptune about Neptune's barycenter. ephemeris.At
 // composes those into a state about any center.
-//
-// It used to answer geocentric, summing the target's chain and the Earth's
-// each to the Solar System barycenter and differencing the two: a 9-body sky
-// evaluated 30 segments where 13 were distinct, and the Moon passed through a
-// barycenter an AU away from both ends of its vector (#803).
 func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

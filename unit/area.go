@@ -20,10 +20,8 @@ var (
 //
 // The companion to [Length] for the two areas that cross astrogo's API: a
 // telescope's collecting area, which optics publishes in m², and a molecular
-// absorption cross section, which every laboratory table publishes in cm².
-// Both were bare float64 before this, with the unit in the field's name — a
-// factor of 10⁴ between the two that nothing but the name stood guard over
-// (#130).
+// absorption cross section, which every laboratory table publishes in cm²: a
+// factor of 10⁴ between the two.
 //
 // # What this does not catch
 //

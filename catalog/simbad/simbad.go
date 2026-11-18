@@ -43,13 +43,10 @@ func (p *Provider) Capabilities() []resolve.Capability {
 //
 // # Identity, not the best of a search
 //
-// This used to be Search's first result after client-side scoring, and the
-// scoring could not save it: the underlying query matched any object holding
-// the name as a substring of any identifier, so for "M31" the ten rows
-// fetched out of 15,843 were Chandra sources inside the galaxy and M31 itself
-// was not among them. Scoring ranks what it is given.
-//
-// It now matches identifiers exactly, against the spellings SIMBAD is known
+// It is not Search's first result: Search matches any object holding the name
+// as a substring of any identifier, and for "M31" the first ten of 15,843 are
+// Chandra sources inside the galaxy, M31 itself not among them. Resolve
+// matches identifiers exactly, against the spellings SIMBAD is known
 // to store — see [identifierVariants]. An unknown name returns
 // [resolve.ErrNotFound] rather than the least-wrong of ten wrong answers,
 // because a caller can act on "not found" and cannot act on a plausible
@@ -74,14 +71,8 @@ func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, e
 // ResolveObjects drains ResolveObject into a slice — the shape both Resolve
 // and Search need.
 //
-// It used to swallow errors here: the iterator's error was written to the
-// global log package and the drained slice came back empty, which every caller
-// then read as "not found". A CDS outage, a canceled context and a genuinely
-// absent object were indistinguishable, and the only trace was a line on
-// whatever writer log.SetOutput last pointed at.
-//
-// The streaming ResolveObject always carried the error correctly. This is the
-// convenience wrapper that used to throw it away.
+// An error from the iterator is returned, so a CDS outage or a canceled
+// context is not read as "not found".
 func (p *Provider) ResolveObjects(ctx context.Context, req resolve.ObjectRequest) ([]resolve.Target, error) {
 	limit := req.Limit
 	if limit <= 0 {
@@ -128,7 +119,7 @@ func (p *Provider) Search(ctx context.Context, query string) ([]resolve.Target, 
 // lookup (see BuildBrightQuery for why this can't reuse ResolveObject's
 // query/parse path directly). Transients are the exception: a supernova's or
 // a nova's catalog magnitude is its outburst's, not the brightness of
-// anything in the sky now, so they are left out (#1137).
+// anything in the sky now, so they are left out.
 //
 // With req.Limit set it returns at most that many. Without one it returns
 // every object, up to 50,000, SIMBAD's own default output limit; a bound
