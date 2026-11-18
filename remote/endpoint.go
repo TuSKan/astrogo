@@ -325,10 +325,12 @@ type Endpoint struct {
 	// for an API where a 404 means the service is not there, as for a TAP sync
 	// endpoint, never for one where it means "no such object".
 	//
+	// A mirror is asked through the endpoint's own transport, so an endpoint
+	// that carries a token (TokenEnv) has none: the token would go to the
+	// mirror's host.
+	//
 	// [SetURL] clears them, since a URL the caller chose is the one it wants,
-	// and [Reset] restores them. SIMBAD has two: since the CDS incident of
-	// 2026-11-13 its primary has given no answer, then a 404 maintenance page,
-	// and every caller had to know to point SetURL at a mirror by hand (#1214).
+	// and [Reset] restores them.
 	Mirrors []string
 	// Kind is KindAPI or KindFile.
 	Kind Kind
@@ -567,7 +569,9 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			IdempotentPost: true,
 		},
 		VizieR: {
-			ID:             VizieR,
+			ID: VizieR,
+			// No mirror: VizieR's mirrors serve its web interface, not this
+			// TAP service, and the TAP links on their pages lead back here.
 			URL:            "https://tapvizier.u-strasbg.fr/TAPVizieR/tap/sync",
 			Kind:           KindAPI,
 			Subsystem:      "catalog/vizier",
@@ -589,8 +593,11 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			IdempotentPost: true,
 		},
 		GaiaTAP: {
-			ID:             GaiaTAP,
-			URL:            "https://gea.esac.esa.int/tap-server/tap/sync",
+			ID:  GaiaTAP,
+			URL: "https://gea.esac.esa.int/tap-server/tap/sync",
+			// No mirror: ARI Heidelberg and AIP Potsdam serve the same gaiadr3
+			// tables, but catalog/gaia asks this host for "votable_plain", the
+			// only name under which it writes TABLEDATA, and both refuse it.
 			Kind:           KindAPI,
 			Subsystem:      "catalog/gaia",
 			Description:    "ESA Gaia archive TAP service",
