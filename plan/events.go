@@ -69,9 +69,9 @@ const (
 	EventAppulse
 	// EventOpposition represents two targets whose geocentric ecliptic
 	// longitudes differ by 180°: the definition of the Astronomical Almanac,
-	// Meeus (Astronomical Algorithms, ch. 36) and JPL Horizons. Until #413 it
-	// was solved on right ascension, which a body with ecliptic latitude
-	// reaches at a different time — up to 51 hours later for Mars over
+	// Meeus (Astronomical Algorithms, ch. 36) and JPL Horizons. It is not the
+	// instant their right ascensions differ by 180°, which a body with ecliptic
+	// latitude reaches at a different time: up to 51 hours apart for Mars over
 	// 2000–2040, and 3 hours for the Full Moon.
 	EventOpposition
 	// EventGreatestElongationEast represents the maximum angular separation of an inner planet east of the Sun.
@@ -189,10 +189,8 @@ type EventSpec struct {
 	// known radius.
 	//
 	// [MoonEvents] sets it against [Site.RiseSetThreshold], which is the
-	// almanac's moonrise: the upper limb on the horizon. It used to subtract
-	// a fixed mean semi-diameter of 15.5′ instead, while the Moon's runs from
-	// 14.7′ to 16.8′, which put moonrise and moonset up to 12 s off at London
-	// and 28 s at 60°N (#693).
+	// almanac's moonrise: the upper limb on the horizon, with the Moon's
+	// semi-diameter as it is at each instant, from 14.7′ to 16.8′.
 	UpperLimb bool
 }
 
@@ -809,10 +807,6 @@ type Event struct {
 	// every event kind. It agrees with [IsObservable] and
 	// [Observable.GetDetails] for the same instant, so altitudes may be
 	// compared across event kinds.
-	//
-	// It was geometric at rise and set and refracted at transit until #156,
-	// with nothing in the type saying so, which made a rise altitude and a
-	// transit altitude two different quantities under one name.
 	Altitude angle.Angle
 
 	// GeometricAltitude is the unrefracted altitude, at every event kind.
@@ -1218,8 +1212,7 @@ func groupTwilightEvents(events []Event, kind TwilightKind) []TwilightEvent {
 // Conjunctions returns all conjunction events in right ascension between
 // target and other: the instants their geocentric apparent right ascensions
 // of date are equal, the definition the almanacs use. Against Skyfield on
-// DE440s these fall within a second; until #545 they were solved on the
-// J2000 equator and came out up to 2.5 min off.
+// DE440s these fall within a second.
 func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{

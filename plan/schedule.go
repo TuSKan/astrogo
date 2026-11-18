@@ -43,13 +43,9 @@ type ScheduledBlock struct {
 	SetupTime time.Duration // Time spent on setup/slew before exposing
 }
 
-// UnscheduledBlock is a block that could not be scheduled, and why.
-//
-// Every unscheduled block used to carry one reason, "constraints
-// unsatisfied, insufficient time, or cadence unfulfillable in window", which
-// could not tell an altitude limit from a Moon distance, from a window too
-// short for the block (#1207). Cause now says which, Constraint names the
-// constraint, and Reason says it in words.
+// UnscheduledBlock is a block that could not be scheduled, and why: Cause
+// says what kind of reason, Constraint names the constraint that refused it,
+// and Reason says it in words.
 //
 // The reason is the one the strategy's forward pass found: for
 // [SwapOptimizedStrategy], its first, greedy pass, whose verdict its later
@@ -113,14 +109,9 @@ type Schedule struct {
 }
 
 // Transition is what a [TransitionModel] prices: the move from one
-// observation to the next.
-//
-// It was TransitionContext, which was not a coord.Context. It carried a
-// hidden pointer to the strategy's Context cache, so that a model could reach
-// a Context through its ContextAt method without building one per call
-// (#485). What a model needs is where the two targets are, so the strategy
-// now puts that in FromAltAz and ToAltAz, observed through the Context it
-// evaluates constraints with, and a model needs no Context at all (#675).
+// observation to the next. It carries where the two targets are, in FromAltAz
+// and ToAltAz, observed through the Context the strategy evaluates
+// constraints with, so a model needs no Context of its own.
 type Transition struct {
 	FromBlock *Block // nil if ToBlock is the first block
 	ToBlock   *Block
@@ -136,9 +127,8 @@ type Transition struct {
 
 // NewTransition is the Transition from one block to the next, as a strategy
 // hands it to a [TransitionModel]: each target observed from site at its own
-// instant. It builds a coord.Context for the pair, as Overhead used to for
-// every call; the built-in strategies observe both through the Context they
-// evaluate constraints with instead.
+// instant. It builds a coord.Context for the pair; the built-in strategies
+// observe both through the Context they evaluate constraints with instead.
 //
 // An error means a target could not be observed, and names which end.
 func NewTransition(from, to *Block, fromTime, toTime time.Time, site *Site) (Transition, error) {

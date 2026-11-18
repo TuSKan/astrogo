@@ -231,24 +231,10 @@ type contextLocator interface {
 // returns a valid State. The observer's geocentric position is subtracted from
 // the body's, so the range is right for a LEO satellite as well as a planet.
 //
-// # It uses the Context it is given
-//
-// It used to build a coord.Reducer from ctx.Site(), ctx.Time() and
-// ctx.Refraction() and throw the Context itself away. The Reducer then
-// lazily constructed a second Context from those three values, repeating the
-// Apco13 precession-nutation solve — about 150 µs — that the one in hand
-// already held. SatellitePasses builds a Context per 30 s step and called
-// this once per step, so the expensive work happened twice for every sample.
-//
-// Everything the Reducer computed is already on Context: GeocentricToObserved
-// is the refracted alt/az, and ObsVec is the observer vector the topocentric
-// range needs. So there is nothing to rebuild.
-//
-// Using the given Context is also what the signature promises. A caller who
-// moved it with Context.SetTime — the cheap update, which interpolates the
-// precession-nutation rather than evaluating it — previously had that quietly
-// discarded and a full rebuild substituted, which is the opposite of what
-// they asked for.
+// It observes through ctx as it is, a Context moved with Context.SetTime
+// included, and builds no other: the altitude and azimuth are ctx's
+// refracted GeocentricToObserved, and the range subtracts ctx's observer
+// vector.
 func LookAngle(prov eph.Provider, id eph.ID, ctx *coord.Context) (coord.AltAz, error) {
 	var (
 		st  eph.State
@@ -308,7 +294,7 @@ type SatellitePass struct {
 // sky: it is visible where Sunlit is true while the Sun is below the
 // horizon, best past civil twilight, SunAltitude below −6°. A pass can be
 // visible at one event and not another, entering Earth's shadow before it
-// sets (#1195).
+// sets.
 type PassEvent struct {
 	Time      time.Time
 	Azimuth   angle.Angle
@@ -329,14 +315,14 @@ type PassEvent struct {
 // within the given time window, filtered by minimum elevation. A pass in
 // progress when the window opens or closes is cut off at that edge and
 // marked, as [SatellitePass] describes, so a window opened during a pass, or
-// lying wholly inside one, still returns it (#896).
+// lying wholly inside one, still returns it.
 //
 // The function uses a grid-sampling approach with 30-second steps (appropriate
 // for LEO satellites with ~90 minute periods) and Chandrupatla root-finding
 // for sub-second rise/set boundary refinement. A pass above minElevation for
 // less than one step can lie wholly between two samples, so every sampled
 // maximum below it is refined to its true peak, which finds such a pass
-// wherever the window starts (#897).
+// wherever the window starts.
 //
 // id is the satellite's NAIF code, the one prov answers for — for a
 // satellite.Satellite, its ID(). name labels the returned passes.

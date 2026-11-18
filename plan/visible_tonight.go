@@ -94,7 +94,7 @@ type VisibleObject struct {
 	// its own row, brightest first, and Target and every other field above
 	// are the brightest counted member's, with ApparentMag the group's.
 	//
-	// Members is nil for an object seen on its own (#1182).
+	// Members is nil for an object seen on its own.
 	Members []VisibleObject
 }
 
@@ -264,23 +264,17 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // default (see [WithResolution]), are one row, an observing group, with each
 // star among its [VisibleObject.Members]: alf Cen A and B and their system's
 // record are one naked-eye row, at their combined magnitude, with each star's
-// light counted once (#1182). The members are separate objects, as their
+// light counted once. The members are separate objects, as their
 // catalogs keep them; only the listing joins them. A group is made of stars
 // that each pass magLimit, so two stars each fainter than it, whose light
 // together would pass, are not listed.
 //
 // # The result can be incomplete, and says so
 //
-// That skip covers a network failure as well as a missing orbit. A kernel
-// fetch that times out, or JPL being unreachable, removes that body's moons or
-// that small body from the result — so a short list can mean "nothing
-// qualified" or "not everything could be checked", and those are different
-// answers.
-//
-// Skipping is deliberate: a partial sky is more useful than an error for a
-// planning query, and one unreachable kernel should not cost the caller the
-// other forty candidates. Staying quiet about it was not. So both values are
-// returned together: the candidates that did qualify, and an error wrapping
+// A skipped candidate may be a network failure as well as a missing orbit: a
+// kernel fetch that times out, or JPL being unreachable, removes that body's
+// moons or that small body from the result. So both values are returned
+// together: the candidates that did qualify, and an error wrapping
 // [ErrIncomplete] naming everything that could not be evaluated and why.
 //
 //	objects, err := plan.VisibleTonight(...)
@@ -290,11 +284,8 @@ var planetConstructors = []func(eph.Provider) *Planet{
 //		return err
 //	}
 //
-// A caller who wants the old behavior ignores an [ErrIncomplete] error; one
-// who needs certainty treats it as fatal. Both are now possible, which is the
-// point — a Warn log line, which is all this used to emit, is not something a
-// program can branch on. Every other error return is fatal and comes with no
-// results, so ignoring [ErrIncomplete] specifically is safe.
+// Every other error return is fatal and comes with no results, so a caller
+// may treat [ErrIncomplete] as a warning or as fatal.
 //
 // To avoid the situation rather than detect it, pre-seed the kernels the query
 // depends on; remote.SetOffline(true) makes the degradation deterministic
