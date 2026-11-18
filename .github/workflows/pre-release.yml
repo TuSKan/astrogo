@@ -190,3 +190,137 @@ jobs:
           name: validation-${{ github.sha }}
           path: ${{ env.ASTROGO_METROLOGY_OUT }}
           retention-days: 90
+
+  # The generated accuracy table in docs/VALIDATION.md, rendered from the
+  # newest results of every tier (#1199). Nothing ran the renderer before, so
+  # every row read 2026-10-06 for six weeks while the prose beside the table
+  # quoted later runs.
+  #
+  # It renders and does not commit. A pull request opened with this workflow's
+  # token starts no workflow runs, and main's required checks run only on
+  # pull_request events, so such a pull request could never merge. The weekly
+  # release pull request carries the table instead: it renders these results
+  # into main as it stands (docs/RELEASING.md), and the Changelog Fragment check
+  # accepts a change there confined to the generated region.
+  report:
+    name: Accuracy Report
+    needs: [network, validation]
+    # Wherever the validation tier ran to its end: Mondays, and on demand. A
+    # failed suite still belongs in the table, as outside its contract or not
+    # verified, so a failed tier is rendered too.
+    if: always() && (needs.validation.result == 'success' || needs.validation.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # This run's artifacts, and on a Monday the newest nightly run's.
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.27'
+          cache: true
+
+      - name: Collect this run's validation tier
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: validation-${{ github.sha }}
+          path: ${{ runner.temp }}/results/validation
+
+      - name: Collect this run's network tier
+        if: needs.network.result != 'skipped'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: network-${{ github.sha }}
+          path: ${{ runner.temp }}/results/network
+
+      # On a Monday the network tier ran in that night's run of this workflow,
+      # not in this one. Its newest results are taken, from a run that may
+      # still be going or one from an earlier night; every row of the table
+      # names the date and commit its suite ran at, so which is visible.
+      - name: Collect the network tier from the newest nightly run
+        if: needs.network.result == 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pre-release.yml --limit 30 \
+            --json databaseId --jq ".[] | select(.databaseId != $GITHUB_RUN_ID) | .databaseId")
+
+          for run in $runs; do
+            if gh run download "$run" --repo "$GITHUB_REPOSITORY" --pattern 'network-*' \
+              --dir "$RUNNER_TEMP/results/network" 2>/dev/null; then
+              echo "The network tier's results are run $run's."
+              exit 0
+            fi
+          done
+
+          echo "::error::None of the last 30 runs kept network results to render."
+          exit 1
+
+      # A suite both tiers ran, as every untagged one is, keeps the newer of
+      # its two results. A tier with no results fails the job rather than
+      # rendering a table without its rows.
+      - name: Gather the results
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$ASTROGO_METROLOGY_OUT"
+
+          for tier in validation network; do
+            found=$(find "$RUNNER_TEMP/results/$tier" -name '*.json' -type f 2>/dev/null || true)
+            if [ -z "$found" ]; then
+              echo "::error::No $tier results to render."
+              exit 1
+            fi
+
+            while read -r f; do
+              dest="$ASTROGO_METROLOGY_OUT/$(basename "$f")"
+              if [ -f "$dest" ]; then
+                this=$(jq -er .generated "$f")
+                kept=$(jq -er .generated "$dest")
+                if [[ "$this" < "$kept" ]]; then
+                  continue
+                fi
+              fi
+
+              cp "$f" "$dest"
+            done <<<"$found"
+
+            echo "$tier: $(echo "$found" | wc -l) result(s)"
+          done
+
+      - name: Render the accuracy table
+        shell: bash
+        run: go test -tags=validation -count=1 -v -run '^TestRenderAccuracyReport$' ./internal/metrology/ -args -update-accuracy
+
+      - name: Summarize the change
+        shell: bash
+        run: |
+          {
+            echo "## Accuracy report"
+            echo
+            if git diff --quiet docs/VALIDATION.md; then
+              echo "docs/VALIDATION.md's generated table is current for these results."
+            else
+              echo "The release pull request renders these results into docs/VALIDATION.md (docs/RELEASING.md)."
+              echo
+              echo '```diff'
+              git diff docs/VALIDATION.md
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the results the table was rendered from
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accuracy-results-${{ github.sha }}
+          path: ${{ env.ASTROGO_METROLOGY_OUT }}/*.json
+          retention-days: 90
