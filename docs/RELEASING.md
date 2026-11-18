@@ -73,19 +73,37 @@ gh run list --workflow govulncheck.yml --limit 1
    That folds every fragment into a new `CHANGELOG.md` section, extends the
    link-reference chain and deletes the consumed fragments (see
    [`docs/changelog.d`](changelog.d/README.md)).
-3. **Open a pull request** with the assembled changelog. CI runs on exactly the
+3. **Render the week's measured accuracy** into `docs/VALIDATION.md`'s
+   generated table, so the release documents what that week's runs measured.
+   The Monday run's Accuracy Report job keeps the results it rendered as the
+   `accuracy-results-<sha>` artifact, the newest of every tier; take them from
+   the newest run that has one, and render them into this branch:
+
+   ```bash
+   gh run list --workflow pre-release.yml --limit 8
+   gh run download <run> --pattern 'accuracy-results-*' --dir accuracy-results
+   ASTROGO_METROLOGY_OUT="$(ls -d "$PWD"/accuracy-results/accuracy-results-*)" \
+     go test -tags=validation -count=1 -run '^TestRenderAccuracyReport$' ./internal/metrology/ -args -update-accuracy
+   rm -r accuracy-results
+   ```
+
+   It rewrites only the region between the table's markers, so prose merged
+   since the run stays as `main` has it. The Changelog Fragment check accepts a
+   release pull request whose `docs/VALIDATION.md` changes there and nowhere
+   else.
+4. **Open a pull request** with the assembled changelog. CI runs on exactly the
    tree that will be tagged, and the generated section gets read before it is
    published. A fragment merged while the pull request is open belongs to the
    next release: merge `main` in, and reassemble only if the new fragment must
    ship now.
-4. **After it merges, tag the merge commit** and push the tag:
+5. **After it merges, tag the merge commit** and push the tag:
 
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z" <merge commit>
    git push origin vX.Y.Z
    ```
 
-5. **The tag push creates the GitHub Release** (`.github/workflows/release.yml`),
+6. **The tag push creates the GitHub Release** (`.github/workflows/release.yml`),
    with that version's `CHANGELOG.md` section as its notes, marked Latest. The
    workflow refuses a tag whose section is missing or empty, which is what a tag
    pushed without its release pull request looks like.

@@ -12,14 +12,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/internal/parquetcol"
 	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/remote"
-
-	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/apache/arrow-go/v18/parquet/file"
-	"github.com/apache/arrow-go/v18/parquet/pqarrow"
 )
 
 // resultRows is one aggregation result, read a row at a time.
@@ -132,11 +127,10 @@ func (c *csvRows) Err() error { return c.err }
 // is around sixty megabytes this way against two hundred and forty-five as
 // CSV, so materializing it is cheaper than streaming the alternative.
 type parquetRows struct {
-	columns map[string]arrow.Array
+	columns map[string]*parquetcol.Column
+	err     error
 	rows    int64
 	at      int64
-	release func()
-	err     error
 }
 
 // newParquetRows reads a Parquet result into columns addressable by name.
@@ -159,48 +153,22 @@ func newParquetRows(ctx context.Context, r io.Reader) (*parquetRows, error) {
 		return nil, fmt.Errorf("%w: the response is not Parquet: %s", ErrGaiaResponse, summary)
 	}
 
-	pf, err := file.NewParquetReader(bytes.NewReader(raw))
+	pf, err := parquetcol.Open(bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
 	}
 
-	reader, err := pqarrow.NewFileReader(pf, pqarrow.ArrowReadProperties{}, memory.DefaultAllocator)
+	columns, err := parquetcol.ReadAll(pf)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
 	}
 
-	table, err := reader.ReadTable(ctx)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrGaiaResponse, err)
 	}
 
-	out := &parquetRows{
-		columns: make(map[string]arrow.Array, int(table.NumCols())),
-		rows:    table.NumRows(),
-		at:      -1,
-		release: table.Release,
-	}
-
-	for i := range int(table.NumCols()) {
-		col := table.Column(i)
-
-		chunks := col.Data().Chunks()
-		if len(chunks) != 1 {
-			// Concatenating would work and would double the memory for a
-			// result this size. The reader returns one chunk per column for
-			// what this package asks for, so a second chunk means the shape
-			// changed and the caller should know rather than pay for it
-			// silently.
-			table.Release()
-
-			return nil, fmt.Errorf("%w: column %q arrived in %d chunks, want one",
-				ErrGaiaResponse, col.Name(), len(chunks))
-		}
-
-		out.columns[strings.ToLower(col.Name())] = chunks[0]
-	}
-
-	return out, nil
+	// parquetcol refuses a file whose columns do not each hold its rows.
+	return &parquetRows{columns: columns, rows: pf.NumRows(), at: -1}, nil
 }
 
 func (p *parquetRows) Next() bool {
@@ -223,38 +191,35 @@ func (p *parquetRows) Has(column string) bool {
 // out of the accumulation, where it would be a per-column special case.
 func (p *parquetRows) Number(column string) (float64, bool) {
 	col, ok := p.columns[column]
-	if !ok || p.at < 0 || p.at >= p.rows || col.IsNull(int(p.at)) {
+	if !ok || p.at < 0 || p.at >= p.rows {
 		return 0, false
 	}
 
-	switch c := col.(type) {
-	case *array.Float64:
-		return c.Value(int(p.at)), true
-	case *array.Float32:
-		return float64(c.Value(int(p.at))), true
-	case *array.Int64:
-		return float64(c.Value(int(p.at))), true
-	case *array.Int32:
-		return float64(c.Value(int(p.at))), true
-	case *array.Uint64:
-		return float64(c.Value(int(p.at))), true
-	case *array.String:
-		v, err := strconv.ParseFloat(strings.TrimSpace(c.Value(int(p.at))), 64)
+	v := col.At(int(p.at))
 
-		return v, err == nil
-	default:
+	switch v.Kind {
+	case parquetcol.Float:
+		return v.F, true
+	case parquetcol.Int:
+		return float64(v.I), true
+	case parquetcol.Uint:
+		return float64(v.U), true
+	case parquetcol.String:
+		f, err := strconv.ParseFloat(strings.TrimSpace(v.S), 64)
+
+		return f, err == nil
+	case parquetcol.Null:
 		return 0, false
 	}
+
+	return 0, false
 }
 
 func (p *parquetRows) Err() error { return p.err }
 
 // Close releases the table's buffers.
 func (p *parquetRows) Close() {
-	if p.release != nil {
-		p.release()
-		p.release = nil
-	}
+	p.columns = nil
 }
 
 // integer reads a column that has to be a whole number.
