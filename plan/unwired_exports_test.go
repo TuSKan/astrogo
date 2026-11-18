@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"errors"
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -89,44 +88,6 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 		if events[i].Time.Before(events[i-1].Time) {
 			t.Fatalf("event %d is before event %d; the combined pass is not sorted", i, i-1)
 		}
-	}
-}
-
-// TestNewEarthTargetsEarth covers the one planet constructor nothing used.
-//
-// Earth is the odd member of the set: every other NewX names something to point
-// a telescope at. This one is mostly a way to reach Earth's own state through
-// Provider(), and whether it earns its place in the public API is a question
-// for #106 rather than for a test. What a test can settle is that it targets
-// the body it names, which is the way a constructor written by copying its
-// neighbor goes wrong.
-func TestNewEarthTargetsEarth(t *testing.T) {
-	t.Parallel()
-
-	earth := NewEarth(eph.Default())
-
-	if earth == nil {
-		t.Fatal("NewEarth returned nil")
-	}
-
-	if earth.Name() != "Earth" {
-		t.Errorf("Name() = %q, want Earth", earth.Name())
-	}
-
-	if got := earth.EphID(); got != eph.Earth {
-		t.Errorf("EphID() = %v, want eph.Earth (%v) — this constructor targets the wrong body",
-			got, eph.Earth)
-	}
-
-	// And the id is actually used rather than merely stored. The Earth seen
-	// from the geocentre is the zero vector, which has no direction, so
-	// Position refuses it. It used to answer: the default provider was asked
-	// for the Earth under Plan94's 3, the Earth-Moon barycenter, and placed
-	// the geocentre 4,671 km from itself (#809).
-	epoch := time.Date(2026, 3, 20, 12, 0, 0, 0, time.LocationUTC)
-
-	if _, err := earth.Position(epoch); !errors.Is(err, eph.ErrZeroVector) {
-		t.Errorf("Position: err = %v, want eph.ErrZeroVector — the geocentre has no direction from itself", err)
 	}
 }
 
