@@ -12,6 +12,12 @@ import (
 
 // Planet represents a solar system body with an ephemeris provider
 // (Sun, Moon, Mercury–Pluto).
+//
+// A planet is its system barycenter, NAIF 1 to 9, for every planet: the one
+// point every planetary kernel and [eph.Default] hold. Seen from the Earth it
+// is within 0.05″ of the planet's center, and Mercury's and Venus's are their
+// centers. A caller who wants a planet's own center, which needs its
+// satellite kernel, passes that ID to [NewPlanet].
 type Planet struct {
 	provider eph.Provider
 	name     string
@@ -48,19 +54,16 @@ func NewMoon(provider eph.Provider) *Planet {
 	return NewPlanet("Moon", eph.Moon, provider)
 }
 
-// NewMercury creates a Mercury target.
+// NewMercury creates a Mercury target: the Mercury barycenter, NAIF 1, which
+// is Mercury.
 func NewMercury(provider eph.Provider) *Planet {
-	return NewPlanet("Mercury", eph.Mercury, provider)
+	return NewPlanet("Mercury", eph.MercuryBarycenter, provider)
 }
 
-// NewVenus creates a Venus target.
+// NewVenus creates a Venus target: the Venus barycenter, NAIF 2, which is
+// Venus.
 func NewVenus(provider eph.Provider) *Planet {
-	return NewPlanet("Venus", eph.Venus, provider)
-}
-
-// NewEarth creates an Earth target.
-func NewEarth(provider eph.Provider) *Planet {
-	return NewPlanet("Earth", eph.Earth, provider)
+	return NewPlanet("Venus", eph.VenusBarycenter, provider)
 }
 
 // NewMars creates a Mars target: the Mars system barycenter, NAIF 4,

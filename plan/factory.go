@@ -367,11 +367,10 @@ func naifMajorRangeID(spkID string) (int, bool) {
 }
 
 // majorBodyForNAIF returns the point plan observes for the major body a
-// NAIF code names: the code itself for the Sun, the Moon, the Earth, Mercury
-// and Venus, and from Mars out the system barycenter for either the
-// barycenter or the planet's center, since a planetary kernel holds only the
-// barycenter, a few hundredths of an arcsecond from the planet (see eph.ID).
-// The Earth-Moon barycenter (3) names no body to observe.
+// NAIF code names: the code itself for the Sun, the Moon and the Earth, and
+// for a planet its system barycenter, for either the barycenter or the
+// planet's center, as every Planet is (see [Planet]). The Earth-Moon
+// barycenter (3) names no body to observe.
 func majorBodyForNAIF(naif int) (eph.ID, bool) {
 	switch naif {
 	case 10:
@@ -379,9 +378,9 @@ func majorBodyForNAIF(naif int) (eph.ID, bool) {
 	case 301:
 		return eph.Moon, true
 	case 1, 199:
-		return eph.Mercury, true
+		return eph.MercuryBarycenter, true
 	case 2, 299:
-		return eph.Venus, true
+		return eph.VenusBarycenter, true
 	case 399:
 		return eph.Earth, true
 	case 4, 499:
