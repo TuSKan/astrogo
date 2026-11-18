@@ -351,9 +351,9 @@ func TestGaiaConeCenterIsMovedToJ2016(t *testing.T) {
 	redirect(t, server.URL)
 
 	barnard := coord.NewICRSWithKinematics(angle.Deg(269.4520769586), angle.Deg(4.6933649666),
-		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11))
+		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11), time.J2000())
 
-	req := resolve.ConeRequest{Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
+	req := resolve.ConeRequest{Center: barnard, Radius: angle.Arcsec(5), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
 
 	adql := query.Get()

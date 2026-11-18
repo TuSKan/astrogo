@@ -89,6 +89,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 			s.coord.RA(), s.coord.Dec(),
 			s.pmRA, s.pmDec,
 			s.parallax, s.radialVelocity,
+			time.J2000(),
 		), nil
 	}
 

@@ -168,6 +168,7 @@ func FK5ToICRS(c FK5) ICRS {
 		angle.Rad(rh).Wrap360(), angle.Rad(dh),
 		pmRACosDec(drh, angle.Rad(dh)), angle.Rad(ddh),
 		angle.Arcsec(pxh), unit.KmPerSec(rvh),
+		time.J2000(),
 	)
 }
 
@@ -195,10 +196,12 @@ func FK5ToICRS(c FK5) ICRS {
 // and [FK5.Epoch] reports [J2000Epoch] rather than echoing the argument.
 //
 // This is the same limitation [ICRSToFK4] has at B1950.0, for the same reason,
-// and #330 recorded it only for FK4 — it is here too. Use [PropagateEpoch] to
-// move a star to another epoch, which is a different operation from a frame
-// conversion and is kept separate on purpose.
+// and #330 recorded it only for FK4 — it is here too. A star given at an epoch
+// other than J2000.0, as [ICRS.Epoch] reports it, is moved there first through
+// [PropagateEpoch], so both routes start from the star's J2000.0 state.
 func ICRSToFK5(c ICRS, jepoch float64) FK5 {
+	c = c.atJ2000()
+
 	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(jepoch)
 		r5, d5, dr5, dd5 := gofaext.Hfk5z(c.RA().Radians(), c.Dec().Radians(), jd1, jd2)

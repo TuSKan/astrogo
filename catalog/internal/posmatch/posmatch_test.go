@@ -92,7 +92,7 @@ func TestSeparationReportsAPositionItCannotMove(t *testing.T) {
 
 	gaiaEpoch := time.FromJD(time.J2000().JD()+16*365.25, time.TT)
 	unmovable := coord.NewICRSWithKinematics(angle.Deg(150), angle.Deg(20),
-		angle.Arcsec(0.1), angle.Arcsec(0.1), angle.Arcsec(1e300), unit.KmPerSec(0))
+		angle.Arcsec(0.1), angle.Arcsec(0.1), angle.Arcsec(1e300), unit.KmPerSec(0), gaiaEpoch)
 	moving := Coord(barnard)
 	still := coord.NewICRS(angle.Deg(150), angle.Deg(20))
 
@@ -124,7 +124,7 @@ func TestSeparationMovesTheStarThatMoves(t *testing.T) {
 	c := Coord(barnard)
 	laterEpoch := time.FromJD(time.J2000().JD()+3652.5, time.TT)
 
-	later, err := coord.PropagateEpoch(c, barnard.Epoch, laterEpoch)
+	later, err := coord.PropagateEpoch(c, laterEpoch)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -292,11 +292,12 @@ func FK4ToICRS(c FK4) ICRS {
 // propagates into [FK4ToFK5]'s position-only route and into anything reading
 // [FK4.Epoch].
 //
-// To place a star at another epoch, use [PropagateEpoch], which applies
-// rigorous space motion through SOFA's Pmsafe — including parallax and the
-// light-time term — and then convert. That is a different operation from a
-// frame conversion, and separating them is the point.
+// A star given at an epoch other than J2000.0, as [ICRS.Epoch] reports it,
+// is moved there first through [PropagateEpoch], so both routes start from
+// the star's J2000.0 state.
 func ICRSToFK4(c ICRS, bepoch float64) FK4 {
+	c = c.atJ2000()
+
 	if !c.hasKinematics {
 		jd1, jd2 := ttAtJulianEpoch(J2000Epoch)
 		r5, d5, _, _ := gofaext.Hfk5z(c.RA().Radians(), c.Dec().Radians(), jd1, jd2)

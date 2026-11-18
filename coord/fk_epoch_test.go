@@ -18,6 +18,7 @@ func kinematicStarForEpoch() coord.ICRS {
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(0.150), angle.Arcsec(0.220),
 		angle.Arcsec(0.020), unit.KmPerSec(-22.4),
+		time.J2000(),
 	)
 }
 
@@ -125,18 +126,11 @@ func TestTheSixElementRouteIgnoresTheEpochEntirely(t *testing.T) {
 	}
 }
 
-// TestPropagateEpochIsWhatTheEpochArgumentCannotDo shows the limitation has
-// teeth, and shows the supported way round it.
-//
-// Ignoring an epoch would be harmless if the epoch did not matter. It does:
-// this star moves 0.27 arcsec a year, so a quarter century is arcseconds. What
-// the six-element conversion cannot do, [coord.PropagateEpoch] can — rigorously,
-// through SOFA's Pmsafe, including parallax and the light-time term that simple
-// linear propagation omits.
-//
-// So the answer to "I want this star in FK4 at B1975" is to propagate first and
-// convert second, and this test is that recipe executed.
-func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
+// TestFKConversionStartsFromTheStarsEpoch: a star propagated to another
+// epoch converts to FK4 as the star it came from does, since the conversion
+// moves it back to J2000.0 first; the same position labeled J2000.0 is the
+// star 25 years of proper motion away.
+func TestFKConversionStartsFromTheStarsEpoch(t *testing.T) {
 	t.Parallel()
 
 	star := kinematicStarForEpoch()
@@ -144,33 +138,25 @@ func TestPropagateEpochIsWhatTheEpochArgumentCannotDo(t *testing.T) {
 	// Twenty-five Julian years after J2000.
 	later := time.J2000().Add(unit.JulianYears(25))
 
-	moved, err := coord.PropagateEpoch(star, time.J2000(), later)
+	moved, err := coord.PropagateEpoch(star, later)
 	testutil.AssertNoError(t, err)
 
-	atEquinox := coord.ICRSToFK4(star, coord.B1950)
-	propagated := coord.ICRSToFK4(moved, coord.B1950)
+	mislabeled := coord.NewICRSWithKinematics(moved.RA(), moved.Dec(), moved.PmRA(), moved.PmDec(),
+		moved.Parallax(), moved.RV(), time.J2000())
 
-	// Both are B1950 positions, and they differ because the star moved.
-	if propagated.Epoch() != coord.B1950 || atEquinox.Epoch() != coord.B1950 {
-		t.Fatalf("both should be labeled B1950, got %g and %g",
-			propagated.Epoch(), atEquinox.Epoch())
+	fk4 := func(c coord.ICRS) coord.ICRS {
+		f := coord.ICRSToFK4(c, coord.B1950)
+
+		return coord.NewICRS(f.RA(), f.Dec())
 	}
 
-	sep := coord.Separation(
-		coord.NewICRS(atEquinox.RA(), atEquinox.Dec()),
-		coord.NewICRS(propagated.RA(), propagated.Dec()),
-	).Arcseconds()
+	if sep := coord.Separation(fk4(star), fk4(moved)).Arcseconds(); sep > 1e-6 {
+		t.Errorf("the star moved to 2025 converts %.2e″ from the star at J2000", sep)
+	}
 
-	// 0.267 arcsec/yr over 25 years is about 6.7 arcsec, and the conversion is
-	// very nearly length-preserving on the sky.
+	// 0.267 arcsec/yr over 25 years is about 6.7 arcsec.
 	expected := math.Hypot(0.150, 0.220) * 25
-
-	testutil.AssertRelNear(t, "the propagated star moved", sep, expected, 0.02)
-
-	if sep < 1 {
-		t.Errorf("propagation moved the star %.4f arcsec over 25 years, which is too little "+
-			"for this proper motion — the limitation would be harmless if this were zero", sep)
-	}
+	testutil.AssertRelNear(t, "the mislabeled position's offset", coord.Separation(fk4(star), fk4(mislabeled)).Arcseconds(), expected, 0.02)
 }
 
 // TestTheRoundTripStillClosesAfterTheRelabeling guards the thing a label
