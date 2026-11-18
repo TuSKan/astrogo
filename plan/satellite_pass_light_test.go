@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -76,7 +75,7 @@ func TestSatellitePassEventsSayWhetherTheSatelliteIsSunlit(t *testing.T) {
 			// The Sun's altitude, through a Context of its own and the Sun's
 			// apparent place, which differs from the geometric one by the
 			// aberration, about 20″.
-			ctx := coord.NewContext(ev.e.Time, site, defaultAtm)
+			ctx := mustContext(t, ev.e.Time, site, defaultAtm)
 
 			aa, err := observedPlace(NewSun(eph.Default()), ev.e.Time, ctx)
 			if err != nil {
