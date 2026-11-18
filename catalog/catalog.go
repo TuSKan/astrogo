@@ -444,10 +444,11 @@ func incompleteSearch(query string, failed, asked int, failures []error) error {
 // Target via field-level provider precedence.
 func (r *Resolver) reconcile(ctx context.Context, candidates []candidate) []Target {
 	uf := newUnionFind(len(candidates))
-	unionByAlias(candidates, uf)
-	unionByPosition(candidates, uf, r.cfg.positionMatchThreshold)
+	links := unionByAlias(candidates, uf)
+	links = append(links, unionByPosition(candidates, uf, r.cfg.positionMatchThreshold)...)
 
 	groups := groupCandidates(candidates, uf)
+	attachAssociations(groups, candidates, uf, links)
 
 	if len(r.coneSearchers) > 0 {
 		groups = r.bridgeConeSearch(ctx, groups)
@@ -462,9 +463,27 @@ func (r *Resolver) reconcile(ctx context.Context, candidates []candidate) []Targ
 }
 
 // group holds every candidate believed to describe the same physical
-// object, in provider-registration order.
+// object, in provider-registration order, and the evidence that joined them.
 type group struct {
-	candidates []candidate
+	candidates   []candidate
+	associations []resolve.Association
+}
+
+// attachAssociations gives each group the evidence of the links inside it.
+// The groups are in groupCandidates' order, first-seen root first.
+func attachAssociations(groups []group, candidates []candidate, uf *unionFind, links []link) {
+	index := make(map[int]int, len(groups))
+
+	for i := range candidates {
+		if _, ok := index[uf.find(i)]; !ok {
+			index[uf.find(i)] = len(index)
+		}
+	}
+
+	for _, l := range links {
+		g := index[uf.find(l.a)]
+		groups[g].associations = append(groups[g].associations, associationOf(candidates, l, resolve.Accepted))
+	}
 }
 
 // ── Union-find ────────────────────────────────────────────────────────────
@@ -527,20 +546,31 @@ func (uf *unionFind) union(a, b int) {
 // match by too: the ID, designation and aliases, each read in its naming
 // scheme, so SIMBAD's "* eps Ori" meets OpenNGC's "Eps Ori" and SIMBAD's
 // "HD  37128" meets OpenNGC's "HD 037128" (#1136).
-func unionByAlias(candidates []candidate, uf *unionFind) {
-	idx := make(map[string][]int)
+//
+// It returns one link for each join it makes, naming the key that made it:
+// the first a record shares with any earlier one, in the records' order.
+func unionByAlias(candidates []candidate, uf *unionFind) []link {
+	first := make(map[string]int)
+
+	var links []link
 
 	for i, c := range candidates {
 		for _, key := range resolve.IdentityKeys(c.target) {
-			idx[key] = append(idx[key], i)
+			j, seen := first[key]
+			if !seen {
+				first[key] = i
+
+				continue
+			}
+
+			if uf.find(i) != uf.find(j) {
+				uf.union(j, i)
+				links = append(links, link{a: j, b: i, key: key})
+			}
 		}
 	}
 
-	for _, indices := range idx {
-		for i := 1; i < len(indices); i++ {
-			uf.union(indices[0], indices[i])
-		}
-	}
+	return links
 }
 
 // ── Positional fallback cross-match (secondary signal) ───────────────────
@@ -590,8 +620,13 @@ func singletonIndices(candidates []candidate, uf *unionFind) []int {
 // remaining singletons M, which is bounded by provider count (not catalog
 // size) at this point in the pipeline — appropriate at this scale; see
 // catalog/doc.go for the fuller justification against a spatial index.
-func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angle) {
-	var eligible []int
+//
+// It returns one link for each join it makes, with the separation.
+func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angle) []link {
+	var (
+		eligible []int
+		links    []link
+	)
 
 	for _, i := range singletonIndices(candidates, uf) {
 		if trustworthyCoord(candidates[i].target, candidates[i].provider) {
@@ -611,9 +646,12 @@ func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angl
 				posmatch.Coord(candidates[j].target), candidates[j].target.Epoch)
 			if err == nil && sep <= threshold {
 				uf.union(i, j)
+				links = append(links, link{a: i, b: j, sep: sep})
 			}
 		}
 	}
+
+	return links
 }
 
 // groupCandidates assembles union-find groups, preserving first-seen-root
@@ -763,11 +801,31 @@ func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.A
 		}
 
 		if sep <= threshold {
+			g.associations = append(g.associations, resolve.Association{
+				From:         anchorSource(g),
+				To:           sourceOf(nc),
+				Relationship: resolve.SameObject,
+				Separation:   sep,
+				Authority:    "astrogo",
+				Status:       resolve.Accepted,
+			})
 			g.candidates = append(g.candidates, nc)
 		}
 	}
 
 	return g
+}
+
+// anchorSource is the source record of the candidate anchorCoord takes the
+// group's position from.
+func anchorSource(g group) resolve.SourceRecord {
+	for _, c := range g.candidates {
+		if trustworthyCoord(c.target, c.provider) {
+			return sourceOf(c)
+		}
+	}
+
+	return resolve.SourceRecord{}
 }
 
 // ── Field-level precedence merge ─────────────────────────────────────────
@@ -905,7 +963,7 @@ var astrometricPrecedence = []string{"gaia", "simbad", "openngc", "mast", "vizie
 // scalarFieldRules. A provider no precedence names ranks after those it does,
 // in g's order (see ranking).
 func mergeGroup(g group) Target {
-	var merged Target
+	merged := Target{Sources: sourcesOf(g.candidates), Associations: g.associations}
 
 	for _, c := range g.candidates {
 		t := c.target
