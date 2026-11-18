@@ -595,13 +595,9 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 		GaiaTAP: {
 			ID:  GaiaTAP,
 			URL: "https://gea.esac.esa.int/tap-server/tap/sync",
-			// ARI Heidelberg and AIP Potsdam serve the same gaiadr3 tables to
-			// the same ADQL. AIP answers in VOTable whatever FORMAT asks, which
-			// catalog/gaia reads as it reads CSV.
-			Mirrors: []string{
-				"https://gaia.ari.uni-heidelberg.de/tap/sync",
-				"https://gaia.aip.de/tap/sync",
-			},
+			// No mirror: ARI Heidelberg and AIP Potsdam serve the same gaiadr3
+			// tables, but catalog/gaia asks this host for "votable_plain", the
+			// only name under which it writes TABLEDATA, and both refuse it.
 			Kind:           KindAPI,
 			Subsystem:      "catalog/gaia",
 			Description:    "ESA Gaia archive TAP service",
