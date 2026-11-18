@@ -111,8 +111,8 @@ func FromSpherical(lon, lat float64) Vec3 {
 //
 // The latitude is atan2(Z, √(X²+Y²)), as SOFA's iauC2s computes it, not
 // asin(Z/|v|): asin's slope is unbounded as its argument nears 1, so one ulp
-// in Z/|v| became up to 2.7 mas of latitude within 0.2″ of a pole, an error
-// as large as the distance from the pole itself (#754).
+// in Z/|v| would become up to 2.7 mas of latitude within 0.2″ of a pole, an
+// error as large as the distance from the pole itself.
 func (v Vec3) ToSpherical() (lon, lat float64) {
 	if v.X == 0 && v.Y == 0 && v.Z == 0 {
 		return 0, 0

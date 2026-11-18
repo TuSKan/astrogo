@@ -21,19 +21,17 @@
 // [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels,
 // which means files, a cache and a network: remote, and through it net/http
 // and crypto/tls. A build that only asks SOFA where Mars is has no use
-// for any of it, and used to link all of it because one branch of
-// [NewProvider] mentioned the type.
+// for any of it.
 //
 // So the kernel half registers itself instead:
 //
 //	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 //
-// Measured with go1.27 on windows/amd64, a program calling
-// eph.Default().State(eph.MarsBarycenter, t), the call before #803, was 4.7 MB and 107 packages without the
-// import and 12.4 MB and 236 with it, 69 of them crypto. The import adds those
-// bytes only to the build that wants them. The same pattern remote/eop uses;
-// see #112, whose figures (13.9 MB and 424 packages) were measured when the
-// storage layer was gocloud.dev.
+// Measured with go1.27.4 on windows/amd64, a program calling
+// eph.Default().Locate(eph.MarsBarycenter, t) is 4.6 MB and 107 packages
+// without the import and 11.0 MB and 231 with it, 69 of them crypto. The
+// import adds those bytes only to the build that wants them, the pattern
+// remote/eop uses.
 //
 // Without the import, those five sources report an error naming it.
 // [Default] and everything built on SOFA are unaffected.

@@ -39,9 +39,7 @@
 // asserts it to 1e-4 km. The suite is built to exercise the hard regimes:
 // perigees below 220 km, where SGP4 switches to simplified drag, the
 // deep-space SDP4 branch that 24 of the 31 cases take, and objects in their
-// last stage of decay. The Go implementation this package wrapped before
-// disagreed with the same suite on seven cases, by up to 3438 km
-// (TuSKan/astrogo#309); all seven now agree.
+// last stage of decay.
 //
 // That is agreement with the reference implementation, which is a statement
 // about this code and not about where the satellite is. SGP4's accuracy

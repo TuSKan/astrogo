@@ -30,8 +30,7 @@ import (
 // off the zenith by R⊕ times that tilt over the body's distance. For the Sun
 // and the planets that is under a milliarcsecond, and the two answers are
 // the same. For the Moon, at 60 Earth radii, it is up to about 10″, 0.3 km on
-// the ground: SubPoint used only the direction and called the Moon
-// "effectively infinite" until #579. A direction given without a meaningful
+// the ground. A direction given without a meaningful
 // length (a unit vector) is taken as a body that many AU away, where the two
 // answers agree. A satellite's position works too: the foot of the normal
 // through it is its sub-satellite point.
@@ -41,13 +40,10 @@ import (
 // GCRS to ITRS is the full IAU 2006/2000A celestial-to-terrestrial matrix,
 // SOFA's C2t06a: frame bias, precession and nutation, then Earth rotation,
 // then polar motion, at t's own UT1 and polar motion — the matrix
-// [Context] uses. It used to be Earth rotation alone, by GAST, which is the
-// right rotation only for a vector already referred to the true equator and
-// equinox of date. A GCRS vector is not, so the sub-point was displaced by
-// precession and nutation since J2000. For the Sun, measured as the zenith
-// distance at the point returned: 15 arcsec at J2000 itself, from nutation,
-// 0.38° — 42 km — in October 2026, and growing at the general precession's
-// 50 arcsec a year.
+// [Context] uses. Earth rotation alone, by GAST, is the right rotation only
+// for a vector already referred to the true equator and equinox of date. A
+// GCRS vector is not: rotated that way, the Sun's sub-point lies 0.38°, 42 km,
+// from where the Sun is overhead in October 2026.
 //
 // Returns [ErrZeroVector] for a zero vector, and an error when UT1 cannot be
 // had for t, as [time.Time.UT1] reports it.
@@ -96,7 +92,7 @@ func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 //
 // Returns ErrTooFewPoints if n < 3, ErrNilCenter if center is nil, or
 // ErrNotFinite for a non-finite radius, which would otherwise make every point
-// NaN: a Geodetic NewGeodetic and FromECEF both refuse to build (#979).
+// NaN: a Geodetic NewGeodetic and FromECEF both refuse to build.
 func SmallCircle(center *Geodetic, radius angle.Angle, n int) ([]*Geodetic, error) {
 	if n < 3 {
 		return nil, fmt.Errorf("coord: smallcircle: n=%d: %w", n, ErrTooFewPoints)

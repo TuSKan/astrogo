@@ -17,10 +17,9 @@ import (
 // SourceETagSuffix names the sidecar recording the source ETag a partially
 // downloaded object was fetched under.
 //
-// # A sidecar, where this used to be object metadata
+// # A sidecar, not object metadata
 //
-// gocloud gave every driver a metadata map, and the ETag rode in it. io/fs has
-// no such thing, and inventing one would mean an extension interface every
+// io/fs has no metadata map, and inventing one would mean an extension interface every
 // backend had to implement to be usable as a cache — for a single string that
 // only the resume path reads.
 //
@@ -113,28 +112,14 @@ func (k *keyedSemaphore) acquire(ctx context.Context, key string) (release func(
 // Zero, or anything past 30 minutes, means 30 minutes. A caller who knows how
 // long a live holder can take — remote.GetFile, from the download timeout every
 // holder of that entry runs under — passes that, so a small file's lock left
-// by a crash is not waited out for half an hour (#445).
+// by a crash is not waited out for half an hour.
 //
 // Exclusion is in two layers. Within this process it is [inProcess], which
 // makes waiting cancellable. Across processes it is [CreateExclFS], which
 // astrogo's local backend implements with O_CREATE|O_EXCL inside an [os.Root].
 //
-// # This is the part that got stronger
-//
-// The cross-process layer used to be gocloud's WriterOptions.IfNotExist, which
-// this code described as "on S3 a genuinely atomic conditional PUT, on fileblob
-// a Stat-then-Rename that is best-effort and can admit a second holder". The
-// gap was real and tracked as #241, and it forced a losing writer to be
-// recognized by three different error codes — FailedPrecondition, the intended
-// signal; Unknown, from a Windows "Access is denied" when the winner held the
-// destination open; and NotFound, from the loser's own staging file being
-// renamed away because both had picked the same name from a clock that does not
-// advance on Windows.
-//
-// None of that survives. O_CREATE|O_EXCL is indivisible in the kernel, so there
-// is exactly one way to lose and it is [fs.ErrExist]. The classifier, the
-// staging lock this function had to take around its own lock write, and the
-// residual race the caller double-checked for are all gone with it.
+// O_CREATE|O_EXCL is indivisible in the kernel, so there is exactly one way to
+// lose and it is [fs.ErrExist].
 //
 // The layering still matters for a reason beyond belt-and-braces: `go test
 // ./...` runs each package as its own process and several of them want the same
@@ -245,9 +230,9 @@ func PartialKey(cacheKey string) string { return cacheKey + ".part" }
 //
 // A partial whose ETag sidecar exists but cannot be read is neither resumed
 // nor discarded: the error is returned, and the caller must not start over,
-// since a fresh download is written over the partial. Until #452 an unreadable
-// sidecar read as no ETag, so a transient sharing violation on Windows threw
-// away whatever a multi-gigabyte download had fetched so far.
+// since a fresh download is written over the partial: a transient sharing
+// violation on Windows must not throw away what a multi-gigabyte download has
+// fetched so far.
 func ResumePoint(ctx context.Context, fsys fs.FS, cacheKey, sourceETag string) (int64, error) {
 	bound := WithContext(ctx, fsys)
 	pKey := PartialKey(cacheKey)
@@ -307,10 +292,8 @@ func RecordedETag(ctx context.Context, fsys fs.FS, key string) string {
 // disk — so the HTTP backend puts its response header in Sys, which is the
 // standard library's own escape hatch for exactly this.
 //
-// Otherwise a weak validator synthesized from size and modification time. That
-// is not a fallback invented here: it is precisely what gocloud's fileblob did
-// for every local object, and it is what makes a file:// source resumable at
-// all. It is weaker than a real ETag and says so in its shape — a file replaced
+// Otherwise a weak validator synthesized from size and modification time,
+// which is what makes a file:// source resumable at all. It is weaker than a real ETag and says so in its shape — a file replaced
 // with different content of the same length in the same nanosecond would not be
 // noticed — which is why the strong one is preferred whenever offered.
 //
@@ -393,7 +376,7 @@ func WriteETag(ctx context.Context, fsys fs.FS, key, sourceETag string) error {
 // key. An error from it leaves cacheKey as it was: whatever was cached there
 // before is neither replaced nor removed. It is handed a key rather than a
 // stream so that a caller's own reader, which opens the file however it needs
-// to, can decide before the cached copy is replaced (#1047).
+// to, can decide before the cached copy is replaced.
 //
 // offset > 0 means body continues an existing partial: the two are
 // concatenated into a separate staging key rather than written back over

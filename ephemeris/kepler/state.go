@@ -22,7 +22,7 @@ type stateVector struct {
 // conic.
 //
 // It is the form a state vector arrives in — a Horizons VECTORS answer, an
-// orbit determination — and the one a barycentric refit produces (#803).
+// orbit determination — and the one a barycentric refit produces.
 // Nothing passes through angles: the propagation starts from the state
 // itself, so a state converted here and propagated by zero days is the state.
 //

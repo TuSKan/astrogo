@@ -107,25 +107,14 @@ type Context struct {
 // Everything a Context holds is built from one TT, t.TT(), and one UT1,
 // t.UT1Using with the epoch's DUT1: the astrometry the stellar path reads, the
 // celestial-to-intermediate matrix the vector path and SetTime read, and the
-// Earth rotation both apply.
-//
-// It used to hand SOFA's Apco13 the UTC date and let it derive its own TT and
-// UT1 from SOFA's TAI−UTC table, while deriving astrogo's for everything else.
-// From 1972 on the two agree. Before, they did not: astrogo's ΔT against
-// SOFA's TAI−UTC put the TTs up to 34 s apart, and on the eleven days SOFA
-// stretches for a step in TAI−UTC (1959-12-31, ten in the 1960s, 1971-12-31)
-// the UT1s differed by up to 0.82 s, so a star and the Moon in one Context
-// were rotated by different Earths, 11.8″ apart (#474).
+// Earth rotation both apply, so a star and the Moon in one Context are
+// rotated by the same Earth at every epoch, before 1972 included.
 //
 // # What it refuses
 //
 // A nil site is [ErrNilGeodetic], a time that is not finite is
 // [ErrNotFinite], and air that fails [atmosphere.Refraction.Validate] is that
-// error. Each used to be accepted: the nil site panicked, the time made every
-// place NaN, and the air made every observed altitude NaN, all with no error,
-// since NewContext had no way to return one (#1186). Refco would otherwise
-// clamp the air, so a NaN temperature came out as −150 °C and refracted 2.35
-// times too much (#903).
+// error, rather than the clamp SOFA's Refco would apply to it.
 func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) (*Context, error) {
 	if site == nil {
 		return nil, fmt.Errorf("coord: NewContext: %w", ErrNilGeodetic)
@@ -233,25 +222,16 @@ var (
 // holdFor. At an instant where the series were evaluated, ctx is what
 // [NewContext] builds there.
 //
-// It used to hold the series' state fixed for an hour and evaluate it again
-// an hour out: 24 evaluations in a day of steps, at 0.1 ms each, and a drift
-// of up to 0.07″, three quarters of it the observer's velocity held at the
-// epoch's Earth rotation angle while the Earth turned (#790).
-//
-// It replaces AtTime, which returned a new Context for every instant, 704
-// bytes on the heap to change four values, and left the rebuild to each
-// caller (#675).
-//
 // SetTime writes ctx, so it must not run while anything else reads or moves
 // the same Context; see the package's Concurrency section.
 //
 // # DUT1 is t's own, not interpolated
 //
 // Across a leap second DUT1 = UT1 − UTC jumps by exactly one second, because
-// UTC steps back and UT1 does not, so reusing an earlier instant's put every
-// instant after the leap a second early in Earth rotation — 13″ for a star at
-// −30° (#489). Looking DUT1 up at t, as NewContext does, costs one
-// interpolation.
+// UTC steps back and UT1 does not, so SetTime looks DUT1 up at t, as
+// NewContext does, at the cost of one interpolation. An earlier instant's
+// would put every instant after the leap a second early in Earth rotation,
+// 13″ for a star at −30°.
 func (ctx *Context) SetTime(t time.Time) {
 	t = t.UTC()
 	lo, hi := &ctx.nodes[0], &ctx.nodes[1]
@@ -366,8 +346,7 @@ func (ctx *Context) Site() *Geodetic { return ctx.site }
 // carry no DUT1 or polar motion, which can put a topocentric place 13.5″ off;
 // [time.LoadEOP] loads a bulletin, and says when it cannot. A source of
 // "network" or "cache" with covered false is an instant past the bulletin's
-// end, where DUT1 is held as [time.DeltaT] describes. Until #1187 a Context
-// could not say which of these it was built with.
+// end, where DUT1 is held as [time.DeltaT] describes.
 func (ctx *Context) EOPSource() (source string, covered bool) { return ctx.eopSource, ctx.eopCovered }
 
 // Refraction returns the encapsulated refraction configuration. Renamed
@@ -465,9 +444,7 @@ func (ctx *Context) AstrometricToObserved(c Astrometric) AltAz {
 // [Context.refract].
 //
 // The result carries the topocentric distance, |v − observer|, with v read in
-// AU as the observer vector is. It used to carry none: Dist() was zero, while
-// ICRSToAltAz passes its input's distance through, and a satellite's
-// TargetDetails read that zero as its range (#495).
+// AU as the observer vector is.
 func (ctx *Context) GeocentricToObserved(v vector.Vec3) AltAz {
 	// Topocentric vector in ICRS frame.
 	topoVec := v.Sub(ctx.obsVec)
@@ -542,8 +519,7 @@ func (ctx *Context) TopocentricToObserved(v vector.Vec3) AltAz {
 // (proper motion, parallax, radial velocity), they are forwarded to SOFA for
 // rigorous space-motion propagation.
 //
-// A position or kinematics that is not finite is [ErrNotFinite]. It used to
-// come back as a NaN place with a nil error (#1186).
+// A position or kinematics that is not finite is [ErrNotFinite].
 func (ctx *Context) ICRSToAltAz(c ICRS) (AltAz, error) {
 	if !c.Astrometric().finite() {
 		return AltAz{}, fmt.Errorf("coord: ICRSToAltAz: %v: %w", c, ErrNotFinite)
@@ -585,8 +561,7 @@ func (ctx *Context) ParallacticAngle(c AltAz) angle.Angle {
 //
 // Observed means refracted: the hour angle of the direction [Context.ICRSToAltAz]
 // returns, rotated from the horizon to the equator as iauAtioq rotates it,
-// with the latitude corrected for polar motion. Until #588 a Context with an
-// explicit refraction model returned the unrefracted hour angle.
+// with the latitude corrected for polar motion.
 //
 // A position or kinematics that is not finite is [ErrNotFinite], as for
 // [Context.ICRSToAltAz].
@@ -604,13 +579,10 @@ func (ctx *Context) ICRSToHourAngle(c ICRS) (angle.Angle, error) {
 //
 // It inverts with the astrometry this Context already holds, through SOFA's
 // quick inverse (Atoiq, then Aticq), which is what Atoc13 does after building
-// that astrometry itself. It used to call Atoc13, so every inversion evaluated
-// the precession-nutation series again on a Context built to cache it, and did
-// so at SOFA's own TT and UT1 rather than this Context's: on the days #474
-// names, the inverse of ICRSToAltAz was not ICRSToAltAz's inverse.
+// that astrometry itself, so it inverts [Context.ICRSToAltAz] at this
+// Context's own TT and UT1 and evaluates no series.
 //
-// An altitude or azimuth that is not finite is [ErrNotFinite]. It used to
-// come back as a NaN position with a nil error (#1186).
+// An altitude or azimuth that is not finite is [ErrNotFinite].
 func (ctx *Context) AltAzToICRS(c AltAz) (ICRS, error) {
 	if !finite(c.Alt().Radians()) || !finite(c.Az().Radians()) {
 		return ICRS{}, fmt.Errorf("coord: AltAzToICRS: altitude %v, azimuth %v: %w", c.Alt(), c.Az(), ErrNotFinite)

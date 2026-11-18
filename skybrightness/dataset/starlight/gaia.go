@@ -933,9 +933,7 @@ func JohnsonCousinsColorTerm(band string) ([]float64, error) {
 //
 //	F_lambda = F_nu * c / lambda_pivot^2
 //
-// Checked against the value this package used to carry as a literal: Bessell V
-// at 3630.22 Jy and a pivot of 547.77 nm gives 3.627e-11, against the 3.63e-11
-// that was written down.
+// Bessell V at 3630.22 Jy and a pivot of 547.77 nm gives 3.627e-11.
 func VegaZeroFlux(band magnitude.Passband) (float64, error) {
 	if band.VegaZeroPointJy <= 0 {
 		return 0, fmt.Errorf("%w: passband %q carries no Vega zero point",

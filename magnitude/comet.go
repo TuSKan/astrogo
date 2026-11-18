@@ -45,9 +45,6 @@ func CometApparent(M1, k1, r, delta float64) float64 {
 //   - r: heliocentric distance (AU)
 //   - delta: geocentric distance (AU)
 //   - phase: the Sun–target–observer angle β
-//
-// Until #548 the phase term was missing, which made a nucleus brighter by
-// PC·β: 0.21 mag for 13P/Olbers at 7°, against Horizons' own N-mag.
 func CometNuclearApparent(M2, k2, pc, r, delta float64, phase angle.Angle) float64 {
 	if r <= 0 || delta <= 0 {
 		return M2

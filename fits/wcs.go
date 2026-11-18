@@ -16,11 +16,8 @@ import (
 //
 // [WCS.PixelToWorld] and [WCS.WorldToPixel] only read a WCS, so any number of
 // goroutines may transform through one at once; the setters change it, and
-// must not run beside them. The transforms used to re-derive the projection
-// and the celestial axes from CTYPE on every call, writing them into the WCS
-// as they went, so two goroutines transforming through a shared one were a
-// data race (#797). Those are now derived when CTYPE is set, the one thing
-// they depend on.
+// must not run beside them. The projection and the celestial axes are derived
+// when CTYPE is set, the one thing they depend on.
 type WCS struct {
 	sipA    sipPoly
 	tpv2    map[int]float64
@@ -333,17 +330,15 @@ const (
 // Because [WCS.PixelToWorld] returns a bare float per axis, and for a
 // non-celestial axis nothing else in this package says what that number is.
 // A spectral axis may be meters, Hertz or Angstrom; a time axis seconds or
-// days. The value astrogo returns is correct in the header's unit, and until
-// now the header's unit was not reachable through the API at all — a caller
-// had to parse the card themselves to interpret a number this package handed
-// them.
+// days. The value astrogo returns is correct in the header's unit, and this is
+// where a caller reads that unit.
 //
 // It is not parsed into a typed quantity because FITS units are a small
 // language of their own (Paper I §4.3: prefixes, powers, products, and forms
 // like "10**(-20) erg/s/cm**2/Angstrom"), and a partial parser that silently
 // mishandled the rest would be worse than the string. That is also why
 // [WCS.PixelToWorld] returns a bare float64 per axis rather than a typed
-// quantity (#178): a non-celestial axis is in whatever unit this says, and
+// quantity: a non-celestial axis is in whatever unit this says, and
 // this is how a caller finds out which.
 //
 // Celestial axes are the exception that needs no interpretation: WCS Paper II
@@ -380,7 +375,7 @@ func (w *WCS) SetCUnit(cunit []string) error {
 // The return is one value per axis, and the unit is not the same for all of
 // them. Saying so is the point of this section: the signature is a bare
 // []float64 both ways, so nothing but this comment distinguishes a right
-// ascension in degrees from a wavelength in Angstrom (#178).
+// ascension in degrees from a wavelength in Angstrom.
 //
 //   - Celestial axes — the pair CTYPE names as longitude and latitude — come
 //     back in DEGREES, right ascension normalized to [0, 360). Degrees rather
@@ -393,8 +388,8 @@ func (w *WCS) SetCUnit(cunit []string) error {
 //   - When no celestial pair is present, every axis is the linear case above.
 //
 // A caller mixing the two — passing a spectral value to something expecting an
-// angle — is not stopped by anything here, and that is decided rather than
-// pending (#178). A typed return would need a unit for every axis, and for
+// angle — is not stopped by anything here, and that is decided. A typed
+// return would need a unit for every axis, and for
 // anything but a celestial one that unit is the header's CUNITi, a small
 // language astrogo does not parse: a typed shape would have to refuse most
 // headers or guess at them.

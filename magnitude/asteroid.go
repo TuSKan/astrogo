@@ -18,8 +18,7 @@ import (
 // The basis functions follow Bowell et al. (1989) Eq. A4 exactly,
 // matching the sbpy HG._hgphi implementation. Where both are zero, at
 // α = 180°, no light is reflected toward the observer and the magnitude is
-// +Inf, as sbpy gives and as [SurfaceBrightness] answers a zero radiance;
-// until #835 it was a finite H + 75.
+// +Inf, as sbpy gives and as [SurfaceBrightness] answers a zero radiance.
 //
 // Parameters:
 //   - H: absolute magnitude
@@ -103,7 +102,7 @@ func bowellPhi(alphaRad float64, i int) float64 {
 // knot values from Muinonen et al. (2010), exactly matching sbpy's
 // HG1G2 implementation. Each is clipped at zero, as sbpy clips it, and where
 // the weighted sum is zero — G₁ = 1 beyond 152.3°, say — the magnitude is
-// +Inf; until #835 it was a finite H + 75.
+// +Inf.
 func AsteroidHG1G2(H, G1, G2, r, delta float64, alpha angle.Angle) float64 {
 	a := alpha.Radians()
 	G3 := 1 - G1 - G2

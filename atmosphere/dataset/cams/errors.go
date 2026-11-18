@@ -32,8 +32,7 @@ var (
 	// ErrMalformed is returned for a file this reader cannot decode safely:
 	// a dataset that declares more values than the file could hold, or a
 	// structure that makes the HDF5 decoder fail outright. Either is
-	// reported as an error rather than allowed to end the caller's process
-	// (#794).
+	// reported as an error rather than allowed to end the caller's process.
 	ErrMalformed = errors.New("cams: malformed file")
 
 	// ErrUnexpectedAttributeType is returned when a known attribute

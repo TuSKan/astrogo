@@ -11,13 +11,8 @@ type Cache interface {
 	Close() error
 }
 
-// MapCache implements an in-memory cache that stores Target slices directly.
-//
-// The previous implementation serialized targets to/from Arrow RecordBatches on
-// every Set/Get, adding marshal/unmarshal overhead and per-row allocations
-// (ICRS, aliases) without exposing a columnar query path. This version stores
-// the slices directly, retaining the MapCache name and Cache interface for
-// API compatibility.
+// MapCache is an in-memory [Cache] that stores Target slices directly. It is
+// safe for concurrent use.
 type MapCache struct {
 	items map[string][]Target
 	mu    sync.RWMutex

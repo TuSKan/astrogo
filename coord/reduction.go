@@ -79,8 +79,7 @@ type Reducer struct {
 }
 
 // NewReducer creates a new apparent-place reduction pipeline, building its
-// [Context]: what [NewContext] refuses, it refuses. It used to build the
-// Context on the first Reduce, which had no error to return (#1186).
+// [Context]: what [NewContext] refuses, it refuses.
 func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Refraction) (*Reducer, error) {
 	ctx, err := NewContext(t, site, atmos)
 	if err != nil {
@@ -140,18 +139,10 @@ func (r *Reducer) Reduce(v vector.Vec3) *Reduction {
 // Disperse computes wavelength-dependent refraction for a set of target
 // wavelengths, returning the reduction evaluated differentially for each.
 //
-// # Why there is no nil-model shortcut here any more
-//
-// This used to return [Reduction.Observed] unchanged for every wavelength when
-// atmos.Model was nil — zero dispersion. But a nil Model does not mean no
-// refraction: with a pressure set it means SOFA's, which is exactly what
-// [Reducer.Reduce] applied a few lines earlier when it filled in Observed. So
-// the two halves of one reduction disagreed about whether there was an
-// atmosphere, and the half that said there wasn't is the one a caller asking
-// for dispersion cares about.
-//
-// Resolving through [atmosphere.Refraction.EffectiveModel] removes the
-// disagreement by construction: a zero-pressure environment still yields no
+// A nil atmos.Model does not mean no refraction: with a pressure set it means
+// SOFA's, which is what [Reducer.Reduce] applies. Disperse resolves the model
+// through [atmosphere.Refraction.EffectiveModel] as Reduce does, so the two
+// agree about the atmosphere; a zero-pressure environment yields no
 // dispersion, because the model it resolves to returns zero.
 func (r *Reducer) Disperse(v vector.Vec3, wavelengths []float64) *Reduction {
 	res := r.Reduce(v)

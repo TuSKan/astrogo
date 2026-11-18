@@ -69,9 +69,6 @@ func (gp GP) EpochTime() (time.Time, error) {
 // O, so 100690 is "A0690". Beyond 339999 no TLE can name the object, and both
 // lines come back empty rather than naming another one; CelesTrak serves those
 // as GP data only.
-//
-// Until #737 the number was clamped to 99999, so every object cataloged since
-// July claimed to be the same one.
 func (gp GP) ToTLE() (line1, line2 string) {
 	catID, ok := catalogField(gp.NoradCatID)
 	if !ok {
@@ -352,9 +349,7 @@ func (p *Provider) Capabilities() []resolve.Capability {
 // row meant tracking the wrong satellite, silently, for the single most
 // common query this provider will ever receive.
 //
-// A catalog number now goes to CelesTrak's CATNR parameter, which is exact:
-// "25544" used to find nothing at all, because the number was being sent as
-// a name.
+// A catalog number goes to CelesTrak's CATNR parameter, which is exact.
 //
 // A name is ranked rather than taken in arrival order — see [rankByName].
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {

@@ -43,9 +43,7 @@ func StarApparent(catMag, airmass, k float64) float64 {
 //
 // Fitted for −0.5 < BP−RP < 5.0. Outside that the cubic extrapolates — at
 // BP−RP = 7 it is already several magnitudes adrift — so ok is false there and
-// v is the extrapolation, not a magnitude. It used to return the extrapolation
-// alone, documented as "not clamped here", and catalog/gaia reported it as V
-// for any color (#530).
+// v is the extrapolation, not a magnitude.
 //
 // Parameters:
 //   - G: Gaia DR3 G-band magnitude
@@ -67,12 +65,7 @@ func GaiaGToJohnsonV(G, bpMinusRp float64) (v float64, ok bool) {
 // so B = G − (G−B), the same tabulation and the same direction as
 // [GaiaGToJohnsonV]. Published σ is 0.0633 mag, twice that of the V relation.
 //
-// The coefficients this function previously carried — −0.02907, 0.6399,
-// −0.09631, 0.01023, cited only as "Gaia DR3 photometric documentation" — appear
-// nowhere in that table. They are a cubic where the published relation is a
-// quartic, and they failed an empirical check in both orientations by −0.46 mag
-// at BP−RP ≈ 0 growing to −2.0 by BP−RP = 3, so the shape was wrong rather than
-// the sign. Measured against 4,000 stars carrying both Gaia and Tycho-2
+// Measured against 4,000 stars carrying both Gaia and Tycho-2
 // photometry, with Johnson B taken from Tycho as B = B_T − 0.240(B_T − V_T), the
 // published quartic has a median residual of −0.010 mag over the range it is
 // unrestrictedly valid on.

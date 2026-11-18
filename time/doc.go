@@ -96,13 +96,12 @@
 // or following the Espenak & Meeus (2006) extrapolation, which was 6.2 s high in
 // 2026 against a ΔT the bulletin shows flat since 2020. [DeltaT] is that same
 // value at every epoch, so no conversion disagrees with it, and
-// [DeltaTUncertainty] grows from the bulletin's end (#696).
+// [DeltaTUncertainty] grows from the bulletin's end.
 //
 // Where those bytes come from is supplied by a registered [EOPLoader], not
-// reached for by this package. Importing astrogo/remote registers one — as
-// any program granting download consent necessarily does — so nothing
-// changes for a caller that wants EOP data. A program that imports neither
-// degrades to zero EOP and links no storage backend at all, which is the
+// reached for by this package. Blank-importing astrogo/remote/eop registers
+// the one that fetches through remote; importing remote alone does not. A
+// program that registers none degrades to zero EOP and links no storage backend at all, which is the
 // difference between a 2.5 MB binary and a 19.4 MB one.
 //
 // # The clock you are given
@@ -165,9 +164,7 @@
 // fraction of *that day's* length, which is 86401 seconds on a day ending in a
 // leap second, so 23:59:60 sits at 86400/86401 of the day — iauDtf2d exactly,
 // and what astropy does through ERFA. On every ordinary day the two readings
-// coincide and nothing changed. utcday.go has the details, and #144 the
-// argument; before it, 23:59:60 landed on the following midnight and was
-// converted a full second wrong.
+// coincide.
 //
 // Three consequences worth knowing:
 //

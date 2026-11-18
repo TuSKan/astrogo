@@ -80,13 +80,7 @@ const satelliteReferenceRange unit.Length = 1_000_000
 // for the same object, which this does.
 //
 // At α = 180° the sphere's phase function is zero: the satellite turns its
-// unlit side to the observer, and the magnitude is +Inf. Until #835 it was a
-// finite 75 magnitudes fainter than the standard one.
-//
-// Until #560 the phase was measured from 90° whatever the convention — so a
-// McCants magnitude came out 0.75 mag (sphere) or 1.24 mag (cylinder) too
-// bright at its own reference geometry — and a Molczan magnitude was shifted
-// by the whole 1.45 mag as well.
+// unlit side to the observer, and the magnitude is +Inf.
 //
 // Parameters:
 //   - stdMag: standard magnitude from catalog (McCants or Molczan convention)

@@ -46,17 +46,12 @@ const (
 	// only attaches a color index, and the catalog holds about 9,100 stars
 	// over the whole sky, so a window this size almost never contains two.
 	//
-	// It was thirty arcseconds, on the reasoning that the slack would absorb
-	// the proper motion between the Hipparcos epoch and J2000 without having
-	// to propagate it. That was wrong, and Alpha Centauri A is where it showed:
-	// at 3.7 arcseconds a year it moves 32 in that interval and fell outside,
-	// so the fourth brightest star in the sky got no R magnitude. Widening
-	// further would have been worse than useless - Alpha Centauri A and B sit
-	// 1.4 arcseconds apart in the catalog, so a radius large enough to
-	// recover the star is large enough to take the wrong component of the
-	// binary, and picking the nearer would have been luck rather than
-	// correctness. The positions are propagated now, and the radius is what a
-	// position match needs rather than what an unpropagated one needs.
+	// The positions are propagated to J2000 first, so the radius is what a
+	// position match needs. A radius wide enough to absorb the proper motion
+	// instead would fail on Alpha Centauri A, which moves 32 arcseconds
+	// between the Hipparcos epoch and J2000, while A and B sit 1.4 arcseconds
+	// apart in the catalog: any such radius takes the wrong component of the
+	// binary.
 	BrightStarCatalogRadius = angle.Angle(10 * math.Pi / 180 / 3600)
 
 	// BrightStarMagnitudeTolerance is how far a candidate's V may sit from the

@@ -176,10 +176,9 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // the source is dimmed along its own line of sight first, by the scene's own
 // air through [atmosphere.Atmosphere.ExtinctionToward] at every wavelength,
 // weighted by the sky-colored spectrum and the instrument's response, and the
-// magnitude returned is the one above the atmosphere. Until #893 it was the
-// one at the ground, deeper by the target's whole extinction. Measured at
-// Paranal through a V filter, that was 0.11 mag at the zenith and 0.57 at ten
-// degrees, where V's own extinction is 0.11 and 0.60.
+// magnitude returned is the one above the atmosphere. The one at the ground
+// would be deeper by the target's whole extinction: at Paranal through a V
+// filter, 0.11 mag at the zenith and 0.57 at ten degrees.
 //
 // # Put the filter in the throughput, or the band label is a half-truth
 //

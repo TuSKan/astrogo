@@ -205,13 +205,10 @@ func NewTicker(d Duration) *time.Ticker { return time.NewTicker(d) }
 // epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
 // sources assume when they don't report their own epoch explicitly.
 //
-// A function rather than a var, and that is the whole of #113's remainder.
-//
-// It used to be `var J2000 = FromJD(...)`, which any importer could reassign,
-// shifting the standard epoch for every other package in the process. Go
-// offers no way to declare a struct value immutable, so a function returning a
-// copy is the only construction that removes the footgun. The stored value is
-// computed once; the call is a copy of a small struct and costs nothing.
+// It is a function rather than a var so that no importer can reassign the
+// standard epoch for every other package in the process: Go offers no way to
+// declare a struct value immutable. The stored value is computed once; the
+// call is a copy of a small struct and costs nothing.
 //
 // [LocationUTC] is the one exported var left, and it stays: the standard
 // library declares `var UTC *Location = &utcLoc`, so wrapping it would hand
@@ -268,12 +265,9 @@ const (
 	//	TAI − GPST = 19 s, exactly and for ever
 	//	GPST − UTC = ΔAT − 19 s, which is 18 s today
 	//
-	// A caller with a receiver timestamp previously had no way to say what it
-	// was. The only expressible option was to call it UTC, and that is wrong
-	// by 18 s — 138 km of ISS ground track, in the package that also fixed a
-	// 69.184 s scale error worth 530 km (#133). Satellite work is exactly the
-	// population holding GNSS timestamps, which is what made this the most
-	// likely remaining instance of that defect class.
+	// A receiver timestamp called UTC is wrong by 18 s, 138 km of ISS ground
+	// track, and satellite work is exactly the population holding GNSS
+	// timestamps.
 	//
 	// Galileo System Time shares this scale: it is also TAI − 19 s, and agrees
 	// with GPST to within nanoseconds by design. BeiDou does not, and has
@@ -343,8 +337,8 @@ const (
 	// a planetary ephemeris is argued in TDB and not in TCB: TDB was defined
 	// to keep the difference from TT bounded at milliseconds.
 	//
-	// A caller holding a pulsar timing solution or a barycentric dynamical
-	// model quoted in TCB has, until now, had no way to say so.
+	// It is the scale a pulsar timing solution or a barycentric dynamical
+	// model is often quoted in.
 	TCB
 )
 
@@ -466,11 +460,8 @@ func FromGo(t time.Time) Time {
 }
 
 // NowUTC returns the current time in the UTC scale, displayed in UTC: its
-// [Time.String], [Time.Format] and [Time.ToGo] show the UTC clock.
-//
-// It used to keep the host's local zone for display, as [FromGo] keeps the
-// zone it is given, so NowUTC().Format("15:04 UTC") printed the local clock
-// labeled UTC (#1142). For the current instant shown on the local clock, use
+// [Time.String], [Time.Format] and [Time.ToGo] show the UTC clock. For the
+// current instant shown on the local clock, use
 // FromGo(Now()), or call [Time.In] with the zone wanted.
 func NowUTC() Time {
 	return FromGo(time.Now().UTC())
@@ -520,29 +511,17 @@ func (t Time) String() string {
 // If a display location was set (via [FromGo], [Date], or [Time.In]),
 // the result is expressed in that timezone; otherwise it defaults to UTC.
 //
-// # The scale conversion, and why it was missing
+// # The scale conversion
 //
-// time.Time is an instant on the UTC timeline, so a Time on any other scale
-// has to be converted before its numbers mean anything there. This used to
-// subtract the Unix epoch from jd1/jd2 directly, whatever scale they were on,
-// which silently reinterpreted a TT or TDB Julian Date as a UTC one.
-//
-// The effect was that one instant produced different time.Time values
-// depending on which representation the caller happened to be holding:
-//
-//	utc := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-//	utc.ToGo()        // 2026-01-01 00:00:00.000
-//	utc.TT().ToGo()   // 2026-01-01 00:01:09.184  — the same instant
-//
-// 69.184 seconds apart, from a conversion that looks total. Since ToGo backs
-// [Time.String], [Time.Format] and every formatted event time in plan, a
-// caller who had converted a scale anywhere upstream got a wrong clock
-// reading with nothing to indicate it.
+// time.Time is an instant on the UTC timeline, so a Time on any other scale is
+// converted to UTC first: one instant gives one time.Time, whichever scale it
+// is held in. ToGo backs [Time.String], [Time.Format] and every formatted
+// event time in plan.
 //
 // # The one cost
 //
 // Converting a UT1-scale Time needs DUT1, so it can trigger time's lazy
-// Earth-orientation load — which formatting previously never did. That path
+// Earth-orientation load. That path
 // degrades rather than fails (disk cache, then a consent-gated fetch, then
 // zero EOP with a warning), and |DUT1| < 0.9 s bounds the error even when it
 // degrades. UTC, TAI, TT and TDB convert by arithmetic alone and reach no
@@ -674,12 +653,10 @@ func julianCalendar(jd1, jd2 float64) (year, month, day int, dayFrac float64) {
 //
 // The time is rounded to the nearest second, not truncated: an instant held a
 // few microseconds short of 12:30:00 prints as 12:30:00, and one a few short
-// of midnight as the next day's 00:00:00 (#439).
+// of midnight as the next day's 00:00:00.
 //
 // The clock is UTC's, whatever scale t holds, as [Time.Format]'s is: the two
-// differ only in calendar. It used to be t's own scale's, so the same instant
-// held as TT printed 5h06m later in 585 BC, and 1 min 9 s later in 2026, than
-// it did held as UTC or through Format (#766). MST reads "UTC".
+// differ only in calendar. MST reads "UTC".
 func (t Time) FormatJulian(format string) string {
 	jd1, jd2 := t.clockParts()
 	y, m, d, frac := julianCalendar(jd1, jd2+halfSecondDays)
@@ -796,9 +773,6 @@ func (t Time) AddDate(years, months, days int) Time {
 //
 // It takes a [unit.Duration] rather than the standard library's: an epoch here
 // can sit in 4713 BC, and an int64 nanosecond count saturates past ±292 years.
-// This used to be two methods for that reason — Add over a time.Duration and
-// AddDays over a bare float64 — and the float64 was the one that carried its
-// unit in the method name instead of the type.
 //
 // # This advances the label, and [Time.Sub] measures physical time
 //
@@ -809,20 +783,15 @@ func (t Time) AddDate(years, months, days int) Time {
 //
 // The asymmetry is deliberate rather than an oversight, and it is bounded:
 //
-//   - Add stays label arithmetic because that is what it has always meant, and
-//     changing the meaning of an existing method under its callers is a
-//     decision of its own. t.Add(d).Add(-d) returns exactly t, which
-//     TestAddIsReversible pins, for every instant that has a label in the
-//     uniform count — everything but the leap second itself, which is where an
-//     Add starting inside one lands on the following midnight, as it always
-//     did.
+//   - Add is label arithmetic. t.Add(d).Add(-d) returns exactly t for every
+//     instant that has a label in the uniform count — everything but the leap
+//     second itself, where an Add starting inside one lands on the following
+//     midnight.
 //   - Sub is physical because it returns a [unit.Duration], which is a count
 //     of SI seconds by type.
 //
-// Now that UTC represents its leap seconds (see utcday.go) the reason this
-// could not be otherwise has gone, and physical addition would be reversible
-// too; whether Add should become it is a separate question. To advance a UTC
-// epoch by physical time today, do the arithmetic in a uniform scale:
+// To advance a UTC epoch by physical time, do the arithmetic in a uniform
+// scale:
 // t.TAI().Add(d).UTC().
 func (t Time) Add(d unit.Duration) Time {
 	if t.scale == UTC {
@@ -921,13 +890,6 @@ func DateJulianCal(year, month, day, hour, minute, second int) Time {
 // fraction of that year elapsed at t, the day of the year and the day's
 // fraction over the year's 365 or 366 days, in the proleptic Gregorian
 // calendar [Time.Calendar] reads. ΔT is read at it before 1960.
-//
-// It used to be year + (month − 0.5 + dayFraction)/12: the middle of the
-// month, with the day's fraction added as if it were the month's and the day
-// of the month dropped. Within a month it ran backward with the date and
-// forward with the hour, so 2026-03-01 23:59 read 2026.2916 and 2026-03-31
-// 00:00 read 2026.2083, and ΔT before 1960 was read up to half a month off:
-// 0.4 s in the first century, where ΔT changes by about 10 s a year (#697).
 func (t Time) DecimalYear() float64 {
 	y, m, d, f := t.Calendar()
 
@@ -965,12 +927,7 @@ var daysBeforeMonth = [12]int{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 
 // tidal friction. For a UTC label from 1960 on, [Time.TT] is the conversion:
 // it goes through the leap seconds instead of reading the label as UT1.
 //
-// The returned scale is TT, which is what the relationship above defines and
-// what all three paragraphs of this comment describe. It used to be tagged
-// TDB — a flat contradiction between contract and implementation, and one
-// that cost a further 1.7 ms of periodic term on every subsequent conversion
-// plus, for anything that then asked for UTC, the whole TDB->TT->TAI->UTC
-// chain applied to a value that was already TT.
+// The returned scale is TT.
 func (t Time) ApplyDeltaT() Time {
 	dt := DeltaT(t).Seconds()
 
@@ -1001,9 +958,7 @@ func (t Time) In(loc *time.Location) Time {
 // it formats manually using the SOFA-derived calendar components.
 //
 // Either way the clock is UTC's, whatever scale t holds, as [Time.ToGo]
-// explains. The manual path used to read t's own scale instead, so one TT
-// instant printed its UTC clock in 2026 and its TT clock in 585 BC, 5h06m
-// apart (#766); MST there reads "UTC". The display location applies only
+// explains; on the manual path MST reads "UTC". The display location applies only
 // within the standard library's years.
 func (t Time) Format(format string) string {
 	// A non-finite time has no date or clock to lay out. Its calendar year
@@ -1114,7 +1069,7 @@ func (t Time) IsZero() bool {
 // It saturates at ±292 years rather than wrapping, because [time.Duration] is
 // an int64 nanosecond count and cannot hold more. That ceiling is why
 // [Time.Sub] returns a [unit.Duration] and not this: an epoch here can sit in
-// 4713 BC, and Sub used to report year 1 to 2026 as a negative span.
+// 4713 BC.
 //
 // The second return says whether the value fit. A caller converting a
 // scheduling interval can ignore it; one converting an epoch difference should
@@ -1142,9 +1097,6 @@ func ToGoDuration(d unit.Duration) (Duration, bool) {
 // Exact to the nanosecond up to 2^22 s, about 48.5 days. A [unit.Duration] is
 // float64 seconds, whose spacing grows with the value: past 2^22 s it exceeds
 // half a nanosecond, and the count rounds — by up to 4 ns at a year, measured.
-// This used to claim exactness in every case, on the reasoning that float64
-// carries 15 significant digits; it does, but a nanosecond count of a year
-// needs 17.
 func FromGoDuration(d Duration) unit.Duration {
 	return unit.Seconds(d.Seconds())
 }
@@ -1159,24 +1111,11 @@ func FromGoDuration(d Duration) unit.Duration {
 // 27 s across 1972-2026, which is 207 km of ISS track and about 16 arcsec of
 // lunar motion.
 //
-// This used to unify only when the two scales *differed*, which meant mixing
-// scales gave the right answer and being consistent gave the wrong one:
-//
-//	b.Sub(a)             // 1704153600 s — two UTC labels
-//	b.Sub(a.TAI())       // 1704153627 s — mixed, so unified via TT
-//
-// A duration is a count of SI seconds by type, so the second reading was
-// always the one Sub promised.
-//
 // # Range
 //
 // It does not saturate, which is the reason it returns a [unit.Duration]
-// rather than the standard library's. time.Duration is an int64 nanosecond
-// count and stops just past ±292 years; this used to return one and *wrapped*
-// there, reporting year 1 to 2026 as −9223372037 s — a negative span for a
-// positive interval. Saturating instead of wrapping fixed the sign and left a
-// second method, SubDays, as the only way to measure an interval astrogo
-// routinely spans. There is now one method and no ceiling.
+// rather than the standard library's: time.Duration is an int64 nanosecond
+// count and stops just past ±292 years.
 //
 // A caller who needs the standard library's type — for a timeout, a ticker —
 // converts explicitly with [ToGoDuration], which saturates and says so.
@@ -1603,17 +1542,14 @@ func (t Time) TCB() Time {
 //
 // Past the bulletin's end it answers with ΔT held at its value on the
 // bulletin's last day, the forecast every conversion uses there, and the
-// one-time notice saying so; it used to fail there, while Time.EOP and the
-// conversions answered with DUT1=0 (#696). See [DeltaT].
+// one-time notice saying so. See [DeltaT].
 //
 // Returns an error when a loaded bulletin starts after the epoch: unlike
 // [Time.EOP] and [Time.UTC]'s UT1 branch, this method propagates that
 // failure rather than degrading to DUT1=0. When nothing was loaded at all,
 // as in a program that never imported remote/eop, it degrades like them,
 // to DUT1=0 with the one-time EOP warning, and returns no error; so does a
-// caller that registered ZeroModel deliberately, without the warning. This
-// doc promised an error in that case too until #518, which no code ever
-// returned.
+// caller that registered ZeroModel deliberately, without the warning.
 func (t Time) UT1() (Time, error) {
 	if t.scale == UT1 {
 		return t, nil
