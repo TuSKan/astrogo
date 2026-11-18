@@ -712,19 +712,18 @@ time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals
 
 `ephemeris` works the same way, and it buys more than a Julian date. The
 kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
-read SPK files, so they reach `remote` and through it `net/http`, `crypto/tls` and
-`resty`; the SOFA path does not. The kernel half therefore registers itself:
+read SPK files, so they reach `remote` and through it `net/http` and `crypto/tls`;
+the SOFA path does not. The kernel half therefore registers itself:
 
 ```go
 import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 ```
 
 Measured with go1.27 on windows/amd64, a program asking `eph.Default()` where Mars
-is comes to **4.7 MB and 107 packages without the import, and 12.4 MB and 236 with
+is comes to **4.6 MB and 107 packages without the import, and 11.0 MB and 231 with
 it**. (When #112 introduced the registration the storage layer was `gocloud.dev`, and
 the import cost 13.9 MB and 424 packages, 64 of them gRPC.) Without the import those
-five sources return an error naming it; `Satellites` and everything on SOFA are
-unaffected.
+five sources return an error naming it; everything on SOFA is unaffected.
 
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network via

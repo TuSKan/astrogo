@@ -71,7 +71,7 @@ func (s *connServer) closedWithin(want int32, wait time.Duration) int32 {
 
 // TestCloseReleasesTheIdleConnections holds Close to its doc: a connection a
 // finished request left idle is closed, not kept until the transport's idle
-// timeout. resty's own Close never reaches the transport (#1089).
+// timeout.
 func TestCloseReleasesTheIdleConnections(t *testing.T) {
 	srv := newConnServer(t)
 	c := api.NewClient(0)

@@ -15,8 +15,8 @@ import (
 //
 // If ephemeris imported ephemeris/jpl, asking where Mars is would cost a
 // network stack the answer never touches: jpl imports remote, which imports
-// net/http, crypto/tls and resty. Measured with go1.27 on windows/amd64 that
-// is 12.4 MB and 236 packages against 4.7 MB and 107 for the pure-SOFA build.
+// net/http and crypto/tls. Measured with go1.27 on windows/amd64 that is
+// 11.0 MB and 231 packages against 4.6 MB and 107 for the pure-SOFA build.
 // When #112 introduced the registration the storage layer was gocloud.dev, and
 // the gap was 14 MB and 424 packages, gRPC and OpenTelemetry among them. A
 // pure-SOFA call — no kernel, no network, no file — paid for all of it because

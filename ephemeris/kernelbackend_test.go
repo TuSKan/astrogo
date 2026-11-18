@@ -56,23 +56,3 @@ func TestSOFAPathNeedsNoBackend(t *testing.T) {
 		t.Error("the SOFA provider returned a zero position")
 	}
 }
-
-// TestSatellitesNeedNoBackend: SGP4 is not kernel-backed, and grouping it with
-// the sources that are would be an easy mistake to make in the switch this
-// change edited.
-func TestSatellitesNeedNoBackend(t *testing.T) {
-	// A real ISS element set, checksum and all. My first attempt invented the
-	// digits and the parser refused it, correctly — a TLE carries its own
-	// checksum and this package validates it.
-	const (
-		l1 = "1 25544U 98067A   26109.48995873  .00010082  00000-0  19194-3 0  9999"
-		l2 = "2 25544  51.6329 230.6068 0006631 325.6576  34.3983 15.48833250562656"
-	)
-
-	p, err := eph.NewProvider(context.Background(), eph.Satellites, "ISS", eph.WithTLE(l1, l2))
-	if err != nil {
-		t.Fatalf("Satellites source failed in a build with no kernel backend: %v", err)
-	}
-
-	defer func() { _ = p.Close() }()
-}

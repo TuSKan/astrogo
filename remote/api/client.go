@@ -8,11 +8,10 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-
-	"resty.dev/v3"
 
 	"github.com/TuSKan/astrogo/time"
 )
@@ -20,12 +19,10 @@ import (
 // DefaultTimeout applies to an endpoint whose registered Timeout is zero.
 const DefaultTimeout = 30 * time.Second
 
-// defaultUserAgent identifies astrogo to the services it calls. Several of
-// them (Nominatim in particular) require a real one.
-// It names the project rather than only the library so an operator seeing
-// unwelcome traffic has somewhere to look and someone to contact. An
-// unidentified client is indistinguishable from abuse, and a shared research
-// service that cannot tell the difference has to assume the worse one.
+// defaultUserAgent identifies astrogo to the services it calls, several of
+// which (Nominatim in particular) require a real one. It names the project
+// so an operator seeing unwelcome traffic has somewhere to look and someone
+// to contact.
 const defaultUserAgent = "AstroGo/1.0 (+https://github.com/TuSKan/astrogo)"
 
 // defaultRetries bounds attempts for a retriable failure.
@@ -63,87 +60,65 @@ func WithUserAgent(ua string) Option {
 	return func(c *config) { c.userAgent = ua }
 }
 
-// WithAuthToken authenticates every request with an HTTP Authorization header
-// of the given scheme.
+// WithAuthToken authenticates every request with an Authorization header,
+// "<scheme> <token>". An empty scheme is "Bearer".
 //
-// The scheme is a parameter because services disagree and the disagreement is
-// silent. Gaia@AIP accepts "Token" and ignores "Bearer" — an unrecognized
-// scheme is not rejected, the request simply proceeds anonymously, so the
-// symptom of getting it wrong is not an authentication error but a query that
-// mysteriously still hits the anonymous limits.
+// The scheme is a parameter because services disagree, silently: Gaia@AIP
+// accepts "Token" and ignores "Bearer", serving the request anonymously, so
+// the wrong scheme shows as anonymous limits rather than as an error.
 //
-// Services that serve anonymously but throttle hard often lift their limits for
-// an identified caller: Gaia@AIP caps an anonymous query at a five-second
-// statement timeout, which no whole-sky aggregation can fit inside.
-//
-// The token is a secret and is treated as one. It goes in a header, never in a
-// URL query string, because URLs are logged by proxies and servers as a matter
-// of course. It is never written to disk by this package — resolving where it
-// comes from belongs to [github.com/TuSKan/astrogo/remote], which owns
-// credential policy the same way it owns the consent gate.
+// The token goes in a header, never in a URL, which proxies and servers log,
+// and this package never writes it to disk. Where it comes from is
+// [github.com/TuSKan/astrogo/remote]'s decision.
 func WithAuthToken(scheme, token string) Option {
 	return func(c *config) { c.authScheme, c.authToken = scheme, token }
 }
 
-// WithMinInterval spaces this client's requests at least d apart.
-//
-// It exists for the case where a caller issues hundreds of queries in a row
-// against a shared research service that is free, anonymous and not obliged to
-// serve anyone in particular. Such a service will defend itself, and the
-// defense is rarely a clear error: submissions simply stop being answered,
-// including ones that should fail instantly at the parser.
-//
-// The pacing is per client and serializes its requests, so it is a rate limit
-// and a concurrency limit at once. That is the intent — a burst of parallel
-// queries is what a limiter notices first.
+// WithMinInterval spaces this client's requests at least d apart, and lets
+// one be in flight at a time: a rate limit and a concurrency limit at once,
+// for a caller issuing hundreds of queries to a shared service that defends
+// itself by no longer answering.
 func WithMinInterval(d time.Duration) Option {
 	return func(c *config) { c.minInterval = d }
 }
 
 // WithIdempotentPost declares that a POST through this client is a query:
-// sent again, it gets the same answer back and changes nothing on the server,
-// as a TAP sync query or a JSON search does. Such a POST is retried under the
-// client's [RetryPolicy], as a GET is.
-//
-// Without it a POST is sent once, whatever the policy says. resty retries only
-// the methods HTTP defines as idempotent, and a POST that creates something,
-// a UWS job, could create a second. Until #845 that was every POST, so no TAP
-// query was ever retried: one slow SIMBAD answer failed the query.
+// sent again, it gets the same answer and changes nothing on the server, as
+// a TAP sync query or a JSON search does. Such a POST is retried under the
+// client's [RetryPolicy], as a GET is. Without it a POST is sent once,
+// whatever the policy says, since a POST that creates something, a UWS job,
+// would create a second.
 func WithIdempotentPost() Option {
 	return func(c *config) { c.idempotentPost = true }
 }
 
 // Client issues paced, retried requests against a base URL given per call.
 //
-// It holds no endpoint and no URL. Which service a request goes to is decided
-// by the caller, one call at a time, which is what keeps this package free of
-// any notion of an endpoint — [github.com/TuSKan/astrogo/remote] owns that,
-// and owns offline mode, Disable and per-endpoint overrides with it. Two
-// consequences worth stating: a provider covering two endpoints of one service
-// (JPL's SBDB identify and query APIs) needs a single client, and a policy
-// change lands on the next request rather than the next client, because there
-// is nothing cached here to go stale.
+// It holds no endpoint and no URL: which service a request goes to is the
+// caller's choice, one call at a time. [github.com/TuSKan/astrogo/remote]
+// owns endpoints, offline mode and overrides.
 //
 // Safe for concurrent use.
 type Client struct {
-	rc *resty.Client
+	hc        *http.Client
+	transport *http.Transport
 
-	// timeout is the deadline this client was built with, kept so
-	// [Client.Timeout] can report it. It bounds a whole call: every attempt,
-	// the waits between them, and the reading of the body. It used to bound
-	// each attempt alone, so a host that never answered cost a call one
-	// timeout per attempt, four of them by default, 73 s for SIMBAD on
-	// Windows and up to 2 min where a connection waits out the full 30 s.
-	timeout time.Duration
+	userAgent string
+	// auth is the Authorization header's value, empty for none.
+	auth string
 
-	// retryPolicy is consulted twice: by resty, to decide whether to retry,
-	// and by body, to decide whether a final failure is worth reporting as
-	// one that was retried. Holding it here keeps those two answers the same
-	// policy rather than two copies of a rule.
+	retries        int
+	idempotentPost bool
+	// retryPolicy decides whether a failed attempt is retried, and whether a
+	// final failure is reported as one the policy would have retried.
 	retryPolicy RetryPolicy
 
+	// timeout bounds a whole call: every attempt, the waits between them,
+	// and the reading of the body.
+	timeout time.Duration
+
 	// mu serializes paced requests and guards last. Both are unused when no
-	// minimum interval was asked for, so an ordinary client pays nothing.
+	// minimum interval was asked for.
 	minInterval time.Duration
 	mu          sync.Mutex
 	last        time.GoTime
@@ -153,10 +128,6 @@ type Client struct {
 // retries and its body included; zero means [DefaultTimeout]. A retry is made
 // only inside it, so a call never takes longer than the timeout, however many
 // attempts the policy allows.
-//
-// There is no error to return, because there is nothing left to get wrong: a
-// caller with an endpoint's registered timeout passes it, and every other
-// decision arrives as an [Option] that cannot fail either.
 func NewClient(timeout time.Duration, opts ...Option) *Client {
 	cfg := config{
 		timeout:     timeout,
@@ -172,62 +143,66 @@ func NewClient(timeout time.Duration, opts ...Option) *Client {
 		cfg.timeout = DefaultTimeout
 	}
 
-	// resty's "default conditions" cover only transport, header and URL
-	// errors — status-based retrying is opt-in, so the condition has to be
-	// added explicitly. One condition, delegating to the client's
-	// [RetryPolicy]; [DefaultRetryPolicy] is the rule that used to live here
-	// as three of resty's own predicates, and states the same thing in terms
-	// a caller can read, override and defer to.
-	rc := resty.New().
-		SetTimeout(cfg.timeout).
-		SetRetryCount(cfg.retries).
-		SetRetryAllowNonIdempotent(cfg.idempotentPost).
-		SetHeader("User-Agent", cfg.userAgent).
-		AddRetryConditions(retryCondition(cfg.retryPolicy))
+	var auth string
 
 	if cfg.authToken != "" {
-		rc = rc.SetAuthScheme(cfg.authScheme).SetAuthToken(cfg.authToken)
+		scheme := cfg.authScheme
+		if scheme == "" {
+			scheme = "Bearer"
+		}
+
+		auth = scheme + " " + cfg.authToken
 	}
 
+	transport := newTransport()
+
 	return &Client{
-		rc:          rc,
-		timeout:     cfg.timeout,
-		minInterval: cfg.minInterval,
-		retryPolicy: cfg.retryPolicy,
+		// No http.Client timeout: each call's budget context bounds it.
+		hc:             &http.Client{Transport: transport},
+		transport:      transport,
+		userAgent:      cfg.userAgent,
+		auth:           auth,
+		retries:        cfg.retries,
+		idempotentPost: cfg.idempotentPost,
+		retryPolicy:    cfg.retryPolicy,
+		timeout:        cfg.timeout,
+		minInterval:    cfg.minInterval,
 	}
 }
 
-// Timeout reports the per-request timeout this client was built with.
-//
-// It exists so the parent package can assert that a transport was built for the
-// endpoint it is used against: one client per endpoint, each carrying that
-// endpoint's registered timeout, is the arrangement that replaced a single
-// transport whose timeout came from whichever endpoint was named first.
+// newTransport is a transport of this client's own, configured as
+// net/http's default one, so Close can release its connections without
+// touching anyone else's.
+func newTransport() *http.Transport {
+	if def, ok := http.DefaultTransport.(*http.Transport); ok {
+		return def.Clone()
+	}
+
+	return &http.Transport{Proxy: http.ProxyFromEnvironment, ForceAttemptHTTP2: true}
+}
+
+// Timeout reports the per-call timeout this client was built with.
 func (c *Client) Timeout() time.Duration { return c.timeout }
 
 // Close releases the client's idle connections. A Client is usually held
 // for the life of a provider, so this is optional.
-//
-// The release is done here because resty's own Close does not do it. That
-// Close runs close hooks, of which this package registers none, and stops a
-// certificate watcher. It never reaches the transport. Until #1089 every idle
-// connection outlived Close by the transport's idle timeout, 90 seconds by
-// resty's default.
 func (c *Client) Close() error {
-	c.rc.Client().CloseIdleConnections()
-
-	if err := c.rc.Close(); err != nil {
-		return fmt.Errorf("remote/api: close: %w", err)
-	}
+	c.transport.CloseIdleConnections()
 
 	return nil
 }
 
-// Get issues a GET against baseURL/path and returns the response body. The
-// caller closes it. A non-2xx response is returned as an *HTTPError
-// instead of a body, so a caller never parses an error page as data.
+// Get issues a GET against baseURL/path with query added to whatever query
+// baseURL carries, and returns the response body for the caller to close. A
+// non-2xx response is an *HTTPError instead of a body, so a caller never
+// parses an error page as data.
 func (c *Client) Get(ctx context.Context, baseURL string, path string, query url.Values) (io.ReadCloser, error) {
 	full, err := requestURL(baseURL, path)
+	if err != nil {
+		return nil, err
+	}
+
+	full, err = withQuery(full, query)
 	if err != nil {
 		return nil, err
 	}
@@ -238,15 +213,7 @@ func (c *Client) Get(ctx context.Context, baseURL string, path string, query url
 	}
 	defer release()
 
-	ctx, cancel := c.budget(ctx)
-
-	resp, err := c.rc.R().
-		SetContext(ctx).
-		SetQueryParamsFromValues(query).
-		SetResponseDoNotParse(true).
-		Get(full)
-
-	return c.body(resp, err, cancel)
+	return c.do(ctx, http.MethodGet, full, "", nil)
 }
 
 // GetJSON issues a GET and decodes the JSON response into out, closing the
@@ -268,7 +235,7 @@ func (c *Client) GetJSON(ctx context.Context, baseURL string, path string, query
 }
 
 // PostForm issues a POST with an application/x-www-form-urlencoded body
-// and returns the raw response body — the shape TAP-ADQL services and any
+// and returns the raw response body: the shape TAP-ADQL services and any
 // endpoint whose response format must be sniffed need.
 func (c *Client) PostForm(ctx context.Context, baseURL string, path string, form url.Values) (io.ReadCloser, error) {
 	full, err := requestURL(baseURL, path)
@@ -282,7 +249,7 @@ func (c *Client) PostForm(ctx context.Context, baseURL string, path string, form
 	}
 	defer release()
 
-	return c.post(ctx, full, "application/x-www-form-urlencoded", []byte(form.Encode()))
+	return c.do(ctx, http.MethodPost, full, "application/x-www-form-urlencoded", []byte(form.Encode()))
 }
 
 // PostJSON marshals payload as the JSON request body and returns the raw
@@ -304,59 +271,149 @@ func (c *Client) PostJSON(ctx context.Context, baseURL string, path string, payl
 	}
 	defer release()
 
-	return c.post(ctx, full, "application/json", encoded)
+	return c.do(ctx, http.MethodPost, full, "application/json", encoded)
+}
+
+// do sends one call: its attempts, the waits between them, and the
+// response, all inside the call's budget. A success hands the budget to the
+// returned body, which releases it on Close; anything else releases it here.
+//
+// A POST is retried only from a client built [WithIdempotentPost]. A failed
+// attempt is retried while the policy says so, attempts remain, and the wait
+// before the next one ends inside the budget.
+func (c *Client) do(ctx context.Context, method, full, contentType string, body []byte) (io.ReadCloser, error) {
+	ctx, cancel := c.budget(ctx)
+
+	retries := c.retries
+	if method == http.MethodPost && !c.idempotentPost {
+		retries = 0
+	}
+
+	for attempt := 1; ; attempt++ {
+		resp, err := c.send(ctx, method, full, contentType, body)
+
+		a := Attempt{Number: attempt, Err: err}
+		if resp != nil {
+			a.StatusCode = resp.StatusCode
+		}
+
+		if err == nil && resp.StatusCode < http.StatusBadRequest {
+			return &budgetedBody{ReadCloser: resp.Body, cancel: cancel}, nil
+		}
+
+		if attempt <= retries && ctx.Err() == nil && c.retryPolicy(a) {
+			wait := retryWait(resp, attempt)
+
+			if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > wait {
+				discard(resp)
+
+				if sleep(ctx, wait) == nil {
+					continue
+				}
+			}
+		}
+
+		return c.failure(resp, err, a, cancel)
+	}
+}
+
+// send makes one attempt. The body is read from a reader of its own, so an
+// earlier attempt's write that net/http has not finished, as when a server
+// answers before reading the whole body, never shares a cursor with it.
+func (c *Client) send(ctx context.Context, method, full, contentType string, body []byte) (*http.Response, error) {
+	var r io.Reader
+	if body != nil {
+		r = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, full, r)
+	if err != nil {
+		return nil, fmt.Errorf("remote/api: build request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
+	if c.auth != "" {
+		req.Header.Set("Authorization", c.auth)
+	}
+
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // failure wraps it with ErrNoResponse
+	}
+
+	return resp, nil
+}
+
+// failure turns a final failed attempt into the error every method here
+// returns, and releases the call's budget.
+//
+// A transport failure, no answer at all, wraps [ErrNoResponse]. A status is
+// an *HTTPError carrying the body, since these services describe their
+// failures in it, and wraps [ErrRetriable] when the policy would have
+// retried that status: the attempts ran out, rather than the request being
+// wrong.
+func (c *Client) failure(resp *http.Response, err error, a Attempt, cancel context.CancelFunc) (io.ReadCloser, error) {
+	defer cancel()
+
+	if err != nil {
+		discard(resp)
+
+		return nil, fmt.Errorf("remote/api: request failed: %w: %w", ErrNoResponse, err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+	httpErr := &HTTPError{StatusCode: resp.StatusCode, Body: string(detail)}
+
+	if c.retryPolicy(a) {
+		return nil, fmt.Errorf("%w: %w", ErrRetriable, httpErr)
+	}
+
+	return nil, httpErr
+}
+
+// discard drains a little of a response being abandoned and closes it, so
+// its connection can be reused.
+func discard(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxErrorBody))
+	_ = resp.Body.Close()
+}
+
+// sleep waits d, or until ctx ends, which it reports.
+func sleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("remote/api: waiting to retry: %w", ctx.Err())
+	case <-timer.C:
+		return nil
+	}
 }
 
 // budget bounds one call by the client's timeout: every attempt and every
-// wait between them comes out of it, so a retry happens only while time is
-// left. The returned cancel releases it, which [Client.body] does once the
-// caller is done with the response.
-//
-// Pacing waits before it starts. That wait is spent being polite to the
-// service, not waiting for its answer.
+// wait between them comes out of it. Pacing waits before it starts, since
+// that wait is spent being polite to the service, not waiting for it.
 func (c *Client) budget(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout)
-}
-
-// post sends body to full, from a reader of its own on every attempt.
-//
-// # Why not resty's own form and byte-slice bodies
-//
-// resty copies those into a bytes.Buffer from a pool shared by the whole
-// process, and returns it to the pool when Execute finishes. net/http may
-// still be writing the body then: its contract lets the connection's write
-// loop outlive RoundTrip whenever the server answers before reading it all,
-// with an early 429 or 5xx, say. The buffer could then be taken by another
-// request before the old write finished, and that write would send the other
-// request's bytes and then reset them, leaving the other request an empty
-// body (#1107).
-//
-// resty uses an io.Reader as it is, and never pools it. A fresh *bytes.Reader
-// for each attempt, installed by a retry hook, also means a retry never
-// shares a cursor with an earlier attempt's write that is still running.
-func (c *Client) post(ctx context.Context, full, contentType string, body []byte) (io.ReadCloser, error) {
-	ctx, cancel := c.budget(ctx)
-
-	req := c.rc.R().
-		SetContext(ctx).
-		SetHeader("Content-Type", contentType).
-		SetBody(bytes.NewReader(body)).
-		SetResponseDoNotParse(true)
-
-	req.AddRetryHooks(func(*resty.Response, error) {
-		req.SetBody(bytes.NewReader(body))
-	})
-
-	resp, err := req.Post(full)
-
-	return c.body(resp, err, cancel)
 }
 
 // pace blocks until this client is allowed to make its next request.
 //
 // It returns a release function so the caller holds the slot for the duration
-// of the request rather than only its start: the point is that one request is
-// in flight at a time, not that departures are evenly spaced.
+// of the request rather than only its start: one request is in flight at a
+// time, not merely departures evenly spaced.
 func (c *Client) pace(ctx context.Context) (release func(), err error) {
 	if c.minInterval <= 0 {
 		return func() {}, nil
@@ -384,12 +441,8 @@ func (c *Client) pace(ctx context.Context) (release func(), err error) {
 	}, nil
 }
 
-// requestURL appends path to baseURL.
-//
-// The join goes through net/url rather than string arithmetic: a base URL that
-// already carries a query — a mirror with a token in it — would otherwise have
-// path spliced in after the query, producing a URL that silently addresses the
-// wrong thing.
+// requestURL appends path to baseURL through net/url, so a base URL that
+// carries a query, a mirror with a token in it, keeps it after the path.
 func requestURL(baseURL string, path string) (string, error) {
 	if path == "" {
 		return baseURL, nil
@@ -403,49 +456,28 @@ func requestURL(baseURL string, path string) (string, error) {
 	return u.JoinPath(path).String(), nil
 }
 
-// body turns a resty exchange into the (stream, error) pair every method
-// here returns. A non-2xx becomes an *HTTPError carrying the body, since
-// these services describe their failures in it.
-//
-// cancel releases the call's [Client.budget]. Every failure releases it here;
-// a success hands it to the stream, which releases it on Close, since the
-// caller reads the body after this returns and the budget bounds that read.
-// A failure with no response at all wraps [ErrNoResponse].
-func (c *Client) body(resp *resty.Response, err error, cancel context.CancelFunc) (io.ReadCloser, error) {
+// withQuery adds query to the query full already carries.
+func withQuery(full string, query url.Values) (string, error) {
+	if len(query) == 0 {
+		return full, nil
+	}
+
+	u, err := url.Parse(full)
 	if err != nil {
-		cancel()
-
-		if resp != nil && resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-
-		return nil, fmt.Errorf("remote/api: request failed: %w: %w", ErrNoResponse, err)
+		return "", fmt.Errorf("remote/api: unparseable URL %q: %w", full, err)
 	}
 
-	if resp.IsStatusFailure() {
-		defer cancel()
-		defer func() { _ = resp.Body.Close() }()
+	q := u.Query()
 
-		detail, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-		httpErr := &HTTPError{StatusCode: resp.StatusCode(), Body: string(detail)}
-
-		// A final status the policy would have retried means the retries ran
-		// out — or were disabled — rather than that the request was wrong.
-		// Marking it lets a caller tell "the service was busy and we gave up"
-		// from "you asked for something that is not there", which are both
-		// non-2xx and only one of which is worth trying again later.
-		//
-		// The wrapping goes ErrRetriable first so errors.As still finds the
-		// *HTTPError underneath, and every existing caller that type-asserts
-		// for the status keeps working.
-		if c.retryPolicy != nil && c.retryPolicy(attemptOf(resp, nil)) {
-			return nil, fmt.Errorf("%w: %w", ErrRetriable, httpErr)
+	for k, vs := range query {
+		for _, v := range vs {
+			q.Add(k, v)
 		}
-
-		return nil, httpErr
 	}
 
-	return &budgetedBody{ReadCloser: resp.Body, cancel: cancel}, nil
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
 }
 
 // budgetedBody is a response body that releases its call's budget when it is
@@ -470,10 +502,9 @@ func (b *budgetedBody) Close() error {
 }
 
 // maxErrorBody bounds how much of a failed response is captured in
-// [HTTPError.Body]. It bounds memory, not the message: [HTTPError.Error]
-// prints an excerpt. It was 4096 bytes, which during the CDS outage of
-// 2026-11-13 ended inside the 404 page's style block, before the sentence
-// that said why (#1135).
+// [HTTPError.Body]: enough to reach the sentence an HTML error page puts
+// after its styles. It bounds memory, not the message: [HTTPError.Error]
+// prints an excerpt.
 const maxErrorBody = 64 << 10
 
 // maxExcerpt is the most characters of the body [HTTPError.Error] prints,
@@ -492,10 +523,6 @@ type HTTPError struct {
 // Error is one line: the status and an excerpt of the body. An HTML page's
 // excerpt is its visible text, without the markup, scripts or styles around
 // it; any body has its whitespace collapsed and is cut at 300 characters.
-//
-// It used to print the raw body. For a TAP or plain-text answer that was the
-// reason, but for an HTML page it was 4 KB of markup over about 150 lines,
-// and the reason was not among them (#1135).
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("remote/api: http %d - %s", e.StatusCode, excerpt(e.Body))
 }

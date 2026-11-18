@@ -25,8 +25,7 @@
 // This package is not importable from outside remote/. Reach it through
 // remote.NewAPIClient.
 //
-// Transport is resty.dev/v3, wrapped completely: no resty type appears in
-// any signature here, and neither does net/http beyond the standard
-// url.Values used to describe a query. That keeps the transport
-// replaceable, as it has already been replaced once.
+// Transport is net/http, with each Client on a transport of its own. No
+// net/http type appears in any signature here beyond the standard url.Values
+// used to describe a query.
 package api
