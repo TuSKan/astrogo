@@ -23,6 +23,7 @@ var wallClockAllowed = map[string]string{
 	"internal/changelog/assemble_test.go":                   "release dating",
 	"remote/api/budget_test.go":                             "a call's time budget; elapsed time is the subject",
 	"remote/api/pace_test.go":                               "rate limiting; elapsed time is the subject",
+	"remote/api/retry_wait_test.go":                         "the wait between attempts; elapsed time is the subject",
 	"remote/fetch_test.go":                                  "a download lock's age is measured from the present; the test needs one older than twice the timeout and younger than the 30-minute default",
 	"remote/file/lock_test.go":                              "lock acquisition timing is the subject",
 	"remote/unreachable_test.go":                            "a silent host's cooldown is defined relative to now, and a refusal's speed is the subject",
