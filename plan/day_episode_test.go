@@ -57,8 +57,8 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	// day earlier than under UTC -- confirm via the stdlib conversion this
 	// function itself relies on, so this test would fail loudly if that
 	// assumption were ever wrong.
-	localDate := utcMidnight30.GoTime().In(utcMinus5)
-	utcDate := utcMidnight30.GoTime().In(time.UTC)
+	localDate := utcMidnight30.ToGo().In(utcMinus5)
+	utcDate := utcMidnight30.ToGo().In(time.UTC)
 
 	if localDate.Day() == utcDate.Day() {
 		t.Fatal("test fixture assumption broken: local and UTC calendar days should differ at this instant")

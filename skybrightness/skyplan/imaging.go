@@ -206,7 +206,7 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // on, and the answer is fully meaningful only when the instrument passes that
 // band and little else.
 func (i *Imaging) LimitingMagnitudeAt(t epoch.Time, alt, az angle.Angle) (float64, error) {
-	scene, err := i.spec.Sky.Scene(i.spec.Site, t.GoTime(), i.spec.Air)
+	scene, err := i.spec.Sky.Scene(i.spec.Site, t.ToGo(), i.spec.Air)
 	if err != nil {
 		return 0, fmt.Errorf("skybrightness/skyplan: scene: %w", err)
 	}

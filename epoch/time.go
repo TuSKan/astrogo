@@ -10,54 +10,9 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// Weekday represents a day of the week (0=Sunday, 6=Saturday).
-type Weekday int
-
-const (
-	// Sunday is the first day of the week.
-	Sunday Weekday = 0
-	// Monday is the second day of the week.
-	Monday Weekday = 1
-	// Tuesday is the third day of the week.
-	Tuesday Weekday = 2
-	// Wednesday is the fourth day of the week.
-	Wednesday Weekday = 3
-	// Thursday is the fifth day of the week.
-	Thursday Weekday = 4
-	// Friday is the sixth day of the week.
-	Friday Weekday = 5
-	// Saturday is the seventh day of the week.
-	Saturday Weekday = 6
-
-	// NoWeekday is the weekday of a time that has none, one whose Julian Date
-	// is NaN or infinite. Its String is "".
-	NoWeekday Weekday = -1
-)
-
-// String returns the English name of the day ("Sunday", "Monday", ...), or ""
-// for NoWeekday.
-func (w Weekday) String() string {
-	switch w {
-	case NoWeekday:
-		return ""
-	case Sunday:
-		return "Sunday"
-	case Monday:
-		return "Monday"
-	case Tuesday:
-		return "Tuesday"
-	case Wednesday:
-		return "Wednesday"
-	case Thursday:
-		return "Thursday"
-	case Friday:
-		return "Friday"
-	case Saturday:
-		return "Saturday"
-	default:
-		return fmt.Sprintf("Weekday(%d)", w)
-	}
-}
+// NoWeekday is the weekday of a time that has none, one whose Julian Date is
+// NaN or infinite. No time.Weekday constant has its value.
+const NoWeekday time.Weekday = -1
 
 // J2000 is the standard epoch J2000.0 (JD 2451545.0 TT) — the reference
 // epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
@@ -405,9 +360,6 @@ func (t Time) ToGo() time.Time {
 	return gt
 }
 
-// GoTime is an alias for [Time.ToGo].
-func (t Time) GoTime() time.Time { return t.ToGo() }
-
 // Year returns the Gregorian calendar year of t.
 // Uses SOFA's JD→calendar conversion for proper proleptic calendar support.
 func (t Time) Year() int {
@@ -517,11 +469,11 @@ func (t Time) FormatJulian(format string) string {
 	return r.Replace(format)
 }
 
-// Weekday returns the day of the week for time t.
-// 0=Sunday, 1=Monday, ..., 6=Saturday.
+// Weekday returns the day of the week of t, as the standard library numbers
+// them: time.Sunday is 0 and time.Saturday is 6.
 // This is computed directly from the Julian Date and works for all epochs.
 // A time whose Julian Date is NaN or infinite has no day and gets NoWeekday.
-func (t Time) Weekday() Weekday {
+func (t Time) Weekday() time.Weekday {
 	// The Julian Date at noon on Monday 1 Jan 4713 BC is 0.0.
 	// JD 0.0 was a Monday. So JD mod 7 gives:
 	//   0 = Monday, 1 = Tuesday, ..., 6 = Sunday
@@ -542,7 +494,7 @@ func (t Time) Weekday() Weekday {
 		d += 7
 	}
 
-	return Weekday(d)
+	return time.Weekday(d)
 }
 
 // AddDate returns the time corresponding to adding the given number of

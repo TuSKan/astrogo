@@ -3,6 +3,7 @@ package epoch_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/epoch"
 )
@@ -19,12 +20,13 @@ func TestWeekdayOfANonFiniteTimeIsNoWeekday(t *testing.T) {
 		}
 	}
 
-	if s := epoch.NoWeekday.String(); s != "" {
-		t.Errorf("NoWeekday.String() = %q, want \"\"", s)
+	// NoWeekday is no day the standard library names.
+	if epoch.NoWeekday >= time.Sunday && epoch.NoWeekday <= time.Saturday {
+		t.Errorf("NoWeekday = %d, one of the days time.Sunday to time.Saturday", epoch.NoWeekday)
 	}
 
 	// J2000.0, JD 2451545.0, was a Saturday: a finite time keeps its day.
-	if got := epoch.FromJD(2451545.0, epoch.UTC).Weekday(); got != epoch.Saturday {
+	if got := epoch.FromJD(2451545.0, epoch.UTC).Weekday(); got != time.Saturday {
 		t.Errorf("FromJD(2451545.0).Weekday() = %v, want Saturday", got)
 	}
 }

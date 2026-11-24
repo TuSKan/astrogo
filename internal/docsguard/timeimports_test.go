@@ -1,24 +1,17 @@
 package docsguard_test
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-// namedTimeImport matches an import of either time package under a local
-// name: the standard library's time or this module's epoch, in a block or on
-// its own line. It captures the name and the path.
-//
-// Spaces and tabs rather than \s, because \s matches a newline: with it, the
-// pattern could begin on the blank line above an unaliased single-line import
-// and read the `import` keyword itself as the alias. The guard this replaced
-// reported exactly that against atmosphere/provenance.go before its classes
-// were narrowed.
-var namedTimeImport = regexp.MustCompile(
-	`(?m)^(?:import[ \t]+|[ \t]+)([A-Za-z_][A-Za-z0-9_]*)[ \t]+"(time|github\.com/TuSKan/astrogo/epoch)"[ \t]*$`)
+// epochImportPath is this module's epoch package.
+const epochImportPath = "github.com/TuSKan/astrogo/epoch"
 
 // TestTimePackagesKeepTheirNames keeps time.X meaning the standard library and
 // epoch.X meaning this module, in every file.
@@ -46,6 +39,12 @@ var namedTimeImport = regexp.MustCompile(
 // LocationUTC, GoDate, the duration, month and layout constants), exemptions
 // for the packages below it, and untyped nanosecond constants in
 // internal/testutil where it could import neither.
+//
+// # Why the parser and not a pattern
+//
+// The guard this replaced matched import lines with a regular expression,
+// which reads `return "time"` as an import of time named return. The import
+// declarations are what is being judged, so they are what is read.
 func TestTimePackagesKeepTheirNames(t *testing.T) {
 	t.Parallel()
 
@@ -75,22 +74,29 @@ func TestTimePackagesKeepTheirNames(t *testing.T) {
 			return nil //nolint:nilerr // an unrelatable path is skipped, not fatal
 		}
 
-		src, rerr := os.ReadFile(path)
-		if rerr != nil {
-			return nil //nolint:nilerr // a file we cannot read is skipped, not fatal
+		fset := token.NewFileSet()
+
+		file, perr := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if perr != nil {
+			t.Errorf("%s: %v", filepath.ToSlash(rel), perr)
+
+			return nil
 		}
 
 		checked++
 
-		body := string(src)
+		for _, spec := range file.Imports {
+			importPath, uerr := strconv.Unquote(spec.Path.Value)
+			if uerr != nil || spec.Name == nil || (importPath != "time" && importPath != epochImportPath) {
+				continue
+			}
 
-		for _, m := range namedTimeImport.FindAllStringSubmatchIndex(body, -1) {
 			offenders++
 
 			t.Errorf("%s:%d: imports %q as %s.\n"+
 				"  time is the standard library's and epoch is astrogo's, and each reads as "+
 				"itself at every use; a local name makes the reader look up which one it is.",
-				filepath.ToSlash(rel), lineOf(body, m[0]), body[m[4]:m[5]], body[m[2]:m[3]])
+				filepath.ToSlash(rel), fset.Position(spec.Pos()).Line, importPath, spec.Name.Name)
 		}
 
 		return nil
@@ -104,9 +110,4 @@ func TestTimePackagesKeepTheirNames(t *testing.T) {
 	}
 
 	t.Logf("%d files checked, %d offenders", checked, offenders)
-}
-
-// lineOf returns the 1-indexed line containing the byte at off.
-func lineOf(s string, off int) int {
-	return 1 + strings.Count(s[:off], "\n")
 }

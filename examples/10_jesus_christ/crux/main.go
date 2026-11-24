@@ -166,7 +166,7 @@ func main() {
 					weekday := nisan14.Weekday()
 
 					marker := ""
-					if weekday == epoch.Friday {
+					if weekday == time.Friday {
 						marker = "★ FRIDAY"
 
 						fridays = append(fridays, fridayCandidate{

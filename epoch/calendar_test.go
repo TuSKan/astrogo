@@ -20,20 +20,20 @@ func TestWeekdayOfKnownDates(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		at   epoch.Time
-		want epoch.Weekday
+		want time.Weekday
 	}{
-		{"J2000.0, 2000-01-01 12:00", epoch.FromJD(2451545.0, epoch.UTC), epoch.Saturday},
-		{"Apollo 11 landing, 1969-07-20", epoch.Date(1969, 7, 20, 20, 17, 0, 0, time.UTC), epoch.Sunday},
+		{"J2000.0, 2000-01-01 12:00", epoch.FromJD(2451545.0, epoch.UTC), time.Saturday},
+		{"Apollo 11 landing, 1969-07-20", epoch.Date(1969, 7, 20, 20, 17, 0, 0, time.UTC), time.Sunday},
 		// The first day of the Gregorian calendar, and the day before it, which
 		// the Julian calendar called Thursday 4 October.
-		{"Gregorian reform, 1582-10-15", epoch.FromJD(2299160.5, epoch.UTC), epoch.Friday},
-		{"1582-10-14 noon (Julian 4 October)", epoch.FromJD(2299160.0, epoch.UTC), epoch.Thursday},
-		{"just before midnight", epoch.Date(2026, 10, 6, 23, 59, 0, 0, time.UTC), epoch.Tuesday},
-		{"just after midnight", epoch.Date(2026, 10, 7, 0, 1, 0, 0, time.UTC), epoch.Wednesday},
+		{"Gregorian reform, 1582-10-15", epoch.FromJD(2299160.5, epoch.UTC), time.Friday},
+		{"1582-10-14 noon (Julian 4 October)", epoch.FromJD(2299160.0, epoch.UTC), time.Thursday},
+		{"just before midnight", epoch.Date(2026, 10, 6, 23, 59, 0, 0, time.UTC), time.Tuesday},
+		{"just after midnight", epoch.Date(2026, 10, 7, 0, 1, 0, 0, time.UTC), time.Wednesday},
 		// JD 0 is noon on Monday 1 January 4713 BC, the origin the formula
 		// counts from; a negative day number must still land in 0..6.
-		{"JD 0", epoch.FromJD(0, epoch.UTC), epoch.Monday},
-		{"JD -1", epoch.FromJD(-1, epoch.UTC), epoch.Sunday},
+		{"JD 0", epoch.FromJD(0, epoch.UTC), time.Monday},
+		{"JD -1", epoch.FromJD(-1, epoch.UTC), time.Sunday},
 	} {
 		if got := tc.at.Weekday(); got != tc.want {
 			t.Errorf("%s: Weekday = %v, want %v", tc.name, got, tc.want)

@@ -13,7 +13,7 @@ import (
 // calendar date, no instant on the standard library's timeline, and nothing to
 // format. Each used to get a definite answer from converting the NaN to an
 // int: -1721059 for DayOfYear, -4712-01-01 from JulianCalendar, and the year
-// 292277019622 from ToGo, GoTime and Format on amd64 (#986).
+// 292277019622 from ToGo and Format on amd64 (#986).
 func TestCalendarOfANonFiniteTimeHasNoValue(t *testing.T) {
 	t.Parallel()
 
@@ -32,10 +32,6 @@ func TestCalendarOfANonFiniteTimeHasNoValue(t *testing.T) {
 
 		if g := tm.ToGo(); !g.IsZero() {
 			t.Errorf("FromJD(%v).ToGo() = %v, want the zero time.Time", jd, g)
-		}
-
-		if g := tm.GoTime(); !g.IsZero() {
-			t.Errorf("FromJD(%v).GoTime() = %v, want the zero time.Time", jd, g)
 		}
 
 		for _, s := range []string{tm.Format("2006-01-02 15:04:05"), tm.In(tokyo).String()} {

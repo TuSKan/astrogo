@@ -290,7 +290,7 @@ func minutesFromMidnight(h, m int) float64 {
 
 // eventMinutes returns the event time as minutes from midnight in the given timezone.
 func eventMinutesIn(t epoch.Time, loc *time.Location) float64 {
-	gt := t.GoTime().In(loc)
+	gt := t.ToGo().In(loc)
 	return float64(gt.Hour())*60 + float64(gt.Minute()) + float64(gt.Second())/60.0
 }
 
@@ -1437,7 +1437,7 @@ func compareUSNOEvents(
 	}
 
 	astro = listable
-	local := day.GoTime().In(tz)
+	local := day.ToGo().In(tz)
 	listed := map[plan.EventKind]int{}
 
 	for _, p := range usno {
@@ -1453,7 +1453,7 @@ func compareUSNOEvents(
 
 		listed[kind]++
 
-		at := epoch.Date(local.Year(), local.Month(), local.Day(), h, m, 0, 0, tz).GoTime()
+		at := epoch.Date(local.Year(), local.Month(), local.Day(), h, m, 0, 0, tz).ToGo()
 
 		var nearest *plan.Event
 
@@ -1464,7 +1464,7 @@ func compareUSNOEvents(
 				continue
 			}
 
-			if d := astro[i].Time.GoTime().Sub(at).Abs().Minutes(); d < best {
+			if d := astro[i].Time.ToGo().Sub(at).Abs().Minutes(); d < best {
 				best, nearest = d, &astro[i]
 			}
 		}

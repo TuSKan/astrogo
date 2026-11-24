@@ -256,8 +256,8 @@ func TestLimitingMagnitudeAtCarriesTheRequestThrough(t *testing.T) {
 		t.Error("the scene was built for a different site than the spec holds")
 	}
 
-	if !sky.gotWhen.Equal(when.GoTime()) {
-		t.Errorf("the scene was built at %v, want %v", sky.gotWhen, when.GoTime())
+	if !sky.gotWhen.Equal(when.ToGo()) {
+		t.Errorf("the scene was built at %v, want %v", sky.gotWhen, when.ToGo())
 	}
 
 	if sky.gotAir != spec.Air {
@@ -363,7 +363,7 @@ func groundDepth(
 ) (float64, *skybrightness.Scene) {
 	t.Helper()
 
-	scene, err := sky.Scene(spec.Site, when.GoTime(), spec.Air)
+	scene, err := sky.Scene(spec.Site, when.ToGo(), spec.Air)
 	if err != nil {
 		t.Fatalf("Scene: %v", err)
 	}

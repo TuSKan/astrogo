@@ -72,7 +72,7 @@ func DayEvents(target Observable, site *Site, day epoch.Time, loc *time.Location
 		loc = time.UTC
 	}
 
-	local := day.GoTime().In(loc)
+	local := day.ToGo().In(loc)
 	y, m, d := local.Date()
 
 	start := epoch.FromGo(time.Date(y, m, d, 0, 0, 0, 0, loc))
