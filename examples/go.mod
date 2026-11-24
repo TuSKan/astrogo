@@ -24,7 +24,7 @@ require (
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hebl/gofa v1.19.1 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
+	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/klauspost/pgzip v1.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
