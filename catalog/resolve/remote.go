@@ -22,6 +22,10 @@ const (
 	// CapMagnitudeBrowse indicates that the provider can enumerate objects
 	// brighter than a magnitude bound, independent of name or position.
 	CapMagnitudeBrowse Capability = "MagnitudeBrowse"
+	// CapIdentifierResolution indicates that the provider can find its own
+	// records by the identifiers other catalogs list them under, as an
+	// [IdentifierResolver].
+	CapIdentifierResolution Capability = "IdentifierResolution"
 )
 
 // ObjectRequest represents a request to resolve a specific object name or ID.
@@ -73,6 +77,18 @@ type ConeSearcher interface {
 	Capabilities() []Capability
 	// ConeSearch searches for targets within a given radius of a center coordinate.
 	ConeSearch(ctx context.Context, req ConeRequest) SeqIterator[Target]
+}
+
+// IdentifierResolver finds a provider's own records by the identifiers other
+// catalogs list them under: Gaia's sources by the "Gaia DR3 …" designation a
+// SIMBAD record carries.
+type IdentifierResolver interface {
+	// Capabilities returns the capabilities of the catalog provider.
+	Capabilities() []Capability
+	// ResolveIdentifiers returns the provider's records that ids name. An
+	// identifier in another naming scheme, or one the provider holds no
+	// record for, names nothing.
+	ResolveIdentifiers(ctx context.Context, ids []Identifier) SeqIterator[Target]
 }
 
 // BrightRequest bounds a magnitude-filtered bulk query — the counterpart to

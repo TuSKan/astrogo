@@ -116,6 +116,13 @@ func BuildResolveQuery(req resolve.ObjectRequest) string {
 		basic.pmdec,
 		basic.plx_value,
 		basic.rvz_radvel,
+		basic.coo_err_maj,
+		basic.coo_err_min,
+		basic.coo_err_angle,
+		basic.coo_bibcode,
+		basic.pm_err_maj,
+		basic.pm_err_min,
+		basic.pm_err_angle,
 		ident.id,
 		allfluxes.V
 	FROM basic
@@ -161,6 +168,13 @@ func BuildSearchQuery(req resolve.ObjectRequest) string {
 		basic.pmdec,
 		basic.plx_value,
 		basic.rvz_radvel,
+		basic.coo_err_maj,
+		basic.coo_err_min,
+		basic.coo_err_angle,
+		basic.coo_bibcode,
+		basic.pm_err_maj,
+		basic.pm_err_min,
+		basic.pm_err_angle,
 		ident.id,
 		allfluxes.V AS vmag
 	FROM basic
@@ -212,6 +226,13 @@ func BuildBrightQuery(req resolve.BrightRequest) string {
 		basic.pmdec,
 		basic.plx_value,
 		basic.rvz_radvel,
+		basic.coo_err_maj,
+		basic.coo_err_min,
+		basic.coo_err_angle,
+		basic.coo_bibcode,
+		basic.pm_err_maj,
+		basic.pm_err_min,
+		basic.pm_err_angle,
 		allfluxes.V AS vmag
 	FROM basic
 	JOIN allfluxes ON basic.oid = allfluxes.oidref

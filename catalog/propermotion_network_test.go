@@ -5,8 +5,11 @@ package catalog
 import (
 	"context"
 	"errors"
+	"net"
+	"net/url"
 	"testing"
 
+	"github.com/TuSKan/astrogo/catalog/gaia"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
@@ -35,7 +38,7 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 		from, column string
 	}{
 		{remote.SIMBAD, "basic", "main_id"},
-		{remote.GaiaTAP, "gaiadr3.gaia_source", "source_id"},
+		{gaia.DefaultEndpoint, "gaiadr3.gaia_source", "source_id"},
 	} {
 		syncURL, err := remote.URL(svc.id)
 		if err != nil {
@@ -64,7 +67,7 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 // mas/yr, took a field from Gaia.
 func TestResolverMergesGaiaForMovingStarsLive(t *testing.T) {
 	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	requireEndpoint(t, gaia.DefaultEndpoint)
 
 	r := NewResolver(SIMBAD, Gaia)
 
@@ -84,4 +87,29 @@ func TestResolverMergesGaiaForMovingStarsLive(t *testing.T) {
 			}
 		})
 	}
+}
+
+// requireEndpoint skips the test when the host behind id does not answer.
+// The Resolver asks Gaia's default archive, so that archive is the one to
+// check: checking ESA's while Gaia@AIP was down failed the test with "no
+// field came from Gaia" instead of skipping it.
+func requireEndpoint(t *testing.T, id remote.EndpointID) {
+	t.Helper()
+
+	raw, err := remote.URL(id)
+	if err != nil {
+		t.Fatalf("%s endpoint: %v", id, err)
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("%s resolves to %q, which does not parse: %v", id, raw, err)
+	}
+
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	testutil.RequireReachable(t, net.JoinHostPort(u.Hostname(), port))
 }

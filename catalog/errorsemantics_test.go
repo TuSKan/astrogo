@@ -36,7 +36,7 @@ func TestResolveDoesNotReportAFailureAsNotFound(t *testing.T) {
 
 	r := &Resolver{
 		providers: []Provider{&mockProvider{name: "broken", failWith: errOutage}},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{cap: defaultCap},
 	}
 
 	_, err := r.Resolve(context.Background(), "NGC 5139")
@@ -60,7 +60,7 @@ func TestResolveReportsNotFoundOnlyWhenEveryProviderAnswered(t *testing.T) {
 
 	r := &Resolver{
 		providers: []Provider{&mockProvider{name: "empty", targets: map[string]Target{}}},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{cap: defaultCap},
 	}
 
 	if _, err := r.Resolve(context.Background(), "nothing here"); !errors.Is(err, ErrNotFound) {
@@ -80,7 +80,7 @@ func TestResolveChecksTheContextBeforeConsultingProviders(t *testing.T) {
 	// The provider would succeed if asked, so reaching it at all is the bug.
 	r := &Resolver{
 		providers: []Provider{&mockProvider{name: "would-succeed", targets: m31()}},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{cap: defaultCap},
 	}
 
 	if _, err := r.Resolve(ctx, "M31"); !errors.Is(err, context.Canceled) {
@@ -108,7 +108,7 @@ func TestUnsupportedIsAnAnswerNotAnIncident(t *testing.T) {
 			&mockProvider{name: "cone-only", failWith: resolve.ErrUnsupported},
 			&mockProvider{name: "names", targets: m31()},
 		},
-		cfg: resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg: resolverConfig{cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "M31")
@@ -123,7 +123,7 @@ func TestUnsupportedIsAnAnswerNotAnIncident(t *testing.T) {
 	// And with nothing else to answer, it is a miss rather than a failure.
 	only := &Resolver{
 		providers: []Provider{&mockProvider{name: "cone-only", failWith: resolve.ErrUnsupported}},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{cap: defaultCap},
 	}
 
 	if _, err := only.Resolve(context.Background(), "M31"); !errors.Is(err, ErrNotFound) {
@@ -141,7 +141,7 @@ func TestASuccessfulProviderWinsOverAFailedOne(t *testing.T) {
 			&mockProvider{name: "broken", failWith: errOutage},
 			&mockProvider{name: "working", targets: m31()},
 		},
-		cfg: resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg: resolverConfig{cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "M31")
@@ -171,7 +171,7 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 			&mockProvider{name: "broken", failWith: errOutage},
 			&mockProvider{name: "working", targets: m31()},
 		},
-		cfg: resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg: resolverConfig{cap: defaultCap},
 	}
 
 	got, err := partial.Search(context.Background(), "M31")
@@ -191,7 +191,7 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 
 	total := &Resolver{
 		providers: []Provider{&mockProvider{name: "broken", failWith: errOutage}},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{cap: defaultCap},
 	}
 
 	results, err := total.Search(context.Background(), "M31")

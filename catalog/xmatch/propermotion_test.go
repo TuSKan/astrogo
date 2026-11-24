@@ -85,7 +85,7 @@ func TestMatchAppliesTheTargetsOwnProperMotion(t *testing.T) {
 			twoMASSBarnard,
 		},
 	} {
-		pairs := Match([]resolve.Target{c.a}, []resolve.Target{c.b})
+		pairs := Match([]resolve.Target{c.a}, []resolve.Target{c.b}, WithResolution(angle.Arcsec(2)))
 		if len(pairs) != 1 {
 			t.Errorf("%s: %d pairs, want 1", c.name, len(pairs))
 		}

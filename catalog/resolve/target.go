@@ -120,6 +120,10 @@ type Target struct {
 	// what coord.NewICRSWithKinematics takes, so it travels from a catalog
 	// row to a position without conversion at any layer between.
 	PmRA angle.Angle
+	// AstrometricError is the published uncertainty of Coord and of the
+	// proper motion, and is zero where the provider publishes none. Gaia
+	// and SIMBAD publish it.
+	AstrometricError AstrometricError
 	// Oblateness is the oblateness of the target.
 	Oblateness float64
 	// SpinDec is the declination of the target's spin-axis pole, J2000.

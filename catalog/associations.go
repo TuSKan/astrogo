@@ -15,6 +15,9 @@ type link struct {
 	key string
 	// sep is the separation of a positional join.
 	sep angle.Angle
+	// d2 is a positional join's D², where hasD2 says it was computed.
+	d2    float64
+	hasD2 bool
 }
 
 // releasePattern finds a data release in a provider's Catalog: "DR3" in
@@ -49,6 +52,7 @@ func associationOf(cands []candidate, l link, status resolve.AssociationStatus) 
 
 	if l.key == "" {
 		as.Separation = l.sep
+		as.D2, as.HasD2 = l.d2, l.hasD2
 		as.Authority = "astrogo"
 
 		return as

@@ -42,9 +42,10 @@ type Record struct {
 // under the policy [Resolver.Resolve] applies to the records it cross-matches:
 //   - the ID, name, designation, SPK ID, catalog and kind from the first
 //     record that has each;
-//   - the position with its epoch, parallax and proper motion together, from
-//     the first provider with a position in the order Gaia, SIMBAD, OpenNGC,
-//     MAST, VizieR, so one astrometric solution is never mixed with another;
+//   - the position with its epoch, parallax, proper motion and their errors
+//     together, from the first provider with a position in the order Gaia,
+//     SIMBAD, OpenNGC, MAST, VizieR, so one astrometric solution is never
+//     mixed with another;
 //   - each other measurement from the best-ranked provider that has it: the
 //     V magnitude from SIMBAD, OpenNGC, then Gaia, whose is converted from
 //     G; the radial velocity from SIMBAD; a body's physical parameters, its

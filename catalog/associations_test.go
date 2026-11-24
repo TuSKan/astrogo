@@ -131,7 +131,7 @@ func TestResolverRecordsAPositionalAssociation(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "target")
@@ -169,7 +169,7 @@ func TestResolverRecordsAConeSearchAssociation(t *testing.T) {
 	r := &Resolver{
 		providers:     []resolve.Provider{p1},
 		coneSearchers: []coneProvider{{name: "gaia", cs: cs}},
-		cfg:           resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:           resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "star")
