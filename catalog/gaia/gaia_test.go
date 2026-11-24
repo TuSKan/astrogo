@@ -315,7 +315,7 @@ func TestGaiaConeQueryOrdersByDistance(t *testing.T) {
 		}
 	}
 
-	m := regexp.MustCompile(`DISTANCE\(POINT\('ICRS', ra, dec\), POINT\('ICRS', ([-0-9.]+), ([-0-9.]+)\)\) AS dist`).FindStringSubmatch(adql)
+	m := regexp.MustCompile(`DISTANCE\(POINT\('ICRS', g\.ra, g\.dec\), POINT\('ICRS', ([-0-9.]+), ([-0-9.]+)\)\) AS dist`).FindStringSubmatch(adql)
 	if m == nil {
 		t.Fatalf("the cone query measures no distance from its center:\n%s", adql)
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -134,7 +135,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 	// Ordered by an alias rather than by the DISTANCE expression itself, which
 	// ADQL 2.0 does not allow in ORDER BY.
-	adql := fmt.Sprintf(`SELECT TOP %d %s, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, columns, ra, dec, ra, dec, radius)
+	adql := fmt.Sprintf(`SELECT TOP %d %s, DISTANCE(POINT('ICRS', g.ra, g.dec), POINT('ICRS', %s, %s)) AS dist FROM %s WHERE 1=CONTAINS(POINT('ICRS', g.ra, g.dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, columns, ra, dec, sources, ra, dec, radius)
 
 	// The archive is part of the key. Two providers over one cache would
 	// otherwise serve each other's answers, and the whole point of holding
@@ -144,42 +145,126 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 // ResolveIdentifiers returns the Gaia DR3 sources ids name, as other
 // catalogs cross-identify them: SIMBAD lists Barnard's star as "Gaia DR3
-// 4472832130942575872". An identifier in another naming scheme or release
-// names none of them and costs no query.
+// 4472832130942575872", "HIP 87937" and "TYC 425-2502-1". A Gaia DR3 source
+// ID names its source; a Hipparcos-2 or Tycho-2 identifier names the source
+// Gaia's own cross-match gives as its best neighbor. An identifier in another
+// naming scheme or release names none of them, and when ids hold none of
+// these, no query is made.
+//
+// Each scheme ids hold is asked in a query of its own, and a source two of
+// them name is returned once: asked in one query, the schemes would have the
+// archive scan every source rather than look each identifier up.
 func (p *Provider) ResolveIdentifiers(ctx context.Context, ids []resolve.Identifier) resolve.SeqIterator[resolve.Target] {
-	var sourceIDs []string
+	var dr3, hip, tyc []string
 
+	add := func(list *[]string, v string) {
+		if !slices.Contains(*list, v) {
+			*list = append(*list, v)
+		}
+	}
+
+	// Only a number, or a Tycho identifier's three numbers, goes into the
+	// query.
 	for _, id := range ids {
-		if id.Namespace != "gaia" || id.Release != "DR3" || slices.Contains(sourceIDs, id.Value) {
+		switch {
+		case id.Namespace == "gaia" && id.Release == "DR3" && isNumber(id.Value):
+			add(&dr3, id.Value)
+		case id.Namespace == "hip" && isNumber(id.Value):
+			add(&hip, id.Value)
+		case id.Namespace == "tyc" && tychoID.MatchString(id.Value):
+			add(&tyc, "'"+id.Value+"'")
+		}
+	}
+
+	var queries []resolve.SeqIterator[resolve.Target]
+
+	for _, c := range []struct {
+		list   []string
+		column string
+	}{
+		{dr3, "g.source_id"},
+		{hip, "hip.original_ext_source_id"},
+		{tyc, "tyc.original_ext_source_id"},
+	} {
+		if len(c.list) == 0 {
 			continue
 		}
 
-		// A source ID is a number, and only a number goes into the query.
-		if _, err := strconv.ParseUint(id.Value, 10, 64); err != nil {
-			continue
-		}
-
-		sourceIDs = append(sourceIDs, id.Value)
+		slices.Sort(c.list)
+		in := strings.Join(c.list, ", ")
+		adql := fmt.Sprintf(`SELECT %s FROM %s WHERE %s IN (%s)`, columns, sources, c.column, in)
+		queries = append(queries, p.query(ctx, adql, fmt.Sprintf("gaia:ids:%s:%s:%s", p.endpoint, c.column, in), len(c.list)))
 	}
 
-	if len(sourceIDs) == 0 {
-		return resolve.SliceSeq[resolve.Target](nil)
-	}
-
-	slices.Sort(sourceIDs)
-	list := strings.Join(sourceIDs, ", ")
-	adql := fmt.Sprintf(`SELECT TOP %d %s FROM gaiadr3.gaia_source WHERE source_id IN (%s)`, len(sourceIDs), columns, list)
-
-	return p.query(ctx, adql, fmt.Sprintf("gaia:ids:%s:%s", p.endpoint, list), len(sourceIDs))
+	return distinctSources(queries)
 }
 
-// columns are what every query of this provider selects: the source ID, the
-// position, proper motion and parallax, their errors and correlations, and
-// the photometry V is derived from.
-const columns = "source_id, ra, dec, pmra, pmdec, parallax, " +
-	"ra_error, dec_error, pmra_error, pmdec_error, " +
-	"ra_dec_corr, ra_pmra_corr, ra_pmdec_corr, dec_pmra_corr, dec_pmdec_corr, pmra_pmdec_corr, " +
-	"phot_g_mean_mag, bp_rp"
+// distinctSources yields what each of queries yields, in turn, each source
+// once, and stops at the first error.
+func distinctSources(queries []resolve.SeqIterator[resolve.Target]) resolve.SeqIterator[resolve.Target] {
+	return func(yield func(resolve.Target, error) bool) {
+		seen := make(map[string]bool)
+
+		for _, q := range queries {
+			done := false
+
+			q(func(t resolve.Target, err error) bool {
+				if err != nil {
+					done = true
+
+					yield(resolve.Target{}, err)
+
+					return false
+				}
+
+				if seen[t.ID] {
+					return true
+				}
+
+				seen[t.ID] = true
+				done = !yield(t, nil)
+
+				return !done
+			})
+
+			if done {
+				return
+			}
+		}
+	}
+}
+
+// tychoID is a Tycho-2 identifier as Gaia's cross-match writes it: region,
+// running number and component, unpadded.
+var tychoID = regexp.MustCompile(`^[0-9]+-[0-9]+-[0-9]+$`)
+
+// isNumber reports whether s is a non-negative integer.
+func isNumber(s string) bool {
+	_, err := strconv.ParseUint(s, 10, 64)
+
+	return err == nil
+}
+
+// sources is what every query of this provider reads: Gaia DR3's sources,
+// each joined to its Hipparcos-2 and its Tycho-2 counterpart in Gaia's own
+// best-neighbor cross-matches, where it has one. Both archives serve both
+// tables under these names.
+const sources = "gaiadr3.gaia_source AS g" +
+	" LEFT OUTER JOIN gaiadr3.hipparcos2_best_neighbour AS hip ON hip.source_id = g.source_id" +
+	" LEFT OUTER JOIN gaiadr3.tycho2tdsc_merge_best_neighbour AS tyc ON tyc.source_id = g.source_id"
+
+// columns are what every query of this provider selects, each named as
+// targetFromRow reads it: the source ID, the position, proper motion and
+// parallax, their errors and correlations, the photometry V is derived from,
+// and the Hipparcos-2 and Tycho-2 counterparts with their cross-match flags.
+const columns = "g.source_id AS source_id, g.ra AS ra, g.dec AS dec, " +
+	"g.pmra AS pmra, g.pmdec AS pmdec, g.parallax AS parallax, " +
+	"g.ra_error AS ra_error, g.dec_error AS dec_error, g.pmra_error AS pmra_error, g.pmdec_error AS pmdec_error, " +
+	"g.ra_dec_corr AS ra_dec_corr, g.ra_pmra_corr AS ra_pmra_corr, g.ra_pmdec_corr AS ra_pmdec_corr, " +
+	"g.dec_pmra_corr AS dec_pmra_corr, g.dec_pmdec_corr AS dec_pmdec_corr, g.pmra_pmdec_corr AS pmra_pmdec_corr, " +
+	"g.phot_g_mean_mag AS phot_g_mean_mag, g.bp_rp AS bp_rp, " +
+	"hip.original_ext_source_id AS hip_id, hip.xm_flag AS hip_xm_flag, " +
+	"tyc.original_ext_source_id AS tyc_id, tyc.xm_flag AS tyc_xm_flag"
 
 // query runs adql against the archive and yields its sources, keeping the
 // answer under cacheKey unless the archive cut it. A cut answer, short of
@@ -288,13 +373,68 @@ func parseResult(body io.Reader) (targets []resolve.Target, truncated bool, err 
 		}
 
 		if b[0] == '<' {
-			return parseVOTable(buf)
+			targets, truncated, err := parseVOTable(buf)
+
+			return mergeRows(targets), truncated, err
 		}
 
 		targets, err := parseCSV(buf)
 
-		return targets, false, err
+		return mergeRows(targets), false, err
 	}
+}
+
+// mergeRows makes one target of the rows a source has in an answer: it has
+// one for each pairing of its counterparts when the cross-match joins give it
+// more than one. A source that two Hipparcos-2 objects, or two Tycho-2 ones,
+// both name as their best neighbor is neither's alone, so it keeps neither
+// identifier.
+func mergeRows(rows []resolve.Target) []resolve.Target {
+	index := make(map[string]int, len(rows))
+	out := make([]resolve.Target, 0, len(rows))
+
+	for _, r := range rows {
+		if k, seen := index[r.ID]; seen {
+			out[k].Aliases = append(out[k].Aliases, r.Aliases...)
+
+			continue
+		}
+
+		index[r.ID] = len(out)
+		out = append(out, r)
+	}
+
+	for i := range out {
+		out[i].Aliases = unambiguous(out[i].Aliases)
+	}
+
+	return out
+}
+
+// unambiguous is aliases with each repeat dropped, and with no "HIP " or
+// "TYC " alias at all where two different ones remain.
+func unambiguous(aliases []string) []string {
+	var out []string
+
+	count := map[string]int{}
+
+	for _, a := range aliases {
+		if slices.Contains(out, a) {
+			continue
+		}
+
+		out = append(out, a)
+
+		if scheme, _, ok := strings.Cut(a, " "); ok {
+			count[scheme]++
+		}
+	}
+
+	return slices.DeleteFunc(out, func(a string) bool {
+		scheme, _, _ := strings.Cut(a, " ")
+
+		return (scheme == "HIP" || scheme == "TYC") && count[scheme] > 1
+	})
 }
 
 // parseVOTable turns a VOTable result into targets, and reports whether the
@@ -444,6 +584,17 @@ func targetFromRow(row []string, col map[string]int) (resolve.Target, bool) {
 
 	t.AstrometricError = astrometricError(number)
 
+	// Gaia's own cross-match names the source's Hipparcos-2 and Tycho-2
+	// counterparts, an identity key each that SIMBAD's cross-identifications
+	// carry too.
+	if id, ok := counterpart(cell, number, "hip_id", "hip_xm_flag"); ok {
+		t.Aliases = append(t.Aliases, "HIP "+id)
+	}
+
+	if id, ok := counterpart(cell, number, "tyc_id", "tyc_xm_flag"); ok {
+		t.Aliases = append(t.Aliases, "TYC "+id)
+	}
+
 	// Johnson V from Gaia G and the BP−RP color.
 	gMag, okG := number("phot_g_mean_mag")
 	if !okG {
@@ -500,4 +651,26 @@ func astrometricError(number func(string) (float64, bool)) resolve.AstrometricEr
 		DecPmDec:  corr("dec_pmdec_corr"),
 		PmRAPmDec: corr("pmra_pmdec_corr"),
 	}
+}
+
+// ambiguousMatch is the cross-match flags that make a best neighbor no
+// identity: the external object has multiples (1) or suspected duplicates
+// (2), or Gaia resolves it into several sources (4).
+const ambiguousMatch = 1 | 2 | 4
+
+// counterpart reads a row's counterpart in one of Gaia's best-neighbor
+// cross-matches: its identifier in column idCol, false where the row has
+// none, or where flagCol marks the match ambiguous.
+func counterpart(cell func(string) (string, bool), number func(string) (float64, bool), idCol, flagCol string) (string, bool) {
+	id, ok := cell(idCol)
+	if !ok || id == "" {
+		return "", false
+	}
+
+	flag, ok := number(flagCol)
+	if !ok || int(flag)&ambiguousMatch != 0 {
+		return "", false
+	}
+
+	return id, true
 }
