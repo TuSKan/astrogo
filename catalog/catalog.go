@@ -116,7 +116,8 @@ type idProvider struct {
 // Providers that resolve no names are bridged in after the cross-match, so
 // their astrometry can participate. One that resolves identifiers, as Gaia
 // does, is asked for the records each group's identifiers name: a SIMBAD
-// star's "Gaia DR3 …" brings in its Gaia row. One that searches cones, as
+// star's "Gaia DR3 …" brings in its Gaia row, and so does its "HIP …" or
+// "TYC …" through Gaia's own cross-match of those catalogs. One that searches cones, as
 // Gaia and VizieR do, is searched within [Resolver.Resolution] of each
 // group's position, when one is set.
 type Resolver struct {

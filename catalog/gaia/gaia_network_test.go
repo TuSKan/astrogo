@@ -157,3 +157,44 @@ func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
 		t.Errorf("rows %v, want %v", got, want)
 	}
 }
+
+// TestGaiaResolvesHipparcosAndTychoIdentifiers: a Hipparcos-2 or Tycho-2
+// identifier brings back the source Gaia's cross-match gives as its best
+// neighbor, carrying both identifiers: 61 Cyg A by HIP 104214, Barnard's
+// star by TYC 425-2502-1. alf Cen A, too bright for Gaia, has no counterpart.
+func TestGaiaResolvesHipparcosAndTychoIdentifiers(t *testing.T) {
+	requireGaia(t)
+
+	prov, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ids := []resolve.Identifier{
+		resolve.ParseIdentifier("HIP 104214"), resolve.ParseIdentifier("TYC 425-2502-1"), resolve.ParseIdentifier("HIP 71683"),
+	}
+
+	rows, err := resolve.Drain(prov.ResolveIdentifiers(ctx, ids), 0)
+	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("ResolveIdentifiers: %v", err)
+	}
+
+	want := map[string][]string{
+		"Gaia DR3 1872046609345556480": {"HIP 104214", "TYC 3168-2800-1"},
+		"Gaia DR3 4472832130942575872": {"HIP 87937", "TYC 425-2502-1"},
+	}
+
+	if len(rows) != len(want) {
+		t.Errorf("%d rows, want %d", len(rows), len(want))
+	}
+
+	for _, r := range rows {
+		if !slices.Equal(r.Aliases, want[r.Designation]) {
+			t.Errorf("%s: aliases %v, want %v", r.Designation, r.Aliases, want[r.Designation])
+		}
+	}
+}
