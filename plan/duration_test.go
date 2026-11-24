@@ -139,3 +139,57 @@ func TestWindowDurationIsSeconds(t *testing.T) {
 		t.Errorf("0-2 h and 1-3 h total %v h, want 3", d.Hours())
 	}
 }
+
+// TestAZeroStepTakesTheDefault: VisibleIntervals and Find take a zero step for
+// their five-minute default, and give the windows a five-minute step gives. A
+// zero step left as it is would sample the same instant forever.
+func TestAZeroStepTakesTheDefault(t *testing.T) {
+	t.Parallel()
+
+	site, start := predicateSite(t), fixedEpoch()
+	w := Window{Start: start, End: start.Add(unit.Days(1))}
+	equator := benchMock{c: coord.NewICRS(angle.Zero(), angle.Zero())}
+
+	for name, run := range map[string]func(step unit.Duration) ([]Window, error){
+		"VisibleIntervals": func(step unit.Duration) ([]Window, error) {
+			return VisibleIntervals(equator, site, w, step, angle.Zero())
+		},
+		"Find": func(step unit.Duration) ([]Window, error) {
+			return Find(equator, site, w, step, Altitude{Threshold: angle.Zero()})
+		},
+	} {
+		zero, err := run(0)
+		if err != nil {
+			t.Fatalf("%s with a zero step: %v", name, err)
+		}
+
+		five, err := run(unit.Minutes(5))
+		if err != nil {
+			t.Fatalf("%s with a five-minute step: %v", name, err)
+		}
+
+		if len(five) == 0 || len(zero) != len(five) {
+			t.Fatalf("%s: %d windows with a zero step and %d with five minutes; want the same, and some", name, len(zero), len(five))
+		}
+
+		for i := range five {
+			if !zero[i].Start.Equal(five[i].Start) || !zero[i].End.Equal(five[i].End) {
+				t.Errorf("%s: window %d is %v with a zero step and %v with five minutes", name, i, zero[i], five[i])
+			}
+		}
+	}
+}
+
+// TestCheckBlocksSkipsANilBlock: a nil block is the strategies' to report, and
+// one before a block with a NaN duration does not end the check early.
+func TestCheckBlocksSkipsANilBlock(t *testing.T) {
+	t.Parallel()
+
+	if err := checkBlocks([]*Block{nil, {ID: "a", Duration: unit.Minutes(1)}}); err != nil {
+		t.Errorf("a nil block and a good one: %v", err)
+	}
+
+	if err := checkBlocks([]*Block{nil, {ID: "b", Duration: unit.Duration(math.NaN())}}); !errors.Is(err, ErrNonFiniteDuration) {
+		t.Errorf("a nil block, then a NaN duration: got %v, want %v", err, ErrNonFiniteDuration)
+	}
+}
