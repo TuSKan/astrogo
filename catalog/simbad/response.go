@@ -14,8 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
-	"github.com/TuSKan/astrogo/unit"
 )
 
 // csvBody prepares a CSV response for parsing, refusing one that is a web page.
@@ -146,35 +144,7 @@ func ParseCSV(r io.Reader) ([]resolve.Target, error) {
 		}
 
 		if hasCoord {
-			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
-
-			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
-				if v, ok := finite.Parse(row[pmRAStr]); ok {
-					t.PmRA = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
-				if v, ok := finite.Parse(row[pmDecStr]); ok {
-					t.PmDec = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
-				if v, ok := finite.Parse(row[plxStr]); ok {
-					t.Parallax = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
-				if v, ok := finite.Parse(row[rvStr]); ok {
-					// SIMBAD's rvz_radvel is km/s.
-					t.RadialVelocity = unit.KmPerSec(v)
-					t.HasRadialVelocity = true
-				}
-			}
-
-			t.AstrometricError = astrometricError(row, colIdx)
+			readKinematics(&t, row, colIdx)
 			// V-band magnitude from allfluxes table. The column name is
 			// "V" (uppercase) in SIMBAD's live TAP response — confirmed
 			// directly against the real service, not "v".
@@ -296,35 +266,7 @@ func parseBright(r io.Reader) ([]resolve.Target, []int64, error) {
 		}
 
 		if hasCoord {
-			t.Epoch = time.J2000() // SIMBAD's ICRS positions are at J2000
-
-			if pmRAStr, ok := colIdx["pmra"]; ok && row[pmRAStr] != "" {
-				if v, ok := finite.Parse(row[pmRAStr]); ok {
-					t.PmRA = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if pmDecStr, ok := colIdx["pmdec"]; ok && row[pmDecStr] != "" {
-				if v, ok := finite.Parse(row[pmDecStr]); ok {
-					t.PmDec = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if plxStr, ok := colIdx["plx_value"]; ok && row[plxStr] != "" {
-				if v, ok := finite.Parse(row[plxStr]); ok {
-					t.Parallax = angle.Arcsec(v / 1000.0)
-				}
-			}
-
-			if rvStr, ok := colIdx["rvz_radvel"]; ok && row[rvStr] != "" {
-				if v, ok := finite.Parse(row[rvStr]); ok {
-					// SIMBAD's rvz_radvel is km/s.
-					t.RadialVelocity = unit.KmPerSec(v)
-					t.HasRadialVelocity = true
-				}
-			}
-
-			t.AstrometricError = astrometricError(row, colIdx)
+			readKinematics(&t, row, colIdx)
 		}
 
 		// BuildBrightQuery aliases allfluxes.V to vmag (see its doc comment

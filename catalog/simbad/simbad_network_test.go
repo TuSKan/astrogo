@@ -8,7 +8,9 @@ import (
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -251,4 +253,59 @@ func TestSimbadSearchBrightReturnsEveryObject(t *testing.T) {
 	}
 
 	t.Logf("SIMBAD objects brighter than V 4.5: %d", n)
+}
+
+// TestSimbadReportsItsGaiaStarsAtGaiasEpochLive holds SIMBAD's convention
+// for a position it takes from Gaia to what readKinematics assumes: moved to
+// J2000.0 without the radial velocity, with the proper motion at Gaia's
+// epoch. Undone, Barnard's star and 61 Cyg A land on their Gaia DR3 rows at
+// J2016.0 within Gaia's stated error. If SIMBAD changes the convention, or
+// cites a Gaia release gaiaCoordinateEpochs does not know, this fails.
+func TestSimbadReportsItsGaiaStarsAtGaiasEpochLive(t *testing.T) {
+	requireSimbad(t)
+
+	prov := New()
+
+	for _, query := range []string{"Barnard's star", "61 Cyg A"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		var got []resolve.Target
+
+		prov.ResolveObject(ctx, resolve.ObjectRequest{Query: query, Limit: 1})(func(tg resolve.Target, err error) bool {
+			testutil.SkipOnDegradedService(t, err, simbadControl(t))
+
+			if err != nil {
+				t.Fatalf("%s: %v", query, err)
+			}
+
+			got = append(got, tg)
+
+			return true
+		})
+
+		cancel()
+
+		if len(got) != 1 {
+			t.Fatalf("%s: %d targets, want 1", query, len(got))
+		}
+
+		tg := got[0]
+
+		row, ok := gaiaDR3[tg.ID]
+		if !ok {
+			t.Fatalf("%s resolved to %q, which has no Gaia DR3 row here", query, tg.ID)
+		}
+
+		if !tg.Epoch.Equal(gaiaEpoch) {
+			t.Errorf("%s is reported at %v, want Gaia's J2016.0", tg.ID, tg.Epoch)
+		}
+
+		d := masApart(tg.Coord, coord.NewICRS(angle.Deg(row.ra), angle.Deg(row.dec)))
+		if d > row.raErr+row.decErr {
+			t.Errorf("%s lands %.4f mas from its Gaia DR3 row at J2016.0, over its stated %.3f mas",
+				tg.ID, d, row.raErr+row.decErr)
+		}
+
+		t.Logf("%s: %.4f mas from its Gaia DR3 row at J2016.0", tg.ID, d)
+	}
 }
