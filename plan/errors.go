@@ -139,7 +139,7 @@ var (
 	// against every entry's Name — see PlanetaryMoons).
 	ErrUnknownPlanetaryMoon = errors.New("plan: unknown planetary moon name")
 
-	// ErrGeocodeNoResult indicates NewSiteEarthAddress's geocoding query
+	// ErrGeocodeNoResult indicates NewSiteFromAddress's geocoding query
 	// matched no location.
 	ErrGeocodeNoResult = errors.New("plan: geocoding found no match for address")
 

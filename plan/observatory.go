@@ -350,21 +350,21 @@ func NewSite(name string, lat angle.Latitude, lon angle.Longitude, height unit.L
 }
 
 // geocodeResult is one row of a Nominatim /search response — only the
-// fields NewSiteEarthAddress uses are decoded.
+// fields NewSiteFromAddress uses are decoded.
 type geocodeResult struct {
 	Lat string `json:"lat"`
 	Lon string `json:"lon"`
 }
 
 // elevationResponse is an Open-Elevation /lookup response — only the
-// field NewSiteEarthAddress uses is decoded.
+// field NewSiteFromAddress uses is decoded.
 type elevationResponse struct {
 	Results []struct {
 		Elevation float64 `json:"elevation"`
 	} `json:"results"`
 }
 
-// NewSiteEarthAddress builds a Site by geocoding a free-text address (e.g.
+// NewSiteFromAddress builds a Site by geocoding a free-text address (e.g.
 // "Quinta Calixto, Extrema, MG, Brazil") via OpenStreetMap's Nominatim API
 // (remote.Nominatim) — for when a site's coordinates aren't already known.
 // Nominatim doesn't report elevation, so the
@@ -374,7 +374,7 @@ type elevationResponse struct {
 // one with remote.DisableEndpoint or remote.SetOffline(true) if that's
 // undesired — a caller who already knows a site's coordinates and height
 // builds it with [NewSite], which needs neither.
-func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...SiteOption) (*Site, error) {
+func NewSiteFromAddress(ctx context.Context, name, address string, opts ...SiteOption) (*Site, error) {
 	lat, lon, err := geocodeAddress(ctx, address)
 	if err != nil {
 		return nil, err

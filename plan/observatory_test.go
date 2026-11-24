@@ -47,16 +47,16 @@ func TestNewSiteKeepsItsLocation(t *testing.T) {
 	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
-// TestNewSiteEarthAddress_Offline confirms remote.SetOffline's ErrOffline
-// surfaces through NewSiteEarthAddress rather than being swallowed — the
+// TestNewSiteFromAddress_Offline confirms remote.SetOffline's ErrOffline
+// surfaces through NewSiteFromAddress rather than being swallowed — the
 // same offline-mode gate every other remote.KindAPI caller respects.
-func TestNewSiteEarthAddress_Offline(t *testing.T) {
+func TestNewSiteFromAddress_Offline(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.Nominatim).Restore)
 	remote.SetOffline(true)
 
-	_, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	_, err := NewSiteFromAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
 	if !errors.Is(err, remote.ErrOffline) {
-		t.Errorf("NewSiteEarthAddress while offline: got %v, want wrapping remote.ErrOffline", err)
+		t.Errorf("NewSiteFromAddress while offline: got %v, want wrapping remote.ErrOffline", err)
 	}
 }
 
@@ -78,11 +78,11 @@ func jsonServer(t *testing.T, body string) *httptest.Server {
 	return srv
 }
 
-// TestNewSiteEarthAddress_Success exercises the full geocode + elevation
+// TestNewSiteFromAddress_Success exercises the full geocode + elevation
 // round trip against mocked Nominatim/Open-Elevation responses — the real
 // live services are covered separately by the network-tagged
-// TestNewSiteEarthAddress_Live.
-func TestNewSiteEarthAddress_Success(t *testing.T) {
+// TestNewSiteFromAddress_Live.
+func TestNewSiteFromAddress_Success(t *testing.T) {
 	geo := jsonServer(t, `[{"lat":"-22.528478","lon":"-46.473002"}]`)
 	elev := jsonServer(t, `{"results":[{"elevation":835.05}]}`)
 
@@ -96,9 +96,9 @@ func TestNewSiteEarthAddress_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	site, err := NewSiteFromAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
 	if err != nil {
-		t.Fatalf("NewSiteEarthAddress: %v", err)
+		t.Fatalf("NewSiteFromAddress: %v", err)
 	}
 
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
@@ -107,10 +107,10 @@ func TestNewSiteEarthAddress_Success(t *testing.T) {
 	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
-// TestNewSiteEarthAddress_NoResult confirms ErrGeocodeNoResult surfaces
+// TestNewSiteFromAddress_NoResult confirms ErrGeocodeNoResult surfaces
 // whether the empty result comes from Nominatim (no match for the address)
 // or from Open-Elevation (no elevation for otherwise-valid coordinates).
-func TestNewSiteEarthAddress_NoResult(t *testing.T) {
+func TestNewSiteFromAddress_NoResult(t *testing.T) {
 	cases := []struct {
 		name           string
 		geocodeBody    string
@@ -138,7 +138,7 @@ func TestNewSiteEarthAddress_NoResult(t *testing.T) {
 				}
 			}
 
-			_, err := NewSiteEarthAddress(context.Background(), "Nowhere", "a place that doesn't exist")
+			_, err := NewSiteFromAddress(context.Background(), "Nowhere", "a place that doesn't exist")
 			if !errors.Is(err, ErrGeocodeNoResult) {
 				t.Errorf("got %v, want wrapping ErrGeocodeNoResult", err)
 			}
@@ -146,10 +146,10 @@ func TestNewSiteEarthAddress_NoResult(t *testing.T) {
 	}
 }
 
-// TestNewSiteEarthAddress_BadCoordinates confirms a malformed lat/lon in
+// TestNewSiteFromAddress_BadCoordinates confirms a malformed lat/lon in
 // Nominatim's response surfaces as an error rather than a silently-zeroed
 // coordinate.
-func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
+func TestNewSiteFromAddress_BadCoordinates(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
@@ -168,7 +168,7 @@ func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := NewSiteEarthAddress(context.Background(), "Bad", "somewhere"); err == nil {
+			if _, err := NewSiteFromAddress(context.Background(), "Bad", "somewhere"); err == nil {
 				t.Error("expected a parse error for a non-numeric coordinate")
 			}
 		})

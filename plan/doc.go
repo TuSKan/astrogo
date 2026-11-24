@@ -12,7 +12,7 @@
 // # Sites
 //
 // [NewSite] builds a [Site] from a geodetic location, a [coord.Geodetic], and
-// [NewSiteEarthAddress] geocodes a free-text address. Well-known observatories come from
+// [NewSiteFromAddress] geocodes a free-text address. Well-known observatories come from
 // [KnownSiteNames] and [NewKnownSite], and the Minor Planet Center's
 // observatory codes from [MPCObservatories] and [NewMPCSite]. A [SiteOption]
 // adds a local horizon ([WithHorizon], [WithHorizonProfile] and a

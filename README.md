@@ -531,7 +531,7 @@ rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
 `catalog/sbdb`, `catalog/norad`, `catalog/fink`) and
-`plan.NewSiteEarthAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
+`plan.NewSiteFromAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
 site by address) make small request/response API calls, not bulk downloads — those are
 gated by endpoint enable/disable and offline mode, not by download-size consent (the
 network call itself is the explicit purpose of the method you're calling).

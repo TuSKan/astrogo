@@ -167,7 +167,7 @@ func handshakeError(t *testing.T, fx certFixture) error {
 }
 
 // TestAnExpiredCertificateIsTheServicesProblem is #360: api.open-elevation.com
-// let its certificate lapse on 2026-09-20 and TestNewSiteEarthAddress_Live
+// let its certificate lapse on 2026-09-20 and TestNewSiteFromAddress_Live
 // began failing on every run — past the TCP pre-check, which the handshake
 // happens after, and through every network predicate, none of which describes
 // a certificate.
@@ -192,7 +192,7 @@ func TestAnExpiredCertificateIsTheServicesProblem(t *testing.T) {
 
 	if _, up := UpstreamFailure(err); !up {
 		t.Errorf("UpstreamFailure = false, want a skip citing %q — this is the "+
-			"classifier TestNewSiteEarthAddress_Live actually reaches, through "+
+			"classifier TestNewSiteFromAddress_Live actually reaches, through "+
 			"SkipOnUpstreamFailure", reason)
 	}
 

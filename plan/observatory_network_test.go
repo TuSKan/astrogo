@@ -10,7 +10,7 @@ import (
 )
 
 // requireGeocoding skips when either service the address lookup needs is
-// unreachable. NewSiteEarthAddress calls two: Nominatim for coordinates
+// unreachable. NewSiteFromAddress calls two: Nominatim for coordinates
 // and Open-Elevation for height, so checking only the first leaves the
 // test failing on the second's downtime.
 func requireGeocoding(t *testing.T) {
@@ -21,13 +21,13 @@ func requireGeocoding(t *testing.T) {
 	}
 }
 
-func TestNewSiteEarthAddress_Live(t *testing.T) {
+func TestNewSiteFromAddress_Live(t *testing.T) {
 	requireGeocoding(t)
 
-	site, err := NewSiteEarthAddress(context.Background(), "Greenwich", "Royal Observatory, Greenwich, London, UK")
+	site, err := NewSiteFromAddress(context.Background(), "Greenwich", "Royal Observatory, Greenwich, London, UK")
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("NewSiteEarthAddress: %v", err)
+		t.Fatalf("NewSiteFromAddress: %v", err)
 	}
 
 	if lat := site.Latitude().Degrees(); lat < 51 || lat > 52 {
