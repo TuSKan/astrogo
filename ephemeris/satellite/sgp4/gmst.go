@@ -9,7 +9,7 @@ const twoPi = 2.0 * math.Pi
 // gmst82 is Greenwich mean sidereal time in radians, by the 1982 IAU
 // expression evaluated on UT1, which SGP4 supplies as UTC.
 //
-// # Why this is not time.Time.GAST, and must not become it
+// # Why this is not epoch.Time.GAST, and must not become it
 //
 // astrogo has a proper sidereal time: [github.com/TuSKan/astrogo/epoch]'s GAST
 // is IAU 2006/2000A with real Earth orientation parameters, and it is a

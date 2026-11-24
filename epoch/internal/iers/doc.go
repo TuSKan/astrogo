@@ -17,7 +17,8 @@
 // The global [Model] defaults to [ZeroModel] (zero EOP for every epoch).
 // It can be populated directly via [RegisterModel], but the common case is
 // [EnsureLoaded]'s automatic lazy load, triggered the first time a query
-// (via [time.Time.EOP]/[time.Time.UTC]/[time.Time.UT1]) doesn't find
+// (via [github.com/TuSKan/astrogo/epoch.Time.EOP], [github.com/TuSKan/astrogo/epoch.Time.UTC] or
+// [github.com/TuSKan/astrogo/epoch.Time.UT1]) doesn't find
 // coverage for the requested epoch:
 //
 //  1. Read and parse whatever finals2000A file already exists at the
@@ -62,11 +63,11 @@
 // Once real time advances past the registered model's coverage, every call
 // to [Model.EOP] for a later epoch returns [ErrOutOfRange], triggering
 // another lazy-load attempt (throttled by [SetRetryCooldown] after a
-// failure). If that attempt doesn't help, time.Time degrades gracefully
+// failure). If that attempt doesn't help, epoch.Time degrades gracefully
 // rather than propagating the failure everywhere: UT1→UTC conversion and
-// the [time.Time.EOP] accessor (used by coord.NewContext) silently
+// the [github.com/TuSKan/astrogo/epoch.Time.EOP] accessor (used by coord.NewContext) silently
 // substitute DUT1=XP=YP=0 and log a warning exactly once per process;
-// time.Time.UT1 (UTC→UT1) is the one exception that returns the error
+// epoch.Time.UT1 (UTC→UT1) is the one exception that returns the error
 // directly, since it has no reasonable zero-value fallback direction. Use
 // [Coverage] to check the currently-registered model's actual range rather
 // than waiting for the one-time degradation warning.

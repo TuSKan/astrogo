@@ -56,7 +56,7 @@ type EOPLoader = iers.Loader
 // filesystem using nothing but the standard library — for a deployment that
 // pre-seeds EOP data and wants no network dependency. It downloads nothing.
 //
-//	time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS(dir), Name: "finals2000A.data"})
+//	epoch.RegisterEOPLoader(epoch.FSEOPLoader{FS: os.DirFS(dir), Name: "finals2000A.data"})
 //
 // The filesystem is the caller's: os.DirFS for a directory on disk, or a
 // remote.FS, which is an fs.FS. A missing object is [ErrNoEOPData], an

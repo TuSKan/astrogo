@@ -209,7 +209,7 @@ type coverer interface {
 // Use this to proactively check whether the currently-registered EOP data
 // still covers the epoch you are about to compute with — e.g. at service
 // startup, or on a periodic health check — rather than relying on the
-// one-time degradation warning coord.NewContext and time.Time log
+// one-time degradation warning coord.NewContext and epoch.Time log
 // internally the first time a query falls outside the model's range.
 func Coverage() (mjdMin, mjdMax float64, ok bool) {
 	c, ok := GetModel().(coverer)

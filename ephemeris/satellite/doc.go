@@ -13,7 +13,7 @@
 //
 // # If your timestamp came from a receiver, say so
 //
-// [Satellite.Locate] takes an astrogo time.Time, which carries its own scale, and
+// [Satellite.Locate] takes an astrogo epoch.Time, which carries its own scale, and
 // a GNSS receiver does not hand out UTC. GPS and Galileo system time run 18
 // seconds ahead of it today, because they were synchronized once in 1980 and
 // told to ignore leap seconds since.
@@ -25,7 +25,7 @@
 // [github.com/TuSKan/astrogo/epoch.GPST] as its scale and the arithmetic happens
 // for you, at whatever epoch:
 //
-//	t := epoch.FromJD(gpsJD, epoch.GPST)   // not time.UTC
+//	t := epoch.FromJD(gpsJD, epoch.GPST)   // not epoch.UTC
 //	state, err := sat.Locate(sat.ID(), t)
 //
 // BeiDou is a different offset again — TAI − 33 s, so BDT − UTC is 4 s today —

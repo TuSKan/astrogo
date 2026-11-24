@@ -708,7 +708,7 @@ which costs about an arcsecond of topocentric position. To read a pre-seeded fil
 without any `remote` dependency at all, register a filesystem loader instead:
 
 ```go
-time.RegisterEOPLoader(time.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals2000A.data"})
+epoch.RegisterEOPLoader(epoch.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals2000A.data"})
 ```
 
 `ephemeris` works the same way, and it buys more than a Julian date. The

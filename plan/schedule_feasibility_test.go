@@ -41,7 +41,7 @@ func assertExecutable(t *testing.T, sched *Schedule, model TransitionModel) {
 			t.Fatalf("overhead into %s: %v", sb.Block.ID, err)
 		}
 
-		// A millisecond for the float seconds a time.Time is built from.
+		// A millisecond for the float seconds an epoch.Time is built from.
 		if got := sb.Window.Start.Sub(prevEnd).Seconds(); got < need.Seconds()-1e-3 {
 			t.Errorf("[%d] %s starts %.0f s after its predecessor ends, but the slew to it takes %.0f s",
 				k, sb.Block.ID, got, need.Seconds())

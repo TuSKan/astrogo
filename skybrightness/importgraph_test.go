@@ -52,7 +52,7 @@ func TestCoreDoesNotImportIOPackages(t *testing.T) {
 
 	// The walk must reach past the core, or a forbidden package deep in the
 	// graph could not be found at all.
-	for _, want := range []string{modulePath + "/coord", modulePath + "/time", "fmt"} {
+	for _, want := range []string{modulePath + "/coord", modulePath + "/epoch", "fmt"} {
 		if _, ok := closure[want]; !ok {
 			t.Fatalf("the import closure has no %s; the walk is not following imports", want)
 		}
@@ -125,9 +125,9 @@ func TestCoreImportsOnlyLowerLayers(t *testing.T) {
 		modulePath + "/coord":          true,
 		modulePath + "/ephemeris":      true,
 		modulePath + "/ephemeris/core": true,
+		modulePath + "/epoch":          true,
 		modulePath + "/magnitude":      true,
 		modulePath + "/optics":         true,
-		modulePath + "/time":           true,
 		modulePath + "/unit":           true,
 		modulePath + "/vector":         true,
 	}
