@@ -34,7 +34,7 @@ func transitionSite(t *testing.T) *Site {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("s", loc)
+	site, err := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -162,7 +162,7 @@ func fullContextAltAz(t *testing.T, b *Block, at time.Time, site *Site) coord.Al
 // it.
 func BenchmarkGreedyStrategy_10Slew(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
-	site, _ := NewSite("Bench", loc)
+	site, _ := NewSite("Bench", loc.Lat(), loc.Lon(), loc.Height())
 	planner, _ := NewPlanner(site, nil)
 	tm := &BasicTransitionModel{BaseSetup: 0, SlewRate: unit.DegreesPerSec(2)}
 	blocks := makeBlocks(10)

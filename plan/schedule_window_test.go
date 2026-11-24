@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -20,7 +19,7 @@ import (
 func TestScheduleRefusesABadWindow(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		t.Fatal(err)
 	}

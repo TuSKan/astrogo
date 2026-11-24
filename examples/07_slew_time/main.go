@@ -11,7 +11,6 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -27,7 +26,7 @@ func main() {
 	time.RegisterModel(time.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
-	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

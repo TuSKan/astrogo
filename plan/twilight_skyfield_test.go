@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -105,7 +104,7 @@ func TestTwilightAgreesWithSkyfield(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			site, err := NewSite(c.name, coord.MustGeodetic(angle.LatDeg(c.lat), angle.LonDeg(c.lon), unit.Meters(c.elev)))
+			site, err := NewSite(c.name, angle.LatDeg(c.lat), angle.LonDeg(c.lon), unit.Meters(c.elev))
 			if err != nil {
 				t.Fatalf("NewSite: %v", err)
 			}

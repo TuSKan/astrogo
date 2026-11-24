@@ -27,7 +27,7 @@ func TestGetDetails_Star(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC) // J2000
@@ -88,7 +88,7 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -115,7 +115,7 @@ func TestGetDetails_MovingBody(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -154,7 +154,7 @@ func TestGetDetails_String(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -182,7 +182,7 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
@@ -228,7 +228,7 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -261,7 +261,7 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -290,7 +290,7 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	ra, dec := angle.Zero(), angle.Zero()
@@ -512,7 +512,7 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 			loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 			testutil.AssertNoError(t, err)
 
-			site, err := NewSite("Test", loc)
+			site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 			testutil.AssertNoError(t, err)
 
 			ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
@@ -551,7 +551,7 @@ func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())

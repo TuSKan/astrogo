@@ -65,7 +65,7 @@ func TestUSNO_SiderealTime(t *testing.T) {
 				t.Fatalf("NewGeodetic: %v", err)
 			}
 
-			site, err := plan.NewSite(c.site, geodetic)
+			site, err := plan.NewSite(c.site, geodetic.Lat(), geodetic.Lon(), geodetic.Height())
 			if err != nil {
 				t.Fatalf("NewSite: %v", err)
 			}

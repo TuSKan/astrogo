@@ -250,7 +250,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		t.Fatalf("polar site geodetic: %v", err)
 	}
 
-	polarSite, err := plan.NewSite("Polar (synthetic, 78N)", polarLoc)
+	polarSite, err := plan.NewSite("Polar (synthetic, 78N)", polarLoc.Lat(), polarLoc.Lon(), polarLoc.Height())
 	if err != nil {
 		t.Fatalf("polar site: %v", err)
 	}

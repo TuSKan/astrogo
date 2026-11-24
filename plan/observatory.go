@@ -302,15 +302,20 @@ func WithSiteAliases(aliases ...string) SiteOption {
 	return func(s *Site) { s.aliases = aliases }
 }
 
-// NewSite creates a new observing site with validation.
-// name: A human-readable name for the site.
-// loc: The geodetic location (longitude, latitude, height).
-// opts: optional parameters — see WithHorizon, WithHorizonProfile,
+// NewSite creates an observing site named name at latitude lat, longitude
+// lon and height above the WGS84 ellipsoid. The location must be one
+// [coord.NewGeodetic] accepts, and its error is returned otherwise:
+//
+//	site, err := plan.NewSite("Quinta Calixto",
+//		angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
+//
+// opts are optional parameters: see WithHorizon, WithHorizonProfile,
 // WithHorizonRefraction, WithHorizonHeight, WithTimeZone, WithMPCCode, and
 // WithSiteAliases.
-func NewSite(name string, loc *coord.Geodetic, opts ...SiteOption) (*Site, error) {
-	if loc == nil {
-		return nil, ErrNilLocation
+func NewSite(name string, lat angle.Latitude, lon angle.Longitude, height unit.Length, opts ...SiteOption) (*Site, error) {
+	loc, err := coord.NewGeodetic(lat, lon, height)
+	if err != nil {
+		return nil, fmt.Errorf("plan: site %q: %w", name, err)
 	}
 
 	s := &Site{
@@ -368,7 +373,7 @@ type elevationResponse struct {
 // other remote.KindAPI endpoint, both are reachable by default; disable
 // one with remote.DisableEndpoint or remote.SetOffline(true) if that's
 // undesired — a caller who already knows a site's coordinates and height
-// builds it with [NewSite] and [coord.NewGeodetic], which need neither.
+// builds it with [NewSite], which needs neither.
 func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...SiteOption) (*Site, error) {
 	lat, lon, err := geocodeAddress(ctx, address)
 	if err != nil {
@@ -380,12 +385,7 @@ func NewSiteEarthAddress(ctx context.Context, name, address string, opts ...Site
 		return nil, err
 	}
 
-	loc, err := coord.NewGeodetic(angle.LatDeg(lat), angle.LonDeg(lon), unit.Meters(heightMeters))
-	if err != nil {
-		return nil, fmt.Errorf("plan: %w", err)
-	}
-
-	return NewSite(name, loc, opts...)
+	return NewSite(name, angle.LatDeg(lat), angle.LonDeg(lon), unit.Meters(heightMeters), opts...)
 }
 
 // geocodeAddress resolves address to decimal-degree latitude/longitude via
@@ -652,7 +652,7 @@ func sameHorizonAir(a, b *atmosphere.Refraction) bool {
 
 // WithHorizon returns a copy of s with the given horizon limit.
 func (s *Site) WithHorizon(h angle.Angle) (*Site, error) {
-	site, err := NewSite(s.name, s.location, WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...), WithHorizonProfile(s.horizonProfile))
+	site, err := NewSite(s.name, s.location.Lat(), s.location.Lon(), s.location.Height(), WithHorizon(h), WithTimeZone(s.timeZone), WithMPCCode(s.mpcCode), WithSiteAliases(s.aliases...), WithHorizonProfile(s.horizonProfile))
 	if err != nil {
 		return nil, err
 	}

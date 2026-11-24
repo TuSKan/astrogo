@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -119,7 +118,7 @@ func TestObservedRateFollowsTheDate(t *testing.T) {
 	prov := eph.Default()
 	per := meteorShowers["perseids"]
 
-	site, err := NewSite("45N", coord.MustGeodetic(angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0)))
+	site, err := NewSite("45N", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

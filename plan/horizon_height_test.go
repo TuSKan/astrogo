@@ -69,7 +69,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 
-		site, err := plan.NewSite(c.name, loc)
+		site, err := plan.NewSite(c.name, loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -92,7 +92,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 			}
 		}
 
-		dipped, err := plan.NewSite(c.name, loc, plan.WithHorizonHeight(unit.Meters(c.heightM)))
+		dipped, err := plan.NewSite(c.name, loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(c.heightM)))
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -122,12 +122,12 @@ func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 	}
 
 	for _, h := range []float64{-1, math.NaN(), math.Inf(1)} {
-		if _, err := plan.NewSite("x", loc, plan.WithHorizonHeight(unit.Meters(h))); !errors.Is(err, plan.ErrInvalidHorizonHeight) {
+		if _, err := plan.NewSite("x", loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(h))); !errors.Is(err, plan.ErrInvalidHorizonHeight) {
 			t.Errorf("WithHorizonHeight(%g m): err = %v, want ErrInvalidHorizonHeight", h, err)
 		}
 	}
 
-	site, err := plan.NewSite("Mauna Kea over the sea", loc, plan.WithHorizonHeight(unit.Meters(4145)))
+	site, err := plan.NewSite("Mauna Kea over the sea", loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(4145)))
 	if err != nil {
 		t.Fatalf("WithHorizonHeight(4145 m): %v", err)
 	}
@@ -139,7 +139,7 @@ func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 
 	// Two sites that differ only in the height above their horizon rise and
 	// set things at different times, so they are not equal.
-	level, err := plan.NewSite("Mauna Kea over the sea", loc)
+	level, err := plan.NewSite("Mauna Kea over the sea", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

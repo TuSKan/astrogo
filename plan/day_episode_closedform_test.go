@@ -46,7 +46,7 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 			t.Fatalf("NewGeodetic(%g): %v", latDeg, err)
 		}
 
-		site, err := NewSite("sweep", loc)
+		site, err := NewSite("sweep", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}
@@ -131,7 +131,7 @@ func TestEpisodeStillSearchesNearTheHorizonBoundary(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("boundary", loc)
+	site, err := NewSite("boundary", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("arctic", loc)
+	site, err := NewSite("arctic", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -254,7 +254,7 @@ func BenchmarkEpisodeNeverRises(b *testing.B) {
 		b.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Arctic", loc)
+	site, err := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		b.Fatalf("NewSite: %v", err)
 	}

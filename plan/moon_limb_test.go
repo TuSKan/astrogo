@@ -51,7 +51,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		site, err := plan.NewSite(s.name, loc)
+		site, err := plan.NewSite(s.name, loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}
@@ -130,7 +130,7 @@ func TestUpperLimbNeedsABody(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := plan.NewSite("s", loc)
+	site, err := plan.NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

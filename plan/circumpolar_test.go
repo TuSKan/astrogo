@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -13,7 +12,7 @@ import (
 func circumpolarTestSite(t *testing.T, latDeg float64) *plan.Site {
 	t.Helper()
 
-	site, err := plan.NewSite("test", coord.MustGeodetic(angle.LatDeg(latDeg), angle.LonDeg(0), unit.Meters(0)))
+	site, err := plan.NewSite("test", angle.LatDeg(latDeg), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

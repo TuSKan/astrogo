@@ -11,7 +11,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
 	"github.com/TuSKan/astrogo/catalog/simbad"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -239,7 +238,7 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
 
-	site, err := plan.NewSite("Paranal", coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2640)))
+	site, err := plan.NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2640))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

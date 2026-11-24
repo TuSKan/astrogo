@@ -27,7 +27,7 @@ func runSkySite(t *testing.T) *Site {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("Run sky", loc)
+	site, err := NewSite("Run sky", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

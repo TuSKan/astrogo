@@ -86,7 +86,7 @@ func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		site, err := NewSite("fatoohi", loc)
+		site, err := NewSite("fatoohi", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}
@@ -289,7 +289,7 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 	// Dipped by its height, as every site was before #1185: the later sunset
 	// that puts the Moon's lower limb on the horizon, where refraction is at
 	// its largest, which is what this case reads.
-	calixto, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)),
+	calixto, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05),
 		WithHorizonHeight(unit.Meters(835.05)))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)

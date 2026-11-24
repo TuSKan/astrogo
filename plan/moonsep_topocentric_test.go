@@ -17,7 +17,7 @@ import (
 func paranalMoonNight(t *testing.T) (*Site, time.Time) {
 	t.Helper()
 
-	site, err := NewSite("Paranal", coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635)))
+	site, err := NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

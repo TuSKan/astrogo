@@ -21,7 +21,7 @@ func crescentSite(tb testing.TB, latDeg, lonDeg float64) *Site {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("crescent", loc)
+	site, err := NewSite("crescent", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		tb.Fatalf("NewSite: %v", err)
 	}

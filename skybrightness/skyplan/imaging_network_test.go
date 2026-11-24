@@ -158,7 +158,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 		t.Fatalf("NewImaging: %v", err)
 	}
 
-	planSite, err := plan.NewSite("Paranal", site)
+	planSite, err := plan.NewSite("Paranal", site.Lat(), site.Lon(), site.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

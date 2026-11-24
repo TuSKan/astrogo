@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
@@ -25,7 +24,7 @@ func TestNightOfIsOneNightFromAnyInstantInIt(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSite("Madrid", coord.MustGeodetic(angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0)))
+	site, err := plan.NewSite("Madrid", angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +78,7 @@ func TestNightOfAfterDawnIsTheComingNight(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSite("Madrid", coord.MustGeodetic(angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0)))
+	site, err := plan.NewSite("Madrid", angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +126,7 @@ func TestNightOfFindsNoNightThatLastsADayOrNever(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSite("Longyearbyen", coord.MustGeodetic(angle.LatDeg(78.2232), angle.LonDeg(15.6267), unit.Meters(0)))
+	site, err := plan.NewSite("Longyearbyen", angle.LatDeg(78.2232), angle.LonDeg(15.6267), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +156,7 @@ func TestNightOfRefusesWhatIsNotAnInstantOrAKind(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := plan.NewSite("Madrid", coord.MustGeodetic(angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0)))
+	site, err := plan.NewSite("Madrid", angle.LatDeg(40.4168), angle.LonDeg(-3.7038), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}

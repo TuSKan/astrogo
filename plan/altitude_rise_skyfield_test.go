@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -40,7 +39,7 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 
 	// The summit looks down on a horizon 8849 m below, which is what makes
 	// the dip in the threshold its own: a height alone dips nothing (#1185).
-	site, err := NewSite("Everest", coord.MustGeodetic(angle.LatDeg(27.9881), angle.LonDeg(86.925), unit.Meters(8849)), WithHorizonHeight(unit.Meters(8849)))
+	site, err := NewSite("Everest", angle.LatDeg(27.9881), angle.LonDeg(86.925), unit.Meters(8849), WithHorizonHeight(unit.Meters(8849)))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -46,7 +45,7 @@ func TestStarRiseAndSetAgreeWithSkyfield(t *testing.T) {
 		{"Sirius", 60, "rise", 14, 53, 50, 733.978},
 		{"Sirius", 60, "set", 22, 52, 15, 894.058},
 	} {
-		site, err := NewSite("sea level", coord.MustGeodetic(angle.LatDeg(c.lat), angle.LonDeg(0), unit.Meters(0)))
+		site, err := NewSite("sea level", angle.LatDeg(c.lat), angle.LonDeg(0), unit.Meters(0))
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}

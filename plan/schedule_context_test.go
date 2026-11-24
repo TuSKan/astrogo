@@ -39,7 +39,7 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("paranal", loc)
+	site, err := NewSite("paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

@@ -59,7 +59,7 @@ type detailer interface {
 func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSite("parallax", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
+	site, err := plan.NewSite("parallax", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 func TestMoonParallaxIsActuallyApplied(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSite("parallax", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
+	site, err := plan.NewSite("parallax", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

@@ -195,7 +195,7 @@ func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Cont
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := NewSite("São Paulo", coord.MustGeodetic(angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760)))
+	site, err := NewSite("São Paulo", angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

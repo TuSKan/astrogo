@@ -65,7 +65,7 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 	// The Sun's geometric altitude plus 18° at the sample, from a context
 	// based at the sample itself.
 	above := func(lat float64) float64 {
-		site, err := NewSite("s", coord.MustGeodetic(angle.LatDeg(lat), angle.LonDeg(0), unit.Meters(0)))
+		site, err := NewSite("s", angle.LatDeg(lat), angle.LonDeg(0), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,7 +102,7 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 	for k := -100; k <= 100; k++ {
 		lat := lo + float64(k)*2e-8
 
-		site, err := NewSite("s", coord.MustGeodetic(angle.LatDeg(lat), angle.LonDeg(0), unit.Meters(0)))
+		site, err := NewSite("s", angle.LatDeg(lat), angle.LonDeg(0), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}

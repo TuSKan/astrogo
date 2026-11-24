@@ -100,7 +100,7 @@ func TestSchedulingWithTheRunsMoonIsBitIdentical(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("Moon places", loc)
+	site, err := NewSite("Moon places", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

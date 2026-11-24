@@ -36,7 +36,7 @@ func unscheduledFixture(t *testing.T) (*Planner, Window) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("equator", loc)
+	site, err := NewSite("equator", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

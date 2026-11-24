@@ -222,7 +222,7 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("North Pole", loc)
+	site, err := NewSite("North Pole", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

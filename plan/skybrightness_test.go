@@ -42,7 +42,7 @@ func skyConstraintFixture(t *testing.T, vmag float64) (*Star, *Site, *coord.Cont
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestLimitingMagnitudeBelowHorizonScoresZero(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

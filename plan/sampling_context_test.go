@@ -57,7 +57,7 @@ func samplingCases(t *testing.T) []samplingCase {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		site, err := NewSite("s", loc)
+		site, err := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}

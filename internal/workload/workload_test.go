@@ -429,7 +429,9 @@ func BenchmarkSkyFromSite(b *testing.B) {
 // BenchmarkEventSearch (B7): plan's root finders call the provider many times
 // per event, and that count is what a faster Locate would divide.
 func BenchmarkEventSearch(b *testing.B) {
-	site, err := plan.NewSite("Barcelona", barcelona(b))
+	loc := barcelona(b)
+
+	site, err := plan.NewSite("Barcelona", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		b.Fatalf("site: %v", err)
 	}

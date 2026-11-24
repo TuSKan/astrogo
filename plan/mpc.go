@@ -215,7 +215,7 @@ func lookupMPCSite(list []MPCObservatory, code string) (*Site, error) {
 			return nil, fmt.Errorf("%w: %q (%s)", ErrSiteNotOnEarth, code, obs.Name)
 		}
 
-		return NewSite(obs.Name, obs.Location, WithMPCCode(obs.Code))
+		return NewSite(obs.Name, obs.Location.Lat(), obs.Location.Lon(), obs.Location.Height(), WithMPCCode(obs.Code))
 	}
 
 	return nil, fmt.Errorf("%w: MPC code %q", ErrUnknownSite, code)

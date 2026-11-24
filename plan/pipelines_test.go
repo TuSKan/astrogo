@@ -33,7 +33,7 @@ const (
 func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSite("pipelines", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
+	site, err := plan.NewSite("pipelines", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSite("pipelines", coord.MustGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800)))
+	site, err := plan.NewSite("pipelines", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

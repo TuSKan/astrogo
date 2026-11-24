@@ -30,7 +30,7 @@ func rcSite(tb testing.TB) *Site {
 		tb.Fatal(err)
 	}
 
-	site, err := NewSite("Barcelona", loc)
+	site, err := NewSite("Barcelona", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		tb.Fatal(err)
 	}

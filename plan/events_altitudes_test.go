@@ -59,7 +59,7 @@ func TestAltitudesAtReportsFailureRatherThanAGuess(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("altitudes", loc)
+	site, err := NewSite("altitudes", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestAltitudesAtSeparatesTheTwoAtmospheres(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("altitudes", loc)
+	site, err := NewSite("altitudes", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

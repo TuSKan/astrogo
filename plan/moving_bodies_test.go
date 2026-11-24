@@ -64,7 +64,7 @@ func testContext(t *testing.T) *coord.Context {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

@@ -33,7 +33,7 @@ func benchSite(b *testing.B) *Site {
 		b.Fatal(err)
 	}
 
-	site, err := NewSite("Bench", loc)
+	site, err := NewSite("Bench", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		b.Fatal(err)
 	}

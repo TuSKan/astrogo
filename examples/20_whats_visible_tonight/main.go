@@ -46,7 +46,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
@@ -120,7 +119,7 @@ func main() {
 		log.Fatalf("failed to load timezone: %v", err)
 	}
 
-	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)), plan.WithTimeZone(brtz))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05), plan.WithTimeZone(brtz))
 	if err != nil {
 		log.Fatalf("NewSite: %v", err)
 	}

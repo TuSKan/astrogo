@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -20,7 +19,7 @@ import (
 // altitude against the geometric threshold, called the Moon up, and returned
 // the episode that had ended seconds before.
 func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
-	site, err := NewSite("Barcelona", coord.MustGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0)))
+	site, err := NewSite("Barcelona", angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +56,7 @@ func TestEpisodeJustBeforeARiseIsThatRise(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := NewSite("Barcelona", coord.MustGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0)))
+	site, err := NewSite("Barcelona", angle.LatDeg(41.39), angle.LonDeg(2.17), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}

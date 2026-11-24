@@ -9,7 +9,6 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/unit"
@@ -125,12 +124,12 @@ func TestVisibleTonightDimsThroughTheSitesAir(t *testing.T) {
 func TestVisibleTonightDefaultAirFollowsTheSite(t *testing.T) {
 	t.Parallel()
 
-	seaLevel, err := plan.NewSite("sea level", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(0)))
+	seaLevel, err := plan.NewSite("sea level", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(0))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	paranal, err := plan.NewSite("Paranal", coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2640)))
+	paranal, err := plan.NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2640))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

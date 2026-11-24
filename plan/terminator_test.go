@@ -86,7 +86,7 @@ func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
 
-	site, err := NewSite("subsolar", geo)
+	site, err := NewSite("subsolar", geo.Lat(), geo.Lon(), geo.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

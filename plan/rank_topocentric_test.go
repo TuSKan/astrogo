@@ -48,7 +48,7 @@ func TestRankObservableScoresTheMoonFromTheObserver(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("s", loc)
+	site, err := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 
 	prov, loc := testISS(t)
 
-	site, err := NewSite("s", loc)
+	site, err := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

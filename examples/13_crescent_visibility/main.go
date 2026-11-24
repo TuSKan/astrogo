@@ -16,7 +16,6 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
@@ -33,7 +32,7 @@ func main() {
 	time.RegisterModel(time.ZeroModel{})
 
 	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────
-	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

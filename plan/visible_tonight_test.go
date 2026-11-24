@@ -46,7 +46,7 @@ func (m *mockBrightSource) SearchBright(_ context.Context, req resolve.BrightReq
 func quintaCalixtoSite(t *testing.T) *plan.Site {
 	t.Helper()
 
-	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -238,7 +238,9 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 	// horizon from its own height: a height alone dips nothing (#1185).
 	base := quintaCalixtoSite(t)
 
-	site, err := plan.NewSite(base.Name(), base.Location(), plan.WithHorizonHeight(base.Height()))
+	loc := base.Location()
+
+	site, err := plan.NewSite(base.Name(), loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(base.Height()))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

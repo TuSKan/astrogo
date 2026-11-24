@@ -214,7 +214,7 @@ func main() {
 	moonTarget := plan.NewMoon(prov)
 	now := events26[0].Time // Use the actual vernal equinox moment
 
-	site, err := plan.NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)), plan.WithTimeZone(brtz))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05), plan.WithTimeZone(brtz))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

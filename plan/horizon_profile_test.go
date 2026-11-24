@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -104,7 +103,7 @@ func TestParseHorizonProfileDrivesTheHorizonConstraint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("garden", coord.MustGeodetic(angle.LatDeg(51.48), angle.LonDeg(0), unit.Meters(46)), WithHorizonProfile(p))
+	site, err := NewSite("garden", angle.LatDeg(51.48), angle.LonDeg(0), unit.Meters(46), WithHorizonProfile(p))
 	if err != nil {
 		t.Fatal(err)
 	}

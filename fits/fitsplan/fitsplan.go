@@ -39,7 +39,7 @@ func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 		obsName = "FITS Site"
 	}
 
-	site, err := plan.NewSite(obsName, geodetic)
+	site, err := plan.NewSite(obsName, geodetic.Lat(), geodetic.Lon(), geodetic.Height())
 	if err != nil {
 		return nil, fmt.Errorf("fits/fitsplan: new site: %w", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -52,7 +51,7 @@ func requireTransits(t *testing.T, what string, got, want []time.Time, tol unit.
 func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 	prov := eph.Default()
 
-	north75, err := NewSite("75N", coord.MustGeodetic(angle.LatDeg(75), angle.LonDeg(0), unit.Meters(0)))
+	north75, err := NewSite("75N", angle.LatDeg(75), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +68,7 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 		time.Date(2026, 1, 10, 5, 32, 22, 0, time.LocationUTC),
 	}, unit.Seconds(2))
 
-	north89, err := NewSite("89N", coord.MustGeodetic(angle.LatDeg(89), angle.LonDeg(15), unit.Meters(0)))
+	north89, err := NewSite("89N", angle.LatDeg(89), angle.LonDeg(15), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 func TestTransitInTheWindowsFirstStep(t *testing.T) {
 	prov := eph.Default()
 
-	brno, err := NewSite("Brno", coord.MustGeodetic(angle.LatDeg(49.195), angle.LonDeg(16.608), unit.Meters(0)))
+	brno, err := NewSite("Brno", angle.LatDeg(49.195), angle.LonDeg(16.608), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +131,7 @@ func TestTransitsDoNotDependOnTheStep(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := NewSite("69N", coord.MustGeodetic(angle.LatDeg(69), angle.LonDeg(0), unit.Meters(0)))
+	site, err := NewSite("69N", angle.LatDeg(69), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +170,7 @@ func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := NewSite("85N", coord.MustGeodetic(angle.LatDeg(85), angle.LonDeg(0), unit.Meters(0)))
+	site, err := NewSite("85N", angle.LatDeg(85), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +215,7 @@ func TestTransitIsWhereSiderealTimeMeetsRightAscension(t *testing.T) {
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(0.001))
 
 	for _, s := range []struct{ lat, lon float64 }{{49.195, 16.608}, {75, 0}} {
-		site, err := NewSite("site", coord.MustGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(0)))
+		site, err := NewSite("site", angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}

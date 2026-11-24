@@ -19,7 +19,7 @@ func moreSite(t *testing.T) *Site {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -251,7 +251,7 @@ func ridgeSite(t *testing.T, opts ...SiteOption) *Site {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal with a ridge", loc, opts...)
+	site, err := NewSite("Paranal with a ridge", loc.Lat(), loc.Lon(), loc.Height(), opts...)
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

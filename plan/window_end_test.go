@@ -29,7 +29,7 @@ func TestWindowFindersSampleTheEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("45N", loc)
+	site, err := NewSite("45N", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

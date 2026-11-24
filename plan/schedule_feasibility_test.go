@@ -71,7 +71,7 @@ func TestSwapOptimizedLeavesTimeForEverySlew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("equator", loc)
+	site, err := NewSite("equator", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

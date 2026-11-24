@@ -53,7 +53,7 @@ func predicateSite(t *testing.T) *Site {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("predicates", loc)
+	site, err := NewSite("predicates", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

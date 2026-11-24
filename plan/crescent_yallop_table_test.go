@@ -53,7 +53,7 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		site, err := NewSite("yallop", loc)
+		site, err := NewSite("yallop", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}

@@ -72,7 +72,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 		t.Error("Provider() did not return the constructor-supplied provider")
 	}
 
-	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 		t.Error("expected ApparentMagnitude to fail without observer context")
 	}
 
-	site, err := NewSite("Quinta Calixto", coord.MustGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)))
+	site, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
