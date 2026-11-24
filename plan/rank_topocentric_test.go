@@ -123,7 +123,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 
 		// Widened by a pass's length each side, so a pass already in progress
 		// at the window's start, or still in progress at its end, is found.
-		passes, err := SatellitePasses(prov, prov.ID(), "ISS", start.Add(unit.Minutes(-15)), end.Add(unit.Minutes(15)), loc, angle.Deg(0))
+		passes, err := SatellitePasses(NewSatellite("ISS", prov.ID(), prov), siteAt(t, loc), Window{Start: start.Add(unit.Minutes(-15)), End: end.Add(unit.Minutes(15))}, WithMinElevation(angle.Deg(0)))
 		if err != nil {
 			t.Fatalf("SatellitePasses: %v", err)
 		}

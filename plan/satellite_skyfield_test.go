@@ -39,7 +39,7 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 
 	start := time.Date(2026, time.April, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Days(2)), observer, angle.Deg(10))
+	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: start, End: start.Add(unit.Days(2))}, WithMinElevation(angle.Deg(10)))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			passes, err := SatellitePasses(sat, sat.ID(), "ISS", tc.start, tc.end, observer, angle.Deg(10))
+			passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: tc.start, End: tc.end}, WithMinElevation(angle.Deg(10)))
 			if err != nil {
 				t.Fatalf("SatellitePasses: %v", err)
 			}
@@ -220,7 +220,7 @@ func TestSatellitePassesFindAPassThatBarelyClearsTheThreshold(t *testing.T) {
 		start := time.Date(2026, time.April, 20, 16, 0, offset, 0, time.LocationUTC)
 		end := start.Add(unit.Seconds(3600))
 
-		passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, observer, angle.Deg(13.84))
+		passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: start, End: end}, WithMinElevation(angle.Deg(13.84)))
 		if err != nil {
 			t.Fatalf("SatellitePasses from 16:00:%02d: %v", offset, err)
 		}
@@ -248,7 +248,7 @@ func TestSatellitePassesFindAPassThatBarelyClearsTheThreshold(t *testing.T) {
 				offset, p.Culmination.Elevation.Degrees())
 		}
 
-		above, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, observer, angle.Deg(13.86))
+		above, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: start, End: end}, WithMinElevation(angle.Deg(13.86)))
 		if err != nil {
 			t.Fatalf("SatellitePasses from 16:00:%02d above 13.86°: %v", offset, err)
 		}

@@ -124,8 +124,8 @@ func TestSearchesRefuseANilSiteOrTarget(t *testing.T) {
 			return errOf(plan.ObservableWindows(star, nil, plan.Window{Start: start, End: end}, unit.Minutes(5)))
 		}, plan.ErrNilSite},
 		{"SatellitePasses", func() error {
-			return errOf(plan.SatellitePasses(eph.Default(), eph.Moon, "Moon", start, end, nil, angle.Deg(10)))
-		}, coord.ErrNilGeodetic},
+			return errOf(plan.SatellitePasses(plan.NewSatellite("Moon", eph.Moon, eph.Default()), nil, plan.Window{Start: start, End: end}, plan.WithMinElevation(angle.Deg(10))))
+		}, plan.ErrNilSite},
 	} {
 		if err := noPanic(c.call); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", c.name, err, c.want)

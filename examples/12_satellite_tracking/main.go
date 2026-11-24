@@ -154,7 +154,13 @@ func main() {
 		log.Fatalf("loc: %v", err)
 	}
 
-	passes, err := plan.SatellitePasses(sat, sat.ID(), target.Name, start, end, observer, minEl)
+	site, err := plan.NewSite("Quinta Calixto", observer.Lat(), observer.Lon(), observer.Height())
+	if err != nil {
+		log.Fatalf("NewSite: %v", err)
+	}
+
+	passes, err := plan.SatellitePasses(plan.NewSatellite(target.Name, sat.ID(), sat), site,
+		plan.Window{Start: start, End: end}, plan.WithMinElevation(minEl))
 	if err != nil {
 		log.Fatalf("SatellitePasses failed: %v", err)
 	}

@@ -83,7 +83,7 @@ func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error 
 			return errOf(planner.RankObservable([]plan.Observable{star}, plan.Window{Start: s, End: e}))
 		},
 		"SatellitePasses": func(s, e time.Time) error {
-			return errOf(plan.SatellitePasses(prov, eph.Moon, "ISS", s, e, site.Location(), angle.Deg(10)))
+			return errOf(plan.SatellitePasses(plan.NewSatellite("ISS", eph.Moon, prov), site, plan.Window{Start: s, End: e}, plan.WithMinElevation(angle.Deg(10))))
 		},
 		"TransitEstimate": func(s, e time.Time) error {
 			return errOf2(plan.TransitEstimate(vega, site, plan.Window{Start: s, End: e}))

@@ -170,7 +170,7 @@ func TestSatellitePasses_ISS(t *testing.T) {
 	start := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Hours(24))
 
-	passes, err := SatellitePasses(prov, prov.ID(), "ISS", start, end, loc, angle.Deg(10))
+	passes, err := SatellitePasses(NewSatellite("ISS", prov.ID(), prov), siteAt(t, loc), Window{Start: start, End: end}, WithMinElevation(angle.Deg(10)))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
