@@ -69,10 +69,10 @@ func TestTransformsRefuseWhatIsNotFinite(t *testing.T) {
 	}{
 		{"NaN right ascension", coord.NewICRS(angle.Rad(nan), dec)},
 		{"infinite declination", coord.NewICRS(ra, angle.Rad(inf))},
-		{"NaN proper motion in RA", coord.NewICRSWithKinematics(ra, dec, angle.Rad(nan), pm, plx, rv)},
-		{"infinite proper motion in Dec", coord.NewICRSWithKinematics(ra, dec, pm, angle.Rad(-inf), plx, rv)},
-		{"NaN parallax", coord.NewICRSWithKinematics(ra, dec, pm, pm, angle.Rad(nan), rv)},
-		{"NaN radial velocity", coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, unit.Velocity(nan))},
+		{"NaN proper motion in RA", coord.NewICRSWithKinematics(ra, dec, angle.Rad(nan), pm, plx, rv, time.J2000())},
+		{"infinite proper motion in Dec", coord.NewICRSWithKinematics(ra, dec, pm, angle.Rad(-inf), plx, rv, time.J2000())},
+		{"NaN parallax", coord.NewICRSWithKinematics(ra, dec, pm, pm, angle.Rad(nan), rv, time.J2000())},
+		{"NaN radial velocity", coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, unit.Velocity(nan), time.J2000())},
 	} {
 		if aa, err := ctx.ICRSToAltAz(c.icrs); !errors.Is(err, coord.ErrNotFinite) {
 			t.Errorf("ICRSToAltAz, %s: %v, %v, want ErrNotFinite", c.name, aa, err)
@@ -95,7 +95,7 @@ func TestTransformsRefuseWhatIsNotFinite(t *testing.T) {
 		}
 	}
 
-	star := coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, rv)
+	star := coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, rv, time.J2000())
 
 	aa, err := ctx.ICRSToAltAz(star)
 	if err != nil || math.IsNaN(aa.Alt().Radians()) {

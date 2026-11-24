@@ -29,7 +29,7 @@ func Coord(t resolve.Target) coord.ICRS {
 		return t.Coord
 	}
 
-	return coord.NewICRSWithKinematics(t.Coord.RA(), t.Coord.Dec(), t.PmRA, t.PmDec, t.Parallax, t.RadialVelocity)
+	return coord.NewICRSWithKinematics(t.Coord.RA(), t.Coord.Dec(), t.PmRA, t.PmDec, t.Parallax, t.RadialVelocity, t.Epoch)
 }
 
 // Separation returns the angle between a, given at aEpoch, and b, given at
@@ -39,25 +39,27 @@ func Coord(t resolve.Target) coord.ICRS {
 // is the other's own epoch, since a position without a motion cannot be
 // moved: a catalog row that publishes none is compared where the star was
 // when it was measured. When neither does, the positions are compared as
-// given.
+// given. A moving position is moved from its own [coord.ICRS.Epoch], as
+// [Coord] sets it, so aEpoch and bEpoch matter only for one that does not
+// move.
 func Separation(a coord.ICRS, aEpoch time.Time, b coord.ICRS, bEpoch time.Time) (angle.Angle, error) {
 	var err error
 
 	switch {
 	case moving(a) && moving(b):
-		if a, err = coord.PropagateEpoch(a, aEpoch, time.J2000()); err != nil {
+		if a, err = coord.PropagateEpoch(a, time.J2000()); err != nil {
 			return 0, fmt.Errorf("catalog: %w", err)
 		}
 
-		if b, err = coord.PropagateEpoch(b, bEpoch, time.J2000()); err != nil {
+		if b, err = coord.PropagateEpoch(b, time.J2000()); err != nil {
 			return 0, fmt.Errorf("catalog: %w", err)
 		}
 	case moving(a):
-		if a, err = coord.PropagateEpoch(a, aEpoch, bEpoch); err != nil {
+		if a, err = coord.PropagateEpoch(a, bEpoch); err != nil {
 			return 0, fmt.Errorf("catalog: %w", err)
 		}
 	case moving(b):
-		if b, err = coord.PropagateEpoch(b, bEpoch, aEpoch); err != nil {
+		if b, err = coord.PropagateEpoch(b, aEpoch); err != nil {
 			return 0, fmt.Errorf("catalog: %w", err)
 		}
 	}

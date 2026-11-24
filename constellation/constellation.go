@@ -136,9 +136,7 @@ func Lookup(pos coord.ICRS) (name, abbreviation string, err error) {
 	v := pos.ToUnitVector()
 	v1875 := gofaext.Rxp(b1875Matrix, [3]float64{v.X, v.Y, v.Z})
 
-	var precessed coord.ICRS
-
-	precessed.FromUnitVector(vector.V3(v1875[0], v1875[1], v1875[2]))
+	precessed := coord.ICRSFromUnitVector(vector.V3(v1875[0], v1875[1], v1875[2]))
 
 	raHours := precessed.RA().Degrees() / 15
 	decDeg := precessed.Dec().Degrees()

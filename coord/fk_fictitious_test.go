@@ -6,6 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -129,6 +130,7 @@ func TestARecordedMotionStillTakesTheSixElementRoute(t *testing.T) {
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(pmRAIn/1000), angle.Arcsec(pmDecIn/1000),
 		angle.Arcsec(pxIn), unit.KmPerSec(rvIn),
+		time.J2000(),
 	)
 
 	back := coord.FK4ToICRS(coord.ICRSToFK4(star, coord.B1950))

@@ -90,10 +90,7 @@ func (f SkyOffset) FromICRS(c ICRS) (lat angle.Latitude, lon angle.Longitude) {
 func (f SkyOffset) ToICRS(lat angle.Latitude, lon angle.Longitude) ICRS {
 	v := f.toSky(vector.FromSpherical(lon.Radians(), lat.Radians()))
 
-	var c ICRS
-	c.FromUnitVector(v)
-
-	return c
+	return ICRSFromUnitVector(v)
 }
 
 // String renders the frame for logs and errors.

@@ -7,6 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,6 +22,7 @@ func barnardsStar() coord.ICRS {
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
 		angle.Arcsec(0.54698), unit.KmPerSec(-110.6),
+		time.J2000(),
 	)
 }
 
@@ -74,6 +76,7 @@ func TestTheRadialComponentIsTheRadialVelocity(t *testing.T) {
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
 			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
+			time.J2000(),
 		)
 
 		v, ok := coord.SpaceVelocity(star)
@@ -135,6 +138,7 @@ func TestTheTransverseComponentMatchesTheClassicalIdentity(t *testing.T) {
 			angle.Deg(tc.ra), angle.Deg(tc.dec),
 			angle.Arcsec(tc.pmRA), angle.Arcsec(tc.pmDec),
 			angle.Arcsec(tc.px), unit.KmPerSec(tc.rv),
+			time.J2000(),
 		)
 
 		v, ok := coord.SpaceVelocity(star)
@@ -185,13 +189,13 @@ func TestSpaceVelocityRefusesWhatItCannotAnswer(t *testing.T) {
 			name: "kinematics recorded, but no parallax to scale them",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4)),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4), time.J2000()),
 		},
 		{
 			name: "a parallax below SOFA's floor is the same as none",
 			star: coord.NewICRSWithKinematics(
 				angle.Deg(123.4), angle.Deg(-35.6),
-				angle.Arcsec(0.150), angle.Arcsec(0.220), angle.Arcsec(1e-9), unit.KmPerSec(-22.4)),
+				angle.Arcsec(0.150), angle.Arcsec(0.220), angle.Arcsec(1e-9), unit.KmPerSec(-22.4), time.J2000()),
 		},
 	} {
 		if v, ok := coord.SpaceVelocity(tc.star); ok {
@@ -206,7 +210,7 @@ func TestSpaceVelocityRefusesWhatItCannotAnswer(t *testing.T) {
 	// A star at rest with a parallax is a different thing entirely: the answer
 	// exists and is zero, and must not be confused with having no answer.
 	atRest := coord.NewICRSWithKinematics(
-		angle.Deg(123.4), angle.Deg(-35.6), 0, 0, angle.Arcsec(0.020), 0)
+		angle.Deg(123.4), angle.Deg(-35.6), 0, 0, angle.Arcsec(0.020), 0, time.J2000())
 
 	v, ok := coord.SpaceVelocity(atRest)
 	if !ok {

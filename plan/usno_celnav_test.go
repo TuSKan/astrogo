@@ -50,7 +50,7 @@ func TestUSNO_CelNav(t *testing.T) {
 	sirius := coord.NewICRSWithKinematics(
 		angle.Deg(101.2871553333), angle.Deg(-16.7161158611),
 		angle.Arcsec(-0.54601), angle.Arcsec(-1.22307),
-		angle.Arcsec(0.37921), unit.KmPerSec(-5.5))
+		angle.Arcsec(0.37921), unit.KmPerSec(-5.5), time.J2000())
 
 	sun := plan.NewSun(eph.Default())
 

@@ -770,9 +770,9 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 
 	laterEpoch := time.J2000().Add(unit.JulianYears(50))
 
-	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0)
+	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0, time.J2000())
 
-	laterCoord, err := coord.PropagateEpoch(base, time.J2000(), laterEpoch)
+	laterCoord, err := coord.PropagateEpoch(base, laterEpoch)
 	if err != nil {
 		t.Fatalf("test setup: PropagateEpoch: %v", err)
 	}

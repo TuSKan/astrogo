@@ -108,7 +108,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	}
 
 	// Gaia's positions are at J2016.0, so a moving center is sought there.
-	center, err := coord.PropagateEpoch(req.Center, req.Epoch, gaiaDR3Epoch)
+	center, err := coord.PropagateEpoch(req.Center, gaiaDR3Epoch)
 	if err != nil {
 		return func(yield func(resolve.Target, error) bool) {
 			yield(resolve.Target{}, fmt.Errorf("gaia: cone center: %w", err))

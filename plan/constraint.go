@@ -428,11 +428,7 @@ func topocentricPosition(obj Observable, t time.Time, ctx *coord.Context) (coord
 // topocentricDirection is the direction of geocentric vector v, in AU, from
 // ctx's observer.
 func topocentricDirection(v vector.Vec3, ctx *coord.Context) coord.ICRS {
-	var pos coord.ICRS
-
-	pos.FromUnitVector(v.Sub(ctx.ObsVec()).Unit())
-
-	return pos
+	return coord.ICRSFromUnitVector(v.Sub(ctx.ObsVec()).Unit())
 }
 
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.

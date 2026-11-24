@@ -8,6 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -602,7 +603,7 @@ func TestICRSKinematicsRecordedVersusAbsent(t *testing.T) {
 			// Recorded as at rest in ICRS: the zeros are a measurement, so the
 			// conversion must preserve them.
 			atRest := coord.NewICRSWithKinematics(tc.ra, tc.dec, angle.Zero(), angle.Zero(),
-				angle.Zero(), 0)
+				angle.Zero(), 0, time.J2000())
 			back := coord.FK4ToICRS(coord.ICRSToFK4(atRest, coord.B1950))
 
 			pmRA := back.PmRA().Arcseconds() * 1000
