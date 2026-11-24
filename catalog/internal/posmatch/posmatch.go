@@ -172,16 +172,7 @@ func covarianceAt(t resolve.Target, tc time.Time) (covariance, bool) {
 	sx, sy := e.RA.Radians(), e.Dec.Radians()
 	c := covariance{xx: sx * sx, xy: e.RADec * sx * sy, yy: sy * sy}
 
-	from := e.Epoch
-	if from.IsZero() {
-		from = t.Epoch
-	}
-
-	if from.IsZero() {
-		from = time.J2000()
-	}
-
-	dt := tc.Sub(from).JulianYears()
+	dt := tc.Sub(errorEpoch(t)).JulianYears()
 	if dt == 0 {
 		return c, true
 	}
@@ -197,6 +188,19 @@ func covarianceAt(t resolve.Target, tc time.Time) (covariance, bool) {
 	c.xy += dt*(e.RAPmDec*sx*my+e.DecPmRA*sy*mx) + dt*dt*e.PmRAPmDec*mx*my
 
 	return c, true
+}
+
+// errorEpoch is the epoch t's errors hold at: their own, else t's, else
+// J2000.0.
+func errorEpoch(t resolve.Target) time.Time {
+	switch {
+	case !t.AstrometricError.Epoch.IsZero():
+		return t.AstrometricError.Epoch
+	case !t.Epoch.IsZero():
+		return t.Epoch
+	default:
+		return time.J2000()
+	}
 }
 
 // mahalanobis is Δᵀ C⁻¹ Δ for b's offset Δ from a on the plane tangent at a.

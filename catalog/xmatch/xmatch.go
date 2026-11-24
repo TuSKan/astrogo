@@ -191,10 +191,11 @@ func unpairedIndices(items []item, uf *unionFind) []int {
 // early item could claim a partner far closer to a later one, and Match(a, b)
 // and Match(b, a) could pair different rows.
 //
-// O(M² log M) over the remaining items M: appropriate at the scale this
-// package targets (two candidate lists from a handful of catalogs, not a
-// bulk all-sky cross-match), the same reasoning catalog.go's own
-// unionByPosition documents.
+// The pairs compared are those posmatch.CandidatePairs finds through its
+// declination-sorted indexes, every pair Compare could accept, so the cost
+// grows with the items and their nearby pairs, not with the product of the
+// two slices: two all-sky catalogs of a hundred thousand rows each are
+// compared pair by pair only where their rows lie close.
 func unionByPosition(items []item, uf *unionFind, resolution angle.Angle) {
 	var side [2][]int
 
@@ -209,17 +210,26 @@ func unionByPosition(items []item, uf *unionFind, resolution angle.Angle) {
 		sep  angle.Angle
 	}
 
+	targets := func(idx []int) []resolve.Target {
+		out := make([]resolve.Target, len(idx))
+		for k, i := range idx {
+			out[k] = items[i].target
+		}
+
+		return out
+	}
+
 	var candidates []candidate
 
-	for _, ia := range side[0] {
-		for _, ib := range side[1] {
-			ev, ok, err := posmatch.Compare(items[ia].target, items[ib].target, resolution)
-			if err != nil || !ok {
-				continue
-			}
+	for _, p := range posmatch.CandidatePairs(targets(side[0]), targets(side[1]), resolution) {
+		ia, ib := side[0][p[0]], side[1][p[1]]
 
-			candidates = append(candidates, candidate{a: ia, b: ib, sep: ev.Separation})
+		ev, ok, err := posmatch.Compare(items[ia].target, items[ib].target, resolution)
+		if err != nil || !ok {
+			continue
 		}
+
+		candidates = append(candidates, candidate{a: ia, b: ib, sep: ev.Separation})
 	}
 
 	// Closest first; equal separations fall back to input order so the
