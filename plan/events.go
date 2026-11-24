@@ -246,11 +246,11 @@ type EventSolver struct {
 // quantities, so they are [unit.Duration] — the same type [Solver.Tolerance]
 // takes, which is where tol ends up.
 func NewEventSolver(step, tol unit.Duration) EventSolver {
-	if step <= 0 {
+	if !(step > 0) || !finite(float64(step)) {
 		step = unit.Minutes(15)
 	}
 
-	if tol <= 0 {
+	if !(tol > 0) || !finite(float64(tol)) {
 		tol = unit.Seconds(1)
 	}
 
@@ -271,6 +271,17 @@ func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error)
 
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
+	}
+
+	// A solver built as a literal skips NewEventSolver's defaults, and its
+	// samples are counted as int(span / Step), which Go leaves undefined for
+	// a NaN.
+	if err := checkFinite("Step", s.Step); err != nil {
+		return nil, err
+	}
+
+	if s.Step <= 0 {
+		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, s.Step)
 	}
 
 	var (

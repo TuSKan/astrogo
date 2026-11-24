@@ -349,21 +349,21 @@ func TestTotalDuration(t *testing.T) {
 
 	t.Run("single window", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 2)})
-		if got != 2*time.Hour {
+		if got != unit.Hours(2) {
 			t.Errorf("got %v, want 2h", got)
 		}
 	})
 
 	t.Run("disjoint windows sum", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 1), h(2, 4)})
-		if got != 3*time.Hour {
+		if got != unit.Hours(3) {
 			t.Errorf("got %v, want 3h", got)
 		}
 	})
 
 	t.Run("overlapping windows are not double-counted", func(t *testing.T) {
 		got := TotalDuration([]Window{h(0, 2), h(1, 3)})
-		if got != 3*time.Hour {
+		if got != unit.Hours(3) {
 			t.Errorf("got %v, want 3h (union, not 4h)", got)
 		}
 	})

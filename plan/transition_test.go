@@ -5,7 +5,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,9 +17,9 @@ func TestBasicTransitionModel(t *testing.T) {
 	}
 
 	tm := &BasicTransitionModel{
-		BaseSetup:           1 * time.Minute,
+		BaseSetup:           unit.Minutes(1),
 		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
-		FilterChangePenalty: 30 * time.Second,
+		FilterChangePenalty: unit.Seconds(30),
 	}
 
 	block1 := &Block{
@@ -51,7 +50,7 @@ func TestBasicTransitionModel(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if overhead != 1*time.Minute {
+	if overhead != unit.Minutes(1) {
 		t.Errorf("expected 1m setup overhead, got %v", overhead)
 	}
 
@@ -69,7 +68,7 @@ func TestBasicTransitionModel(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if overhead < 30*time.Second {
+	if overhead < unit.Seconds(30) {
 		t.Errorf("expected overhead to be at least filter penalty (30s), got %v", overhead)
 	}
 }
@@ -128,7 +127,7 @@ func TestBasicTransitionModel_SameEpoch(t *testing.T) {
 		diff = -diff
 	}
 
-	if diff > 2*time.Second {
+	if diff > unit.Seconds(2) {
 		t.Errorf("same-epoch overhead %v diverges too much from different-epoch overhead %v (diff %v)", sameOverhead, diffOverhead, diff)
 	}
 }

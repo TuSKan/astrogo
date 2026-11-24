@@ -321,7 +321,7 @@ func BenchmarkScheduleNightChain(b *testing.B) {
 
 	blocks := make([]*Block, len(stars))
 	for i, star := range stars {
-		blocks[i] = &Block{ID: star.Name(), Target: star, Duration: 20 * time.Minute, Priority: float64(len(stars) - i)}
+		blocks[i] = &Block{ID: star.Name(), Target: star, Duration: unit.Minutes(20), Priority: float64(len(stars) - i)}
 	}
 
 	window := Window{Start: start, End: end}

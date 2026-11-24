@@ -208,7 +208,7 @@ func passRow(pass, label string, ev plan.PassEvent, loc *time.Location) []string
 	}
 }
 
-func fmtDuration(d time.Duration) string {
+func fmtDuration(d unit.Duration) string {
 	total := int(d.Seconds())
 	mins := total / 60
 	sec := total % 60

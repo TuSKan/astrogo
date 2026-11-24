@@ -376,12 +376,12 @@ func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
 
 // urgencyProbes are the offsets from the scoring instant at which
 // estimateHoursUntilSet evaluates a target's altitude, nearest first.
-var urgencyProbes = [...]time.Duration{
-	30 * time.Minute,
-	1 * time.Hour,
-	2 * time.Hour,
-	4 * time.Hour,
-	8 * time.Hour,
+var urgencyProbes = [...]unit.Duration{
+	30 * 60,
+	1 * 3600,
+	2 * 3600,
+	4 * 3600,
+	8 * 3600,
 }
 
 // estimateHoursUntilSet computes a lightweight estimate of how many hours
@@ -407,7 +407,7 @@ func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, curr
 	probe := *ctx
 
 	for _, offset := range urgencyProbes {
-		ft := t.Add(time.FromGoDuration(offset))
+		ft := t.Add(offset)
 
 		pos, err := obj.Position(ft)
 		if err != nil {
@@ -626,7 +626,7 @@ func RankObservables(
 	// again for the instant a day on, the same one for every target: 90% of a
 	// ranking (#951). Moved there and back, ctx is at t exactly as NewContext
 	// placed it and keeps what the move evaluated, so the copies interpolate.
-	ctx.SetTime(t.Add(time.FromGoDuration(urgencyProbes[len(urgencyProbes)-1])))
+	ctx.SetTime(t.Add(urgencyProbes[len(urgencyProbes)-1]))
 	ctx.SetTime(t)
 
 	scores, err := parallel.Map(objs, 0, func(_ int, obj Observable) (float64, error) {
@@ -707,6 +707,10 @@ func observableWindows(
 ) ([]Window, error) {
 	// For the reason visibleIntervals checks it (#996).
 	if err := checkInterval(start, end); err != nil {
+		return nil, err
+	}
+
+	if err := checkFinite("step", step); err != nil {
 		return nil, err
 	}
 

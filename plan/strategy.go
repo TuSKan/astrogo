@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // SwapOptimizedStrategy wraps a base Strategy with local search post-optimization.
@@ -36,7 +37,7 @@ type SwapOptimizedStrategy struct {
 
 	// Step is the time increment for constraint validation during
 	// swap and insertion feasibility checks. Default: 1 minute.
-	Step time.Duration
+	Step unit.Duration
 
 	// TabuTenure is the number of passes a swap pair stays tabu. Zero, the
 	// zero value, means the default of 3; a negative value disables tabu
@@ -93,6 +94,10 @@ func (s *SwapOptimizedStrategy) schedule(
 		maxPasses = 20
 	}
 
+	if err := checkFinite("Step", s.Step); err != nil {
+		return nil, fmt.Errorf("scheduler: %w", err)
+	}
+
 	step := s.Step
 	if step <= 0 {
 		step = defaultStep
@@ -139,7 +144,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 	sched *Schedule,
 	planner *Planner,
 	transition TransitionModel,
-	step time.Duration,
+	step unit.Duration,
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
 	tabu *tabuList,
@@ -178,11 +183,11 @@ func (s *SwapOptimizedStrategy) swapPass(
 		}
 
 		newJStart := bi.Window.Start
-		if earliest := prevEnd.Add(time.FromGoDuration(setupJ)); earliest.After(newJStart) {
+		if earliest := prevEnd.Add(setupJ); earliest.After(newJStart) {
 			newJStart = earliest
 		}
 
-		newJEnd := newJStart.Add(time.FromGoDuration(bj.Block.Duration))
+		newJEnd := newJStart.Add(bj.Block.Duration)
 
 		// Validate bj's constraints at the new time.
 		okJ, err := checkConstraintsInterval(bj.Block.Target, newJStart, newJEnd, step, planner.Site, ctxAt, sky, mergedC[bj.Block.ID]...)
@@ -199,8 +204,8 @@ func (s *SwapOptimizedStrategy) swapPass(
 			return false, fmt.Errorf("plan: swap: %w", err)
 		}
 
-		newIStart := newJEnd.Add(time.FromGoDuration(overhead))
-		newIEnd := newIStart.Add(time.FromGoDuration(bi.Block.Duration))
+		newIStart := newJEnd.Add(overhead)
+		newIEnd := newIStart.Add(bi.Block.Duration)
 
 		// Check window boundary.
 		if newIEnd.After(sched.Window.End) {
@@ -211,7 +216,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 		// still have time for that slew. Ending before it starts is not
 		// enough: until #547 that was the whole check, and the block was left
 		// starting before the telescope could reach it.
-		var setupNext time.Duration
+		var setupNext unit.Duration
 
 		if i+2 < n {
 			next := sched.Blocks[i+2]
@@ -221,7 +226,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 				return false, fmt.Errorf("plan: swap: %w", err)
 			}
 
-			if newIEnd.Add(time.FromGoDuration(setupNext)).After(next.Window.Start) {
+			if newIEnd.Add(setupNext).After(next.Window.Start) {
 				continue
 			}
 		}
@@ -289,7 +294,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 	planner *Planner,
 	window Window,
 	transition TransitionModel,
-	step time.Duration,
+	step unit.Duration,
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
 ) (bool, error) {
@@ -332,8 +337,8 @@ func (s *SwapOptimizedStrategy) insertPass(
 				return false, fmt.Errorf("plan: insert: %w", err)
 			}
 
-			startTime := gap.window.Start.Add(time.FromGoDuration(overhead))
-			endTime := startTime.Add(time.FromGoDuration(ub.Block.Duration))
+			startTime := gap.window.Start.Add(overhead)
+			endTime := startTime.Add(ub.Block.Duration)
 
 			if endTime.After(gap.window.End) {
 				continue
@@ -343,7 +348,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 			// slew to it has to fit too. Until #547 the insertion only had to
 			// end by the time that block started, which left it starting
 			// before the telescope could reach it.
-			var setupNext time.Duration
+			var setupNext unit.Duration
 
 			if gap.next >= 0 {
 				next := sched.Blocks[gap.next]
@@ -353,7 +358,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 					return false, fmt.Errorf("plan: insert: %w", err)
 				}
 
-				if endTime.Add(time.FromGoDuration(setupNext)).After(next.Window.Start) {
+				if endTime.Add(setupNext).After(next.Window.Start) {
 					continue
 				}
 			}
@@ -466,7 +471,7 @@ func transitionOverhead(
 	fromTime, toTime time.Time,
 	site *Site,
 	ctxAt func(time.Time) *coord.Context,
-) (time.Duration, error) {
+) (unit.Duration, error) {
 	if transition == nil {
 		return 0, nil
 	}

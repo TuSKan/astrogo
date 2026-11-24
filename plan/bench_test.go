@@ -36,7 +36,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		if _, err := VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20)); err != nil {
+		if _, err := VisibleIntervals(obj, site, start, end, unit.Minutes(10), angle.Deg(20)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -50,7 +50,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		if _, err := VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20)); err != nil {
+		if _, err := VisibleIntervals(obj, site, start, end, unit.Minutes(1), angle.Deg(20)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -122,7 +122,7 @@ func makeBlocks(n int) []*Block {
 		blocks[i] = &Block{
 			ID:       fmt.Sprintf("B%d", i),
 			Target:   NewStar(fmt.Sprintf("T%d", i), angle.Deg(0), angle.Deg(0)),
-			Duration: 10 * time.Minute,
+			Duration: unit.Minutes(10),
 			Priority: float64(n - i), // descending priority
 		}
 	}

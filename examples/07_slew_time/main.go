@@ -33,9 +33,9 @@ func main() {
 
 	// 2. The telescope's physical properties
 	model := &plan.BasicTransitionModel{
-		BaseSetup:           30 * time.Second,        // the night's first pointing, with nothing to slew from
+		BaseSetup:           unit.Seconds(30),        // the night's first pointing, with nothing to slew from
 		SlewRate:            unit.DegreesPerSec(1.5), // each axis moves 1.5 degrees per second
-		FilterChangePenalty: 45 * time.Second,        // time to change filter
+		FilterChangePenalty: unit.Seconds(45),        // time to change filter
 	}
 
 	// 3. Two observing blocks, in different parts of the sky and filters

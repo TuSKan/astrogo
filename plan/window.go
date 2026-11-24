@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // Window represents a contiguous time interval.
@@ -18,16 +19,11 @@ type Window struct {
 	End   time.Time
 }
 
-// Duration returns the length of the window as a standard time.Duration:
-// End − Start, negative for an inverted window.
-//
-// An observing window is hours, and a caller prints it or compares it against
-// an exposure time, so it stays the type the standard library formats. The
-// conversion saturates past ±292 years, which no window reaches.
-func (w Window) Duration() time.Duration {
-	d, _ := time.ToGoDuration(w.End.Sub(w.Start))
-
-	return d
+// Duration returns the length of the window, End − Start, negative for an
+// inverted window: the unit.Duration that Time.Sub gives, and that a block's
+// Duration and every step in this package are.
+func (w Window) Duration() unit.Duration {
+	return w.End.Sub(w.Start)
 }
 
 // Overlaps reports whether w and o share any instant, including a shared
@@ -211,8 +207,8 @@ func subtractOne(w, wb Window) []Window {
 // TotalDuration sums ws's windows' durations, after normalizing via Union
 // so overlapping input — e.g. two independently-computed window sets
 // concatenated by hand without merging — isn't double-counted.
-func TotalDuration(ws []Window) time.Duration {
-	var total time.Duration
+func TotalDuration(ws []Window) unit.Duration {
+	var total unit.Duration
 
 	for _, w := range Union(ws) {
 		total += w.Duration()

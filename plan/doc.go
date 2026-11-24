@@ -125,7 +125,8 @@
 //
 // Errors a caller can act on wrap one of the package's sentinels, for
 // errors.Is: bad input ([ErrInvalidHorizon], [ErrReversedInterval],
-// [ErrNonFiniteInterval], [ErrStepNotPositive], [ErrSlewTime]), a name not
+// [ErrNonFiniteInterval], [ErrStepNotPositive], [ErrNonFiniteDuration],
+// [ErrSlewTime]), a name not
 // found ([ErrUnknownSite], [ErrUnknownMeteorShower],
 // [ErrUnknownPlanetaryMoon], [ErrGeocodeNoResult]), an event that does not
 // occur ([ErrEventNotFound], [ErrNoTwilight]), a solver that failed

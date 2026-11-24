@@ -19,7 +19,7 @@ type Configuration struct {
 
 // Cadence specifies recurrence requirements for an observation block.
 type Cadence struct {
-	MinInterval time.Duration // Minimum time to wait before re-observing
+	MinInterval unit.Duration // Minimum time to wait before re-observing
 	Repeats     int           // Number of additional times to repeat this block (e.g. 1 means observe 2 times total)
 }
 
@@ -31,7 +31,7 @@ type Block struct {
 	Config      Configuration
 	ID          string
 	Constraints []Constraint
-	Duration    time.Duration
+	Duration    unit.Duration
 	Priority    float64
 }
 
@@ -40,7 +40,7 @@ type ScheduledBlock struct {
 	Block     *Block
 	Window    Window
 	Score     float64
-	SetupTime time.Duration // Time spent on setup/slew before exposing
+	SetupTime unit.Duration // Time spent on setup/slew before exposing
 }
 
 // UnscheduledBlock is a block that could not be scheduled, and why: Cause
@@ -193,14 +193,14 @@ func observedTargetAt(target Observable, t time.Time, ctxAt func(time.Time) *coo
 // the overhead cannot be known; a transition that is merely expensive is a
 // long duration.
 type TransitionModel interface {
-	Overhead(tr Transition) (time.Duration, error)
+	Overhead(tr Transition) (unit.Duration, error)
 }
 
 // BasicTransitionModel provides a fundamental slew and configuration penalty model.
 type BasicTransitionModel struct {
 	// BaseSetup is the default overhead applied when initializing pointing
 	// if there is no previous block.
-	BaseSetup time.Duration
+	BaseSetup unit.Duration
 
 	// SlewRate is the dome/mount slew speed. A mount's manual quotes it in
 	// degrees per second: write [unit.DegreesPerSec] around that number,
@@ -208,22 +208,30 @@ type BasicTransitionModel struct {
 	SlewRate unit.AngularRate
 
 	// FilterChangePenalty is the time taken to change filters.
-	FilterChangePenalty time.Duration
+	FilterChangePenalty unit.Duration
 }
 
 // Overhead calculates the transition time using separation in Alt/Az at the given times.
-func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
+func (m *BasicTransitionModel) Overhead(tr Transition) (unit.Duration, error) {
+	if err := checkFinite("BaseSetup", m.BaseSetup); err != nil {
+		return 0, err
+	}
+
+	if err := checkFinite("FilterChangePenalty", m.FilterChangePenalty); err != nil {
+		return 0, err
+	}
+
 	// Initial pointing initialization
 	if tr.FromBlock == nil {
 		setup := m.BaseSetup
 		if setup <= 0 {
-			setup = 1 * time.Minute
+			setup = unit.Minutes(1)
 		}
 
 		return setup, nil
 	}
 
-	var total time.Duration
+	var total unit.Duration
 
 	// Configuration overhead
 	if tr.FromBlock.Config.Filter != tr.ToBlock.Config.Filter && tr.FromBlock.Config.Filter != "" && tr.ToBlock.Config.Filter != "" {
@@ -253,20 +261,18 @@ func (m *BasicTransitionModel) Overhead(tr Transition) (time.Duration, error) {
 		maxAngularDist := math.Max(dAlt, dAz)
 		slewSeconds := maxAngularDist / m.SlewRate.DegreesPerSec()
 
-		// A time.Duration holds fewer than 2^63 nanoseconds, about 292 years,
-		// and past that converting the float is not defined by the language:
-		// amd64 gives -292 years, which would place the next block before
-		// this one ends, and arm64 saturates at +292 years, so the same model
-		// scheduled differently on each (#1121). A 180° slew gets there below
-		// 2e-8 deg/s, and a NaN distance gets there too. float64(MaxInt64) is
-		// 2^63 exactly, so every product below it converts.
-		ns := slewSeconds * float64(time.Second)
-		if !(ns < float64(math.MaxInt64)) {
+		// A slew too slow to finish, a rate so small the time overflows, or a
+		// NaN distance, gives a time that is not a number of seconds, and
+		// adding it would place the next block at an infinite or NaN instant.
+		// Converted to a time.Duration, as it was until unit.Duration replaced
+		// it, amd64 and arm64 even disagreed on the result (#1121).
+		slew := unit.Seconds(slewSeconds)
+		if !finite(float64(slew)) {
 			return 0, fmt.Errorf("%w: a %.6g° slew at %.6g deg/s takes %.6g s",
 				ErrSlewTime, maxAngularDist, m.SlewRate.DegreesPerSec(), slewSeconds)
 		}
 
-		total += time.Duration(ns)
+		total += slew
 	}
 
 	return total, nil
@@ -332,7 +338,8 @@ func (s *Scheduler) BuildSchedule(window Window, blocks []*Block) (*Schedule, er
 	return sched, nil
 }
 
-const defaultStep = 1 * time.Minute
+// defaultStep is a strategy's step when it sets none, a minute.
+const defaultStep unit.Duration = 60
 
 // overheadError names the transition whose overhead could not be computed.
 //
@@ -381,7 +388,7 @@ func overheadError(from, to *Block, err error) error {
 func checkConstraintsInterval(
 	target Observable,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 	site *Site,
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
@@ -398,7 +405,7 @@ func checkConstraintsInterval(
 func firstFailure(
 	target Observable,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 	site *Site,
 	ctxAt func(time.Time) *coord.Context,
 	sky *runSky,
@@ -429,7 +436,7 @@ func firstFailure(
 			return failed, res, err
 		}
 
-		t = t.Add(time.FromGoDuration(step))
+		t = t.Add(step)
 	}
 
 	// Always check the exact end time as well.
@@ -444,7 +451,7 @@ func firstFailure(
 // that satisfies all constraints at the given time. It results in a dense schedule.
 type GreedyStrategy struct {
 	// Step is the time increment used when searching for a valid start time.
-	Step time.Duration
+	Step unit.Duration
 }
 
 // Schedule implements Strategy for GreedyStrategy.
@@ -469,6 +476,14 @@ func (s *GreedyStrategy) schedule(
 ) (*Schedule, error) {
 	if err := checkInterval(window.Start, window.End); err != nil {
 		return nil, fmt.Errorf("scheduler: window: %w", err)
+	}
+
+	if err := checkFinite("Step", s.Step); err != nil {
+		return nil, fmt.Errorf("scheduler: %w", err)
+	}
+
+	if err := checkBlocks(blocks); err != nil {
+		return nil, fmt.Errorf("scheduler: %w", err)
 	}
 
 	step := s.Step
@@ -535,13 +550,13 @@ func (s *GreedyStrategy) schedule(
 
 			// Refine Transition Overhead with better approximation of destination time
 			overhead, err = transitionOverhead(transition, lastBlock, b,
-				currentTime, currentTime.Add(time.FromGoDuration(overhead)), planner.Site, ctxAt)
+				currentTime, currentTime.Add(overhead), planner.Site, ctxAt)
 			if err != nil {
 				return nil, fmt.Errorf("plan: greedy: %w", err)
 			}
 
-			startTime := currentTime.Add(time.FromGoDuration(overhead))
-			endTime := startTime.Add(time.FromGoDuration(b.Duration))
+			startTime := currentTime.Add(overhead)
+			endTime := startTime.Add(b.Duration)
 
 			if endTime.After(window.End) {
 				continue // Block execution exceeds the scheduling window
@@ -575,7 +590,7 @@ func (s *GreedyStrategy) schedule(
 				if item.rem > 0 {
 					item.rem--
 					// Next observation can start after MinInterval passes
-					item.available = endTime.Add(time.FromGoDuration(b.Cadence.MinInterval))
+					item.available = endTime.Add(b.Cadence.MinInterval)
 				} else {
 					unassigned = append(unassigned[:i], unassigned[i+1:]...)
 				}
@@ -607,7 +622,7 @@ func (s *GreedyStrategy) schedule(
 			if allWaiting && earliestAvailable.After(currentTime) {
 				currentTime = earliestAvailable
 			} else {
-				currentTime = currentTime.Add(time.FromGoDuration(step))
+				currentTime = currentTime.Add(step)
 			}
 		}
 	}
@@ -697,7 +712,7 @@ func (t *unscheduledTally) unscheduled(b *Block, constraints []Constraint) Unsch
 // PriorityStrategy pre-sorts blocks by Priority (descending) before applying
 // a time-forward greedy allocation, ensuring high-priority blocks win time slots.
 type PriorityStrategy struct {
-	Step time.Duration
+	Step unit.Duration
 }
 
 // Schedule implements Strategy for PriorityStrategy.

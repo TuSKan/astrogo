@@ -32,7 +32,7 @@ func TestScheduleRefusesABadWindow(t *testing.T) {
 	blocks := []*Block{{
 		ID:       "alpha Cen",
 		Target:   NewStar("alpha Cen", angle.Hour(14.66), angle.Deg(-60.83)),
-		Duration: 30 * time.Minute,
+		Duration: unit.Minutes(30),
 		Priority: 1,
 	}}
 
@@ -48,9 +48,9 @@ func TestScheduleRefusesABadWindow(t *testing.T) {
 	}
 
 	strategies := []Strategy{
-		&GreedyStrategy{Step: 5 * time.Minute},
-		&PriorityStrategy{Step: 5 * time.Minute},
-		&SwapOptimizedStrategy{Step: 5 * time.Minute},
+		&GreedyStrategy{Step: unit.Minutes(5)},
+		&PriorityStrategy{Step: unit.Minutes(5)},
+		&SwapOptimizedStrategy{Step: unit.Minutes(5)},
 	}
 
 	for _, st := range strategies {

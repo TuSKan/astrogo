@@ -76,9 +76,9 @@ func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error 
 		"TransitEstimate":     func(s, e time.Time) error { return errOf2(plan.TransitEstimate(vega, site, s, e)) },
 		"MaxAltitudeInWindow": func(s, e time.Time) error { return errOf(plan.MaxAltitudeInWindow(vega, site, s, e)) },
 		"Episode":             func(s, e time.Time) error { return errOf2(plan.Episode(s, e, star, site)) },
-		"Find":                func(s, e time.Time) error { return errOf(plan.Find(vega, site, nil, s, e, 5*time.Minute)) },
+		"Find":                func(s, e time.Time) error { return errOf(plan.Find(vega, site, nil, s, e, unit.Minutes(5))) },
 		"VisibleIntervals": func(s, e time.Time) error {
-			return errOf(plan.VisibleIntervals(vega, site, s, e, 5*time.Minute, angle.Deg(10)))
+			return errOf(plan.VisibleIntervals(vega, site, s, e, unit.Minutes(5), angle.Deg(10)))
 		},
 		"ObservableWindows": func(s, e time.Time) error {
 			return errOf(plan.ObservableWindows(star, s, e, unit.Minutes(5), site))

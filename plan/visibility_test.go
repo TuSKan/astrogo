@@ -64,7 +64,7 @@ func TestVisibleIntervals(t *testing.T) {
 	// Circumpolar-like object (very high dec)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, 15*time.Minute, angle.Deg(10))
+	intervals, err := VisibleIntervals(obj, site, start, end, unit.Minutes(15), angle.Deg(10))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) == 0 {
@@ -83,7 +83,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 
 	// A caller must be able to match this via errors.Is against the
 	// documented public sentinel (R21 regression).
-	_, err := VisibleIntervals(obj, site, start, end, 20*time.Minute, angle.Deg(10))
+	_, err := VisibleIntervals(obj, site, start, end, unit.Minutes(20), angle.Deg(10))
 	if !errors.Is(err, ErrStepTooLarge) {
 		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
@@ -99,7 +99,7 @@ func TestNeverVisible(t *testing.T) {
 	// Object far below horizon (antipode)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(-89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, 15*time.Minute, angle.Deg(0))
+	intervals, err := VisibleIntervals(obj, site, start, end, unit.Minutes(15), angle.Deg(0))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) > 0 {
@@ -246,7 +246,7 @@ func TestFind(t *testing.T) {
 	end := start.Add(unit.Days(1))
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
-	intervals, err := Find(obj, site, nil, start, end, 15*time.Minute)
+	intervals, err := Find(obj, site, nil, start, end, unit.Minutes(15))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) == 0 {
@@ -265,7 +265,7 @@ func TestDuration(t *testing.T) {
 	win := Window{Start: start, End: end}
 
 	dur := win.Duration()
-	if dur != 24*time.Hour {
+	if dur != unit.Hours(24) {
 		t.Errorf("expected 24h, got %v", dur)
 	}
 }

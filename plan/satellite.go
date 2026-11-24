@@ -274,7 +274,7 @@ type SatellitePass struct {
 	Rise        PassEvent     // AOS (Acquisition of Signal), or the window's start
 	Culmination PassEvent     // TCA (Time of Closest Approach / max elevation)
 	Set         PassEvent     // LOS (Loss of Signal), or the window's end
-	Duration    time.Duration // Total pass duration, inside the window
+	Duration    unit.Duration // Total pass duration, inside the window
 
 	// RiseCutOff reports that the satellite was already above the minimum
 	// elevation when the window opened, so Rise is the window's start and the
@@ -451,7 +451,7 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 			return fmt.Errorf("set: %w", err)
 		}
 
-		currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
+		currentPass.Duration = setTime.Sub(currentPass.Rise.Time)
 
 		if currentPass.Culmination, err = findCulmination(prov, id, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
 			return fmt.Errorf("culmination: %w", err)

@@ -423,7 +423,7 @@ func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
 	from := time.FromJD(2451544.5, time.UTC)
 	to := from.Add(unit.Days(400)) // > episodeSearchWindow's 366 days
 
-	if span := to.Sub(from); span <= time.FromGoDuration(episodeSearchWindow) {
+	if span := to.Sub(from); span <= episodeSearchWindow {
 		t.Fatal("test setup: span must exceed episodeSearchWindow to exercise the widen branch")
 	}
 

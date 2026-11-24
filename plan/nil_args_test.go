@@ -116,10 +116,10 @@ func TestSearchesRefuseANilSiteOrTarget(t *testing.T) {
 		}, plan.ErrNilSite},
 		{"IsVisible", func() error { return errOf(plan.IsVisible(vega, start, nil, angle.Deg(10))) }, plan.ErrNilSite},
 		{"VisibleIntervals", func() error {
-			return errOf(plan.VisibleIntervals(vega, nil, start, end, 5*time.Minute, angle.Deg(10)))
+			return errOf(plan.VisibleIntervals(vega, nil, start, end, unit.Minutes(5), angle.Deg(10)))
 		}, plan.ErrNilSite},
 		{"TransitEstimate", func() error { return errOf2(plan.TransitEstimate(vega, nil, start, end)) }, plan.ErrNilSite},
-		{"Find", func() error { return errOf(plan.Find(vega, nil, nil, start, end, 5*time.Minute)) }, plan.ErrNilSite},
+		{"Find", func() error { return errOf(plan.Find(vega, nil, nil, start, end, unit.Minutes(5))) }, plan.ErrNilSite},
 		{"ObservableWindows", func() error {
 			return errOf(plan.ObservableWindows(star, start, end, unit.Minutes(5), nil))
 		}, plan.ErrNilSite},

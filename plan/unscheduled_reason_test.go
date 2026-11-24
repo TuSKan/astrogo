@@ -92,7 +92,7 @@ func TestAnUnscheduledBlockNamesTheConstraintThatKeptItOut(t *testing.T) {
 			failsBefore{until: window.Start.Add(time.FromGoDuration(c.until)), why: "too early"},
 			failsBefore{until: window.End.Add(unit.Hours(1)), why: "never"},
 		}
-		block := &Block{ID: "B", Target: star, Duration: 10 * time.Minute, Constraints: constraints}
+		block := &Block{ID: "B", Target: star, Duration: unit.Minutes(10), Constraints: constraints}
 
 		ub := scheduleOne(t, &GreedyStrategy{}, planner, window, block)
 
@@ -122,7 +122,7 @@ func TestABlockLongerThanItsWindowHasNoTime(t *testing.T) {
 
 	planner, window := unscheduledFixture(t)
 	block := &Block{
-		ID: "long", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 3 * time.Hour,
+		ID: "long", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Hours(3),
 		Constraints: []Constraint{failsBefore{until: window.End, why: "too early"}},
 	}
 
@@ -146,8 +146,8 @@ func TestACadenceThatRunsOutSaysHowFarItGot(t *testing.T) {
 
 	planner, window := unscheduledFixture(t)
 	block := &Block{
-		ID: "repeat", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute,
-		Cadence: &Cadence{MinInterval: 90 * time.Minute, Repeats: 2},
+		ID: "repeat", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20),
+		Cadence: &Cadence{MinInterval: unit.Minutes(90), Repeats: 2},
 	}
 
 	sched, err := (&GreedyStrategy{}).Schedule(planner, window, []*Block{block}, pairTransition{})
@@ -185,7 +185,7 @@ func TestEveryStrategyGivesTheReason(t *testing.T) {
 		&PriorityStrategy{},
 		&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3},
 	} {
-		block := &Block{ID: "B", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute, Constraints: []Constraint{never}}
+		block := &Block{ID: "B", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10), Constraints: []Constraint{never}}
 
 		ub := scheduleOne(t, s, planner, window, block)
 		if ub.Cause != CauseConstraint || ub.Constraint != never || !strings.HasSuffix(ub.Reason, ": never") {

@@ -84,12 +84,12 @@ func TestVisibleIntervalsThroughTheContextCache(t *testing.T) {
 	for _, c := range samplingCases(t) {
 		end := c.start.Add(c.window)
 
-		got, err := VisibleIntervals(c.obj, c.site, c.start, end, 10*time.Minute, angle.Deg(15))
+		got, err := VisibleIntervals(c.obj, c.site, c.start, end, unit.Minutes(10), angle.Deg(15))
 		if err != nil {
 			t.Fatalf("%s: VisibleIntervals: %v", c.name, err)
 		}
 
-		want, err := visibleIntervals(c.obj, fullContexts(t, c.site), c.start, end, 10*time.Minute, angle.Deg(15))
+		want, err := visibleIntervals(c.obj, fullContexts(t, c.site), c.start, end, unit.Minutes(10), angle.Deg(15))
 		if err != nil {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
@@ -109,12 +109,12 @@ func TestFindThroughTheContextCache(t *testing.T) {
 	for _, c := range samplingCases(t) {
 		end := c.start.Add(c.window)
 
-		got, err := Find(c.obj, c.site, constraints, c.start, end, 10*time.Minute)
+		got, err := Find(c.obj, c.site, constraints, c.start, end, unit.Minutes(10))
 		if err != nil {
 			t.Fatalf("%s: Find: %v", c.name, err)
 		}
 
-		want, err := find(c.obj, c.site, fullContexts(t, c.site), constraints, c.start, end, 10*time.Minute)
+		want, err := find(c.obj, c.site, fullContexts(t, c.site), constraints, c.start, end, unit.Minutes(10))
 		if err != nil {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}

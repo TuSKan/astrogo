@@ -188,7 +188,7 @@ func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
 				t.Errorf("highest elevation %.3f° in a window that ends before the 79.625° culmination", got)
 			}
 
-			if want, _ := time.ToGoDuration(p.Set.Time.Sub(p.Rise.Time)); p.Duration != want {
+			if want := p.Set.Time.Sub(p.Rise.Time); p.Duration != want {
 				t.Errorf("Duration %v, want the %v from Rise to Set", p.Duration, want)
 			}
 		})

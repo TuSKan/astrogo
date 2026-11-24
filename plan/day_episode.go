@@ -16,7 +16,7 @@ import (
 // there — a target that's circumpolar (never sets) or permanently below
 // the horizon (never rises). A year is comfortably longer than any real
 // periodic visibility cycle this package computes events for.
-const episodeSearchWindow = 366 * 24 * time.Hour
+const episodeSearchWindow unit.Duration = 366 * 86400 // seconds
 
 // initialSearchStepDays is searchEvent's first probe width. Deliberately
 // small: the overwhelmingly common case is a rise or set within hours to
@@ -235,7 +235,7 @@ func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Even
 	}
 
 	maxSpanDays := episodeSearchWindow.Hours() / 24
-	if span := to.Sub(from); span > time.FromGoDuration(episodeSearchWindow) {
+	if span := to.Sub(from); span > episodeSearchWindow {
 		maxSpanDays = span.Days()
 	}
 

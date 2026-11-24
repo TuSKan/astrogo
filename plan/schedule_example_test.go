@@ -15,30 +15,30 @@ func ExampleScheduler_BuildSchedule() {
 
 	// Configure transition overheads (slew speeds, filter changes)
 	transition := &BasicTransitionModel{
-		BaseSetup:           1 * time.Minute,
+		BaseSetup:           unit.Minutes(1),
 		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
-		FilterChangePenalty: 30 * time.Second,
+		FilterChangePenalty: unit.Seconds(30),
 	}
 
-	scheduler := NewScheduler(planner, &PriorityStrategy{Step: 5 * time.Minute}, transition)
+	scheduler := NewScheduler(planner, &PriorityStrategy{Step: unit.Minutes(5)}, transition)
 
 	// Define our observing blocks using Custom coordinates
 	blocks := []*Block{
 		{
 			ID:       "BlockA",
 			Target:   NewStar("TargetA", angle.Hour(18.69), angle.Zero()),
-			Duration: 30 * time.Minute,
+			Duration: unit.Minutes(30),
 			Priority: 2.0,
 			Config:   Configuration{Filter: "V"},
 			Cadence: &Cadence{
-				MinInterval: 2 * time.Hour,
+				MinInterval: unit.Hours(2),
 				Repeats:     1, // Observe 2 times total
 			},
 		},
 		{
 			ID:       "BlockB",
 			Target:   NewStar("TargetB", angle.Hour(18.69), angle.Deg(45)),
-			Duration: 45 * time.Minute,
+			Duration: unit.Minutes(45),
 			Priority: 1.0,
 			Config:   Configuration{Filter: "R"},
 		},

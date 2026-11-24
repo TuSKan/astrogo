@@ -119,7 +119,7 @@ func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
 	ctxAt, err := siteContexts(start, end, site)
@@ -163,7 +163,7 @@ func visibleIntervals(
 	obj coord.Object,
 	ctxAt func(time.Time) *coord.Context,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 	minAlt angle.Angle,
 ) ([]Interval, error) {
 	// Unchecked, a reversed window gave no intervals and no error, and one
@@ -172,11 +172,15 @@ func visibleIntervals(
 		return nil, err
 	}
 
-	if step <= 0 {
-		step = 5 * time.Minute
+	if err := checkFinite("step", step); err != nil {
+		return nil, err
 	}
 
-	if step > 15*time.Minute {
+	if step <= 0 {
+		step = unit.Minutes(5)
+	}
+
+	if step > unit.Minutes(15) {
 		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
@@ -190,7 +194,7 @@ func visibleIntervals(
 
 	hasPrev := false
 
-	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, time.FromGoDuration(step)) {
+	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, step) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return nil, fmt.Errorf("visibility: ICRS: %w", err)
@@ -413,7 +417,7 @@ func Find(
 	site *Site,
 	constraints []Constraint,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 ) ([]Interval, error) {
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
@@ -436,17 +440,21 @@ func find(
 	ctxAt func(time.Time) *coord.Context,
 	constraints []Constraint,
 	start, end time.Time,
-	step time.Duration,
+	step unit.Duration,
 ) ([]Interval, error) {
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
 
-	if step <= 0 {
-		step = 5 * time.Minute
+	if err := checkFinite("step", step); err != nil {
+		return nil, err
 	}
 
-	if step > 15*time.Minute {
+	if step <= 0 {
+		step = unit.Minutes(5)
+	}
+
+	if step > unit.Minutes(15) {
 		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
@@ -494,7 +502,7 @@ func find(
 	hasPrev := false
 	prevOK := false
 
-	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, time.FromGoDuration(step)) {
+	for t, more := start, !start.After(end); more; t, more = nextSample(t, end, step) {
 		allOK, err := checkObs(t)
 		if err != nil {
 			return nil, err
