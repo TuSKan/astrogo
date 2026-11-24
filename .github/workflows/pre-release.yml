@@ -91,7 +91,10 @@ jobs:
         shell: bash
         working-directory: examples
         env:
-          ASTROGO_CACHE_DIR: file://${{ runner.temp }}/astrogo-examples-cache
+          # create_dir=true, as astrogo's own default cache carries: on a
+          # cache miss the directory does not exist, and without it the
+          # file:// opener refuses the root and every download fails.
+          ASTROGO_CACHE_DIR: file://${{ runner.temp }}/astrogo-examples-cache?create_dir=true
         run: go test -tags=network -v -count=1 -timeout=90m -run '^TestNetworkExamplesRun$' . 2>&1 | tee "$ASTROGO_METROLOGY_OUT/network-examples.log"
 
       # Every result against the accuracy its suite reached at the last
