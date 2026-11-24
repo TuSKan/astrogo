@@ -10,8 +10,7 @@ import (
 //
 // # Why this is not an HTTPError
 //
-// [HTTPError] covers a service declining with a status code, and #208 settled
-// that a 403 is the service declining rather than a data error. This is the
+// [HTTPError] covers a service declining with a status code, a 403 included. This is the
 // same statement made less honestly: archives serve their own failures — a
 // maintenance notice, a load shedder, a login wall — as an HTML page with a
 // 200, so nothing before the parser can tell. There is no status code to
@@ -27,8 +26,7 @@ import (
 //
 // Without the distinction the honest options are to retry everything or to
 // retry nothing, and both are wrong some of the time. The only alternative was
-// matching on message text, which is the practice the sentinels in #190 exist
-// to end.
+// matching on message text, which is the practice sentinels exist to end.
 //
 // # Why it lives in remote rather than beside a parser
 //

@@ -182,14 +182,6 @@ type Provenance struct {
 // horizon, and provenance. Construct one only via NewBuilder or a
 // package-level default constructor.
 //
-// Renamed from State (v0.14.0-era design work, still unreleased) so the
-// package's richer, general-purpose type gets the name a reader reaches for
-// first — "the atmosphere" — while the narrower refraction-model input
-// struct, which used to hold this name, becomes Refraction (see
-// refraction.go). This is a same-release swap: Go cannot alias one
-// identifier to two meanings at once, so Refraction's rename carries no
-// deprecation cycle either — see refraction.go's doc comment.
-//
 // Atmosphere composes a Refraction as its own surface-conditions field
 // (surface, below) rather than duplicating pressure/temperature as
 // separate raw fields: Refraction stays the single, general-purpose

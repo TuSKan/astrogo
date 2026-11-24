@@ -272,8 +272,8 @@ func Open(r io.ReaderAt, override *GeoTransform) (*Reader, error) {
 //
 // The grid grows as its pixels decode rather than being allocated at the size
 // the header declares. Allocated up front, an image declaring 2³¹−1 pixels a
-// side panicked out of a 118-byte file, and one merely too large for memory
-// would have ended the process (#799); grown, a declaration the file cannot
+// side would panic out of a 118-byte file, and one merely too large for
+// memory would end the process; grown, a declaration the file cannot
 // back fails at the first pixel it lacks, having held only what it read.
 func (t *Reader) ReadGrid() (*Grid, error) {
 	var data []float64

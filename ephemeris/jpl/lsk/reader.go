@@ -54,10 +54,6 @@ type Reader struct {
 // downloads are consented to; one just downloaded (a truncated file, an error
 // page) is what NAIF serves, and is not downloaded again until NAIF serves
 // something else ([remote.ErrRejectedSource]).
-//
-// The doc promised this "auto-healing" before any of it existed: a corrupt
-// cached kernel failed every call until it was deleted by hand, and the file
-// opened for it was not closed (#1010).
 func Cache(ctx context.Context, kernel string) (*Reader, error) {
 	var l *Reader
 
@@ -366,23 +362,16 @@ const (
 // UTCToET converts a time directly to ephemeris seconds past J2000 — the
 // argument every SPK segment is indexed by.
 //
-// # Two defects this replaced
+// # Every scale, and TDB rather than TT
 //
-// The previous implementation special-cased only Scale() == TDB and treated
-// every other scale as UTC, so a TT instant had leap seconds plus 32.184 s
-// added on top of an offset it already carried. 69.184 s late — about 40
-// arcsec of lunar motion and 1.8 arcsec for Mars. The type is scale-aware
-// precisely so this cannot be left to the caller, and the SOFA provider always
-// honored it.
+// t is converted from whatever scale it holds, so a TT instant is not read as
+// UTC, which would put it 69.184 s late: about 40 arcsec of lunar motion.
 //
-// The formula it used, TDB = UTC + (LS + 32.184)/86400, is the formula for
-// **TT**, not TDB. It omitted the TDB−TT periodic term entirely — an amplitude
-// of about 1.7 ms, which is 1.7 m of lunar motion and 85 m for Mars. Small
-// against DE440 itself, and not small against the 33 mm this library claims
-// against Horizons. SPICE's own str2et includes those terms.
-//
-// The second defect was invisible until the first was fixed, because a
-// 69-second error hides a 1.7-millisecond one.
+// TDB = UTC + (LS + 32.184)/86400 is the formula for TT, not TDB: it omits
+// the TDB−TT periodic term, an amplitude of about 1.7 ms, which is 1.7 m of
+// lunar motion and 85 m for Mars. That is small against DE440 itself and not
+// small against the 33 mm this library claims against Horizons, so the term
+// is applied, as SPICE's own str2et applies it.
 //
 // # Why the kernel drives this and not time.Time.TDB
 //
@@ -411,14 +400,9 @@ const (
 //
 //	math.Ulp(2460545.0) = 4.657e-10 days = 40.2 microseconds
 //
-// so the ET handed to the evaluator was quantized to 40 µs. That is 4 cm of
-// lunar motion and 31 cm for the ISS — and the Moon figure sits at the level of
-// the 33 mm this library claims against Horizons.
-//
-// It also made comparison meaningless: measuring the kernel's Moyer model
-// against time's Fairhead & Bretagnon series gave readings of exactly 0.0 or
-// exactly 40.2 µs at every epoch, because the two differ by about 30 µs and
-// the API could not represent the difference.
+// so an ET handed over as a Julian Date would be quantized to 40 µs. That is
+// 4 cm of lunar motion and 31 cm for the ISS, at the level of the 33 mm this
+// library claims against Horizons.
 //
 // Subtracting the epoch first keeps the value small. time.Time stores the day
 // number and the fraction separately for exactly this reason, and JDParts

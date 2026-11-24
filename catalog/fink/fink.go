@@ -107,17 +107,13 @@ func (p *Provider) Capabilities() []resolve.Capability {
 //
 // A numeric lookup, then a name lookup, then the bulk table. Falling through
 // on failure is deliberate — a query that is not a number may still be a name
-// — but the reasons were previously discarded, so a FINK outage and an
-// unknown object both ended at a bare false.
+// — and each failure's reason is kept, so a FINK outage is not reported as an
+// unknown object.
 //
 // The attempts are now joined and returned when none succeeds, so a caller can
 // tell "FINK says no such object" from "FINK could not be reached three
 // different ways". Only [resolve.ErrNotFound] is returned when every attempt
 // completed and simply found nothing.
-//
-// ctx was added in the same change: this used to fabricate
-// context.Background() internally because the interface gave it nowhere to
-// take one, so cancellation and deadlines were silently ignored.
 func (p *Provider) Resolve(ctx context.Context, query string) (resolve.Target, error) {
 	q := strings.TrimSpace(query)
 

@@ -26,19 +26,15 @@ import (
 // # Do not add this to a radial velocity
 //
 // Use [Context.BarycentricRadialVelocity], which composes the two
-// correctly. This comment used to say
-//
-//	rvBarycentric = rvMeasured + ctx.BarycentricRVCorrection(target)  // WRONG
-//
-// and that is first-order only: redshifts multiply, so the exact form
+// correctly. Adding the correction to a measured radial velocity is first
+// order only: redshifts multiply, so the exact form
 // carries a third term rvMeasured·corr/c. Dropping it costs 4.66 m/s at
 // a target velocity of 46.6 km/s and 30 m/s at 300 — larger, for such a
 // target, than every relativistic term listed below put together.
 //
 // This function remains exported because the raw projection is a real
 // quantity with real uses (its annual sinusoid, its diurnal amplitude,
-// comparing against another implementation's correction). It is the
-// composition that needed fixing, not the value.
+// comparing against another implementation's correction).
 //
 // This is the projection alone and is deliberately still classical: no
 // relativity enters here. [Context.ObserverFrameShift] carries the observer's

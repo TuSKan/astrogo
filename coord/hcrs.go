@@ -68,8 +68,8 @@ import (
 // Within a calculation that takes everything from SOFA, it cancels. A
 // position from a JPL kernel should be moved to the Sun with that kernel's
 // own Sun, which its provider locates about the barycenter; moved with
-// [BarycentricToHeliocentric], it carries the offset, 0.16″ seen from one AU
-// (#875).
+// [BarycentricToHeliocentric], it carries the offset, 0.16″ seen from one
+// AU.
 func SunBarycentric(t time.Time) (vector.Vec3, error) {
 	d1, d2 := t.TDB().JDParts()
 

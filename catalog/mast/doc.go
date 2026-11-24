@@ -4,6 +4,5 @@
 //
 // It resolves names and nothing more. MAST's archive searches (CAOM
 // observations, the mission catalogs) are not implemented, and the provider
-// does not claim a cone search: until #1088 it did, with one that could only
-// fail.
+// does not claim a cone search.
 package mast

@@ -141,9 +141,9 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 //
 // SOFA's own routines want the other one, dRA/dt, which near a pole is huge
 // for a star that is barely moving; converting to it is this package's job
-// and happens at the one boundary where SOFA is called. Handing a catalog
-// value to SOFA directly is what #281 was: it lost a factor of cos(dec),
-// which is 30% at δ = 45° and 83% at δ = 80°.
+// and happens at the one boundary where SOFA is called. Handed to SOFA
+// directly, a catalog value would lose a factor of cos(dec), which is 30% at
+// δ = 45° and 83% at δ = 80°.
 func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity) ICRS {
 	return ICRS{
 		ra: ra, dec: dec,
@@ -195,11 +195,8 @@ func (c ICRS) Dec() angle.Angle { return c.dec }
 // Dist returns the distance of the ICRS coordinate, and zero when none was
 // set — which most of the ways an ICRS is built leave it.
 //
-// It is a [unit.Length] rather than a bare number because it did not used to
-// be: the same field held astronomical units on an ephemeris path and
-// kilometers on a satellite one, and nothing in the signature said which had
-// arrived. A caller now asks for the unit it wants and the conversion is the
-// type's, not the reader's.
+// It is a [unit.Length]: an ephemeris path sets it in astronomical units and
+// a satellite one in kilometers, and a caller asks for the unit it wants.
 //
 // Zero is still ambiguous, and deliberately so — it means "not set" and it
 // means "at the observer", and the type cannot tell them apart. Anything that
@@ -278,9 +275,7 @@ var compassPoints = [16]string{
 // ENE, E, ESE, SE, SSE, S, SSW, SW, WSW, W, WNW, NW, NNW) — the everyday
 // "which way do I look" complement to the numeric azimuth degrees.
 //
-// A non-finite azimuth names no direction, so it gets "". It used to get
-// "N": converting NaN to an int gives MinInt64 on amd64 and 0 on arm64, and
-// both land on the first label (#979).
+// A non-finite azimuth names no direction, so it gets "".
 func CompassDirection(az angle.Angle) string {
 	if r := az.Radians(); math.IsNaN(r) || math.IsInf(r, 0) {
 		return ""

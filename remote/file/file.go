@@ -8,12 +8,8 @@
 //
 // # Why io/fs and not a storage abstraction
 //
-// This package used to be a thin naming layer over gocloud.dev/blob: one type,
-// Bucket, aliased to *blob.Bucket. That worked, and it cost 388 packages and an
-// unconditional OpenTelemetry dependency for a library whose storage needs are
-// open, read a range, write, delete.
-//
-// The standard library already has the read half, and every Go programmer
+// A library whose storage needs are open, read a range, write and delete
+// needs no storage SDK. The standard library already has the read half, and every Go programmer
 // already knows it. A file is an [fs.File]; a missing one is [fs.ErrNotExist],
 // checked with errors.Is exactly as it is against os, embed and zip; a name is
 // an [fs.ValidPath], which is the unrooted, slash-separated, no-dot-elements

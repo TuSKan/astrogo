@@ -22,13 +22,12 @@ func (t Time) MJD() float64 {
 // The error that fallback costs is bounded only by the leap-second system:
 // UT1-UTC is held inside ±0.9 s, with IERS acting near ±0.7 s in practice.
 // So the worst case is about 0.9 s of Earth rotation — roughly 13.5 arcsec,
-// or 420 m of ground position at the equator — not the "few hundred ms" this
-// comment claimed before the bound was checked.
+// or 420 m of ground position at the equator.
 //
 // That bound held only while leap seconds did. Resolution 5 of the 28th CGPM
 // (2026) makes UTC continuous from 20 May 2027 and raises the limit on
 // |UT1-UTC| to 3600 s, so from that date this fallback drifts with UT1-UTC
-// itself (#879). Callers that silently discard the returned error will drift
+// itself. Callers that silently discard the returned error will drift
 // silently with it.
 func (t Time) GAST() (angle.Angle, error) {
 	ut1, err := t.UT1()
@@ -53,18 +52,10 @@ func (t Time) JulianEpochYear() float64 {
 
 // DayOfYear returns t's fractional day-of-year, with Jan 1 00:00 = 1.0, in
 // the calendar [Time.Year] reads: t's own scale, whatever its display
-// location.
-//
-// It used to measure from Jan 1 midnight in the display location while
-// taking the year from Year, which ignores it, so near the new year the two
-// described different dates: 01:00 UTC on 1 January 2026 shown in São Paulo
-// came out 0.917, and 23:00 UTC on 31 December shown in Tokyo 366.33 in a
-// 365-day year (#760). A caller pairing Year with DayOfYear, as a TLE epoch
-// does, needs both from one date.
+// location, so a caller pairing Year with DayOfYear, as a TLE epoch does,
+// gets both from one date.
 //
 // A non-finite time has no day of the year and gets NaN, as DecimalYear does.
-// Calendar answers it with zeros, which used to come out as -1721059 here
-// (#986).
 func (t Time) DayOfYear() float64 {
 	if t.nonFinite() {
 		return math.NaN()

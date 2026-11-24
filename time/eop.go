@@ -44,11 +44,9 @@ type EOPData = iers.Data
 // [Time.EOP]/[Time.UTC]/[Time.UT1] query triggers.
 //
 // It exists so this package needs no knowledge of caches, HTTP or download
-// consent, and links none of it: importing astrogo/time to compute a Julian
-// date used to cost about 17 MB of binary in cloud-storage and gRPC machinery
-// that the arithmetic never touches. Blank-importing
+// consent, and links none of it. Blank-importing
 // [github.com/TuSKan/astrogo/remote/eop] registers the loader that fetches
-// through remote; importing remote alone does not (#294).
+// through remote; importing remote alone does not.
 //
 // [FSEOPLoader] serves the pre-seeded, no-dependencies case.
 type EOPLoader = iers.Loader
@@ -103,7 +101,7 @@ func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
 // The lazy load is still there for a program that does not call this: the
 // first [Time.EOP], [Time.UTC] or [Time.UT1] that needs a bulletin tries the
 // same two steps, but with context.Background(), and on failure degrades to
-// zero EOP with one logged warning rather than an error (#1187).
+// zero EOP with one logged warning rather than an error.
 //
 //nolint:wrapcheck // pure delegation to the unexported time/internal/iers, not a true external dependency
 func LoadEOP(ctx context.Context) error { return iers.Load(ctx) }
@@ -125,12 +123,8 @@ func ParseFinals2000A(r io.Reader) (*Table, error) { return iers.ParseFinals2000
 // a network fetch) will not run afterward, so it can never silently
 // replace what was explicitly registered here.
 //
-// This matters most for RegisterModel(ZeroModel{}) — the natural way to
-// ask for deterministic zero EOP — which previously WAS silently
-// overridden the moment an uncovered lookup happened to find a
-// finals2000A file already sitting in the cache directory, making "did
-// this run use real or zero EOP" depend on ambient machine state rather
-// than this call. See [EOPSource] to observe which source is active, and
+// So RegisterModel(ZeroModel{}) gives deterministic zero EOP: a finals2000A
+// file already in the cache directory cannot replace it. See [EOPSource] to observe which source is active, and
 // [ResetEOP] to undo this without pinning anything.
 func RegisterModel(m Model) { iers.RegisterModel(m) }
 
@@ -466,14 +460,13 @@ func (e *deltaTHeldError) Error() string {
 // themselves propagate a lookup failure.
 //
 // "Doesn't help" includes nothing having been loaded at all, the case of a
-// program that never imported remote/eop: until #518 that one answered zeros
-// without the warning. RegisterModel(ZeroModel{}) chooses zero EOP
-// deliberately and stays silent.
+// program that never imported remote/eop. RegisterModel(ZeroModel{}) chooses
+// zero EOP deliberately and stays silent.
 //
 // Past the end of a loaded bulletin, the answer is not zero: DUT1 is what
 // holds ΔT = TT − UT1 at its value on the bulletin's last day, with zero
 // polar motion, and the one-time notice says so with the held value and its
-// uncertainty. See [DeltaT] for why it is held (#696).
+// uncertainty. See [DeltaT] for why it is held.
 func (t Time) EOP() EOP {
 	mjd := t.MJD()
 

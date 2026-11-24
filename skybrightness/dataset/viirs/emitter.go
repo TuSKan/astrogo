@@ -114,7 +114,7 @@ type Region struct {
 	// emitter's radiance: the conversion from DNB radiance through the
 	// assumed spectrum and emission function, which only the caller can
 	// judge. Zero means not stated, as on skybrightness.UniformEmitter, and
-	// skybrightness.ArtificialSkyglow then reports no uncertainty (#933).
+	// skybrightness.ArtificialSkyglow then reports no uncertainty.
 	RelativeUncertainty float64
 }
 

@@ -54,7 +54,7 @@ type GroundEmitter interface {
 	// so it belongs to each source rather than to a component.
 	// [ArtificialSkyglow] combines it with its model's own departure from
 	// an exact solution, and a lit source that states none leaves that
-	// component's uncertainty unknown (#933).
+	// component's uncertainty unknown.
 	SourceUncertainty() (relative float64, known bool)
 }
 

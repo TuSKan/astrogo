@@ -74,12 +74,11 @@ func (h HEALPix) PixelArea() float64 { return 4 * math.Pi / float64(h.NumPixels(
 // index; callers already test the returned index against the map's length,
 // and a negative index fails that test.
 //
-// The guard is not pedantry. The index comes from sin(latitude), and sine
-// folds: 120 degrees has the same sine as 60, so an out-of-domain latitude
-// used to return the pixel at 60 degrees on the *same* longitude — while the
-// direction "120 degrees of latitude" actually means 60 degrees at the
-// longitude 180 away. The answer was a real direction, plausible in every
-// downstream check, and not the one asked for.
+// The index comes from sin(latitude), and sine folds: 120 degrees has the
+// same sine as 60, while the direction "120 degrees of latitude" means 60
+// degrees at the longitude 180 away. Without the guard the answer would be a
+// real direction, plausible in every downstream check, and not the one asked
+// for.
 func (h HEALPix) PixelOf(lat angle.Latitude, lon angle.Longitude) int64 {
 	const outsideTheSphere = -1
 

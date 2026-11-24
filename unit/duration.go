@@ -17,9 +17,7 @@ import (
 // Because it cannot hold an astronomical interval. time.Duration is an int64
 // nanosecond count, so it saturates just past ±292 years, and astrogo's own
 // epochs routinely run past that — [github.com/TuSKan/astrogo/time.ZeroTime]
-// is JD 0, in 4713 BC. Time.Sub used to *wrap* there, reporting a negative
-// span for a positive interval between year 1 and 2026, which is the bug that
-// put a float64 day count beside it in the first place.
+// is JD 0, in 4713 BC.
 //
 // So astrogo already had two ways to hold an interval before this type
 // existed: a time.Duration for wall-clock work and a bare float64 of days for

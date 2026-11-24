@@ -27,6 +27,15 @@
 //
 // # Caching
 //
-// The [resolve.Cache] layer persists resolved results locally using Apache
-// Arrow columnar batches, enabling offline replay and deduplication.
+// Each provider keeps what it has resolved in a [resolve.Cache], by default
+// the in-memory [resolve.MapCache], so a repeated query is answered without
+// asking the service again.
+//
+// # Concurrency
+//
+// A [Resolver] is not changed by a query, so one may serve any number of
+// goroutines at once. It asks its providers concurrently, so a provider
+// written elsewhere and handed to it must be safe for concurrent use, as the
+// ones this module builds are. A [resolve.MapCache] is safe for concurrent
+// use.
 package catalog

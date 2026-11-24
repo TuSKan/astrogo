@@ -34,7 +34,7 @@ const magnitudesPerOpticalDepth = 2.5 * math.Log10E
 // It is the column astrogo's default night air carries, in
 // plan.VisibleTonight and in skybrightness/dataset.Sky.Scene, so that a
 // star's extinction and the sky behind it see the same ozone. An Atmosphere
-// itself defaults to none, which is no real night (#906).
+// itself defaults to none, which is no real night.
 const SubtropicalOzoneDU = 258
 
 // Extinction returns the extinction coefficient of this air at wavelength
@@ -72,7 +72,7 @@ const SubtropicalOzoneDU = 258
 // # Accuracy by wavelength
 //
 // [RayleighOpticalDepth] is a single power law that reads 4% low at 330 nm
-// and within about 1% from 400 nm redward (#592), so the blue end of U
+// and within about 1% from 400 nm redward, so the blue end of U
 // carries up to 0.03 mag per airmass at sea level. The ozone average smooths
 // the narrow structure of the Huggins band below 350 nm.
 //
@@ -104,14 +104,11 @@ func (s *Atmosphere) Extinction(lambda unit.WavelengthNM) (float64, error) {
 //     atmosphere.
 //   - X_O3 is [OzoneAirmass], the airmass of a thin shell 20 km up, the
 //     ozone layer. Near the horizon it is a third of X_R, 12.66 against
-//     38.75 at 0°, so charging ozone X_R over-dimmed a target there: by
-//     0.63 mag at 0°, 0.34 at 1° and 0.19 at 2° on VisibleTonight's
-//     default air (#625).
+//     38.75 at 0°.
 //   - X_aer follows the aerosol's scale height, [Builder.AerosolScaleHeight].
 //     At exactly 2 km, [DesertScaleHeight], it is Pickering's aerosol airmass
 //     for that height, 88.81 at 0° against X_R's 38.75: a ray grazing a thin
-//     low layer spends far longer in it, and charging it X_R under-dimmed a
-//     target 1° up through desert air by 17 aerosol airmasses (#630). At any
+//     low layer spends far longer in it. At any
 //     other height it is X_R, which is right at the molecular 8 km of OPAC's
 //     continental and urban types. A thinner layer, maritime at 1 km, has
 //     the larger airmass near the horizon too, but no published formula for

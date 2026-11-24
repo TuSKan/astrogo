@@ -99,7 +99,7 @@
 // Consent is checked before any request. A caller without it is served
 // what is cached, mutable or not, as offline mode serves it, and refused
 // only when nothing is: it could not download a newer copy, so asking
-// the source whether there is one would only cost it (#964).
+// the source whether there is one would only cost it.
 //
 // # Offline and air-gapped deployments
 //
@@ -111,4 +111,11 @@
 // deployment never dials out even without SetOffline. See the README's
 // "Data downloads & offline usage" for the full table of files, sizes and
 // cache keys.
+//
+// # Concurrency
+//
+// A [Client] is safe for concurrent use, and so are the package-level
+// functions, which act on [Default]. A [File] from [Open] may be read with
+// ReadAt from any number of goroutines at once; its Read and Seek move one
+// offset, as an os.File's do.
 package remote

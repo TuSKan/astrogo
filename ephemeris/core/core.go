@@ -134,7 +134,7 @@ type Provider interface {
 	// It is not geocentric. ephemeris.At composes Locate answers into a state
 	// about any center, the Earth among them. The method replaced a geocentric
 	// State rather than redefining it, so that a caller still expecting a
-	// geocentric answer fails to compile instead of being an AU wrong (#803).
+	// geocentric answer fails to compile instead of being an AU wrong.
 	Locate(id ID, t time.Time) (State, error)
 
 	// Close releases any resources held by the provider (files, caches).
@@ -168,13 +168,6 @@ const (
 // Horizons and SPICE use for every body and point in the Solar System. The
 // constants below are names for codes.
 //
-// It used to hold astrogo's own enumeration, 1 to 12, beside NAIF codes above
-// it, and the two overlapped exactly where NAIF puts the system barycenters:
-// a provider that did not know an astrogo number read it as a NAIF one, so
-// Pluto (astrogo 9) was served as NAIF 9, the Pluto barycenter, by
-// coincidence, while the Solar System barycenter (astrogo 12) was refused
-// (#809). One integer, one meaning.
-//
 // # A planet's center and its system's barycenter are different points
 //
 // NAIF numbers both, and so does astrogo: [Jupiter] is 599, the planet, and
@@ -193,7 +186,7 @@ const (
 //	Mars      0.0000 arcsec   (Phobos and Deimos displace it by centimeters)
 //
 // Which one a planner observes is its choice, made visibly: plan's planets
-// from Mars out are the barycenters (#253). Mercury and Venus have no moons,
+// are their system barycenters. Mercury and Venus have no moons,
 // so their barycenters and their centers are one point under two codes.
 //
 // # Small bodies and satellites
@@ -280,8 +273,7 @@ const smallBodySpan = 1000000
 // SmallBodyID returns the identifier for the numbered small body n — 433 for
 // Eros, 3200 for Phaethon — and whether n is a small-body number at all.
 //
-// It used to return 0 for an n outside NAIF's block, which then failed to
-// resolve. Zero is the Solar System barycenter now, so the answer is a bool
+// Zero is the Solar System barycenter, so whether n has a code is a bool
 // beside the ID rather than a value inside it.
 func SmallBodyID(n int) (ID, bool) {
 	if n <= 0 || n >= smallBodySpan {

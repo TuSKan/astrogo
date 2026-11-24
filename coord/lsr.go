@@ -69,8 +69,8 @@ const (
 	// and what a spectral line's velocity is quoted against unless the paper
 	// says otherwise.
 	//
-	// It is published differently from the other two, which is why it arrived
-	// later (#295): they are Galactic Cartesian components, and this is an
+	// It is published differently from the other two: they are Galactic
+	// Cartesian components, and this is an
 	// apex — 20 km/s toward RA 270°, Dec +30°, referred to the B1900 equinox
 	// (Gordon 1975, Methods of Experimental Physics vol. 12C §6.1.5). See
 	// [kinematicApexICRS] for how that direction is brought to ICRS and what

@@ -96,7 +96,7 @@ var leapRegistry atomic.Pointer[leapTable]
 // The record is also closed. Resolution 5 of the 28th CGPM (2026) makes UTC
 // continuous from 20 May 2027, IERS Bulletin C 72 announced no leap second for
 // December 2026, and June 2027 falls after that date, so the last entry is
-// 2017-01-01's (#879). This remains for a table that restates the record, or
+// 2017-01-01's. This remains for a table that restates the record, or
 // for a future CGPM that changes course.
 func RegisterLeapSeconds(table []LeapSecond, source string) error {
 	if err := validateLeapTable(table); err != nil {

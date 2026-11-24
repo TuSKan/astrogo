@@ -118,8 +118,7 @@ func (c FK4) Dec() angle.Angle { return c.dec }
 // [FK5ToFK4] or [ICRSToFK4] for a position-only input carries the fictitious
 // motion FK4's drifting equinox gives it, which is a real rate and not a
 // measurement. The type keeps that distinction internally because the two
-// convert through different SOFA routines (see FK4.fictitiousMotion and #341),
-// and re-declaring one as the other through [NewFK4WithProperMotion] is
+// convert through different SOFA routines, and re-declaring one as the other through [NewFK4WithProperMotion] is
 // therefore a different claim about the star, not a copy of it.
 func (c FK4) ProperMotion() (pmRA, pmDec angle.Angle, ok bool) {
 	return c.pmRA, c.pmDec, c.hasProperMotion
@@ -260,13 +259,6 @@ func FK4ToICRS(c FK4) ICRS {
 // at rest in ICRS. It is not at rest in FK5, because FK5 rotates slowly with
 // respect to ICRS, so the returned FK4 proper motion carries that spin.
 //
-// The two were indistinguishable before #278, because the branch tested every
-// kinematic field for zero rather than asking whether any had been recorded. A
-// star declared at rest in ICRS therefore took the first route, which answers
-// for a star at rest in FK5, and came back from ICRS → FK4 → ICRS carrying
-// 0.6 to 0.9 mas/yr of proper motion it never had — while its position closed
-// to 19 microarcseconds, which is what kept it invisible.
-//
 // # bepoch applies to the first route only
 //
 // The six-element route answers at B1950.0 whatever bepoch says, and the FK4 it
@@ -285,12 +277,6 @@ func FK4ToICRS(c FK4) ICRS {
 // not define — and getting it wrong in a specific way, since the E-terms would
 // be evaluated at B1950 on this route and at bepoch on the other, so the two
 // branches would disagree about the same star for reasons no caller could see.
-//
-// Before #330 the argument was stored without being used, so ICRSToFK4(star,
-// 1975) returned B1950 numbers labeled 1975. The numbers were right and the
-// label was wrong, which is the worse of the two failures: a wrong label
-// propagates into [FK4ToFK5]'s position-only route and into anything reading
-// [FK4.Epoch].
 //
 // To place a star at another epoch, use [PropagateEpoch], which applies
 // rigorous space motion through SOFA's Pmsafe — including parallax and the

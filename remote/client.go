@@ -18,8 +18,8 @@ import (
 // wrong for a service. Two components in one binary — an HTTP handler serving
 // user queries and a background kernel prefetcher — cannot hold different
 // policies, so the handler cannot be offline-only while the prefetcher
-// downloads, which is exactly how such a service would want to be configured
-// (#114).
+// downloads, which is exactly how such a service would want to be
+// configured.
 //
 // A Client is that policy as a value. Build one, configure it, pass it to the
 // component that owns it:

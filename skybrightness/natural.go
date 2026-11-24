@@ -860,11 +860,8 @@ var ErrNoStarMap = errors.New("skybrightness: integrated starlight needs a sky m
 // Any *other* error is a failure: the band was not in the map, the file was
 // unreadable, the request was malformed.
 //
-// The two used to be indistinguishable here. [IntegratedStarlight] read
-// `if err != nil || value <= 0` and reported both as an uncovered direction,
-// so a misconfigured band — asking a V map for R — came back as a quiet gap in
-// the sky rather than as the mistake it is. That is the shape of #102, where a
-// swallowed error turned a CDS outage into "target not found".
+// Keeping the two apart is what lets a misconfigured band, asking a V map for
+// R, come back as the mistake it is rather than as a quiet gap in the sky.
 var ErrNoCoverage = errors.New("skybrightness: direction not covered by the map")
 
 // StarMap samples extra-atmospheric starlight radiance by direction.

@@ -97,13 +97,11 @@ func WithCachedChunks(n int) ReaderAtOption {
 // lock held; any other reader wanting that chunk meanwhile waits for that one
 // read rather than issuing its own.
 //
-// It used to hold one mutex across every lookup and across the backend read
-// of every miss — a pread, or a ranged GET over HTTP — so sixteen goroutines
-// evaluating the Moon at random epochs got less done in aggregate than one
-// (#811). Measured on de440s, sixteen now take 481 ns per state in aggregate
-// against 2,052 before, and against 457 for the same kernel held in a byte
-// slice with no cache in front of it: the cache no longer costs concurrency
-// anything. Eviction still takes the lock, which is cheap: it only runs when a
+// It holds no lock across a lookup or across the backend read of a miss, a
+// pread or a ranged GET over HTTP. Measured on de440s, sixteen goroutines
+// evaluating the Moon at random epochs take 481 ns per state in aggregate,
+// against 457 for the same kernel held in a byte slice with no cache in front
+// of it. Eviction takes the lock, which is cheap: it only runs when a
 // chunk is claimed. Memory stays bounded at resident chunks, plus — only while
 // every resident chunk is itself still being read — the chunks being read
 // beyond them, each held by a ReadAt in flight.

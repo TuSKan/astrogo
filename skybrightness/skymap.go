@@ -177,10 +177,7 @@ func (m *Model) SkyMap(ctx context.Context, q Query, rings int) ([]SkyPoint, err
 // Each sample is weighted by its own solid angle and by sin(alt), which is
 // the cosine of the zenith angle: a patch near the horizon presents itself
 // obliquely to a horizontal surface and contributes less than the same patch
-// overhead. The code has always done this; the comment used to say cos(alt),
-// which is that factor upside down - one at the horizon and zero at the
-// zenith - and so described the opposite of both the physics and the
-// sentence it introduced.
+// overhead.
 func IntegratedHemisphere(points []SkyPoint, grid unit.SpectralGrid) (SpectralRadiance, error) {
 	out := NewSpectralRadiance(grid)
 

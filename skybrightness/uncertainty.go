@@ -193,7 +193,7 @@ var ErrUncertaintyValue = errors.New("skybrightness: a supplied uncertainty need
 // An artificial-light inventory is the exception. Its uncertainty belongs to
 // each source, through [GroundEmitter.SourceUncertainty], because
 // [ArtificialSkyglow] weights it by each source's share of the radiance and
-// combines it with the model's own published error (#933). Wrapping that
+// combines it with the model's own published error. Wrapping that
 // component here replaces both.
 //
 // It also replaces a figure a component does report, for a caller who holds a
