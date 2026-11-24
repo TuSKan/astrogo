@@ -18,6 +18,12 @@ var simbadCSVSeeds = []string{
 	"oid,main_id,ra,dec,otype,otype_path,pmra,pmdec,plx_value,rvz_radvel,id,V\n" +
 		"2,* zero RV test,10.0,20.0,V*,* > V*,0.0,0.0,10.0,0.0,ZeroRVStar,8.0\n",
 	"oid,main_id,ra,dec,otype,id\n",
+	// A position SIMBAD took from Gaia, which the reader moves back to
+	// Gaia's epoch: its search is what the bytes reach here.
+	"oid,main_id,ra,dec,otype,pmra,pmdec,plx_value,rvz_radvel,coo_bibcode,id\n" +
+		"1,NAME Barnard's star,269.4520769586187,4.693364966576667,BY*,-801.551,10362.394,546.9759,-110.11," +
+		"2020yCat.1350....0G,NAME Barnard's star\n" +
+		"2,star,123.4,89.99999,*,3000,-4000,100,40,2018yCat.1345....0G,star\n",
 	"not a real header\n1,2,3,4,foo,bar\n\"unclosed quote\n",
 	"",
 }

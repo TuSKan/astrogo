@@ -14,7 +14,9 @@ import (
 // such a position to J2000.0 and keeps Gaia's errors as Gaia publishes them,
 // at Gaia's epoch: Barnard's star carries Gaia's 0.026 mas, where sixteen
 // years of its proper-motion error make 0.5 mas by J2000.0. SIMBAD's errors
-// for a position from any other source hold at J2000.0.
+// for a position from any other source hold at J2000.0. readKinematics
+// reports a position from one of these releases at its epoch, where the
+// errors hold.
 var gaiaCoordinateEpochs = map[string]time.Time{
 	"2020yCat.1350....0G": time.FromJD(2457389.0, time.TT),   // Gaia EDR3, J2016.0
 	"2018yCat.1345....0G": time.FromJD(2457206.375, time.TT), // Gaia DR2, J2015.5

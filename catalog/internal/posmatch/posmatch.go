@@ -128,10 +128,12 @@ type Evidence struct {
 //
 // D² weighs the offset by the errors the catalogs state and by nothing else.
 // Two catalogs that move a star between epochs by different models disagree
-// by more than those errors: SIMBAD moves a Gaia position to J2000.0 without
-// a radial velocity, and 61 Cyg A's Gaia row moved there with its own lands
-// 26 mas away, against errors under 1 mas. Such a pair is incompatible by
-// position and is one star by an identifier.
+// by more than those errors. SIMBAD moves a Gaia position to J2000.0 without
+// a radial velocity: read at face value, 61 Cyg A's lands 26 mas from its
+// Gaia row moved there with its own, against errors under 1 mas.
+// catalog/simbad reports such a star at Gaia's epoch instead (#1248), but a
+// pair that disagrees this way is incompatible by position and is one star
+// by an identifier.
 func Compare(a, b resolve.Target, resolution angle.Angle) (Evidence, bool, error) {
 	pa, ta, pb, tb, err := atCommonEpoch(Coord(a), a.Epoch, Coord(b), b.Epoch)
 	if err != nil {

@@ -23,8 +23,9 @@ type AstrometricError struct {
 	// pmra_pmdec_corr.
 	RADec, RAPmRA, RAPmDec, DecPmRA, DecPmDec, PmRAPmDec float64
 	// Epoch is the instant the errors hold at. Zero means the Target's own
-	// Epoch, which is where a provider's errors hold unless it states them
-	// for another: SIMBAD gives a position it took from Gaia at J2000.0
-	// with Gaia's errors, which hold at Gaia's epoch.
+	// Epoch, which is where a provider's errors hold unless it states
+	// another: a catalog that moves a position and not its errors, as SIMBAD
+	// does a position it takes from Gaia, states the epoch the errors still
+	// hold at.
 	Epoch time.Time
 }

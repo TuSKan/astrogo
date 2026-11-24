@@ -3,12 +3,14 @@ package catalog
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
@@ -198,9 +200,12 @@ func TestResolver_ConeSearchBridgeKeepsABinaryApart(t *testing.T) {
 }
 
 // cyg61Simbad and cyg61Gaia are 61 Cyg A as SIMBAD and Gaia DR3 publish it,
-// read 2026-11-18. SIMBAD's position is Gaia's moved to J2000.0 without a
-// radial velocity, with Gaia's errors at J2016.0. The Gaia row carries its
-// DR3 radial velocity, a column catalog/gaia does not read.
+// read 2026-11-18. cyg61Simbad reads SIMBAD's row at face value: Gaia's
+// position moved to J2000.0 without a radial velocity, with Gaia's errors at
+// J2016.0. catalog/simbad no longer reports it so (#1248), which
+// TestResolver_ASimbadStarTakenFromGaiaMatchesItsGaiaRowByPosition holds, but
+// the pair stays two rows of one star that disagree by position. The Gaia row
+// carries its DR3 radial velocity, a column catalog/gaia does not read.
 var (
 	cyg61Simbad = Target{
 		ID: "*  61 Cyg A", Name: "61 Cyg A", Aliases: []string{"Gaia DR3 1872046609345556480"},
@@ -230,9 +235,9 @@ var (
 // TestResolver_BridgeFindsTheGaiaRowByItsIdentifier: SIMBAD lists 61 Cyg
 // A's Gaia DR3 designation, so with no resolution set the Resolver asks Gaia
 // for that source and makes no cone search. Moved to J2000.0 with its radial
-// velocity, the row lands 26 mas from SIMBAD's position, which SIMBAD moved
-// there without one, and is incompatible with it by D² against errors under
-// 1 mas; it is folded in by the identifier.
+// velocity, the row lands 26 mas from SIMBAD's position read at face value,
+// which SIMBAD moved there without one, and is incompatible with it by D²
+// against errors under 1 mas; it is folded in by the identifier.
 func TestResolver_BridgeFindsTheGaiaRowByItsIdentifier(t *testing.T) {
 	t.Parallel()
 
@@ -273,6 +278,34 @@ func TestResolver_BridgeFindsTheGaiaRowByItsIdentifier(t *testing.T) {
 	if got.Provenance["AstrometricError"] != "gaia" || got.AstrometricError != cyg61Gaia.AstrometricError {
 		t.Errorf("errors from %q: %+v, want the Gaia row's, with its position", got.Provenance["AstrometricError"], got.AstrometricError)
 	}
+}
+
+// TestResolver_ASimbadStarTakenFromGaiaMatchesItsGaiaRowByPosition is
+// #1248 where the Resolver compares rows: 61 Cyg A as catalog/simbad reads
+// SIMBAD's row is at Gaia's epoch, and is compatible with its Gaia DR3 row
+// by D², which it was not while read at J2000.0.
+func TestResolver_ASimbadStarTakenFromGaiaMatchesItsGaiaRowByPosition(t *testing.T) {
+	t.Parallel()
+
+	rows, err := simbad.ParseCSV(strings.NewReader("main_id,ra,dec,pmra,pmdec,plx_value,rvz_radvel," +
+		"coo_err_maj,coo_err_min,coo_err_angle,coo_bibcode,pm_err_maj,pm_err_min,pm_err_angle\n" +
+		"*  61 Cyg A,316.7247482895925,38.74941731943694,4164.209,3249.614,285.9949,-65.82," +
+		"0.0388,0.0485,90,2020yCat.1350....0G,0.055,0.055,90\n"))
+	testutil.AssertNoError(t, err)
+
+	if len(rows) != 1 {
+		t.Fatalf("%d rows, want 1", len(rows))
+	}
+
+	ev, ok, err := posmatch.Compare(rows[0], cyg61Gaia, 0)
+	testutil.AssertNoError(t, err)
+
+	if !ev.HasD2 || !ok {
+		t.Errorf("SIMBAD's 61 Cyg A against its Gaia row: D² %g (computed %v), compatible %v; want compatible",
+			ev.D2, ev.HasD2, ok)
+	}
+
+	t.Logf("D² %.4f, %.4f mas apart", ev.D2, ev.Separation.Arcsec()*1000)
 }
 
 // TestResolver_BridgeFindsTheGaiaRowByItsHipparcosNumber: a SIMBAD star that
