@@ -38,7 +38,7 @@ func TestSubsolarPoint_SolsticeLatitude(t *testing.T) {
 		t.Fatal("no SeasonSummerSolstice event found in 2026")
 	}
 
-	geo, err := SubsolarPoint(prov, solstice.Time)
+	geo, err := SubsolarPoint(solstice.Time, prov)
 	if err != nil {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 	ofDate := gofaext.Rxp(gofaext.Pnm06a(tt1, tt2), [3]float64{sun.X, sun.Y, sun.Z})
 	wantRA := math.Atan2(ofDate[1], ofDate[0])
 
-	geo, err := SubsolarPoint(prov, tm)
+	geo, err := SubsolarPoint(tm, prov)
 	if err != nil {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestSubsolarPoint_EquinoxLatitude(t *testing.T) {
 
 		n++
 
-		geo, err := SubsolarPoint(prov, e.Time)
+		geo, err := SubsolarPoint(e.Time, prov)
 		if err != nil {
 			t.Fatalf("SubsolarPoint: %v", err)
 		}
@@ -172,7 +172,7 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 	for _, body := range []struct {
 		name      string
 		id        eph.ID
-		point     func(eph.Provider, time.Time) (*coord.Geodetic, error)
+		point     func(time.Time, eph.Provider) (*coord.Geodetic, error)
 		tolArcsec float64
 	}{
 		{"Sun", eph.Sun, SubsolarPoint, 1},
@@ -183,7 +183,7 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 		for _, jd := range []float64{2451545.0, 2455197.5, 2461318.0, 2469807.5} {
 			tm := time.FromJD(jd, time.UTC)
 
-			geo, err := body.point(prov, tm)
+			geo, err := body.point(tm, prov)
 			if err != nil {
 				t.Fatalf("%s at JD %.1f: %v", body.name, jd, err)
 			}
@@ -219,7 +219,7 @@ func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 	prov := eph.Default()
 	tm := time.FromJD(2461000.25, time.UTC)
 
-	sub, err := SubsolarPoint(prov, tm)
+	sub, err := SubsolarPoint(tm, prov)
 	if err != nil {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 	kinds := []TwilightKind{GeometricTwilight, ApparentTwilight, CivilTwilight, NauticalTwilight, AstronomicalTwilight}
 
 	for _, kind := range kinds {
-		pts, err := Terminator(prov, tm, kind, 24)
+		pts, err := Terminator(tm, prov, kind, 24)
 		if err != nil {
 			t.Fatalf("Terminator(%v): %v", kind, err)
 		}
@@ -277,7 +277,7 @@ func TestTerminator_EquinoxGeometricPassesNearPoles(t *testing.T) {
 		t.Fatal("no SeasonVernalEquinox event found in 2026")
 	}
 
-	pts, err := Terminator(prov, equinox.Time, GeometricTwilight, 36)
+	pts, err := Terminator(equinox.Time, prov, GeometricTwilight, 36)
 	if err != nil {
 		t.Fatalf("Terminator: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestTerminator_TooFewPoints(t *testing.T) {
 	prov := eph.Default()
 	tm := time.FromJD(2461000.25, time.UTC)
 
-	if _, err := Terminator(prov, tm, GeometricTwilight, 2); !errors.Is(err, coord.ErrTooFewPoints) {
+	if _, err := Terminator(tm, prov, GeometricTwilight, 2); !errors.Is(err, coord.ErrTooFewPoints) {
 		t.Errorf("Terminator(n=2) error = %v, want ErrTooFewPoints", err)
 	}
 }
@@ -317,7 +317,7 @@ func TestSublunarPoint_Basic(t *testing.T) {
 	prov := eph.Default()
 	tm := time.FromJD(2461000.25, time.UTC)
 
-	geo, err := SublunarPoint(prov, tm)
+	geo, err := SublunarPoint(tm, prov)
 	if err != nil {
 		t.Fatalf("SublunarPoint: %v", err)
 	}
@@ -334,15 +334,15 @@ func TestSublunarPoint_Basic(t *testing.T) {
 func TestTerminatorFunctions_NilProviderDefaults(t *testing.T) {
 	tm := time.FromJD(2461000.25, time.UTC)
 
-	if _, err := SubsolarPoint(nil, tm); err != nil {
+	if _, err := SubsolarPoint(tm, nil); err != nil {
 		t.Errorf("SubsolarPoint(nil): unexpected error: %v", err)
 	}
 
-	if _, err := SublunarPoint(nil, tm); err != nil {
+	if _, err := SublunarPoint(tm, nil); err != nil {
 		t.Errorf("SublunarPoint(nil): unexpected error: %v", err)
 	}
 
-	if _, err := Terminator(nil, tm, GeometricTwilight, 12); err != nil {
+	if _, err := Terminator(tm, nil, GeometricTwilight, 12); err != nil {
 		t.Errorf("Terminator(nil): unexpected error: %v", err)
 	}
 }

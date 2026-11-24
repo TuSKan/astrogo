@@ -50,7 +50,7 @@ func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Ev
 		Target:    target,
 		Observer:  site,
 		Threshold: site.RiseSetThreshold(),
-	}, start, end)
+	}, Window{Start: start, End: end})
 }
 
 // DayEvents returns the first rise, set, and transit of target, as seen
@@ -66,7 +66,7 @@ func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Ev
 // calendar day is measured in; site's location (via site.Location()) is
 // used for the geometry, and the two need not agree (a caller may
 // legitimately want "Paris's calendar day" applied to "Mauna Kea's sky").
-func DayEvents(day time.Time, loc *time.Location, target Observable, site *Site) (rise, set, transit *Event, err error) {
+func DayEvents(target Observable, site *Site, day time.Time, loc *time.Location) (rise, set, transit *Event, err error) {
 	if loc == nil {
 		loc = time.LocationUTC
 	}
@@ -196,28 +196,30 @@ func searchEvent(target Observable, site *Site, from time.Time, k EventKind, for
 }
 
 // Episode returns the single continuous up-episode — rise, then the set
-// that ends it — framing [from, to]: unlike a plain windowed event search,
+// that ends it — framing w: unlike a plain windowed event search,
 // it reaches outside the interval as needed so rise is always before set
 // and the pair always describes one real, continuous period the target
 // was above the horizon, never two unrelated episodes stitched together.
 //
-// If target is already above the horizon at from, rise is searched for
-// BEFORE from (the episode is already in progress); otherwise the next
-// rise at or after from is used, which may itself fall after to. set is
-// then the first set at or after that rise, which may likewise fall after
-// to — this is the concrete fix for the naive "first set after today's
+// If target is already above the horizon at w.Start, rise is searched for
+// BEFORE w.Start (the episode is already in progress); otherwise the next
+// rise at or after w.Start is used, which may itself fall after w.End. set
+// is then the first set at or after that rise, which may likewise fall after
+// w.End — this is the concrete fix for the naive "first set after today's
 // rise" mistake near a long (e.g. ~40h, near-full-Moon) up-episode: that
 // set is still THIS episode's, not an unrelated later one, however far
-// past to it lands. The search itself starts small (see searchEvent) and
-// only grows as needed, but never gives up before covering at least
-// [from, to]'s own span (widened past episodeSearchWindow's default when
-// to is further out than that) — so a target that never sets
+// past w.End it lands. The search itself starts small (see searchEvent) and
+// only grows as needed, but never gives up before covering at least w's
+// own span (widened past episodeSearchWindow's default when w.End is
+// further out than that) — so a target that never sets
 // (circumpolar) or never rises within that bound returns rise == set ==
 // nil with no error, not a failure.
 //
 // See DayEvents for the different question ("what happened on this
 // calendar day") this is deliberately not answering.
-func Episode(from, to time.Time, target Observable, site *Site) (rise, set *Event, err error) {
+func Episode(target Observable, site *Site, w Window) (rise, set *Event, err error) {
+	from, to := w.Start, w.End
+
 	if err := checkInterval(from, to); err != nil {
 		return nil, nil, err
 	}

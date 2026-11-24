@@ -539,8 +539,8 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 
 	// A day back finds the rise of a pass in progress; two ahead find the
 	// next pass's rise and its set.
-	events, err := NewEventSolver(unit.Minutes(15), unit.Seconds(1)).
-		Find(riseSetSpec(obs, site), t.Add(unit.Hours(-24)), t.Add(unit.Hours(48)))
+	events, err := NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(
+		riseSetSpec(obs, site), Window{Start: t.Add(unit.Hours(-24)), End: t.Add(unit.Hours(48))})
 	if err != nil {
 		return
 	}

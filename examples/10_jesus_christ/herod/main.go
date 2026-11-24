@@ -66,7 +66,7 @@ func main() {
 	start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
 	end := time.DateJulianCal(2, 1, 1, 0, 0, 0)
 
-	eclipses, err := plan.LunarEclipses(start, end, prov)
+	eclipses, err := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 	if err != nil {
 		panic(err)
 	}
@@ -96,8 +96,8 @@ func main() {
 		var visibility string
 
 		// Check if Sun is set (= night) at eclipse time
-		_, sunSet, sunErr := plan.SunriseSunset(dayStart, dayEnd, site, prov)
-		sunRise, _, sunErrR := plan.SunriseSunset(dayStart, dayEnd, site, prov)
+		_, sunSet, sunErr := plan.SunriseSunset(site, plan.Window{Start: dayStart, End: dayEnd}, prov)
+		sunRise, _, sunErrR := plan.SunriseSunset(site, plan.Window{Start: dayStart, End: dayEnd}, prov)
 		_ = sunErrR
 
 		isNight := false
@@ -116,7 +116,7 @@ func main() {
 		// Check if Moon is above horizon at eclipse time
 		moonUp := false
 
-		moonRise, moonSet, moonErr := plan.MoonriseMoonset(dayStart, dayEnd, site, prov)
+		moonRise, moonSet, moonErr := plan.MoonriseMoonset(site, plan.Window{Start: dayStart, End: dayEnd}, prov)
 		if moonErr == nil {
 			if moonRise != nil && moonSet != nil {
 				// Moon is up between rise and set

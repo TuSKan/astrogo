@@ -259,7 +259,7 @@ func TestSchedulingWithTheRunsSkyIsBitIdentical(t *testing.T) {
 	}{{0, false}, {3, false}, {5, true}} {
 		at := start.Add(unit.Hours(premise.hours))
 
-		r, err := moonSep.Check(trailing, at, site)
+		r, err := moonSep.Check(trailing, site, at)
 		if err != nil {
 			t.Fatal(err)
 		}

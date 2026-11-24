@@ -74,7 +74,7 @@ func TestLimitingMagnitudeIsSoftByDefault(t *testing.T) {
 	// A sky three magnitudes shallower than the target needs.
 	c := LimitingMagnitudeConstraint{Sky: fixedDepth(9)}
 
-	got, err := c.CheckCtx(star, ctx.Time(), site, ctx)
+	got, err := c.CheckCtx(star, site, ctx.Time(), ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestLimitingMagnitudeBooleanRejects(t *testing.T) {
 
 	c := LimitingMagnitudeConstraint{Sky: fixedDepth(9), Boolean: true}
 
-	got, err := c.CheckCtx(star, ctx.Time(), site, ctx)
+	got, err := c.CheckCtx(star, site, ctx.Time(), ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestLimitingMagnitudeBooleanRejects(t *testing.T) {
 	// And a sky deep enough passes the same target.
 	deep := LimitingMagnitudeConstraint{Sky: fixedDepth(15), Boolean: true}
 
-	got, err = deep.CheckCtx(star, ctx.Time(), site, ctx)
+	got, err = deep.CheckCtx(star, site, ctx.Time(), ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestLimitingMagnitudeIgnoresTargetsWithNoMagnitude(t *testing.T) {
 
 	c := LimitingMagnitudeConstraint{Sky: fixedDepth(6), Boolean: true}
 
-	got, err := c.CheckCtx(star, ctx.Time(), site, ctx)
+	got, err := c.CheckCtx(star, site, ctx.Time(), ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestLimitingMagnitudeRefusesWithoutASky(t *testing.T) {
 
 	var c LimitingMagnitudeConstraint
 
-	if _, err := c.CheckCtx(star, ctx.Time(), site, ctx); !errors.Is(err, ErrNoSkyDepth) {
+	if _, err := c.CheckCtx(star, site, ctx.Time(), ctx); !errors.Is(err, ErrNoSkyDepth) {
 		t.Errorf("got %v, want ErrNoSkyDepth — a zero-value constraint that silently passed "+
 			"would be indistinguishable from a perfect sky", err)
 	}
@@ -248,7 +248,7 @@ func TestLimitingMagnitudePropagatesDepthErrors(t *testing.T) {
 
 	c := LimitingMagnitudeConstraint{Sky: failingDepth{}}
 
-	if _, err := c.CheckCtx(star, ctx.Time(), site, ctx); !errors.Is(err, errDepth) {
+	if _, err := c.CheckCtx(star, site, ctx.Time(), ctx); !errors.Is(err, errDepth) {
 		t.Errorf("got %v, want the depth model's own error", err)
 	}
 }
@@ -266,7 +266,7 @@ func TestLimitingMagnitudeRequiredOverridesCatalogMagnitude(t *testing.T) {
 		Required: func(Observable) (float64, bool) { return 18, true },
 	}
 
-	got, err := c.CheckCtx(star, ctx.Time(), site, ctx)
+	got, err := c.CheckCtx(star, site, ctx.Time(), ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}

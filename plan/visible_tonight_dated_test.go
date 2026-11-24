@@ -38,12 +38,11 @@ func TestVisibleTonightDatesItsSearchWithinTheNight(t *testing.T) {
 	site := quintaCalixtoSite(t)
 	src := &recordingBrightSource{}
 
-	if _, err := plan.VisibleTonight(context.Background(), site, testNight, 2,
-		[]resolve.BrightObjectSearcher{src}, ephemeris.Default()); err != nil {
+	if _, err := plan.VisibleTonight(context.Background(), site, testNight, []resolve.BrightObjectSearcher{src}, ephemeris.Default(), 2); err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
 
-	night, err := plan.NightOf(testNight, site, ephemeris.Default(), plan.AstronomicalTwilight)
+	night, err := plan.NightOf(site, testNight, ephemeris.Default(), plan.AstronomicalTwilight)
 	if err != nil {
 		t.Fatalf("NightOf: %v", err)
 	}

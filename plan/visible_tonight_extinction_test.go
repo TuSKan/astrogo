@@ -65,7 +65,7 @@ func siriusTonight(t *testing.T, site *plan.Site, opts ...plan.VisibleTonightOpt
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	results, err := plan.VisibleTonight(context.Background(), site, testNight, 2, sources, ephemeris.Default(), opts...)
+	results, err := plan.VisibleTonight(context.Background(), site, testNight, sources, ephemeris.Default(), 2, opts...)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -169,8 +169,10 @@ func TestVisibleTonightRefusesAnAirWithNoPressure(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	_, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources,
-		ephemeris.Default(), plan.WithAtmosphere(&atmosphere.Atmosphere{}))
+	_, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources,
+		ephemeris.Default(), 2,
+		plan.WithAtmosphere(&atmosphere.Atmosphere{}))
+
 	if !errors.Is(err, atmosphere.ErrPressure) {
 		t.Fatalf("VisibleTonight with the zero Atmosphere = %v, want ErrPressure", err)
 	}

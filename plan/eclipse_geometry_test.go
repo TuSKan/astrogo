@@ -91,12 +91,12 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 
 // checkGreatestEclipse finds the one eclipse within three days of td and
 // checks its time against td.
-func checkGreatestEclipse(t *testing.T, name string, find func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error),
+func checkGreatestEclipse(t *testing.T, name string, find func(w Window, prov eph.Provider) ([]EclipseEvent, error),
 	td time.Time, prov eph.Provider, tolMinutes float64,
 ) {
 	t.Helper()
 
-	events, err := find(td.Add(unit.Days(-3)), td.Add(unit.Days(3)), prov)
+	events, err := find(Window{Start: td.Add(unit.Days(-3)), End: td.Add(unit.Days(3))}, prov)
 	if err != nil || len(events) != 1 {
 		t.Errorf("%s: %d eclipses within three days, err %v; want 1", name, len(events), err)
 
@@ -182,7 +182,7 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 
 	cases := []struct {
 		name string
-		find func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		find func(w Window, prov eph.Provider) ([]EclipseEvent, error)
 		at   time.Time
 		want bool
 	}{
@@ -201,7 +201,7 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 	for _, c := range cases {
 		at := time.FromJD(c.at.JD(), time.TDB)
 
-		events, err := c.find(at.Add(unit.Days(-10)), at.Add(unit.Days(10)), prov)
+		events, err := c.find(Window{Start: at.Add(unit.Days(-10)), End: at.Add(unit.Days(10))}, prov)
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -244,7 +244,7 @@ func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 	// Each window holds one eclipse, the first of 2026 of each kind.
 	cases := []struct {
 		name       string
-		find       func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		find       func(w Window, prov eph.Provider) ([]EclipseEvent, error)
 		start, end time.Time
 	}{
 		{"lunar", LunarEclipses, time.Date(2026, 2, 25, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 3, 10, 0, 0, 0, 0, time.LocationUTC)},
@@ -254,7 +254,7 @@ func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 	for _, c := range cases {
 		counting := &failingOnceProvider{Provider: eph.Default(), on: -1}
 
-		events, err := c.find(c.start, c.end, counting)
+		events, err := c.find(Window{Start: c.start, End: c.end}, counting)
 		if err != nil || len(events) != 1 {
 			t.Fatalf("%s: %d eclipses, err %v; want the one eclipse in the window", c.name, len(events), err)
 		}
@@ -262,7 +262,7 @@ func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 		for call := range counting.calls {
 			prov := &failingOnceProvider{Provider: eph.Default(), on: call}
 
-			if _, err := c.find(c.start, c.end, prov); !errors.Is(err, errFailingOnce) {
+			if _, err := c.find(Window{Start: c.start, End: c.end}, prov); !errors.Is(err, errFailingOnce) {
 				t.Errorf("%s: provider failing on call %d of %d: err %v, want errFailingOnce",
 					c.name, call, counting.calls, err)
 			}
@@ -286,7 +286,7 @@ func TestEclipseKindsAndMagnitudesMatchNASA(t *testing.T) {
 
 	for _, c := range []struct {
 		name      string
-		find      func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		find      func(w Window, prov eph.Provider) ([]EclipseEvent, error)
 		td        time.Time
 		kind      EclipseKind
 		magnitude float64
@@ -305,7 +305,7 @@ func TestEclipseKindsAndMagnitudesMatchNASA(t *testing.T) {
 	} {
 		td := time.FromJD(c.td.JD(), time.TDB)
 
-		events, err := c.find(td.Add(unit.Days(-3)), td.Add(unit.Days(3)), prov)
+		events, err := c.find(Window{Start: td.Add(unit.Days(-3)), End: td.Add(unit.Days(3))}, prov)
 		if err != nil || len(events) != 1 {
 			t.Errorf("%s: %d eclipses within three days, err %v; want 1", c.name, len(events), err)
 

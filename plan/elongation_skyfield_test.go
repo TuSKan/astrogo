@@ -53,8 +53,8 @@ func TestGreatestElongationsAgreeWithSkyfield(t *testing.T) {
 		{"Mercury W Nov", eph.Mercury, false, at(2026, 11, 20, 23, 31, 18, 0.16), 19.6217},
 		{"Venus E Aug", eph.Venus, true, at(2026, 8, 15, 6, 31, 33, 0.44), 45.8923},
 	} {
-		events, err := plan.GreatestElongations(c.skyfield.Add(unit.Days(-10)), c.skyfield.Add(unit.Days(10)),
-			plan.NewPlanet(c.name, c.body, prov), sun)
+		events, err := plan.GreatestElongations(
+			plan.NewPlanet(c.name, c.body, prov), sun, plan.Window{Start: c.skyfield.Add(unit.Days(-10)), End: c.skyfield.Add(unit.Days(10))})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}

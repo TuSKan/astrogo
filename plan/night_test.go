@@ -32,7 +32,7 @@ func TestNightOfIsOneNightFromAnyInstantInIt(t *testing.T) {
 	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
 
 	for _, kind := range []plan.TwilightKind{plan.CivilTwilight, plan.NauticalTwilight, plan.AstronomicalTwilight} {
-		pairs, err := plan.TwilightEvents(noon, noon.Add(unit.Hours(24)), site, prov, kind)
+		pairs, err := plan.TwilightEvents(site, plan.Window{Start: noon, End: noon.Add(unit.Hours(24))}, prov, kind)
 		if err != nil {
 			t.Fatalf("%s: TwilightEvents: %v", kind, err)
 		}
@@ -51,7 +51,7 @@ func TestNightOfIsOneNightFromAnyInstantInIt(t *testing.T) {
 			{"23:00", noon.Add(unit.Hours(11))},
 			{"03:00 the next day", noon.Add(unit.Hours(15))},
 		} {
-			got, err := plan.NightOf(at.t, site, prov, kind)
+			got, err := plan.NightOf(site, at.t, prov, kind)
 			if err != nil {
 				t.Fatalf("%s from %s: %v", kind, at.name, err)
 			}
@@ -83,12 +83,12 @@ func TestNightOfAfterDawnIsTheComingNight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tonight, err := plan.NightOf(time.Date(2026, time.November, 17, 23, 0, 0, 0, time.LocationUTC), site, prov, plan.AstronomicalTwilight)
+	tonight, err := plan.NightOf(site, time.Date(2026, time.November, 17, 23, 0, 0, 0, time.LocationUTC), prov, plan.AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	before, err := plan.NightOf(tonight.Dawn.Add(unit.Minutes(-1)), site, prov, plan.AstronomicalTwilight)
+	before, err := plan.NightOf(site, tonight.Dawn.Add(unit.Minutes(-1)), prov, plan.AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestNightOfAfterDawnIsTheComingNight(t *testing.T) {
 	// this instant, past the first day of crossings NightOf looks through.
 	justAfter := tonight.Dawn.Add(unit.Seconds(1))
 
-	after, err := plan.NightOf(justAfter, site, prov, plan.AstronomicalTwilight)
+	after, err := plan.NightOf(site, justAfter, prov, plan.AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestNightOfFindsNoNightThatLastsADayOrNever(t *testing.T) {
 		{"December, civil, noon", time.Date(2026, time.December, 21, 11, 0, 0, 0, time.LocationUTC), plan.CivilTwilight},
 		{"December, civil, midnight", time.Date(2026, time.December, 21, 23, 0, 0, 0, time.LocationUTC), plan.CivilTwilight},
 	} {
-		if n, err := plan.NightOf(c.at, site, prov, c.kind); !errors.Is(err, plan.ErrNoTwilight) {
+		if n, err := plan.NightOf(site, c.at, prov, c.kind); !errors.Is(err, plan.ErrNoTwilight) {
 			t.Errorf("%s: %+v, %v, want ErrNoTwilight", c.name, n, err)
 		}
 	}
@@ -163,12 +163,12 @@ func TestNightOfRefusesWhatIsNotAnInstantOrAKind(t *testing.T) {
 
 	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
 
-	if _, err := plan.NightOf(noon, site, prov, plan.TwilightKind(99)); !errors.Is(err, plan.ErrUnknownTwilightKind) {
+	if _, err := plan.NightOf(site, noon, prov, plan.TwilightKind(99)); !errors.Is(err, plan.ErrUnknownTwilightKind) {
 		t.Errorf("kind 99: %v, want ErrUnknownTwilightKind", err)
 	}
 
 	for _, jd := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
-		if _, err := plan.NightOf(time.FromJD(jd, time.UTC), site, prov, plan.CivilTwilight); !errors.Is(err, plan.ErrNonFiniteInterval) {
+		if _, err := plan.NightOf(site, time.FromJD(jd, time.UTC), prov, plan.CivilTwilight); !errors.Is(err, plan.ErrNonFiniteInterval) {
 			t.Errorf("FromJD(%v): %v, want ErrNonFiniteInterval", jd, err)
 		}
 	}

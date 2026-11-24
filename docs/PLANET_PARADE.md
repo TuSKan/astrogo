@@ -125,13 +125,13 @@ site, _ := plan.NewSite("São Paulo", angle.LatDeg(-23.5505), angle.LonDeg(-46.6
 day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
 next := day.Add(unit.Days(1))
 
-_, sunset, _ := plan.SunriseSunset(day, next, site, prov)
+_, sunset, _ := plan.SunriseSunset(site, plan.Window{Start: day, End: next}, prov)
 
 // The night of February 28, from local noon.
 noon := day.Add(unit.Hours(12))
-civil, _ := plan.NightOf(noon, site, prov, plan.CivilTwilight)
-nautical, _ := plan.NightOf(noon, site, prov, plan.NauticalTwilight)
-astronomical, _ := plan.NightOf(noon, site, prov, plan.AstronomicalTwilight)
+civil, _ := plan.NightOf(site, noon, prov, plan.CivilTwilight)
+nautical, _ := plan.NightOf(site, noon, prov, plan.NauticalTwilight)
+astronomical, _ := plan.NightOf(site, noon, prov, plan.AstronomicalTwilight)
 // civil.Dusk, nautical.Dusk and astronomical.Dusk are the three dusks.
 ```
 
@@ -223,8 +223,8 @@ can identify the closest pairings.
 ```go
 import "github.com/TuSKan/astrogo/plan"
 
-appulses, _ := plan.Appulses(searchStart, searchEnd,
-    plan.NewMercury(prov), plan.NewSaturn(prov))
+appulses, _ := plan.Appulses(plan.NewMercury(prov), plan.NewSaturn(prov),
+    plan.Window{Start: searchStart, End: searchEnd})
 ```
 
 | Pair | Closest Approach | Separation | Date |

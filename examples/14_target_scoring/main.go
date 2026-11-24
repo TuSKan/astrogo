@@ -91,7 +91,7 @@ func main() {
 	tab := show.NewTable(cols...)
 
 	for _, obj := range targets {
-		alt, err := altitude.Check(obj, tm, site)
+		alt, err := altitude.Check(obj, site, tm)
 		if err != nil {
 			log.Fatalf("%s altitude: %v", obj.Name(), err)
 		}

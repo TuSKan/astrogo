@@ -54,7 +54,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	t.Run("ContinuousWindow", func(t *testing.T) {
 		// Altitude > 20 deg (It's at ~90 deg)
 		constraints := []Constraint{Altitude{Threshold: angle.Deg(20)}}
-		windows, err := ObservableWindows(obj, start, end, step, site, constraints...)
+		windows, err := ObservableWindows(obj, site, Window{Start: start, End: end}, step, constraints...)
 		testutil.AssertNoError(t, err)
 
 		if len(windows) != 1 {
@@ -87,7 +87,7 @@ func TestObservableWindows_Moving(t *testing.T) {
 	t.Run("SunDaylight", func(t *testing.T) {
 		// Sun altitude > 0 (Daylight)
 		constraints := []Constraint{Altitude{Threshold: angle.Zero()}}
-		windows, err := ObservableWindows(sun, start, end, step, site, constraints...)
+		windows, err := ObservableWindows(sun, site, Window{Start: start, End: end}, step, constraints...)
 		testutil.AssertNoError(t, err)
 
 		// Over 24 hours, we should see at least one daylight window (actually parts of two if we cross midnight).
@@ -102,7 +102,7 @@ type flipConstraint struct {
 	count int
 }
 
-func (f *flipConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
+func (f *flipConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
 	f.count++
 	pass := f.count%2 == 0
 
@@ -126,7 +126,7 @@ func TestObservableWindows_Grouping(t *testing.T) {
 	// t=4: count=5, fail -> end win
 	// t=5: count=6, pass -> start win, end at end
 
-	windows, err := ObservableWindows(obj, start, end, step, site, &flipConstraint{})
+	windows, err := ObservableWindows(obj, site, Window{Start: start, End: end}, step, &flipConstraint{})
 	testutil.AssertNoError(t, err)
 
 	// Expected windows:
@@ -152,7 +152,7 @@ func TestIsObservable(t *testing.T) {
 			Altitude{Threshold: angle.Deg(20)},
 			Airmass{Threshold: 2.0},
 		}
-		eval, err := IsObservable(obj, tm, site, constraints...)
+		eval, err := IsObservable(obj, site, tm, constraints...)
 		testutil.AssertNoError(t, err)
 
 		if !eval.Observable {
@@ -169,7 +169,7 @@ func TestIsObservable(t *testing.T) {
 			Altitude{Threshold: angle.Deg(95)}, // Should fail
 			Airmass{Threshold: 2.0},            // Should pass
 		}
-		eval, err := IsObservable(obj, tm, site, constraints...)
+		eval, err := IsObservable(obj, site, tm, constraints...)
 		testutil.AssertNoError(t, err)
 
 		if eval.Observable {
@@ -197,7 +197,7 @@ func TestIsObservable(t *testing.T) {
 
 		// Wait, for this test let's just use a high threshold to force a fail.
 		sun := NewSun(eph.Default())
-		eval, err := IsObservable(sun, tm, site, Altitude{Threshold: angle.Deg(80)})
+		eval, err := IsObservable(sun, site, tm, Altitude{Threshold: angle.Deg(80)})
 		testutil.AssertNoError(t, err)
 
 		if eval.Observable {
@@ -300,7 +300,7 @@ func TestRankObservables(t *testing.T) {
 			priority:   3.0, // Score ~135
 		}
 
-		ranked, err := RankObservables(objs, tm, site)
+		ranked, err := RankObservables(objs, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if len(ranked) != 2 {
@@ -337,7 +337,7 @@ func TestPlannerRankObservable(t *testing.T) {
 		NewStar("Low", angle.Hour(12), angle.Deg(-80)),
 	}
 
-	ranked, err := p.RankObservable(objs, start, end)
+	ranked, err := p.RankObservable(objs, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("RankObservable: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(unit.Days(1))
 
-	_, err = p.RankObservable([]Observable{erroringCoordObject{}}, start, end)
+	_, err = p.RankObservable([]Observable{erroringCoordObject{}}, Window{Start: start, End: end})
 	if err == nil {
 		t.Fatal("expected an error from an object whose ICRS always fails")
 	}
@@ -404,13 +404,13 @@ func TestObservableWindows_StepTooLarge(t *testing.T) {
 	// Step > 15min should return an error a caller can match via errors.Is
 	// against the documented public sentinel (R21 regression: these
 	// sentinels were declared and wrapped but never verified reachable).
-	_, err := ObservableWindows(obj, start, end, unit.Minutes(30), site, Altitude{Threshold: angle.Deg(30)})
+	_, err := ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(30), Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepTooLarge) {
 		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
 
 	// Step <= 15min should succeed.
-	_, err = ObservableWindows(obj, start, end, unit.Minutes(15), site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(15), Altitude{Threshold: angle.Deg(30)})
 	testutil.AssertNoError(t, err)
 }
 
@@ -422,12 +422,12 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 	start := fixedEpoch()
 	end := start.Add(unit.Hours(6))
 
-	_, err := ObservableWindows(obj, start, end, 0, site, Altitude{Threshold: angle.Deg(30)})
+	_, err := ObservableWindows(obj, site, Window{Start: start, End: end}, 0, Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a zero step, got %v", err)
 	}
 
-	_, err = ObservableWindows(obj, start, end, unit.Minutes(-1), site, Altitude{Threshold: angle.Deg(30)})
+	_, err = ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(-1), Altitude{Threshold: angle.Deg(30)})
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("expected ErrStepNotPositive for a negative step, got %v", err)
 	}
@@ -506,7 +506,7 @@ func TestScorerConfigIsUsed(t *testing.T) {
 	tm := time.FromJD(2451545.0, time.UTC) // J2000 noon, LST ~18.69h
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
-	eval, err := IsObservable(obj, tm, site)
+	eval, err := IsObservable(obj, site, tm)
 	testutil.AssertNoError(t, err)
 
 	altDeg := eval.AltAz.Alt().Degrees()
@@ -615,7 +615,7 @@ func TestScorerMeritTerms(t *testing.T) {
 		// meaning of the zero that a failed constraint returns.
 		below := NewStar("below", angle.Hour(6.69), angle.Deg(0))
 
-		eval, err := IsObservable(below, tm, site)
+		eval, err := IsObservable(below, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if eval.AltAz.Alt().Degrees() >= 0 {

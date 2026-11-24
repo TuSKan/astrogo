@@ -31,7 +31,7 @@ func TestEclipseGammaIsTheCanons(t *testing.T) {
 	prov := eph.Default()
 
 	cases := []struct {
-		find  func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		find  func(w Window, prov eph.Provider) ([]EclipseEvent, error)
 		date  string
 		y, m  int
 		d     int
@@ -64,7 +64,7 @@ func TestEclipseGammaIsTheCanons(t *testing.T) {
 	for _, c := range cases {
 		day := time.Date(c.y, time.Month(c.m), c.d, 0, 0, 0, 0, time.LocationUTC)
 
-		events, err := c.find(day.Add(unit.Days(-1)), day.Add(unit.Days(2)), prov)
+		events, err := c.find(Window{Start: day.Add(unit.Days(-1)), End: day.Add(unit.Days(2))}, prov)
 		if err != nil || len(events) != 1 {
 			t.Errorf("%s: %d eclipses, err %v; want 1", c.date, len(events), err)
 

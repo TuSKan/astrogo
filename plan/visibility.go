@@ -10,15 +10,9 @@ import (
 	"github.com/TuSKan/astrogo/unit"
 )
 
-// Interval is a continuous window during which an object is observable.
-type Interval struct {
-	Object coord.Object
-	Window Window
-}
-
 // IsVisible returns true if the object is currently above the specified
 // altitude threshold at the given site and time.
-func IsVisible(obj coord.Object, t time.Time, site *Site, minAlt angle.Angle) (bool, error) {
+func IsVisible(obj coord.Object, site *Site, t time.Time, minAlt angle.Angle) (bool, error) {
 	pos, err := obj.ICRS(t)
 	if err != nil {
 		return false, fmt.Errorf("visibility: ICRS: %w", err)
@@ -65,7 +59,7 @@ func refineVisibility(
 	}
 	solver := DefaultSolver()
 
-	refined, _, err := solver.FindRoot(Evaluator(altEval), a, b)
+	refined, _, err := solver.FindRoot(Evaluator(altEval), Window{Start: a, End: b})
 	if err != nil {
 		return b // fallback: use latest grid point
 	}
@@ -113,15 +107,17 @@ func refineBisect(a, b time.Time, aState bool, check func(time.Time) (bool, erro
 //
 // The step must be positive and at most 15 minutes. Larger steps risk missing
 // short visibility windows entirely and will return an error. A window that
-// ends before it starts is ErrReversedInterval, and one whose start or end is
+// ends before it starts is ErrReversedInterval, and one whose Start or End is
 // not a finite time is ErrNonFiniteInterval.
 func VisibleIntervals(
 	obj coord.Object,
 	site *Site,
-	start, end time.Time,
+	w Window,
 	step unit.Duration,
 	minAlt angle.Angle,
-) ([]Interval, error) {
+) ([]Window, error) {
+	start, end := w.Start, w.End
+
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
 		return nil, err
@@ -165,7 +161,7 @@ func visibleIntervals(
 	start, end time.Time,
 	step unit.Duration,
 	minAlt angle.Angle,
-) ([]Interval, error) {
+) ([]Window, error) {
 	// Unchecked, a reversed window gave no intervals and no error, and one
 	// ending at a NaN time gave an interval ending there (#996).
 	if err := checkInterval(start, end); err != nil {
@@ -184,7 +180,7 @@ func visibleIntervals(
 		return nil, fmt.Errorf("%w: %v", ErrStepTooLarge, step)
 	}
 
-	intervals := make([]Interval, 0, 4)
+	intervals := make([]Window, 0, 4)
 	inWindow := false
 
 	var (
@@ -219,10 +215,7 @@ func visibleIntervals(
 		} else if !visible && inWindow {
 			// Transition: visible → invisible. Refine the exact crossing.
 			winEnd := refineVisibility(obj, ctxAt, prevT, t, minAlt)
-			intervals = append(intervals, Interval{
-				Object: obj,
-				Window: Window{Start: winStart, End: winEnd},
-			})
+			intervals = append(intervals, Window{Start: winStart, End: winEnd})
 			inWindow = false
 		}
 
@@ -231,10 +224,7 @@ func visibleIntervals(
 	}
 
 	if inWindow {
-		intervals = append(intervals, Interval{
-			Object: obj,
-			Window: Window{Start: winStart, End: end},
-		})
+		intervals = append(intervals, Window{Start: winStart, End: end})
 	}
 
 	return intervals, nil
@@ -246,7 +236,9 @@ func visibleIntervals(
 // It uses a two-stage approach:
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
-func TransitEstimate(obj coord.Object, site *Site, start, end time.Time) (time.Time, angle.Angle, error) {
+func TransitEstimate(obj coord.Object, site *Site, w Window) (time.Time, angle.Angle, error) {
+	start, end := w.Start, w.End
+
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
@@ -340,7 +332,7 @@ func transitEstimate(
 
 	solver := DefaultSolver()
 
-	resTime, _, err := solver.FindExtremum(Evaluator(altAt), a, b, true)
+	resTime, _, err := solver.FindExtremum(Evaluator(altAt), Window{Start: a, End: b}, true)
 	if err != nil {
 		return time.Time{}, angle.Deg(0), err
 	}
@@ -400,13 +392,16 @@ func transitEstimate(
 
 // MaxAltitudeInWindow returns the maximum altitude reached by an object
 // in the specified time window.
-func MaxAltitudeInWindow(obj coord.Object, site *Site, start, end time.Time) (angle.Angle, error) {
-	_, alt, err := TransitEstimate(obj, site, start, end)
+func MaxAltitudeInWindow(obj coord.Object, site *Site, w Window) (angle.Angle, error) {
+	start, end := w.Start, w.End
+
+	_, alt, err := TransitEstimate(obj, site, Window{Start: start, End: end})
+
 	return alt, err
 }
 
-// Find scans [start, end] in steps of step, returning all intervals during
-// which obj satisfies all constraints from site.
+// Find scans w in steps of step, returning every window during which obj
+// satisfies all constraints from site.
 //
 // Transition boundaries are refined using binary search (sub-second precision).
 //
@@ -415,10 +410,12 @@ func MaxAltitudeInWindow(obj coord.Object, site *Site, start, end time.Time) (an
 func Find(
 	obj coord.Object,
 	site *Site,
-	constraints []Constraint,
-	start, end time.Time,
+	w Window,
 	step unit.Duration,
-) ([]Interval, error) {
+	constraints ...Constraint,
+) ([]Window, error) {
+	start, end := w.Start, w.End
+
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
 		return nil, err
@@ -441,7 +438,7 @@ func find(
 	constraints []Constraint,
 	start, end time.Time,
 	step unit.Duration,
-) ([]Interval, error) {
+) ([]Window, error) {
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
@@ -473,9 +470,9 @@ func find(
 				err error
 			)
 			if cc, ok := c.(ConstraintCtx); ok {
-				res, err = cc.CheckCtx(obs, t, site, ctx)
+				res, err = cc.CheckCtx(obs, site, t, ctx)
 			} else {
-				res, err = c.Check(obs, t, site)
+				res, err = c.Check(obs, site, t)
 			}
 
 			if err != nil {
@@ -491,7 +488,7 @@ func find(
 		return true, nil
 	}
 
-	intervals := make([]Interval, 0, 4)
+	intervals := make([]Window, 0, 4)
 	inWindow := false
 
 	var (
@@ -525,10 +522,7 @@ func find(
 				return nil, err
 			}
 
-			intervals = append(intervals, Interval{
-				Object: obj,
-				Window: Window{Start: winStart, End: winEnd},
-			})
+			intervals = append(intervals, Window{Start: winStart, End: winEnd})
 			inWindow = false
 		}
 
@@ -538,10 +532,7 @@ func find(
 	}
 
 	if inWindow {
-		intervals = append(intervals, Interval{
-			Object: obj,
-			Window: Window{Start: winStart, End: end},
-		})
+		intervals = append(intervals, Window{Start: winStart, End: end})
 	}
 
 	return intervals, nil

@@ -54,7 +54,7 @@ func main() {
 		// under way at an instant, or the coming one in daylight.
 		noon := time.Date(n.year, n.month, n.day, 12, 0, 0, 0, zone)
 
-		tonight, err := plan.TonightAt(noon, site, eph.Default())
+		tonight, err := plan.TonightAt(site, noon, eph.Default())
 		if err != nil {
 			log.Fatalf("tonight: %v", err)
 		}

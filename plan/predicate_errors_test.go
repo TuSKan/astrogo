@@ -20,7 +20,7 @@ var errConstraintUnavailable = errors.New("predicate_errors_test: constraint cou
 // failed or a provider that could not be reached.
 type failingConstraint struct{}
 
-func (failingConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
+func (failingConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
 	return Result{}, errConstraintUnavailable
 }
 
@@ -128,8 +128,8 @@ func TestFindReportsAConstraintThatCannotBeEvaluated(t *testing.T) {
 	_, err := Find(
 		mockObject{pos: coord.NewICRS(angle.Zero(), angle.Zero())},
 		site,
-		[]Constraint{failingConstraint{}},
-		start, start.Add(unit.Hours(2)), unit.Minutes(10),
+		Window{Start: start, End: start.Add(unit.Hours(2))}, unit.Minutes(10),
+		failingConstraint{},
 	)
 
 	if !errors.Is(err, errConstraintUnavailable) {
@@ -151,10 +151,12 @@ func TestObservableWindowsReportsAFailureDuringRefinement(t *testing.T) {
 
 	_, err := ObservableWindows(
 		NewStar("T", angle.Zero(), angle.Zero()),
-		start, start.Add(unit.Hours(2)), unit.Minutes(10),
-		site,
-		failingConstraint{},
-	)
+
+		site, Window{Start: start, End: start.Add(unit.Hours(2))},
+
+		unit.Minutes(10),
+
+		failingConstraint{})
 
 	if !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("ObservableWindows returned %v, want it to wrap the constraint's error", err)
@@ -343,7 +345,7 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 // else.
 type endOnlyFailingConstraint struct{ at time.Time }
 
-func (c endOnlyFailingConstraint) Check(_ Observable, t time.Time, _ *Site) (Result, error) {
+func (c endOnlyFailingConstraint) Check(_ Observable, _ *Site, t time.Time) (Result, error) {
 	if t.Equal(c.at) {
 		return Result{}, errConstraintUnavailable
 	}

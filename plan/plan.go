@@ -34,7 +34,7 @@ func NewPlanner(site *Site, constraints []Constraint) (*Planner, error) {
 
 // Observable returns true if all constraints are satisfied for obj at time t.
 func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
-	eval, err := IsObservable(obj, t, p.Site, p.Constraints...)
+	eval, err := IsObservable(obj, p.Site, t, p.Constraints...)
 	if err != nil {
 		return false, err
 	}
@@ -77,7 +77,9 @@ type RankedObject struct {
 // minutes. That finds a star's or a planet's culmination, but can step over a
 // satellite pass, which lasts a few minutes; rank satellites by
 // [SatellitePasses] instead.
-func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]RankedObject, error) {
+func (p *Planner) RankObservable(objects []Observable, w Window) ([]RankedObject, error) {
+	start, end := w.Start, w.End
+
 	type scored struct {
 		obj   Observable
 		score float64
@@ -90,7 +92,7 @@ func (p *Planner) RankObservable(objects []Observable, start, end time.Time) ([]
 		// implements coord.Object directly, so asObject wraps it, keeping
 		// MovingBody: the peak altitude is the score, and for the Moon or a
 		// satellite it is only right from the observer's position (#483).
-		transitTime, peakAlt, err := TransitEstimate(asObject(obj), p.Site, start, end)
+		transitTime, peakAlt, err := TransitEstimate(asObject(obj), p.Site, Window{Start: start, End: end})
 		if err != nil {
 			return scored{}, err
 		}
@@ -160,8 +162,8 @@ type Evaluation struct {
 // (e.g., ephemeris lookup failure), not if a constraint is simply not satisfied.
 func IsObservable(
 	obj Observable,
-	t time.Time,
 	site *Site,
+	t time.Time,
 	constraints ...Constraint,
 ) (Evaluation, error) {
 	eval, err := isObservableCtx(obj, t, site, nil, nil, constraints...)
@@ -607,8 +609,8 @@ func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
 // goroutine at once, so it must only read it; see that interface.
 func RankObservables(
 	objs []Observable,
-	t time.Time,
 	site *Site,
+	t time.Time,
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
 	// Nothing to score needs no Context, and no site.
@@ -671,22 +673,24 @@ func RankObservables(
 var maxObservableStep = unit.Minutes(15)
 
 // ObservableWindows computes the time intervals where the target satisfies all
-// provided constraints by sampling the range [start, end] at the given cadence.
+// provided constraints by sampling w at the given cadence.
 //
 // Transition boundaries are refined using binary search (sub-second precision),
 // eliminating the ±step quantization error of pure grid search.
 //
 // The step must be positive and at most 15 minutes. Larger steps risk missing
 // short visibility windows entirely and will return an error. A window that
-// ends before it starts is ErrReversedInterval, and one whose start or end is
+// ends before it starts is ErrReversedInterval, and one whose Start or End is
 // not a finite time is ErrNonFiniteInterval.
 func ObservableWindows(
 	obj Observable,
-	start, end time.Time,
-	step unit.Duration,
 	site *Site,
+	w Window,
+	step unit.Duration,
 	constraints ...Constraint,
 ) ([]Window, error) {
+	start, end := w.Start, w.End
+
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
 		return nil, err

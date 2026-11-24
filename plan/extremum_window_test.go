@@ -52,7 +52,7 @@ func TestGreatestElongationsIgnoreTheWindowEnd(t *testing.T) {
 	for _, start := range windowEndStarts() {
 		end := start.Add(unit.Days(365))
 
-		events, err := plan.GreatestElongations(start, end, venus, sun)
+		events, err := plan.GreatestElongations(venus, sun, plan.Window{Start: start, End: end})
 		if err != nil {
 			t.Fatalf("start %v: %v", start, err)
 		}
@@ -94,7 +94,7 @@ func TestAppulsesIgnoreTheWindowEnd(t *testing.T) {
 		a, b := pair[0], pair[1]
 		start := windowEndStarts()[0]
 
-		events, err := plan.Appulses(start, start.Add(unit.Days(365)), a, b)
+		events, err := plan.Appulses(a, b, plan.Window{Start: start, End: start.Add(unit.Days(365))})
 		if err != nil {
 			t.Fatalf("%s-%s: %v", a.Name(), b.Name(), err)
 		}

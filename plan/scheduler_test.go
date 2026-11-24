@@ -14,7 +14,7 @@ type mockConstraint struct {
 	pass bool
 }
 
-func (m mockConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
+func (m mockConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
 	return Result{Pass: m.pass}, nil
 }
 

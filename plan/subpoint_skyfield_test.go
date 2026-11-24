@@ -37,7 +37,7 @@ func TestSubpointsAgreeWithSkyfield(t *testing.T) {
 
 	for _, c := range []struct {
 		name     string
-		point    func(eph.Provider, time.Time) (*coord.Geodetic, error)
+		point    func(time.Time, eph.Provider) (*coord.Geodetic, error)
 		at       time.Time
 		lat, lon float64 // Skyfield's, degrees
 	}{
@@ -46,7 +46,7 @@ func TestSubpointsAgreeWithSkyfield(t *testing.T) {
 		{"Moon", plan.SublunarPoint, march, 10.505128, 18.069419},
 		{"Moon", plan.SublunarPoint, june, 1.451051, 165.199363},
 	} {
-		g, err := c.point(prov, c.at)
+		g, err := c.point(c.at, prov)
 		if err != nil {
 			t.Fatalf("%s at %v: %v", c.name, c.at, err)
 		}

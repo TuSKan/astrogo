@@ -118,7 +118,7 @@ func BenchmarkRankObservables(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			constraints := altitudeOnly()
 
-			ranked, err := RankObservables(tc.objs, t, site, constraints...)
+			ranked, err := RankObservables(tc.objs, site, t, constraints...)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -130,7 +130,7 @@ func BenchmarkRankObservables(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				if _, err := RankObservables(tc.objs, t, site, constraints...); err != nil {
+				if _, err := RankObservables(tc.objs, site, t, constraints...); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -233,7 +233,7 @@ func BenchmarkObservableWindowsChain(b *testing.B) {
 	for _, target := range targets {
 		for _, set := range sets {
 			b.Run(target.name+"/"+set.name, func(b *testing.B) {
-				windows, err := ObservableWindows(target.obj, start, end, step, site, set.constraints...)
+				windows, err := ObservableWindows(target.obj, site, Window{Start: start, End: end}, step, set.constraints...)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -245,7 +245,7 @@ func BenchmarkObservableWindowsChain(b *testing.B) {
 				b.ReportAllocs()
 
 				for b.Loop() {
-					if _, err := ObservableWindows(target.obj, start, end, step, site, set.constraints...); err != nil {
+					if _, err := ObservableWindows(target.obj, site, Window{Start: start, End: end}, step, set.constraints...); err != nil {
 						b.Fatal(err)
 					}
 				}
@@ -273,7 +273,7 @@ func BenchmarkObservableWindowsManyTargets(b *testing.B) {
 		b.Run(set.name, func(b *testing.B) {
 			run := func() (windows int, err error) {
 				for _, star := range stars {
-					w, err := ObservableWindows(star, start, end, step, site, set.constraints...)
+					w, err := ObservableWindows(star, site, Window{Start: start, End: end}, step, set.constraints...)
 					if err != nil {
 						return 0, fmt.Errorf("%s: %w", star.Name(), err)
 					}

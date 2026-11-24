@@ -336,7 +336,7 @@ const greatestEclipseTolMinutes = 1.0
 // Nothing looked. The window is the page's first to last eclipse, a day
 // either side, so no eclipse belonging to a neighboring page can fall in it.
 func checkNoEclipseOutsideCatalog(t *testing.T, kind string,
-	find func(start, end time.Time, prov eph.Provider) ([]plan.EclipseEvent, error),
+	find func(w plan.Window, prov eph.Provider) ([]plan.EclipseEvent, error),
 	refs []nasaEclipseRef, prov eph.Provider,
 ) {
 	t.Helper()
@@ -344,7 +344,7 @@ func checkNoEclipseOutsideCatalog(t *testing.T, kind string,
 	start := time.FromJD(refs[0].JDtd-1, time.TDB)
 	end := time.FromJD(refs[len(refs)-1].JDtd+1, time.TDB)
 
-	events, err := find(start, end, prov)
+	events, err := find(plan.Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Errorf("  FAIL %s over the page: %v", kind, err)
 
@@ -518,7 +518,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 
 				// DE441 covers every date on these pages, so an error from the
 				// search is astrogo's, and a miss rather than a skip.
-				eclipses, err := plan.LunarEclipses(searchStart, searchEnd, prov)
+				eclipses, err := plan.LunarEclipses(plan.Window{Start: searchStart, End: searchEnd}, prov)
 				if err != nil {
 					t.Errorf("  FAIL %04d-%02d-%02d: LunarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)
@@ -653,7 +653,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 
 				// DE441 covers every date on these pages, so an error from the
 				// search is astrogo's, and a miss rather than a skip.
-				eclipses, err := plan.SolarEclipses(searchStart, searchEnd, prov)
+				eclipses, err := plan.SolarEclipses(plan.Window{Start: searchStart, End: searchEnd}, prov)
 				if err != nil {
 					t.Errorf("  FAIL %04d-%02d-%02d: SolarEclipses: %v",
 						ref.Year, ref.Month, ref.Day, err)

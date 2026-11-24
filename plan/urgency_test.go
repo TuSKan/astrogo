@@ -39,12 +39,12 @@ func TestHoursUntilSetInterpolatesBetweenProbes(t *testing.T) {
 	star := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(-30))}
 	day := time.Date(2024, time.June, 15, 0, 0, 0, 0, time.LocationUTC)
 
-	windows, err := VisibleIntervals(star, site, day, day.Add(unit.Days(1)), unit.Minutes(5), angle.Zero())
+	windows, err := VisibleIntervals(star, site, Window{Start: day, End: day.Add(unit.Days(1))}, unit.Minutes(5), angle.Zero())
 	if err != nil || len(windows) != 1 {
 		t.Fatalf("reference day: %d windows, %v; want one", len(windows), err)
 	}
 
-	w := windows[0].Window
+	w := windows[0]
 	probes := []float64{0, 0.5, 1, 2, 4, 8}
 
 	for _, after := range []float64{0.25, 0.5, 1, 2, 3, 5} {

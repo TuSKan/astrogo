@@ -29,7 +29,7 @@ func TestMoonPhasesSeeTheLastPartialStep(t *testing.T) {
 		{"last partial step", time.Date(2026, 9, 26, 8, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 26, 17, 0, 0, 0, time.LocationUTC)},
 		{"window shorter than a step", time.Date(2026, 9, 26, 16, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 26, 17, 0, 0, 0, time.LocationUTC)},
 	} {
-		phases, err := MoonPhases(w.start, w.end, prov)
+		phases, err := MoonPhases(Window{Start: w.start, End: w.end}, prov)
 		if err != nil {
 			t.Fatalf("%s: %v", w.name, err)
 		}
@@ -45,7 +45,7 @@ func TestMoonPhasesSeeTheLastPartialStep(t *testing.T) {
 		}
 	}
 
-	eclipses, err := LunarEclipses(time.Date(2026, 3, 2, 21, 0, 0, 0, time.LocationUTC), time.Date(2026, 3, 3, 14, 0, 0, 0, time.LocationUTC), prov)
+	eclipses, err := LunarEclipses(Window{Start: time.Date(2026, 3, 2, 21, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 3, 3, 14, 0, 0, 0, time.LocationUTC)}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestMoonPhasesDoNotDependOnWhereTheWindowIsCut(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(60))
 
-	whole, err := MoonPhases(start, end, prov)
+	whole, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestMoonPhasesDoNotDependOnWhereTheWindowIsCut(t *testing.T) {
 			b = end
 		}
 
-		got, err := MoonPhases(a, b, prov)
+		got, err := MoonPhases(Window{Start: a, End: b}, prov)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +108,7 @@ func TestMoonPhasesReturnEveryProviderFailure(t *testing.T) {
 
 	counting := &failingOnceProvider{Provider: eph.Default(), on: -1}
 
-	phases, err := MoonPhases(start, end, counting)
+	phases, err := MoonPhases(Window{Start: start, End: end}, counting)
 	if err != nil || len(phases) == 0 {
 		t.Fatalf("%d phases, err %v; want the phases in the window", len(phases), err)
 	}
@@ -116,7 +116,7 @@ func TestMoonPhasesReturnEveryProviderFailure(t *testing.T) {
 	for call := range counting.calls {
 		prov := &failingOnceProvider{Provider: eph.Default(), on: call}
 
-		if _, err := MoonPhases(start, end, prov); !errors.Is(err, errFailingOnce) {
+		if _, err := MoonPhases(Window{Start: start, End: end}, prov); !errors.Is(err, errFailingOnce) {
 			t.Errorf("provider failing on call %d of %d: err %v, want errFailingOnce", call, counting.calls, err)
 		}
 	}

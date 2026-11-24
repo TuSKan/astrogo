@@ -294,9 +294,9 @@ func VisibleTonight(
 	ctx context.Context,
 	site *Site,
 	night time.Time,
-	magLimit float64,
 	brightSources []resolve.BrightObjectSearcher,
 	planetProvider eph.Provider,
+	magLimit float64,
 	opts ...VisibleTonightOption,
 ) ([]VisibleObject, error) {
 	if planetProvider == nil {
@@ -329,7 +329,7 @@ func VisibleTonight(
 
 	cfg.air = air
 
-	nightSpan, err := NightOf(night, site, planetProvider, AstronomicalTwilight)
+	nightSpan, err := NightOf(site, night, planetProvider, AstronomicalTwilight)
 	if err != nil {
 		return nil, fmt.Errorf("plan: visible tonight: %w", err)
 	}
@@ -779,7 +779,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		return placedObject{}, false, fmt.Errorf("%s: %w", stage, err)
 	}
 
-	windows, err := ObservableWindows(obj, start, end, cfg.step, site, Altitude{Threshold: cfg.minAltitude})
+	windows, err := ObservableWindows(obj, site, Window{Start: start, End: end}, cfg.step, Altitude{Threshold: cfg.minAltitude})
 	if err != nil {
 		return skipped("observable windows", err)
 	}
@@ -788,7 +788,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 		return placedObject{}, false, nil // evaluated: never clears the horizon
 	}
 
-	events, err := VisibilityEvents(start, end, obj, site)
+	events, err := VisibilityEvents(obj, site, Window{Start: start, End: end})
 	if err != nil {
 		return skipped("visibility events", err)
 	}
@@ -821,7 +821,7 @@ func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.
 	// falls outside [start, end].
 	w := windows[0]
 
-	peakTime, _, err := TransitEstimate(asObject(obj), site, w.Start, w.End)
+	peakTime, _, err := TransitEstimate(asObject(obj), site, Window{Start: w.Start, End: w.End})
 	if err != nil {
 		return skipped("transit estimate", err)
 	}

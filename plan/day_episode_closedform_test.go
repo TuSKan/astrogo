@@ -232,7 +232,7 @@ func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 
 	// And the Moon really does rise, so short-circuiting here would be wrong
 	// rather than merely unjustified.
-	rise, _, err := Episode(base, base.Add(unit.Days(1)), moon, site)
+	rise, _, err := Episode(moon, site, Window{Start: base, End: base.Add(unit.Days(1))})
 	if err != nil {
 		t.Fatalf("Episode: %v", err)
 	}
@@ -266,7 +266,7 @@ func BenchmarkEpisodeNeverRises(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, _, err := Episode(from, to, star, site); err != nil {
+		if _, _, err := Episode(star, site, Window{Start: from, End: to}); err != nil {
 			b.Fatalf("Episode: %v", err)
 		}
 	}

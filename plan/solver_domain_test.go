@@ -58,7 +58,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 			return c.fa + (c.fb-c.fa)*(h/6), nil
 		}
 
-		_, _, err := solver.FindRoot(eval, solverEpoch(), plusHours(6))
+		_, _, err := solver.FindRoot(eval, plan.Window{Start: solverEpoch(), End: plusHours(6)})
 		if !errors.Is(err, plan.ErrBracketingViolated) {
 			t.Errorf("%s: FindRoot returned err = %v, want ErrBracketingViolated", c.name, err)
 		}
@@ -79,7 +79,7 @@ func TestFindRootRefusesAnUnbracketedInterval(t *testing.T) {
 			return c.fa + (c.fb-c.fa)*(h/6), nil
 		}
 
-		if _, _, err := solver.FindRoot(eval, solverEpoch(), plusHours(6)); err != nil {
+		if _, _, err := solver.FindRoot(eval, plan.Window{Start: solverEpoch(), End: plusHours(6)}); err != nil {
 			t.Errorf("%s: FindRoot refused a bracketed interval: %v", c.name, err)
 		}
 	}
@@ -107,7 +107,7 @@ func TestFindRootLandsOnKnownRoots(t *testing.T) {
 	} {
 		eval := func(at time.Time) (float64, error) { return c.f(atHours(at)), nil }
 
-		got, value, err := solver.FindRoot(eval, solverEpoch(), plusHours(12))
+		got, value, err := solver.FindRoot(eval, plan.Window{Start: solverEpoch(), End: plusHours(12)})
 		if err != nil {
 			t.Errorf("%s: %v", c.name, err)
 
@@ -131,8 +131,8 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 
 	// Failing at the very first evaluation.
 	_, _, err := solver.FindRoot(
-		func(time.Time) (float64, error) { return 0, errEvaluator },
-		solverEpoch(), plusHours(6))
+		func(time.Time) (float64, error) { return 0, errEvaluator }, plan.Window{Start: solverEpoch(), End: plusHours(6)})
+
 	if !errors.Is(err, errEvaluator) {
 		t.Errorf("a failing evaluator gave err = %v, want the evaluator's own error", err)
 	}
@@ -151,7 +151,7 @@ func TestFindRootPropagatesFailure(t *testing.T) {
 			return atHours(at) - 3, nil
 		}
 
-		if _, _, err := solver.FindRoot(eval, solverEpoch(), plusHours(6)); err == nil {
+		if _, _, err := solver.FindRoot(eval, plan.Window{Start: solverEpoch(), End: plusHours(6)}); err == nil {
 			t.Errorf("an evaluator returning %v mid-solve was accepted", bad)
 		}
 	}
@@ -190,7 +190,7 @@ func TestFindExtremumLandsOnKnownExtrema(t *testing.T) {
 	} {
 		eval := func(at time.Time) (float64, error) { return c.f(atHours(at)), nil }
 
-		got, value, err := solver.FindExtremum(eval, solverEpoch(), plusHours(12), c.isMax)
+		got, value, err := solver.FindExtremum(eval, plan.Window{Start: solverEpoch(), End: plusHours(12)}, c.isMax)
 		if err != nil {
 			t.Errorf("%s: %v", c.name, err)
 

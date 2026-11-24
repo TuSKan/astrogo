@@ -69,7 +69,7 @@ func main() {
 	tEnd := time.DateJulianCal(33, 4, 4, 0, 0, 0)
 
 	// ── Sunset ──
-	_, sunSet, err := plan.SunriseSunset(tStart, tEnd, site, prov)
+	_, sunSet, err := plan.SunriseSunset(site, plan.Window{Start: tStart, End: tEnd}, prov)
 	if err != nil {
 		fmt.Printf("  Sunset error: %v\n", err)
 	} else if sunSet != nil {
@@ -80,7 +80,7 @@ func main() {
 	}
 
 	// ── Moonrise ──
-	moonRise, _, err := plan.MoonriseMoonset(tStart, tEnd, site, prov)
+	moonRise, _, err := plan.MoonriseMoonset(site, plan.Window{Start: tStart, End: tEnd}, prov)
 	if err != nil {
 		fmt.Printf("  Moonrise error: %v\n", err)
 	} else if moonRise != nil {
@@ -94,7 +94,7 @@ func main() {
 	eStart := time.DateJulianCal(33, 3, 1, 0, 0, 0)
 	eEnd := time.DateJulianCal(33, 5, 1, 0, 0, 0)
 
-	eclipses, err := plan.LunarEclipses(eStart, eEnd, prov)
+	eclipses, err := plan.LunarEclipses(plan.Window{Start: eStart, End: eEnd}, prov)
 	if err != nil {
 		fmt.Printf("  Eclipse error: %v\n", err)
 	}
@@ -158,7 +158,7 @@ func main() {
 	pilateStart := time.DateJulianCal(26, 1, 1, 0, 0, 0)
 	pilateEnd := time.DateJulianCal(37, 1, 1, 0, 0, 0)
 
-	allEclipses, err := plan.LunarEclipses(pilateStart, pilateEnd, prov)
+	allEclipses, err := plan.LunarEclipses(plan.Window{Start: pilateStart, End: pilateEnd}, prov)
 	if err != nil {
 		panic(err)
 	}

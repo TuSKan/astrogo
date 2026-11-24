@@ -127,11 +127,14 @@ type Transition struct {
 
 // NewTransition is the Transition from one block to the next, as a strategy
 // hands it to a [TransitionModel]: each target observed from site at its own
-// instant. It builds a coord.Context for the pair; the built-in strategies
+// instant, from's at w.Start, when its observation ends, and to's at w.End,
+// when the next begins. It builds a coord.Context for the pair; the built-in strategies
 // observe both through the Context they evaluate constraints with instead.
 //
 // An error means a target could not be observed, and names which end.
-func NewTransition(from, to *Block, fromTime, toTime time.Time, site *Site) (Transition, error) {
+func NewTransition(from, to *Block, site *Site, w Window) (Transition, error) {
+	fromTime, toTime := w.Start, w.End
+
 	if site == nil {
 		return Transition{}, ErrNilSite
 	}

@@ -23,7 +23,7 @@ func TestDayEventsFindsSunRiseSetTransit(t *testing.T) {
 
 	day := time.FromJD(2451545.0, time.UTC) // any instant on the day in question
 
-	rise, set, transit, err := DayEvents(day, time.LocationUTC, sun, site)
+	rise, set, transit, err := DayEvents(sun, site, day, time.LocationUTC)
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil || transit == nil {
@@ -49,7 +49,7 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	utcMidnight30 := time.FromJD(2451544.5+0.5/24, time.UTC) // 2000-01-01 00:30 UTC
 	utcMinus5 := time.FixedZone("UTC-5", -5*3600)
 
-	_, _, _, err := DayEvents(utcMidnight30, utcMinus5, sun, site)
+	_, _, _, err := DayEvents(sun, site, utcMidnight30, utcMinus5)
 	testutil.AssertNoError(t, err)
 
 	// Cross-check: the local calendar date under UTC-5 is 1999-12-31, one
@@ -71,10 +71,10 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 
 	day := time.FromJD(2451545.0, time.UTC)
 
-	withNil, _, _, err := DayEvents(day, nil, sun, site)
+	withNil, _, _, err := DayEvents(sun, site, day, nil)
 	testutil.AssertNoError(t, err)
 
-	withUTC, _, _, err := DayEvents(day, time.LocationUTC, sun, site)
+	withUTC, _, _, err := DayEvents(sun, site, day, time.LocationUTC)
 	testutil.AssertNoError(t, err)
 
 	if withNil == nil || withUTC == nil {
@@ -95,7 +95,7 @@ func TestDayEventsPolarNight(t *testing.T) {
 
 	day := time.FromJD(2451727.5, time.UTC) // known midwinter date, per existing TestSunEvents_Polar
 
-	rise, set, _, err := DayEvents(day, time.LocationUTC, sun, site)
+	rise, set, _, err := DayEvents(sun, site, day, time.LocationUTC)
 	testutil.AssertNoError(t, err)
 
 	if rise != nil || set != nil {
@@ -117,7 +117,7 @@ func TestEpisodeWithinWindowMatchesDirectSearch(t *testing.T) {
 	from := time.FromJD(2451544.5, time.UTC) // local midday-ish, target below horizon
 	to := from.Add(unit.Days(1))
 
-	rise, set, err := Episode(from, to, sun, site)
+	rise, set, err := Episode(sun, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -200,7 +200,7 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 		t.Fatal("test setup: expected the Sun to be up 2h after its own rise")
 	}
 
-	rise, set, err := Episode(from, to, sun, site)
+	rise, set, err := Episode(sun, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -254,7 +254,7 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 	from := realRise.Time.Add(unit.Hours(1))
 	to := realSet.Time.Add(unit.Hours(-1))
 
-	rise, set, err := Episode(from, to, sun, site)
+	rise, set, err := Episode(sun, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -286,7 +286,7 @@ func TestEpisodeCircumpolarReturnsNilNil(t *testing.T) {
 	from := time.FromJD(2451544.5, time.UTC)
 	to := from.Add(unit.Days(1))
 
-	rise, set, err := Episode(from, to, star, site)
+	rise, set, err := Episode(star, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise != nil || set != nil {
@@ -304,7 +304,7 @@ func TestEpisodeNeverRisesReturnsNilNil(t *testing.T) {
 	from := time.FromJD(2451544.5, time.UTC)
 	to := from.Add(unit.Days(1))
 
-	rise, set, err := Episode(from, to, star, site)
+	rise, set, err := Episode(star, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise != nil || set != nil {
@@ -370,7 +370,7 @@ func TestDayEventsPropagatesVisibilityError(t *testing.T) {
 
 	day := time.FromJD(2451545.0, time.UTC)
 
-	_, _, _, err := DayEvents(day, time.LocationUTC, errObservable{}, site)
+	_, _, _, err := DayEvents(errObservable{}, site, day, time.LocationUTC)
 	if !errors.Is(err, errAlwaysFails) {
 		t.Fatalf("expected errAlwaysFails, got %v", err)
 	}
@@ -405,7 +405,7 @@ func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
 	from := time.FromJD(2451544.5, time.UTC)
 	to := from.Add(unit.Days(1))
 
-	_, _, err := Episode(from, to, errObservable{}, site)
+	_, _, err := Episode(errObservable{}, site, Window{Start: from, End: to})
 	if !errors.Is(err, errAlwaysFails) {
 		t.Fatalf("expected errAlwaysFails, got %v", err)
 	}
@@ -427,7 +427,7 @@ func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
 		t.Fatal("test setup: span must exceed episodeSearchWindow to exercise the widen branch")
 	}
 
-	rise, set, err := Episode(from, to, sun, site)
+	rise, set, err := Episode(sun, site, Window{Start: from, End: to})
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -454,7 +454,7 @@ func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
 	calls := 0
 	failing := countingObservable{Observable: sun, calls: &calls, failAfter: 1}
 
-	_, _, err := Episode(from, to, failing, site)
+	_, _, err := Episode(failing, site, Window{Start: from, End: to})
 	if !errors.Is(err, errCountingObservable) {
 		t.Fatalf("expected errCountingObservable, got %v", err)
 	}
@@ -495,7 +495,7 @@ func TestEpisodeSetSearchErrorPropagates(t *testing.T) {
 	// the set search's own first Position call is the first to fail.
 	failing := countingObservable{Observable: sun, calls: new(int), failAfter: calls}
 
-	_, _, err = Episode(from, from.Add(unit.Days(1)), failing, site)
+	_, _, err = Episode(failing, site, Window{Start: from, End: from.Add(unit.Days(1))})
 	if !errors.Is(err, errCountingObservable) {
 		t.Fatalf("expected errCountingObservable, got %v", err)
 	}

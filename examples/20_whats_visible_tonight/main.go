@@ -153,7 +153,7 @@ func main() {
 	// reports what it skipped as an ErrIncomplete. Everything else it can
 	// return is fatal and comes with no results, so this example prints the
 	// warning and carries on with the sky it did get.
-	results, err := plan.VisibleTonight(ctx, site, night, magLimit, sources, planetProvider)
+	results, err := plan.VisibleTonight(ctx, site, night, sources, planetProvider, magLimit)
 
 	switch {
 	case errors.Is(err, plan.ErrIncomplete):

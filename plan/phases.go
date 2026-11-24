@@ -99,12 +99,14 @@ func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
 }
 
 // MoonPhases computes all primary lunar phases (New, First Quarter, Full,
-// Last Quarter) in the time interval [start, end].
+// Last Quarter) in w.
 //
 // The algorithm samples the Moon-Sun ecliptic elongation at regular intervals
 // and uses Brent's method (via Solver) to refine the instant when the elongation
 // crosses 0°, 90°, 180°, or 270°.
-func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, error) {
+func MoonPhases(w Window, prov eph.Provider) ([]MoonPhaseEvent, error) {
+	start, end := w.Start, w.End
+
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
@@ -150,7 +152,7 @@ func MoonPhases(start, end time.Time, prov eph.Provider) ([]MoonPhaseEvent, erro
 				// The samples bracket the crossing, so a refinement that fails
 				// is an ephemeris failure, returned rather than skipped: a
 				// skipped phase is a missing phase with a nil error.
-				refined, _, err := solver.FindRoot(eval, prevT, t)
+				refined, _, err := solver.FindRoot(eval, Window{Start: prevT, End: t})
 				if err != nil {
 					return nil, fmt.Errorf("moon phases: %v near %v: %w", phase, t, err)
 				}
@@ -313,7 +315,7 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 				// The samples bracket the crossing, so a refinement that fails
 				// is an ephemeris failure, returned rather than skipped: a
 				// skipped season is a missing equinox with a nil error (#453).
-				refined, _, err := solver.FindRoot(eval, prevT, t)
+				refined, _, err := solver.FindRoot(eval, Window{Start: prevT, End: t})
 				if err != nil {
 					return nil, fmt.Errorf("seasons: %v near %v: %w", season, t, err)
 				}
@@ -490,7 +492,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	periStart := time.Date(year-1, time.December, 15, 0, 0, 0, 0, time.LocationUTC)
 	periEnd := time.Date(year, time.February, 15, 0, 0, 0, 0, time.LocationUTC)
 
-	periTime, periDist, err := solver.FindExtremum(Evaluator(sunDistance), periStart, periEnd, false)
+	periTime, periDist, err := solver.FindExtremum(Evaluator(sunDistance), Window{Start: periStart, End: periEnd}, false)
 	if err != nil {
 		return nil, fmt.Errorf("apsides: perihelion: %w", err)
 	}
@@ -502,7 +504,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	apStart := time.Date(year, time.May, 15, 0, 0, 0, 0, time.LocationUTC)
 	apEnd := time.Date(year, time.August, 15, 0, 0, 0, 0, time.LocationUTC)
 
-	apTime, apDist, err := solver.FindExtremum(Evaluator(sunDistance), apStart, apEnd, true)
+	apTime, apDist, err := solver.FindExtremum(Evaluator(sunDistance), Window{Start: apStart, End: apEnd}, true)
 	if err != nil {
 		return nil, fmt.Errorf("apsides: aphelion: %w", err)
 	}
@@ -639,7 +641,7 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 	return ecl.Lat().Angle, nil
 }
 
-// LunarEclipses returns the lunar eclipses in [start, end]: every Full Moon at
+// LunarEclipses returns the lunar eclipses in w: every Full Moon at
 // which the Moon enters Earth's penumbra, penumbral eclipses included.
 //
 // Earth's shadow is sized as NASA's Five Millennium Canon of Lunar Eclipses
@@ -648,12 +650,14 @@ func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
 // canon the two agree on every one. Time is greatest eclipse, when the Moon's
 // center passes closest to the shadow axis, and Gamma is that closest distance
 // as the canon gives it. EclipticLatitude is the Moon's, at greatest eclipse.
-func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
+func LunarEclipses(w Window, prov eph.Provider) ([]EclipseEvent, error) {
+	start, end := w.Start, w.End
+
 	if prov == nil {
 		prov = eph.Default()
 	}
 
-	phases, err := MoonPhases(start, end, prov)
+	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		return nil, fmt.Errorf("lunar eclipses: %w", err)
 	}
@@ -683,7 +687,9 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			}
 
 			return g.lunarAxisDistance(), nil
-		}, phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth)), false)
+		}, Window{Start: phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), End: phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth))},
+
+			false)
 		if err != nil {
 			return nil, fmt.Errorf("lunar eclipses: greatest eclipse near %v: %w", phase.Time, err)
 		}
@@ -717,7 +723,7 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 	return eclipses, nil
 }
 
-// SolarEclipses returns the solar eclipses in [start, end]: every New Moon at
+// SolarEclipses returns the solar eclipses in w: every New Moon at
 // which the Moon's penumbra falls on the Earth, partial eclipses included.
 //
 // The penumbra is sized, and the Earth shaped, as NASA's Five Millennium Canon
@@ -726,12 +732,14 @@ func LunarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 // eclipse, when the shadow's axis passes closest to Earth's center, and Gamma
 // is that closest distance as the canon gives it. EclipticLatitude is the
 // Moon's, at greatest eclipse.
-func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error) {
+func SolarEclipses(w Window, prov eph.Provider) ([]EclipseEvent, error) {
+	start, end := w.Start, w.End
+
 	if prov == nil {
 		prov = eph.Default()
 	}
 
-	phases, err := MoonPhases(start, end, prov)
+	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		return nil, fmt.Errorf("solar eclipses: %w", err)
 	}
@@ -761,7 +769,9 @@ func SolarEclipses(start, end time.Time, prov eph.Provider) ([]EclipseEvent, err
 			}
 
 			return g.solarAxisDistance(), nil
-		}, phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth)), false)
+		}, Window{Start: phase.Time.Add(unit.Minutes(-eclipseSearchHalfWidth)), End: phase.Time.Add(unit.Minutes(eclipseSearchHalfWidth))},
+
+			false)
 		if err != nil {
 			return nil, fmt.Errorf("solar eclipses: greatest eclipse near %v: %w", phase.Time, err)
 		}

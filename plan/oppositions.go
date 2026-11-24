@@ -41,7 +41,9 @@ import (
 // oppositions of Mars, Jupiter, Saturn, Uranus and Neptune that a daily scan
 // of the apparent places finds, and over 2000–2004 its Full Moons, within
 // 0.3 s.
-func Oppositions(start, end time.Time, target, other Observable) ([]Event, error) {
+func Oppositions(target, other Observable, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
 		Kind:   EventOpposition,
@@ -78,8 +80,10 @@ func Oppositions(start, end time.Time, target, other Observable) ([]Event, error
 // [Oppositions] of the Moon. With DE440s the Full Moon of 2026-09-26 falls
 // within a second of Skyfield's.
 // For eclipses, use LunarEclipses, which decides each Full Moon by Earth's shadow.
-func FullMoonOppositions(start, end time.Time, provider eph.Provider) ([]Event, error) {
-	return Oppositions(start, end, NewMoon(provider), NewSun(provider))
+func FullMoonOppositions(w Window, provider eph.Provider) ([]Event, error) {
+	start, end := w.Start, w.End
+
+	return Oppositions(NewMoon(provider), NewSun(provider), Window{Start: start, End: end})
 }
 
 // isSun reports whether o is the Sun.

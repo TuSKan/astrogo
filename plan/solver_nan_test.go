@@ -62,7 +62,7 @@ func TestFindRoot_NonFiniteEvaluation(t *testing.T) {
 			t.Run(nf.name+"_"+pos.name, func(t *testing.T) {
 				eval := nonFiniteAt(func(x float64) float64 { return x - 5 }, nf.val, pos.callN)
 
-				_, _, err := s.FindRoot(eval, after(0), after(10))
+				_, _, err := s.FindRoot(eval, plan.Window{Start: after(0), End: after(10)})
 				if err == nil {
 					t.Fatalf("FindRoot: want error for non-finite %s at %s, got nil (non-finite value silently accepted)", nf.name, pos.name)
 				}
@@ -92,7 +92,7 @@ func TestFindExtremum_NonFiniteEvaluation(t *testing.T) {
 				// f(x) = -(x-5)^2 — a maximum at x=5 over [0,10].
 				eval := nonFiniteAt(func(x float64) float64 { return -(x - 5) * (x - 5) }, nf.val, pos.callN)
 
-				_, _, err := s.FindExtremum(eval, after(0), after(10), true)
+				_, _, err := s.FindExtremum(eval, plan.Window{Start: after(0), End: after(10)}, true)
 				if err == nil {
 					t.Fatalf("FindExtremum: want error for non-finite %s at %s, got nil (non-finite value silently accepted)", nf.name, pos.name)
 				}
@@ -115,7 +115,7 @@ func TestFindRoot_WellBehavedStillConverges(t *testing.T) {
 
 	root, _, err := s.FindRoot(timeFunc(func(x float64) float64 {
 		return x - 5
-	}), after(0), after(10))
+	}), plan.Window{Start: after(0), End: after(10)})
 	if err != nil {
 		t.Fatalf("FindRoot: unexpected error for a well-behaved evaluator: %v", err)
 	}
@@ -133,7 +133,9 @@ func TestFindExtremum_WellBehavedStillConverges(t *testing.T) {
 
 	tExt, val, err := s.FindExtremum(timeFunc(func(x float64) float64 {
 		return -(x - 5) * (x - 5)
-	}), after(0), after(10), true)
+	}), plan.Window{Start: after(0), End: after(10)},
+
+		true)
 	if err != nil {
 		t.Fatalf("FindExtremum: unexpected error for a well-behaved evaluator: %v", err)
 	}

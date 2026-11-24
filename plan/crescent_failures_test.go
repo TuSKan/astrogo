@@ -67,14 +67,14 @@ func TestCrescentVisibilityReportsAFailedLookup(t *testing.T) {
 	for _, body := range []eph.ID{eph.Sun, eph.Moon} {
 		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ time.Time) bool { return id == body }}
 
-		if _, err := CrescentVisibility(evening, site, prov); !errors.Is(err, errFailingWhen) {
+		if _, err := CrescentVisibility(site, evening, prov); !errors.Is(err, errFailingWhen) {
 			t.Errorf("body %v failing: err = %v, want the lookup's error", body, err)
 		}
 	}
 
 	counting := &countingProvider{Provider: eph.Default()}
 
-	r, err := CrescentVisibility(evening, site, counting)
+	r, err := CrescentVisibility(site, evening, counting)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -85,14 +85,14 @@ func TestCrescentVisibilityReportsAFailedLookup(t *testing.T) {
 		return id == eph.Moon && at.Before(r.Sunset.Add(unit.Hours(-1)))
 	}}
 
-	if _, err := CrescentVisibility(evening, site, phases); !errors.Is(err, errFailingWhen) {
+	if _, err := CrescentVisibility(site, evening, phases); !errors.Is(err, errFailingWhen) {
 		t.Errorf("the new-moon search failing: err = %v, want the lookup's error", err)
 	}
 
 	for back := 1; back <= 4; back++ {
 		prov := &failingOnceProvider{Provider: eph.Default(), on: counting.calls - back}
 
-		if _, err := CrescentVisibility(evening, site, prov); !errors.Is(err, errFailingOnce) {
+		if _, err := CrescentVisibility(site, evening, prov); !errors.Is(err, errFailingOnce) {
 			t.Errorf("lookup %d from the end failing: err = %v, want the lookup's error", back, err)
 		}
 	}
@@ -106,7 +106,7 @@ func TestMoonsetSearchBackReportsAFailedLookup(t *testing.T) {
 	site := crescentSite(t, 10.65, -61.52)
 	evening := time.Date(2025, 3, 28, 16, 0, 0, 0, time.LocationUTC)
 
-	r, err := CrescentVisibility(evening, site, eph.Default())
+	r, err := CrescentVisibility(site, evening, eph.Default())
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -211,7 +211,9 @@ func TestEventSearchesEndInAShortChunk(t *testing.T) {
 
 	// The event sits in the short chunk: 6.6 h after start, 0.6 h after end − 7.2 h.
 	searchAt := func(event time.Time) eventsFunc {
-		return func(from, to time.Time, _ *Site, _ eph.Provider) ([]Event, error) {
+		return func(_ *Site, w Window, _ eph.Provider) ([]Event, error) {
+			from, to := w.Start, w.End
+
 			windows = append(windows, [2]time.Time{from, to})
 			if !event.Before(from) && !event.After(to) {
 				return []Event{{Kind: EventSet, Time: event}}, nil
@@ -235,7 +237,7 @@ func TestEventSearchesEndInAShortChunk(t *testing.T) {
 		t.Errorf("lastEvent: found %v at %v, err %v, windows %v; want the event in a last window starting at %v", found, e.Time, err, windows, start)
 	}
 
-	broken := func(time.Time, time.Time, *Site, eph.Provider) ([]Event, error) { return nil, errFailingWhen }
+	broken := func(*Site, Window, eph.Provider) ([]Event, error) { return nil, errFailingWhen }
 
 	if _, _, err := firstEvent(broken, start, 0.3, nil, nil, isSet); !errors.Is(err, errFailingWhen) {
 		t.Errorf("firstEvent over a failing search: err = %v", err)

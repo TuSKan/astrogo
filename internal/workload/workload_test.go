@@ -441,17 +441,17 @@ func BenchmarkEventSearch(b *testing.B) {
 		run  func(p core.Provider) error
 	}{
 		{"oppositions-1y-Mars", func(p core.Provider) error {
-			_, err := plan.Oppositions(epoch, epoch.Add(unit.Days(365)), plan.NewMars(p), plan.NewSun(p))
+			_, err := plan.Oppositions(plan.NewMars(p), plan.NewSun(p), plan.Window{Start: epoch, End: epoch.Add(unit.Days(365))})
 
 			return err //nolint:wrapcheck // the benchmark reports it under the search's name
 		}},
 		{"day-events-Moon", func(p core.Provider) error {
-			_, _, _, err := plan.DayEvents(epoch, time.LocationUTC, plan.NewMoon(p), site)
+			_, _, _, err := plan.DayEvents(plan.NewMoon(p), site, epoch, time.LocationUTC)
 
 			return err //nolint:wrapcheck // the benchmark reports it under the search's name
 		}},
 		{"day-events-Mars", func(p core.Provider) error {
-			_, _, _, err := plan.DayEvents(epoch, time.LocationUTC, plan.NewMars(p), site)
+			_, _, _, err := plan.DayEvents(plan.NewMars(p), site, epoch, time.LocationUTC)
 
 			return err //nolint:wrapcheck // the benchmark reports it under the search's name
 		}},

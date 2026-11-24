@@ -45,7 +45,7 @@ func TestCrescentVisibilityReadsTheMABIMSElongationGeocentric(t *testing.T) {
 	site, evening := portOfSpainEvening(t)
 	prov := eph.Default()
 
-	r, err := CrescentVisibility(evening, site, prov)
+	r, err := CrescentVisibility(site, evening, prov)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestCrescentVisibilityYallopAndOdehReadTheirOwnConventions(t *testing.T) {
 	site, evening := portOfSpainEvening(t)
 	prov := eph.Default()
 
-	r, err := CrescentVisibility(evening, site, prov)
+	r, err := CrescentVisibility(site, evening, prov)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestCrescentVisibilityBestTimeContextMatchesAFreshOne(t *testing.T) {
 	site, evening := portOfSpainEvening(t)
 	prov := eph.Default()
 
-	r, err := CrescentVisibility(evening, site, prov)
+	r, err := CrescentVisibility(site, evening, prov)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestCrescentVisibilityMoonSetBeforeTheSun(t *testing.T) {
 	// the Sun, so there is no best time after sunset.
 	site := crescentSite(t, 10.65, -61.52)
 
-	r, err := CrescentVisibility(time.Date(2025, 3, 28, 16, 0, 0, 0, time.LocationUTC), site, eph.Default())
+	r, err := CrescentVisibility(site, time.Date(2025, 3, 28, 16, 0, 0, 0, time.LocationUTC), eph.Default())
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestCrescentVisibilityPolarEvenings(t *testing.T) {
 		{"midsummer", time.Date(2025, 6, 21, 11, 0, 0, 0, time.LocationUTC), errNoSunset},
 		{"circumpolar Moon", time.Date(2025, 3, 7, 11, 0, 0, 0, time.LocationUTC), errNoMoonset},
 	} {
-		_, err := CrescentVisibility(c.evening, site, eph.Default())
+		_, err := CrescentVisibility(site, c.evening, eph.Default())
 		if !errors.Is(err, c.want) {
 			t.Errorf("%s: err = %v, want %v", c.name, err, c.want)
 		}
@@ -232,12 +232,12 @@ func TestCrescentVisibilityNilProviderIsTheDefault(t *testing.T) {
 
 	site, evening := portOfSpainEvening(t)
 
-	withNil, err := CrescentVisibility(evening, site, nil)
+	withNil, err := CrescentVisibility(site, evening, nil)
 	if err != nil {
 		t.Fatalf("CrescentVisibility(nil): %v", err)
 	}
 
-	withDefault, err := CrescentVisibility(evening, site, eph.Default())
+	withDefault, err := CrescentVisibility(site, evening, eph.Default())
 	if err != nil {
 		t.Fatalf("CrescentVisibility(eph.Default()): %v", err)
 	}
@@ -253,7 +253,7 @@ func BenchmarkCrescentVisibility(b *testing.B) {
 	prov := eph.Default()
 
 	for b.Loop() {
-		if _, err := CrescentVisibility(evening, site, prov); err != nil {
+		if _, err := CrescentVisibility(site, evening, prov); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -49,7 +49,7 @@ type Tonight struct {
 //
 // Where the Sun does not set and rise again within a day, as in a polar day
 // or night, it returns [ErrNoTwilight].
-func TonightAt(t time.Time, site *Site, prov eph.Provider) (Tonight, error) {
+func TonightAt(site *Site, t time.Time, prov eph.Provider) (Tonight, error) {
 	sunset, sunrise, err := nightAcross(t, site, prov, site.SunRiseSetThreshold().Degrees(), "sunset and sunrise")
 	if err != nil {
 		return Tonight{}, err
@@ -65,7 +65,7 @@ func TonightAt(t time.Time, site *Site, prov eph.Provider) (Tonight, error) {
 		{NauticalTwilight, &tonight.Nautical},
 		{AstronomicalTwilight, &tonight.Astronomical},
 	} {
-		n, err := NightOf(sunset, site, prov, k.kind)
+		n, err := NightOf(site, sunset, prov, k.kind)
 
 		// From sunset, NightOf finds the night of that kind beginning within
 		// a day. That can only be tonight's: the next night's dusk is about a
@@ -91,7 +91,7 @@ func TonightAt(t time.Time, site *Site, prov eph.Provider) (Tonight, error) {
 // whether it is up at sunset, which is what its last rise or set before
 // sunset left it, and its illumination at the night's middle.
 func (n *Tonight) addMoon(site *Site, prov eph.Provider) error {
-	events, err := MoonEvents(n.Sunset.Add(unit.Days(-1)), n.Sunrise, site, prov)
+	events, err := MoonEvents(site, Window{Start: n.Sunset.Add(unit.Days(-1)), End: n.Sunrise}, prov)
 	if err != nil {
 		return fmt.Errorf("plan: tonight: moon events: %w", err)
 	}

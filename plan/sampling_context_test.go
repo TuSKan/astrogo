@@ -84,7 +84,7 @@ func TestVisibleIntervalsThroughTheContextCache(t *testing.T) {
 	for _, c := range samplingCases(t) {
 		end := c.start.Add(c.window)
 
-		got, err := VisibleIntervals(c.obj, c.site, c.start, end, unit.Minutes(10), angle.Deg(15))
+		got, err := VisibleIntervals(c.obj, c.site, Window{Start: c.start, End: end}, unit.Minutes(10), angle.Deg(15))
 		if err != nil {
 			t.Fatalf("%s: VisibleIntervals: %v", c.name, err)
 		}
@@ -94,7 +94,7 @@ func TestVisibleIntervalsThroughTheContextCache(t *testing.T) {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
 
-		compareIntervals(t, c.name, windowsOf(got), windowsOf(want))
+		compareIntervals(t, c.name, got, want)
 	}
 }
 
@@ -109,7 +109,7 @@ func TestFindThroughTheContextCache(t *testing.T) {
 	for _, c := range samplingCases(t) {
 		end := c.start.Add(c.window)
 
-		got, err := Find(c.obj, c.site, constraints, c.start, end, unit.Minutes(10))
+		got, err := Find(c.obj, c.site, Window{Start: c.start, End: end}, unit.Minutes(10), constraints...)
 		if err != nil {
 			t.Fatalf("%s: Find: %v", c.name, err)
 		}
@@ -119,7 +119,7 @@ func TestFindThroughTheContextCache(t *testing.T) {
 			t.Fatalf("%s: reference: %v", c.name, err)
 		}
 
-		compareIntervals(t, c.name, windowsOf(got), windowsOf(want))
+		compareIntervals(t, c.name, got, want)
 	}
 }
 
@@ -133,7 +133,7 @@ func TestObservableWindowsThroughTheContextCache(t *testing.T) {
 	for _, c := range samplingCases(t) {
 		end := c.start.Add(c.window)
 
-		got, err := ObservableWindows(c.observable, c.start, end, unit.Minutes(10), c.site, constraints...)
+		got, err := ObservableWindows(c.observable, c.site, Window{Start: c.start, End: end}, unit.Minutes(10), constraints...)
 		if err != nil {
 			t.Fatalf("%s: ObservableWindows: %v", c.name, err)
 		}
@@ -166,7 +166,7 @@ func TestTransitEstimateThroughTheContextCache(t *testing.T) {
 
 	for _, c := range samplingCases(t) {
 		for day := c.start; day.Before(c.start.Add(c.window)); day = day.Add(unit.Days(1)) {
-			gotT, gotAlt, err := TransitEstimate(c.obj, c.site, day, day.Add(unit.Days(1)))
+			gotT, gotAlt, err := TransitEstimate(c.obj, c.site, Window{Start: day, End: day.Add(unit.Days(1))})
 			if err != nil {
 				t.Fatalf("%s: TransitEstimate: %v", c.name, err)
 			}
@@ -185,15 +185,6 @@ func TestTransitEstimateThroughTheContextCache(t *testing.T) {
 			}
 		}
 	}
-}
-
-func windowsOf(intervals []Interval) []Window {
-	out := make([]Window, len(intervals))
-	for i, iv := range intervals {
-		out[i] = iv.Window
-	}
-
-	return out
 }
 
 // maxBoundaryShift is how far a cached-Context window boundary may sit from

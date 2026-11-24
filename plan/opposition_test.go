@@ -37,7 +37,7 @@ func TestOppositionsAreInEclipticLongitude(t *testing.T) {
 	} {
 		start := time.Date(c.year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-		events, err := Oppositions(start, start.AddDate(1, 0, 0), c.body, sun)
+		events, err := Oppositions(c.body, sun, Window{Start: start, End: start.AddDate(1, 0, 0)})
 		if err != nil {
 			t.Fatalf("%s %d: %v", c.body.Name(), c.year, err)
 		}
@@ -75,8 +75,8 @@ func TestOppositionsAreInEclipticLongitude(t *testing.T) {
 // and came out up to 3.25 hours off in 2026; the Full Moon of 2026-09-26 is
 // 16:49:02 UTC by Skyfield (DE421).
 func TestFullMoonOppositionsAreFullMoons(t *testing.T) {
-	events, err := FullMoonOppositions(time.Date(2026, 9, 26, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, 9, 27, 0, 0, 0, 0, time.LocationUTC), eph.Default())
+	events, err := FullMoonOppositions(Window{Start: time.Date(2026, 9, 26, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 9, 27, 0, 0, 0, 0, time.LocationUTC)},
+		eph.Default())
 	if err != nil {
 		t.Fatal(err)
 	}

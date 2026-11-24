@@ -66,7 +66,7 @@ func TestRankObservableScoresTheMoonFromTheObserver(t *testing.T) {
 	} {
 		end := start.Add(unit.Days(1))
 
-		ranked, err := planner.RankObservable([]Observable{moon}, start, end)
+		ranked, err := planner.RankObservable([]Observable{moon}, Window{Start: start, End: end})
 		if err != nil {
 			t.Fatalf("RankObservable: %v", err)
 		}
@@ -142,7 +142,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 
 		checked++
 
-		ranked, err := planner.RankObservable([]Observable{sat}, start, end)
+		ranked, err := planner.RankObservable([]Observable{sat}, Window{Start: start, End: end})
 		if err != nil {
 			t.Fatalf("RankObservable: %v", err)
 		}

@@ -46,7 +46,7 @@ func TestIsVisible(t *testing.T) {
 	// Since AltAz calculation is complex, we'll verify it returns a boolean.
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
 
-	_, err = IsVisible(obj, tm, site, angle.Deg(20))
+	_, err = IsVisible(obj, site, tm, angle.Deg(20))
 	testutil.AssertNoError(t, err)
 }
 
@@ -64,7 +64,7 @@ func TestVisibleIntervals(t *testing.T) {
 	// Circumpolar-like object (very high dec)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, unit.Minutes(15), angle.Deg(10))
+	intervals, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(15), angle.Deg(10))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) == 0 {
@@ -83,7 +83,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 
 	// A caller must be able to match this via errors.Is against the
 	// documented public sentinel (R21 regression).
-	_, err := VisibleIntervals(obj, site, start, end, unit.Minutes(20), angle.Deg(10))
+	_, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(20), angle.Deg(10))
 	if !errors.Is(err, ErrStepTooLarge) {
 		t.Errorf("expected ErrStepTooLarge for step > 15 minutes, got %v", err)
 	}
@@ -99,7 +99,7 @@ func TestNeverVisible(t *testing.T) {
 	// Object far below horizon (antipode)
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(-89))}
 
-	intervals, err := VisibleIntervals(obj, site, start, end, unit.Minutes(15), angle.Deg(0))
+	intervals, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(15), angle.Deg(0))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) > 0 {
@@ -116,7 +116,7 @@ func TestTransitEstimate(t *testing.T) {
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
-	tm, alt, err := TransitEstimate(obj, site, start, end)
+	tm, alt, err := TransitEstimate(obj, site, Window{Start: start, End: end})
 	testutil.AssertNoError(t, err)
 
 	if tm.IsZero() {
@@ -173,7 +173,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 
 	day := time.FromJD(2461000.5, time.UTC)
 
-	transit, _, err := TransitEstimate(obj, site, day, day.Add(unit.Days(1)))
+	transit, _, err := TransitEstimate(obj, site, Window{Start: day, End: day.Add(unit.Days(1))})
 	testutil.AssertNoError(t, err)
 
 	cases := []struct {
@@ -200,7 +200,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 			}
 		}
 
-		gotT, gotAlt, err := TransitEstimate(obj, site, start, end)
+		gotT, gotAlt, err := TransitEstimate(obj, site, Window{Start: start, End: end})
 		testutil.AssertNoError(t, err)
 
 		if gotT.Before(start) || gotT.After(end) {
@@ -229,7 +229,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 			}
 		}
 
-		maxAlt, err := MaxAltitudeInWindow(obj, site, start, end)
+		maxAlt, err := MaxAltitudeInWindow(obj, site, Window{Start: start, End: end})
 		testutil.AssertNoError(t, err)
 
 		if maxAlt.Degrees() < bestAlt-1e-6 {
@@ -246,14 +246,14 @@ func TestFind(t *testing.T) {
 	end := start.Add(unit.Days(1))
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
-	intervals, err := Find(obj, site, nil, start, end, unit.Minutes(15))
+	intervals, err := Find(obj, site, Window{Start: start, End: end}, unit.Minutes(15))
 	testutil.AssertNoError(t, err)
 
 	if len(intervals) == 0 {
 		t.Fatalf("Expected observable intervals")
 	}
 
-	dur := intervals[0].Window.Duration()
+	dur := intervals[0].Duration()
 	if dur <= 0 {
 		t.Errorf("Duration() should be positive, got %v", dur)
 	}

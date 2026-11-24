@@ -48,7 +48,7 @@ func TestSunSep(t *testing.T) {
 
 	c := SunSep{Threshold: angle.Deg(30)}
 
-	res, err := c.Check(near, when, site)
+	res, err := c.Check(near, site, when)
 	testutil.AssertNoError(t, err)
 
 	if res.Pass {
@@ -59,7 +59,7 @@ func TestSunSep(t *testing.T) {
 		t.Errorf("separation from the Sun's own position = %.3f°, want ~0", res.Value)
 	}
 
-	res, err = c.Check(far, when, site)
+	res, err = c.Check(far, site, when)
 	testutil.AssertNoError(t, err)
 
 	if !res.Pass {
@@ -78,7 +78,7 @@ func TestSunSepPassesTheSunItself(t *testing.T) {
 	site := moreSite(t)
 	when := time.Date(2026, time.June, 21, 12, 0, 0, 0, time.LocationUTC)
 
-	res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewSun(nil), when, site)
+	res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewSun(nil), site, when)
 	testutil.AssertNoError(t, err)
 
 	if !res.Pass {
@@ -100,7 +100,7 @@ func TestGalacticLatitude(t *testing.T) {
 
 	c := GalacticLatitude{Threshold: angle.Deg(20)}
 
-	res, err := c.Check(pole, when, site)
+	res, err := c.Check(pole, site, when)
 	testutil.AssertNoError(t, err)
 
 	if !res.Pass {
@@ -111,7 +111,7 @@ func TestGalacticLatitude(t *testing.T) {
 		t.Errorf("|b| at the pole = %.4f, want 90", res.Value)
 	}
 
-	res, err = c.Check(center, when, site)
+	res, err = c.Check(center, site, when)
 	testutil.AssertNoError(t, err)
 
 	if res.Pass {
@@ -134,7 +134,7 @@ func TestGalacticLatitudeIsUnsigned(t *testing.T) {
 	// The south galactic pole is the north one's antipode.
 	south := NewStar("south galactic pole", angle.Deg(12.85948), angle.Deg(-27.12825))
 
-	res, err := GalacticLatitude{Threshold: angle.Deg(20)}.Check(south, when, site)
+	res, err := GalacticLatitude{Threshold: angle.Deg(20)}.Check(south, site, when)
 	testutil.AssertNoError(t, err)
 
 	if !res.Pass {
@@ -159,17 +159,17 @@ func TestTimeWindow(t *testing.T) {
 		win  TimeWindow
 		pass bool
 	}{
-		{"inside", open.Add(unit.Hours(2)), TimeWindow{From: open, To: shut}, true},
-		{"on the opening edge", open, TimeWindow{From: open, To: shut}, true},
-		{"on the closing edge", shut, TimeWindow{From: open, To: shut}, true},
-		{"before it opens", open.Add(unit.Hours(-1)), TimeWindow{From: open, To: shut}, false},
-		{"after it closes", shut.Add(unit.Hours(1)), TimeWindow{From: open, To: shut}, false},
+		{"inside", open.Add(unit.Hours(2)), TimeWindow{Start: open, End: shut}, true},
+		{"on the opening edge", open, TimeWindow{Start: open, End: shut}, true},
+		{"on the closing edge", shut, TimeWindow{Start: open, End: shut}, true},
+		{"before it opens", open.Add(unit.Hours(-1)), TimeWindow{Start: open, End: shut}, false},
+		{"after it closes", shut.Add(unit.Hours(1)), TimeWindow{Start: open, End: shut}, false},
 
 		// One-sided: a deadline with no start, and a start with no deadline.
-		{"deadline, in time", open, TimeWindow{To: shut}, true},
-		{"deadline, too late", shut.Add(unit.Minutes(1)), TimeWindow{To: shut}, false},
-		{"not before, and it is", shut, TimeWindow{From: open}, true},
-		{"not before, and it is not", open.Add(unit.Minutes(-1)), TimeWindow{From: open}, false},
+		{"deadline, in time", open, TimeWindow{End: shut}, true},
+		{"deadline, too late", shut.Add(unit.Minutes(1)), TimeWindow{End: shut}, false},
+		{"not before, and it is", shut, TimeWindow{Start: open}, true},
+		{"not before, and it is not", open.Add(unit.Minutes(-1)), TimeWindow{Start: open}, false},
 
 		// Unbounded both ways constrains nothing, which is what a zero value
 		// of this type has to mean: a constraint nobody configured must not
@@ -179,7 +179,7 @@ func TestTimeWindow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := tt.win.Check(obj, tt.when, site)
+			res, err := tt.win.Check(obj, site, tt.when)
 			testutil.AssertNoError(t, err)
 
 			if res.Pass != tt.pass {
@@ -198,12 +198,12 @@ func TestTimeWindowValueRanksByHeadroom(t *testing.T) {
 
 	open := time.Date(2026, time.April, 20, 2, 0, 0, 0, time.LocationUTC)
 	shut := time.Date(2026, time.April, 20, 6, 0, 0, 0, time.LocationUTC)
-	win := TimeWindow{From: open, To: shut}
+	win := TimeWindow{Start: open, End: shut}
 
 	value := func(when time.Time) float64 {
 		t.Helper()
 
-		res, err := win.Check(obj, when, site)
+		res, err := win.Check(obj, site, when)
 		testutil.AssertNoError(t, err)
 
 		return res.Value
@@ -291,7 +291,7 @@ func TestHorizon(t *testing.T) {
 			aa, err := skyAltAzCtx(obj, when, ctx)
 			testutil.AssertNoError(t, err)
 
-			res, err := c.Check(obj, when, site)
+			res, err := c.Check(obj, site, when)
 			testutil.AssertNoError(t, err)
 
 			want := aa.Alt().Degrees() - ridgeProfile(aa.Az()).Degrees()
@@ -344,7 +344,7 @@ func TestHorizonFallsBackToTheScalarLimit(t *testing.T) {
 	aa, err := skyAltAzCtx(obj, when, ctx)
 	testutil.AssertNoError(t, err)
 
-	res, err := Horizon{}.Check(obj, when, site)
+	res, err := Horizon{}.Check(obj, site, when)
 	testutil.AssertNoError(t, err)
 
 	want := aa.Alt().Degrees() - site.Horizon().Degrees()
@@ -360,10 +360,10 @@ func TestHorizonMarginRaisesTheBar(t *testing.T) {
 	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
 	obj := NewStar("target", angle.Deg(120), angle.Deg(-20))
 
-	bare, err := Horizon{}.Check(obj, when, site)
+	bare, err := Horizon{}.Check(obj, site, when)
 	testutil.AssertNoError(t, err)
 
-	withMargin, err := Horizon{Margin: angle.Deg(5)}.Check(obj, when, site)
+	withMargin, err := Horizon{Margin: angle.Deg(5)}.Check(obj, site, when)
 	testutil.AssertNoError(t, err)
 
 	if math.Abs((bare.Value-withMargin.Value)-5) > 1e-9 {
@@ -405,10 +405,10 @@ func TestHorizonReadsTheSiteItIsGiven(t *testing.T) {
 
 	c := Horizon{}
 
-	open, err := c.Check(obj, when, flat)
+	open, err := c.Check(obj, flat, when)
 	testutil.AssertNoError(t, err)
 
-	blocked, err := c.Check(obj, when, blocking)
+	blocked, err := c.Check(obj, blocking, when)
 	testutil.AssertNoError(t, err)
 
 	if !open.Pass {
@@ -442,7 +442,7 @@ func TestSunSepDoesNotExemptOtherPlanets(t *testing.T) {
 		time.Date(2026, time.June, 21, 12, 0, 0, 0, time.LocationUTC),
 		time.Date(2026, time.November, 3, 6, 0, 0, 0, time.LocationUTC),
 	} {
-		res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewMercury(nil), when, site)
+		res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewMercury(nil), site, when)
 		testutil.AssertNoError(t, err)
 
 		if res.Pass {

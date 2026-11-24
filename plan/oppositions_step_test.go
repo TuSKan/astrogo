@@ -19,7 +19,7 @@ func sweptOppositions(t *testing.T, step unit.Duration, target, sun Observable, 
 
 	events, err := NewEventSolver(step, unit.Seconds(0.001)).Find(EventSpec{
 		Family: EventFamilyRelativeGeometry, Kind: EventOpposition, Target: target, Other: sun,
-	}, start, end)
+	}, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestOppositionsMatchADailyScan(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got, err := Oppositions(c.start, c.end, c.target, sun)
+		got, err := Oppositions(c.target, sun, Window{Start: c.start, End: c.end})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +139,7 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 
 		body, sun := NewGenericBody(c.name, eph.ID(2900001), prov), NewSun(prov)
 
-		got, err := Oppositions(epoch, end, body, sun)
+		got, err := Oppositions(body, sun, Window{Start: epoch, End: end})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -154,7 +154,7 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 	prov := eph.Default()
 	spica, sun := NewStar("Spica", angle.Deg(201.298), angle.Deg(-11.161)), NewSun(prov)
 
-	got, err := Oppositions(epoch, end, spica, sun)
+	got, err := Oppositions(spica, sun, Window{Start: epoch, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestOppositionsOfAnInferiorPlanetAreNone(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
 	for _, p := range []*Planet{NewMercury(prov), NewVenus(prov)} {
-		got, err := Oppositions(start, start.AddDate(2, 0, 0), p, NewSun(prov))
+		got, err := Oppositions(p, NewSun(prov), Window{Start: start, End: start.AddDate(2, 0, 0)})
 		if err != nil || len(got) != 0 {
 			t.Errorf("%s: %d oppositions, err %v; want none", p.Name(), len(got), err)
 		}
@@ -194,12 +194,12 @@ func TestOppositionsTakeTheSunEitherWay(t *testing.T) {
 	start := time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.AddDate(0, 3, 0)
 
-	one, err := Oppositions(start, end, mars, sun)
+	one, err := Oppositions(mars, sun, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	other, err := Oppositions(start, end, sun, mars)
+	other, err := Oppositions(sun, mars, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestOppositionsTakeTheSunEitherWay(t *testing.T) {
 	}
 
 	for _, pair := range [][2]Observable{{mars, NewJupiter(prov)}, {sun, sun}} {
-		if _, err := Oppositions(start, end, pair[0], pair[1]); !errors.Is(err, ErrOppositionNeedsSun) {
+		if _, err := Oppositions(pair[0], pair[1], Window{Start: start, End: end}); !errors.Is(err, ErrOppositionNeedsSun) {
 			t.Errorf("%s and %s: err %v, want ErrOppositionNeedsSun", pair[0].Name(), pair[1].Name(), err)
 		}
 	}
@@ -224,7 +224,7 @@ func TestOppositionsKeepToTheInterval(t *testing.T) {
 	prov := eph.Default()
 	sun, mars := NewSun(prov), NewMars(prov)
 
-	found, err := Oppositions(time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC), time.Date(2027, 4, 1, 0, 0, 0, 0, time.LocationUTC), mars, sun)
+	found, err := Oppositions(mars, sun, Window{Start: time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2027, 4, 1, 0, 0, 0, 0, time.LocationUTC)})
 	if err != nil || len(found) != 1 {
 		t.Fatalf("Mars 2027: %v, err %v", found, err)
 	}
@@ -241,13 +241,13 @@ func TestOppositionsKeepToTheInterval(t *testing.T) {
 		{at.Add(-edge), at.Add(unit.Days(1)), 1},
 		{at.Add(edge), at.Add(unit.Days(1)), 0},
 	} {
-		got, err := Oppositions(c.start, c.end, mars, sun)
+		got, err := Oppositions(mars, sun, Window{Start: c.start, End: c.end})
 		if err != nil || len(got) != c.want {
 			t.Errorf("[%v, %v]: %d oppositions, err %v; want %d", c.start, c.end, len(got), err, c.want)
 		}
 	}
 
-	if got, err := Oppositions(at, at, mars, sun); err != nil || len(got) > 1 {
+	if got, err := Oppositions(mars, sun, Window{Start: at, End: at}); err != nil || len(got) > 1 {
 		t.Errorf("an empty interval: %v, err %v", got, err)
 	}
 }
@@ -268,7 +268,7 @@ func TestALongSweepReportsNoWrapAsAnOpposition(t *testing.T) {
 
 	events, err := NewEventSolver(unit.Days(224), unit.Seconds(1)).Find(EventSpec{
 		Family: EventFamilyRelativeGeometry, Kind: EventOpposition, Target: jupiter, Other: sun,
-	}, start, end)
+	}, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}

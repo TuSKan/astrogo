@@ -18,7 +18,7 @@ type failsBefore struct {
 	why   string
 }
 
-func (c failsBefore) Check(_ Observable, t time.Time, _ *Site) (Result, error) {
+func (c failsBefore) Check(_ Observable, _ *Site, t time.Time) (Result, error) {
 	if t.Before(c.until) {
 		return Result{Reason: c.why}, nil
 	}

@@ -156,7 +156,7 @@ func main() {
 	phStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	phEnd := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	phases, err := plan.MoonPhases(phStart, phEnd, prov)
+	phases, err := plan.MoonPhases(plan.Window{Start: phStart, End: phEnd}, prov)
 	if err != nil {
 		log.Fatalf("moon phases: %v", err)
 	}
@@ -186,12 +186,12 @@ func main() {
 	eclStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	eclEnd := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	lunarEcl, err := plan.LunarEclipses(eclStart, eclEnd, prov)
+	lunarEcl, err := plan.LunarEclipses(plan.Window{Start: eclStart, End: eclEnd}, prov)
 	if err != nil {
 		log.Fatalf("lunarEcl: %v", err)
 	}
 
-	solarEcl, err := plan.SolarEclipses(eclStart, eclEnd, prov)
+	solarEcl, err := plan.SolarEclipses(plan.Window{Start: eclStart, End: eclEnd}, prov)
 	if err != nil {
 		log.Fatalf("solarEcl: %v", err)
 	}
@@ -246,7 +246,7 @@ func main() {
 	eqDay := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	eqNext := eqDay.Add(unit.Hours(24))
 
-	moonrise, moonset, err := plan.MoonriseMoonset(eqDay, eqNext, site, prov)
+	moonrise, moonset, err := plan.MoonriseMoonset(site, plan.Window{Start: eqDay, End: eqNext}, prov)
 	if err != nil {
 		log.Fatalf("moonrise: %v", err)
 	}

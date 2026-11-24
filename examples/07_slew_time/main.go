@@ -60,7 +60,7 @@ func main() {
 
 	// 5. Where each target is in the sky, then what the model charges to
 	// move between them.
-	tr, err := plan.NewTransition(&blockA, &blockB, t, t, site)
+	tr, err := plan.NewTransition(&blockA, &blockB, site, plan.Window{Start: t, End: t})
 	if err != nil {
 		log.Fatalf("transition: %v", err)
 	}

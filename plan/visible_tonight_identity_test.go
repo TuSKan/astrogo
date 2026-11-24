@@ -39,8 +39,9 @@ func TestVisibleTonightListsAnObjectOnce(t *testing.T) {
 			Aliases: []string{"NGC 1990", "HD 037128", "HIP 026311", "Eps Ori", "46 Ori"}},
 	}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2,
-		[]resolve.BrightObjectSearcher{simbad, openngc}, ephemeris.Default(), plan.WithResolution(0))
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight,
+		[]resolve.BrightObjectSearcher{simbad, openngc}, ephemeris.Default(), 2,
+		plan.WithResolution(0))
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}

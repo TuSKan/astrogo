@@ -56,7 +56,7 @@ func TestConjunctionsAreInRightAscensionOfDate(t *testing.T) {
 		a := NewPlanet(c.name, c.a, prov)
 		b := NewPlanet(c.name, c.b, prov)
 
-		events, err := Conjunctions(c.start, c.end, a, b)
+		events, err := Conjunctions(a, b, Window{Start: c.start, End: c.end})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}

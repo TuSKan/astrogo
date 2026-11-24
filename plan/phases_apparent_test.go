@@ -22,12 +22,12 @@ func TestMoonPhasesAreApparent(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	phases, err := MoonPhases(start, end, prov)
+	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	oppositions, err := FullMoonOppositions(start, end, prov)
+	oppositions, err := FullMoonOppositions(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -48,7 +48,7 @@ func main() {
 	// 4. Find Rise/Set/Transit events.
 	// The threshold is computed automatically from the site's elevation,
 	// accounting for standard atmospheric refraction and horizon dip.
-	events, err := plan.VisibilityEvents(start, end, target, site)
+	events, err := plan.VisibilityEvents(target, site, plan.Window{Start: start, End: end})
 	if err != nil {
 		log.Fatalf("events: %v", err)
 	}

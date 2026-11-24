@@ -15,7 +15,7 @@ import (
 func moonsetWholeWindow(t *testing.T, sunset time.Time, site *Site, prov eph.Provider) (time.Time, bool) {
 	t.Helper()
 
-	evs, err := MoonEvents(sunset.Add(unit.Days(-1)), sunset.Add(unit.Days(1)), site, prov)
+	evs, err := MoonEvents(site, Window{Start: sunset.Add(unit.Days(-1)), End: sunset.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatalf("MoonEvents: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestCrescentSearchesMatchAWholeWindow(t *testing.T) {
 
 			sunset := sunEvent.Time
 
-			evs, err := SunEvents(evening, evening.Add(unit.Days(1)), site, prov)
+			evs, err := SunEvents(site, Window{Start: evening, End: evening.Add(unit.Days(1))}, prov)
 			if err != nil {
 				t.Fatalf("SunEvents: %v", err)
 			}
@@ -125,7 +125,7 @@ func TestCrescentSearchesMatchAWholeWindow(t *testing.T) {
 func ageFromALunation(t *testing.T, at time.Time, prov eph.Provider) float64 {
 	t.Helper()
 
-	phases, err := MoonPhases(at.Add(unit.Days(-31)), at, prov)
+	phases, err := MoonPhases(Window{Start: at.Add(unit.Days(-31)), End: at}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}

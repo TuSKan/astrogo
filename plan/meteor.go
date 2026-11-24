@@ -385,7 +385,7 @@ func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
 // computed here: it depends on moonlight, zodiacal light and light
 // pollution through a sky-brightness model, which is a separate concern
 // from meteor rate arithmetic.
-func (m MeteorShower) ObservedRate(t time.Time, site *Site, prov eph.Provider, limitingMag float64) (float64, error) {
+func (m MeteorShower) ObservedRate(site *Site, t time.Time, prov eph.Provider, limitingMag float64) (float64, error) {
 	zhr, err := m.ZHRAt(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: observed rate: %w", err)

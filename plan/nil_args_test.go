@@ -64,7 +64,7 @@ func TestConstraintsRefuseANilSiteOrTarget(t *testing.T) {
 		name := fmt.Sprintf("%T", c.constraint)
 		star := plan.NewStar("Vega", angle.Deg(279.23), angle.Deg(38.78))
 
-		if err := noPanic(func() error { return errOf(c.constraint.Check(star, at, nil)) }); !errors.Is(err, plan.ErrNilSite) {
+		if err := noPanic(func() error { return errOf(c.constraint.Check(star, nil, at)) }); !errors.Is(err, plan.ErrNilSite) {
 			t.Errorf("%s.Check with a nil site: %v, want ErrNilSite", name, err)
 		}
 
@@ -72,8 +72,8 @@ func TestConstraintsRefuseANilSiteOrTarget(t *testing.T) {
 			name  string
 			check func() error
 		}{
-			{"Check", func() error { return errOf(c.constraint.Check(nil, at, site)) }},
-			{"CheckCtx", func() error { return errOf(c.constraint.CheckCtx(nil, at, site, ctx)) }},
+			{"Check", func() error { return errOf(c.constraint.Check(nil, site, at)) }},
+			{"CheckCtx", func() error { return errOf(c.constraint.CheckCtx(nil, site, at, ctx)) }},
 		} {
 			err := noPanic(via.check)
 
@@ -109,19 +109,19 @@ func TestSearchesRefuseANilSiteOrTarget(t *testing.T) {
 		call func() error
 		want error
 	}{
-		{"IsObservable, nil target", func() error { return errOf(plan.IsObservable(nil, start, site)) }, plan.ErrNilTarget},
-		{"IsObservable, nil site", func() error { return errOf(plan.IsObservable(star, start, nil)) }, plan.ErrNilSite},
+		{"IsObservable, nil target", func() error { return errOf(plan.IsObservable(nil, site, start)) }, plan.ErrNilTarget},
+		{"IsObservable, nil site", func() error { return errOf(plan.IsObservable(star, nil, start)) }, plan.ErrNilSite},
 		{"RankObservables", func() error {
-			return errOf(plan.RankObservables([]plan.Observable{star}, start, nil))
+			return errOf(plan.RankObservables([]plan.Observable{star}, nil, start))
 		}, plan.ErrNilSite},
-		{"IsVisible", func() error { return errOf(plan.IsVisible(vega, start, nil, angle.Deg(10))) }, plan.ErrNilSite},
+		{"IsVisible", func() error { return errOf(plan.IsVisible(vega, nil, start, angle.Deg(10))) }, plan.ErrNilSite},
 		{"VisibleIntervals", func() error {
-			return errOf(plan.VisibleIntervals(vega, nil, start, end, unit.Minutes(5), angle.Deg(10)))
+			return errOf(plan.VisibleIntervals(vega, nil, plan.Window{Start: start, End: end}, unit.Minutes(5), angle.Deg(10)))
 		}, plan.ErrNilSite},
-		{"TransitEstimate", func() error { return errOf2(plan.TransitEstimate(vega, nil, start, end)) }, plan.ErrNilSite},
-		{"Find", func() error { return errOf(plan.Find(vega, nil, nil, start, end, unit.Minutes(5))) }, plan.ErrNilSite},
+		{"TransitEstimate", func() error { return errOf2(plan.TransitEstimate(vega, nil, plan.Window{Start: start, End: end})) }, plan.ErrNilSite},
+		{"Find", func() error { return errOf(plan.Find(vega, nil, plan.Window{Start: start, End: end}, unit.Minutes(5))) }, plan.ErrNilSite},
 		{"ObservableWindows", func() error {
-			return errOf(plan.ObservableWindows(star, start, end, unit.Minutes(5), nil))
+			return errOf(plan.ObservableWindows(star, nil, plan.Window{Start: start, End: end}, unit.Minutes(5)))
 		}, plan.ErrNilSite},
 		{"SatellitePasses", func() error {
 			return errOf(plan.SatellitePasses(eph.Default(), eph.Moon, "Moon", start, end, nil, angle.Deg(10)))

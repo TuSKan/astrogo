@@ -41,7 +41,7 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 		Family: EventFamilyIllumination,
 		Kind:   EventAnyPhase,
 		Target: moon,
-	}, start, end)
+	}, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Find(EventAnyPhase): %v", err)
 	}
@@ -65,7 +65,7 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 		Family: EventFamilyIllumination,
 		Kind:   EventFullMoon,
 		Target: moon,
-	}, start, end)
+	}, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Find(EventFullMoon): %v", err)
 	}

@@ -140,7 +140,7 @@ func main() {
 		log.Fatalf("site: %v", err)
 	}
 
-	events, err := plan.VisibilityEvents(epoch, epoch.Add(unit.Days(1)), asteroid, site)
+	events, err := plan.VisibilityEvents(asteroid, site, plan.Window{Start: epoch, End: epoch.Add(unit.Days(1))})
 	if err != nil {
 		log.Fatalf("visibility events: %v", err)
 	}

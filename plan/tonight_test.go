@@ -35,7 +35,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 
 	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
 
-	want, err := plan.TonightAt(noon, site, prov)
+	want, err := plan.TonightAt(site, noon, prov)
 	if err != nil {
 		t.Fatalf("TonightAt noon: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 		}
 	}
 
-	rise, set, err := plan.SunriseSunset(noon, noon.Add(unit.Days(1)), site, prov)
+	rise, set, err := plan.SunriseSunset(site, plan.Window{Start: noon, End: noon.Add(unit.Days(1))}, prov)
 	if err != nil || rise == nil || set == nil {
 		t.Fatalf("SunriseSunset: %v %v %v", rise, set, err)
 	}
@@ -73,7 +73,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 		t.Errorf("Tonight %v to %v, SunEvents' sunset %v and sunrise %v", want.Sunset, want.Sunrise, set.Time, rise.Time)
 	}
 
-	astro, err := plan.NightOf(noon, site, prov, plan.AstronomicalTwilight)
+	astro, err := plan.NightOf(site, noon, prov, plan.AstronomicalTwilight)
 	if err != nil || !near(astro.Dusk, want.Astronomical.Dusk) || !near(astro.Dawn, want.Astronomical.Dawn) {
 		t.Errorf("Tonight's astronomical night %+v, NightOf's %+v (%v)", *want.Astronomical, astro, err)
 	}
@@ -82,7 +82,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 		noon.Add(unit.Hours(11)),                     // 23:00
 		want.Astronomical.Dawn.Add(unit.Minutes(30)), // after astronomical dawn, before sunrise
 	} {
-		got, err := plan.TonightAt(at, site, prov)
+		got, err := plan.TonightAt(site, at, prov)
 		if err != nil {
 			t.Fatalf("TonightAt %v: %v", at, err)
 		}
@@ -110,7 +110,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tonight, err := plan.TonightAt(time.Date(2026, time.July, 2, 12, 0, 0, 0, time.LocationUTC), london, prov)
+	tonight, err := plan.TonightAt(london, time.Date(2026, time.July, 2, 12, 0, 0, 0, time.LocationUTC), prov)
 	if err != nil {
 		t.Fatalf("TonightAt London: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 	var before, first plan.Tonight
 
 	for day := 10; day <= 40; day++ {
-		got, err := plan.TonightAt(time.Date(2026, time.July, day, 12, 0, 0, 0, time.LocationUTC), london, prov)
+		got, err := plan.TonightAt(london, time.Date(2026, time.July, day, 12, 0, 0, 0, time.LocationUTC), prov)
 		if err != nil {
 			t.Fatalf("TonightAt London, July %d: %v", day, err)
 		}
@@ -154,7 +154,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := plan.TonightAt(time.Date(2026, time.June, 21, 11, 0, 0, 0, time.LocationUTC), longyearbyen, prov); !errors.Is(err, plan.ErrNoTwilight) {
+	if got, err := plan.TonightAt(longyearbyen, time.Date(2026, time.June, 21, 11, 0, 0, 0, time.LocationUTC), prov); !errors.Is(err, plan.ErrNoTwilight) {
 		t.Errorf("TonightAt under the midnight Sun = %+v, %v, want ErrNoTwilight", got, err)
 	}
 }
@@ -179,12 +179,12 @@ func TestTonightPlacesTheMoon(t *testing.T) {
 		time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC),
 		time.Date(2026, time.December, 1, 12, 0, 0, 0, time.LocationUTC),
 	} {
-		tonight, err := plan.TonightAt(noon, site, prov)
+		tonight, err := plan.TonightAt(site, noon, prov)
 		if err != nil {
 			t.Fatalf("TonightAt %v: %v", noon, err)
 		}
 
-		rise, set, err := plan.MoonriseMoonset(tonight.Sunset, tonight.Sunrise, site, prov)
+		rise, set, err := plan.MoonriseMoonset(site, plan.Window{Start: tonight.Sunset, End: tonight.Sunrise}, prov)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -53,7 +53,7 @@ func ExampleObservableWindows() {
 		Altitude{Threshold: angle.Deg(30)},
 	}
 
-	windows, _ := ObservableWindows(obj, start, end, step, site, constraints...)
+	windows, _ := ObservableWindows(obj, site, Window{Start: start, End: end}, step, constraints...)
 
 	for _, w := range windows {
 		fmt.Printf("Window: %s to %s\n", w.Start.Format("2006-01-02 15:04:05"), w.End.Format("2006-01-02 15:04:05"))
@@ -69,7 +69,7 @@ func ExampleRankObservables() {
 	obj2 := NewStar("Lower", angle.Hour(18.69), angle.Deg(45))
 	objs := []Observable{obj1, obj2}
 
-	ranked, _ := RankObservables(objs, tm, site)
+	ranked, _ := RankObservables(objs, site, tm)
 
 	for i, rt := range ranked {
 		fmt.Printf("%d. %-10s (Score: %5.1f)\n", i+1, rt.Object.Name(), rt.Score)

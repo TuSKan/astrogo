@@ -68,24 +68,24 @@ func TestNonFiniteDurationsAreRefused(t *testing.T) {
 			return err
 		}},
 		{"a NaN VisibleIntervals step", func() error {
-			_, err := VisibleIntervals(fixed, site, start, end, nan, angle.Zero())
+			_, err := VisibleIntervals(fixed, site, Window{Start: start, End: end}, nan, angle.Zero())
 
 			return err
 		}},
 		{"a NaN Find step", func() error {
-			_, err := Find(fixed, site, nil, start, end, nan)
+			_, err := Find(fixed, site, Window{Start: start, End: end}, nan)
 
 			return err
 		}},
 		{"a NaN ObservableWindows step", func() error {
-			_, err := ObservableWindows(star, start, end, nan, site)
+			_, err := ObservableWindows(star, site, Window{Start: start, End: end}, nan)
 
 			return err
 		}},
 		{"a NaN EventSolver.Step", func() error {
 			_, err := EventSolver{Step: nan}.Find(EventSpec{
 				Family: EventFamilyVisibility, Kind: EventAnyVisibility, Target: star, Observer: site,
-			}, start, end)
+			}, Window{Start: start, End: end})
 
 			return err
 		}},
@@ -115,7 +115,8 @@ func TestEventSolverDefaultsAnUnsetStep(t *testing.T) {
 	_, err := EventSolver{}.Find(EventSpec{
 		Family: EventFamilyVisibility, Kind: EventAnyVisibility,
 		Target: NewStar("A", angle.Zero(), angle.Zero()), Observer: site,
-	}, start, start.Add(unit.Hours(1)))
+	}, Window{Start: start, End: start.Add(unit.Hours(1))})
+
 	if !errors.Is(err, ErrStepNotPositive) {
 		t.Errorf("a literal solver's zero step: got %v, want %v", err, ErrStepNotPositive)
 	}

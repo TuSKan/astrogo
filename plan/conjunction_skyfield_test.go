@@ -50,7 +50,7 @@ func TestConjunctionsAgreeWithSkyfield(t *testing.T) {
 		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
 			time.Date(2026, 4, 20, 17, 36, 7, 520_000_000, time.LocationUTC)},
 	} {
-		events, err := plan.Conjunctions(c.start, c.end, plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov))
+		events, err := plan.Conjunctions(plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov), plan.Window{Start: c.start, End: c.end})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -102,7 +102,7 @@ func TestAppulsesAgreeWithSkyfield(t *testing.T) {
 		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
 			time.Date(2026, 4, 19, 22, 14, 27, 20_000_000, time.LocationUTC), 1.194358},
 	} {
-		events, err := plan.Appulses(c.start, c.end, plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov))
+		events, err := plan.Appulses(plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov), plan.Window{Start: c.start, End: c.end})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}

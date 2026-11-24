@@ -89,7 +89,7 @@ func main() {
 	day := time.Date(2025, time.February, 28, 0, 0, 0, 0, brtz)
 	next := day.Add(unit.Hours(24))
 
-	_, sunset, err := plan.SunriseSunset(day, next, site, prov)
+	_, sunset, err := plan.SunriseSunset(site, plan.Window{Start: day, End: next}, prov)
 	if err != nil {
 		log.Fatalf("SunriseSunset: %v", err)
 	}
@@ -98,17 +98,17 @@ func main() {
 	// below the horizon.
 	noon := day.Add(unit.Hours(12))
 
-	civil, err := plan.NightOf(noon, site, prov, plan.CivilTwilight)
+	civil, err := plan.NightOf(site, noon, prov, plan.CivilTwilight)
 	if err != nil {
 		log.Fatalf("NightOf civil: %v", err)
 	}
 
-	nautical, err := plan.NightOf(noon, site, prov, plan.NauticalTwilight)
+	nautical, err := plan.NightOf(site, noon, prov, plan.NauticalTwilight)
 	if err != nil {
 		log.Fatalf("NightOf nautical: %v", err)
 	}
 
-	astronomical, err := plan.NightOf(noon, site, prov, plan.AstronomicalTwilight)
+	astronomical, err := plan.NightOf(site, noon, prov, plan.AstronomicalTwilight)
 	if err != nil {
 		log.Fatalf("NightOf astronomical: %v", err)
 	}
@@ -271,7 +271,7 @@ func main() {
 	for _, pair := range pairs {
 		a, b := planets[pair[0]], planets[pair[1]]
 
-		appulses, err := plan.Appulses(searchStart, searchEnd, a.Target, b.Target)
+		appulses, err := plan.Appulses(a.Target, b.Target, plan.Window{Start: searchStart, End: searchEnd})
 		if err != nil {
 			log.Fatalf("%s–%s closest approach: %v", a.Name, b.Name, err)
 		}

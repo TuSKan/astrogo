@@ -22,7 +22,7 @@ func TestConstraints(t *testing.T) {
 		c := Altitude{Threshold: angle.Deg(20)}
 		// Target near zenith at Greenwich
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-		res, err := c.Check(obj, tm, site)
+		res, err := c.Check(obj, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if !res.Pass {
@@ -31,7 +31,7 @@ func TestConstraints(t *testing.T) {
 
 		c2 := Altitude{Threshold: angle.Deg(95)}
 
-		res2, _ := c2.Check(obj, tm, site)
+		res2, _ := c2.Check(obj, site, tm)
 		if res2.Pass {
 			t.Errorf("Expected FAIL for extreme threshold, got %v", res2)
 		}
@@ -40,7 +40,7 @@ func TestConstraints(t *testing.T) {
 	t.Run("Airmass", func(t *testing.T) {
 		c := Airmass{Threshold: 2.0}
 		obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-		res, err := c.Check(obj, tm, site)
+		res, err := c.Check(obj, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if !res.Pass {
@@ -49,7 +49,7 @@ func TestConstraints(t *testing.T) {
 
 		// Below horizon target
 		obj2 := NewStar("T", angle.Deg(0), angle.Deg(45))
-		res2, err := c.Check(obj2, tm, site)
+		res2, err := c.Check(obj2, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if res2.Pass {
@@ -67,7 +67,7 @@ func TestSunMoonConstraints(t *testing.T) {
 
 	t.Run("Sun", func(t *testing.T) {
 		c := Sun{Threshold: angle.Deg(-12)}
-		res, err := c.Check(nil, tmNight, site)
+		res, err := c.Check(nil, site, tmNight)
 		testutil.AssertNoError(t, err)
 
 		if !res.Pass {
@@ -79,7 +79,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		c := MoonSep{Threshold: angle.Deg(30)}
 		// Target at (0,0)
 		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-		res, err := c.Check(obj, tmNight, site)
+		res, err := c.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 		// Moon position at tmNight is roughly RA=19h, Dec=-16deg.
 		// Separation should be > 30 deg from (0,0).
@@ -102,10 +102,10 @@ func TestSunMoonConstraints(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		want, err := MoonSep{Threshold: angle.Deg(30)}.Check(obj, tmNight, site)
+		want, err := MoonSep{Threshold: angle.Deg(30)}.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
-		got, err := c.CheckCtx(obj, tmNight, site, ctx)
+		got, err := c.CheckCtx(obj, site, tmNight, ctx)
 		testutil.AssertNoError(t, err)
 
 		if got.Pass != want.Pass || got.Value != want.Value {
@@ -120,7 +120,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		testutil.AssertNoError(t, err)
 
 		c := MoonIllum{Threshold: frac + 0.1} // comfortably above the real value
-		res, err := c.Check(obj, tmNight, site)
+		res, err := c.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
 		if !res.Pass {
@@ -143,7 +143,7 @@ func TestSunMoonConstraints(t *testing.T) {
 			t.Skip("test setup: real illumination too low to construct a valid sub-zero threshold")
 		}
 
-		res, err := c.Check(obj, tmNight, site)
+		res, err := c.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
 		if res.Pass {
@@ -159,7 +159,7 @@ func TestSunMoonConstraints(t *testing.T) {
 		moon := NewMoon(eph.Default())
 
 		c := MoonIllum{Threshold: 0} // impossible to satisfy on illumination alone
-		res, err := c.Check(moon, tmNight, site)
+		res, err := c.Check(moon, site, tmNight)
 		testutil.AssertNoError(t, err)
 
 		if !res.Pass {
@@ -179,10 +179,10 @@ func TestSunMoonConstraints(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		want, err := MoonIllum{Threshold: 0.5}.Check(obj, tmNight, site)
+		want, err := MoonIllum{Threshold: 0.5}.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
-		got, err := c.CheckCtx(obj, tmNight, site, ctx)
+		got, err := c.CheckCtx(obj, site, tmNight, ctx)
 		testutil.AssertNoError(t, err)
 
 		if got.Pass != want.Pass || got.Value != want.Value {
@@ -193,10 +193,10 @@ func TestSunMoonConstraints(t *testing.T) {
 	t.Run("MoonIllum nil Provider defaults to eph.Default()", func(t *testing.T) {
 		obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
-		withNil, err := MoonIllum{Threshold: 1}.Check(obj, tmNight, site)
+		withNil, err := MoonIllum{Threshold: 1}.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
-		withDefault, err := MoonIllum{Threshold: 1, Provider: eph.Default()}.Check(obj, tmNight, site)
+		withDefault, err := MoonIllum{Threshold: 1, Provider: eph.Default()}.Check(obj, site, tmNight)
 		testutil.AssertNoError(t, err)
 
 		if withNil.Value != withDefault.Value {
@@ -209,7 +209,7 @@ func TestSunMoonConstraints(t *testing.T) {
 
 		c := MoonIllum{Threshold: 0.5, Provider: errStateProvider{}}
 
-		_, err := c.Check(obj, tmNight, site)
+		_, err := c.Check(obj, site, tmNight)
 		if !errors.Is(err, errMoonPhaseTestProvider) {
 			t.Errorf("Check error = %v, want it to wrap errMoonPhaseTestProvider", err)
 		}
