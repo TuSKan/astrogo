@@ -36,7 +36,7 @@ func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	t.Cleanup(time.ResetEOP)
 	time.RegisterModel(leapStepEOP{})
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

@@ -23,7 +23,7 @@ import (
 func refractionScene(t *testing.T) (withAtm, noAtm *coord.Context) {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Deg(-46.6), angle.Deg(-23.5), 800)
+	site, err := coord.NewGeodetic(angle.LatDeg(-23.5), angle.LonDeg(-46.6), 800)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

@@ -19,7 +19,7 @@ import (
 func TestScheduleRefusesABadWindow(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		t.Fatal(err)
 	}

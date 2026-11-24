@@ -23,7 +23,7 @@ func ExampleGalactocentricFrame_FromICRS() {
 		{"along the rotation", 90, 0},
 		{"toward the pole", 0, 90},
 	} {
-		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(tc.l), angle.Deg(tc.b)))
+		icrs := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(tc.b), angle.LonDeg(tc.l)))
 		g := f.FromICRS(icrs, unit.Pc(1000))
 
 		fmt.Printf("%-19s R = %7.1f pc   Z = %+7.1f pc\n", tc.name, g.Radius().Pc(), g.Z().Pc())
@@ -51,7 +51,7 @@ func ExampleGalactocentricFrame_FromICRS() {
 // A catalog gives a parallax, and the frame wants parsecs.
 func ExampleParallaxDistance() {
 	// A star at Galactic (l, b) = (120°, +15°) with a parallax of 2 mas.
-	star := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(120), angle.Deg(15)))
+	star := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(15), angle.LonDeg(120)))
 
 	d := coord.ParallaxDistance(angle.Arcsec(0.002))
 	g := coord.DefaultGalactocentricFrame().FromICRS(star, d)

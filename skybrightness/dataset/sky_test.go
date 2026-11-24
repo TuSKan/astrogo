@@ -22,7 +22,7 @@ import (
 func skySite(tb testing.TB) *coord.Geodetic {
 	tb.Helper()
 
-	g, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	g, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}
@@ -447,14 +447,18 @@ func TestSceneCarriesThePresetTransfer(t *testing.T) {
 // one under test.
 type uniformStars float64
 
-func (u uniformStars) RadianceAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+func (u uniformStars) RadianceAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return float64(u), nil
+}
 
 func (uniformStars) Galactic() bool { return true }
 
 // uniformDust is the same idea for the 100 micron map.
 type uniformDust float64
 
-func (u uniformDust) IntensityAt(_, _ angle.Angle) (float64, error) { return float64(u), nil }
+func (u uniformDust) IntensityAt(_ angle.Latitude, _ angle.Longitude) (float64, error) {
+	return float64(u), nil
+}
 
 // skyInputs is a synthetic PresetInputs: enough for a preset to build and
 // evaluate, with no service behind any of it.
@@ -526,7 +530,7 @@ func TestOneSkyServesManySites(t *testing.T) {
 	zenith := func(heightM float64) float64 {
 		t.Helper()
 
-		site, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), unit.Meters(heightM))
+		site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(heightM))
 		if err != nil {
 			t.Fatalf("NewGeodetic: %v", err)
 		}

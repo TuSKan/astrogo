@@ -17,7 +17,7 @@ import (
 func setTimeFixture(t *testing.T) (*coord.Geodetic, atmosphere.Refraction, time.Time, coord.ICRS) {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Deg(2.1686), angle.Deg(41.3874), 0)
+	site, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	testutil.AssertNoError(t, err)
 
 	return site, atmosphere.Refraction{Pressure: 0}, time.FromJD(2461000.0, time.UTC),

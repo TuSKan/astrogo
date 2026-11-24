@@ -18,9 +18,9 @@ import (
 func TestHorizonRefractionDefaultsToTheAlmanac(t *testing.T) {
 	t.Parallel()
 
-	site, err := NewSiteEarthLocation("sea level", 45, 0, 0)
+	site, err := NewSite("sea level", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	if got := site.horizonRefraction(); got != standardRefraction {
@@ -55,9 +55,9 @@ func TestHorizonRefractionFollowsTheAir(t *testing.T) {
 		{"air at 4,205 m", atmosphere.AtAltitude(unit.Meters(4205)), 21, 23},
 		{"no air", atmosphere.Refraction{}, 0, 0},
 	} {
-		site, err := NewSiteEarthLocation(c.name, 45, 0, heightM, WithHorizonRefraction(c.air))
+		site, err := NewSite(c.name, angle.LatDeg(45), angle.LonDeg(0), unit.Meters(heightM), WithHorizonRefraction(c.air))
 		if err != nil {
-			t.Fatalf("NewSiteEarthLocation: %v", err)
+			t.Fatalf("NewSite: %v", err)
 		}
 
 		r := site.horizonRefraction() * 60
@@ -96,9 +96,9 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 	events := func(opts ...SiteOption) (site *Site, rise, set time.Time) {
 		t.Helper()
 
-		site, err := NewSiteEarthLocation("sea level", 45, 0, 0, opts...)
+		site, err := NewSite("sea level", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0), opts...)
 		if err != nil {
-			t.Fatalf("NewSiteEarthLocation: %v", err)
+			t.Fatalf("NewSite: %v", err)
 		}
 
 		evs, err := VisibilityEvents(start, end, sirius, site)
@@ -174,17 +174,17 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 func TestHorizonRefractionIsPartOfTheSite(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
 	air := atmosphere.Refraction{Pressure: 1030, Temperature: -20}
 
-	plain, _ := NewSite("s", loc)
-	cold, _ := NewSite("s", loc, WithHorizonRefraction(air))
-	coldAgain, _ := NewSite("s", loc, WithHorizonRefraction(air))
-	bennett, _ := NewSite("s", loc, WithHorizonRefraction(atmosphere.Refraction{
+	plain, _ := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
+	cold, _ := NewSite("s", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonRefraction(air))
+	coldAgain, _ := NewSite("s", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonRefraction(air))
+	bennett, _ := NewSite("s", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonRefraction(atmosphere.Refraction{
 		Pressure: 1030, Temperature: -20, Model: atmosphere.RefractionBennett{},
 	}))
 
@@ -200,7 +200,7 @@ func TestHorizonRefractionIsPartOfTheSite(t *testing.T) {
 		t.Error("sites whose horizon air names different models are equal")
 	}
 
-	warm, _ := NewSite("s", loc, WithHorizonRefraction(atmosphere.Refraction{Pressure: 1030, Temperature: 25}))
+	warm, _ := NewSite("s", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonRefraction(atmosphere.Refraction{Pressure: 1030, Temperature: 25}))
 	if cold.Equal(warm) {
 		t.Error("sites whose horizon air differs in temperature are equal")
 	}
@@ -231,7 +231,7 @@ func TestNewSiteRefusesHorizonAirThatIsNot(t *testing.T) {
 		{Pressure: math.Inf(1), Temperature: 10},
 		{Pressure: 1010, Temperature: 10, Humidity: 2},
 	} {
-		if _, err := NewSiteEarthLocation("bad air", 45, 0, 100, WithHorizonRefraction(air)); !errors.Is(err, atmosphere.ErrRefraction) {
+		if _, err := NewSite("bad air", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(100), WithHorizonRefraction(air)); !errors.Is(err, atmosphere.ErrRefraction) {
 			t.Errorf("%+v: NewSite = %v, want ErrRefraction", air, err)
 		}
 	}

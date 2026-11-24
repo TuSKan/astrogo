@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestStringOmitsAnUnknownDistance: a target nothing gave a distance has a
@@ -17,7 +18,7 @@ import (
 // parallax both did. The line is now left out, as Magnitude and
 // RadialVelocity are when unknown, and kept for a star with a parallax.
 func TestStringOmitsAnUnknownDistance(t *testing.T) {
-	loc, err := coord.NewEarthLocation(-23.5505, -46.6333, 760)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760))
 	testutil.AssertNoError(t, err)
 
 	tm := time.Date(2026, time.April, 25, 20, 0, 0, 0, time.LocationUTC)

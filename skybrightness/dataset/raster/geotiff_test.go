@@ -467,7 +467,7 @@ func readPixelCenters(t *testing.T, s synthTIFF) {
 		for col := range s.width {
 			lon, lat := s.centerLonLat(col, row)
 
-			got, err := gt.SampleBilinear(angle.Deg(lon), angle.Deg(lat))
+			got, err := gt.SampleBilinear(angle.LatDeg(lat), angle.LonDeg(lon))
 			if err != nil {
 				t.Fatalf("SampleBilinear(%d,%d): %v", col, row, err)
 			}
@@ -618,7 +618,7 @@ func TestGeoTIFFBilinearMidpoint(t *testing.T) {
 	lon0, lat0 := s.centerLonLat(0, 0)
 	lon1, _ := s.centerLonLat(1, 0)
 
-	got, err := gt.SampleBilinear(angle.Deg((lon0+lon1)/2), angle.Deg(lat0))
+	got, err := gt.SampleBilinear(angle.LatDeg(lat0), angle.LonDeg((lon0+lon1)/2))
 	if err != nil {
 		t.Fatalf("SampleBilinear: %v", err)
 	}
@@ -702,7 +702,7 @@ func TestGeoKeysPixelIsPointNamesPixelCenters(t *testing.T) {
 			lon := s.originLon + float64(col)*s.pxSize
 			lat := s.originLat - float64(row)*s.pxSize
 
-			got, err := r.SampleBilinear(angle.Deg(lon), angle.Deg(lat))
+			got, err := r.SampleBilinear(angle.LatDeg(lat), angle.LonDeg(lon))
 			if err != nil {
 				t.Fatalf("SampleBilinear(%d,%d): %v", col, row, err)
 			}

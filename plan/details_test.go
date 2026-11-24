@@ -24,10 +24,10 @@ import (
 // None of this was previously exercised by any test — every mock Observable
 // elsewhere in this package implements its own trivial GetDetails stub.
 func TestGetDetails_Star(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC) // J2000
@@ -85,10 +85,10 @@ func TestGetDetails_Star(t *testing.T) {
 // TestGetDetails_DeepSkyObject exercises fillTypedProps' DeepSkyObject case
 // (fillAliasProps via an NGC alias).
 func TestGetDetails_DeepSkyObject(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -112,10 +112,10 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 // (fillMovingBody: topocentric vector, diurnal-parallax-corrected RA/Dec,
 // distance in a.u., and elongation-from-Sun computation).
 func TestGetDetails_MovingBody(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -151,10 +151,10 @@ func TestGetDetails_MovingBody(t *testing.T) {
 // fully-populated TargetDetails (rise/set/transit fields included) without
 // panicking on nil pointer dereferences.
 func TestGetDetails_String(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -179,10 +179,10 @@ func TestGetDetails_String(t *testing.T) {
 // hardcoded number, so this doesn't silently drift from coord's own
 // sign convention.
 func TestGetDetails_RadialVelocity(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
@@ -225,10 +225,10 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 // which would misrepresent "never measured" as "measured exactly zero"),
 // and for a DeepSkyObject (doesn't implement MeasuredRadialVelocity at all).
 func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -258,10 +258,10 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 // DetailOverrides.RadialVelocity wins over the computed value.
 // TestDetailOverridesAppliesEveryField covers the other fields.
 func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	tm := time.FromJD(2451545.0, time.UTC)
@@ -287,10 +287,10 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 // speed projected onto that sightline. A sign error would collapse this
 // to ~zero instead.
 func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	ra, dec := angle.Zero(), angle.Zero()
@@ -333,7 +333,7 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 	t.Parallel()
 
-	site, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -509,10 +509,10 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+			loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 			testutil.AssertNoError(t, err)
 
-			site, err := NewSite("Test", loc)
+			site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 			testutil.AssertNoError(t, err)
 
 			ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
@@ -548,10 +548,10 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())

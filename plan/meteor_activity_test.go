@@ -4,8 +4,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // jenniskensFit is one shower's activity fit as Jenniskens (1994, A&A 287,
@@ -116,9 +118,9 @@ func TestObservedRateFollowsTheDate(t *testing.T) {
 	prov := eph.Default()
 	per := meteorShowers["perseids"]
 
-	site, err := NewSiteEarthLocation("45N", 45, 0, 0)
+	site, err := NewSite("45N", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	rate := func(month, day, hour int) float64 {

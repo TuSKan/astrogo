@@ -32,7 +32,7 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 
 	sat := newISSProvider(t)
 
-	observer, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), unit.Meters(760))
+	observer, err := coord.NewGeodetic(angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
 
 	sat := newISSProvider(t)
 
-	observer, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), unit.Meters(760))
+	observer, err := coord.NewGeodetic(angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestSatellitePassesFindAPassThatBarelyClearsTheThreshold(t *testing.T) {
 
 	sat := newISSProvider(t)
 
-	observer, err := coord.NewGeodetic(angle.Deg(-46.63), angle.Deg(-23.55), unit.Meters(760))
+	observer, err := coord.NewGeodetic(angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760))
 	if err != nil {
 		t.Fatal(err)
 	}

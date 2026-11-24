@@ -600,8 +600,7 @@ reddish-copper. Then, as the sky darkened, it would have hung in the penumbra un
 import "github.com/TuSKan/astrogo/plan"
 
 // Compute moonrise over Jerusalem on April 3, AD 33
-loc, _ := coord.NewEarthLocation(31.7683, 35.2137, 780.0)
-site, _ := plan.NewSite("Jerusalem", loc, plan.WithTimeZone(time.LocationUTC))
+site, _ := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.LocationUTC))
 
 dayStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
 dayEnd   := time.DateJulianCal(33, 4, 3, 20, 0, 0)

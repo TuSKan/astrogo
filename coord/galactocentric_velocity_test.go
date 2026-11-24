@@ -362,7 +362,7 @@ func TestTheGalacticBasisIsOrthonormal(t *testing.T) {
 
 	// The axes themselves: +Y must point toward Galactic longitude 90, which
 	// is what makes the frame right-handed rather than mirrored.
-	towardRotation := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(90), 0))
+	towardRotation := coord.GalacticToICRS(coord.NewGalactic(angle.Latitude{}, angle.LonDeg(90)))
 
 	g := f.FromICRS(towardRotation, unit.Pc(1000))
 	sun := f.SunPosition()

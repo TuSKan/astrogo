@@ -123,9 +123,9 @@ func TestICRSRoundTrip(t *testing.T) {
 
 func TestGalacticRoundTrip_FromVec(t *testing.T) {
 	cases := []coord.Galactic{
-		coord.NewGalactic(angle.Deg(0), angle.Deg(0)),
-		coord.NewGalactic(angle.Deg(45), angle.Deg(20)),
-		coord.NewGalactic(angle.Deg(180), angle.Deg(-45)),
+		coord.NewGalactic(angle.LatDeg(0), angle.LonDeg(0)),
+		coord.NewGalactic(angle.LatDeg(20), angle.LonDeg(45)),
+		coord.NewGalactic(angle.LatDeg(-45), angle.LonDeg(180)),
 	}
 	for i, c := range cases {
 		v := c.ToUnitVector()
@@ -141,9 +141,9 @@ func TestGalacticRoundTrip_FromVec(t *testing.T) {
 
 func TestEclipticRoundTrip_FromVec(t *testing.T) {
 	cases := []coord.Ecliptic{
-		coord.NewEcliptic(angle.Deg(0), angle.Deg(0)),
-		coord.NewEcliptic(angle.Deg(120), angle.Deg(-10)),
-		coord.NewEcliptic(angle.Deg(300), angle.Deg(15)),
+		coord.NewEcliptic(angle.LatDeg(0), angle.LonDeg(0)),
+		coord.NewEcliptic(angle.LatDeg(-10), angle.LonDeg(120)),
+		coord.NewEcliptic(angle.LatDeg(15), angle.LonDeg(300)),
 	}
 	for i, c := range cases {
 		v := c.ToUnitVector()
@@ -174,9 +174,9 @@ func TestICRSEqual(t *testing.T) {
 }
 
 func TestGalacticEqual(t *testing.T) {
-	a := coord.NewGalactic(angle.Deg(120), angle.Deg(30))
-	b := coord.NewGalactic(angle.Deg(120), angle.Deg(30))
-	c := coord.NewGalactic(angle.Deg(121), angle.Deg(30))
+	a := coord.NewGalactic(angle.LatDeg(30), angle.LonDeg(120))
+	b := coord.NewGalactic(angle.LatDeg(30), angle.LonDeg(120))
+	c := coord.NewGalactic(angle.LatDeg(30), angle.LonDeg(121))
 
 	if !a.Equal(b) {
 		t.Error("identical Galactic should be equal")
@@ -188,9 +188,9 @@ func TestGalacticEqual(t *testing.T) {
 }
 
 func TestEclipticEqual(t *testing.T) {
-	a := coord.NewEcliptic(angle.Deg(60), angle.Deg(5))
+	a := coord.NewEcliptic(angle.LatDeg(5), angle.LonDeg(60))
 
-	b := coord.NewEcliptic(angle.Deg(60), angle.Deg(5))
+	b := coord.NewEcliptic(angle.LatDeg(5), angle.LonDeg(60))
 	if !a.Equal(b) {
 		t.Error("identical Ecliptic should be equal")
 	}
@@ -216,7 +216,7 @@ func TestSetters(t *testing.T) {
 	testutil.AssertNear(t, "AltAz Dist", aa.Dist().AU(), 6.0, 1e-10)
 
 	// Galactic
-	gc := coord.NewGalactic(angle.Deg(10), angle.Deg(20))
+	gc := coord.NewGalactic(angle.LatDeg(20), angle.LonDeg(10))
 	gc.SetL(angle.Deg(30))
 	gc.SetB(angle.Deg(40))
 	gc.SetDist(unit.AU(7.0))
@@ -225,7 +225,7 @@ func TestSetters(t *testing.T) {
 	testutil.AssertNear(t, "Galactic Dist", gc.Dist().AU(), 7.0, 1e-10)
 
 	// Ecliptic
-	ec := coord.NewEcliptic(angle.Deg(10), angle.Deg(20))
+	ec := coord.NewEcliptic(angle.LatDeg(20), angle.LonDeg(10))
 	ec.SetLon(angle.Deg(30))
 	ec.SetLat(angle.Deg(40))
 	ec.SetDist(unit.AU(8.0))
@@ -255,7 +255,7 @@ func TestSetters(t *testing.T) {
 	testutil.AssertNear(t, "Apparent Dec", ap.Dec().Degrees(), 40.0, 1e-10)
 
 	// ObserversLocation
-	ol := coord.NewObserversLocation(angle.Deg(10), angle.Deg(20), unit.Meters(100))
+	ol := coord.NewObserversLocation(angle.LatDeg(20), angle.LonDeg(10), unit.Meters(100))
 	ol.SetLon(angle.Deg(30))
 	ol.SetLat(angle.Deg(40))
 	ol.SetHeight(unit.Meters(200))
@@ -269,9 +269,9 @@ func TestNames(t *testing.T) {
 	testutil.AssertEqual(t, "Name", coord.NewCIRS(angle.Deg(0), angle.Deg(0)).Name(), "CIRS")
 	testutil.AssertEqual(t, "Name", coord.NewICRS(angle.Deg(0), angle.Deg(0)).Name(), "ICRS")
 	testutil.AssertEqual(t, "Name", coord.NewAltAz(angle.Deg(0), angle.Deg(0)).Name(), "AltAz")
-	testutil.AssertEqual(t, "Name", coord.NewGalactic(angle.Deg(0), angle.Deg(0)).Name(), "Galactic")
-	testutil.AssertEqual(t, "Name", coord.NewEcliptic(angle.Deg(0), angle.Deg(0)).Name(), "Ecliptic")
-	testutil.AssertEqual(t, "Name", coord.NewObserversLocation(angle.Deg(0), angle.Deg(0), 0).Name(), "ObserversLocation")
+	testutil.AssertEqual(t, "Name", coord.NewGalactic(angle.LatDeg(0), angle.LonDeg(0)).Name(), "Galactic")
+	testutil.AssertEqual(t, "Name", coord.NewEcliptic(angle.LatDeg(0), angle.LonDeg(0)).Name(), "Ecliptic")
+	testutil.AssertEqual(t, "Name", coord.NewObserversLocation(angle.LatDeg(0), angle.LonDeg(0), 0).Name(), "ObserversLocation")
 }
 
 func TestValidations(t *testing.T) {
@@ -281,16 +281,16 @@ func TestValidations(t *testing.T) {
 	err = coord.NewCIRS(angle.Deg(0), angle.Deg(95)).Validate()
 	testutil.AssertError(t, err)
 
-	err = coord.NewGalactic(angle.Deg(0), angle.Deg(95)).Validate()
+	err = coord.NewGalactic(angle.LatDeg(95), angle.LonDeg(0)).Validate()
 	testutil.AssertError(t, err)
 
-	err = coord.NewEcliptic(angle.Deg(0), angle.Deg(95)).Validate()
+	err = coord.NewEcliptic(angle.LatDeg(95), angle.LonDeg(0)).Validate()
 	testutil.AssertError(t, err)
 
 	err = coord.NewAltAz(angle.Deg(95), angle.Deg(0)).Validate()
 	testutil.AssertError(t, err)
 
-	err = coord.NewObserversLocation(angle.Deg(0), angle.Deg(95), 0).Validate()
+	err = coord.NewObserversLocation(angle.LatDeg(95), angle.LonDeg(0), 0).Validate()
 	testutil.AssertError(t, err)
 }
 
@@ -314,9 +314,9 @@ func TestMoreEqual(t *testing.T) {
 		t.Error("identical Apparent should be equal")
 	}
 
-	obsA := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 10)
-	obsB := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 10)
-	obsC := coord.NewObserversLocation(angle.Deg(1), angle.Deg(2), 20)
+	obsA := coord.NewObserversLocation(angle.LatDeg(2), angle.LonDeg(1), 10)
+	obsB := coord.NewObserversLocation(angle.LatDeg(2), angle.LonDeg(1), 10)
+	obsC := coord.NewObserversLocation(angle.LatDeg(2), angle.LonDeg(1), 20)
 
 	if !obsA.Equal(obsB) {
 		t.Error("identical ObserversLocation should be equal")
@@ -337,13 +337,13 @@ func TestStrings(t *testing.T) {
 	aa := coord.NewAltAz(angle.Deg(30), angle.Deg(15))
 	testutil.AssertEqual(t, "AltAz string", aa.String(), "AltAz Alt=+30°00'00.00\" Az=+15°00'00.00\"")
 
-	gal := coord.NewGalactic(angle.Deg(15), angle.Deg(30))
+	gal := coord.NewGalactic(angle.LatDeg(30), angle.LonDeg(15))
 	testutil.AssertEqual(t, "Galactic string", gal.String(), "Galactic L=+15°00'00.00\" B=+30°00'00.00\"")
 
-	ecl := coord.NewEcliptic(angle.Deg(15), angle.Deg(30))
+	ecl := coord.NewEcliptic(angle.LatDeg(30), angle.LonDeg(15))
 	testutil.AssertEqual(t, "Ecliptic string", ecl.String(), "Ecliptic Lon=+15°00'00.00\" Lat=+30°00'00.00\"")
 
-	obs := coord.NewObserversLocation(angle.Deg(15), angle.Deg(30), 100)
+	obs := coord.NewObserversLocation(angle.LatDeg(30), angle.LonDeg(15), 100)
 	testutil.AssertEqual(t, "ObserversLocation string", obs.String(), "ObserversLocation Lon=+15°00'00.00\" Lat=+30°00'00.00\" Height=100.000000 m")
 }
 
@@ -420,9 +420,9 @@ func TestMoreRoundTrips(t *testing.T) {
 	app2.FromUnitVector(v)
 	testutil.AssertNear(t, "apparent roundtrip", app2.RA().Degrees(), 45.0, 1e-10)
 
-	obs := coord.NewObserversLocation(angle.Deg(45), angle.Deg(45), 100)
+	obs := coord.NewObserversLocation(angle.LatDeg(45), angle.LonDeg(45), 100)
 	v = obs.ToUnitVector()
-	obs2 := coord.NewObserversLocation(angle.Deg(0), angle.Deg(0), 0)
+	obs2 := coord.NewObserversLocation(angle.LatDeg(0), angle.LonDeg(0), 0)
 	obs2.FromUnitVector(v)
 	testutil.AssertNear(t, "observers roundtrip", obs2.Lon().Degrees(), 45.0, 1e-10)
 

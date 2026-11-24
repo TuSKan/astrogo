@@ -23,7 +23,7 @@ func teteContext(t *testing.T) *coord.Context {
 
 	return mustContext(t,
 		teteEpoch,
-		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
+		coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		atmosphere.Refraction{},
 	)
 }
@@ -192,7 +192,7 @@ func TestTETEAccessorsCarryWhatTheyWereGiven(t *testing.T) {
 func BenchmarkCIRSToTETE(b *testing.B) {
 	ctx := mustContext(b,
 		teteEpoch,
-		coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635),
+		coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		atmosphere.Refraction{},
 	)
 

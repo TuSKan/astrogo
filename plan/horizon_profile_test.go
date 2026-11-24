@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestParseHorizonProfileReadsAHorizonTable: a table in the form Stellarium,
@@ -102,7 +103,7 @@ func TestParseHorizonProfileDrivesTheHorizonConstraint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSiteEarthLocation("garden", 51.48, 0, 46, WithHorizonProfile(p))
+	site, err := NewSite("garden", angle.LatDeg(51.48), angle.LonDeg(0), unit.Meters(46), WithHorizonProfile(p))
 	if err != nil {
 		t.Fatal(err)
 	}

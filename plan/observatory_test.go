@@ -20,11 +20,11 @@ import (
 )
 
 func TestNewSite(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
 	tz, _ := time.LoadLocation("Europe/Rome")
 	horizon := angle.Deg(20)
 
-	site, err := NewSite("My Observatory", loc, WithHorizon(horizon), WithTimeZone(tz))
+	site, err := NewSite("My Observatory", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(horizon), WithTimeZone(tz))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertEqual(t, "Name", site.Name(), "My Observatory")
@@ -35,12 +35,10 @@ func TestNewSite(t *testing.T) {
 	testutil.AssertEqual(t, "TimeZone", site.TimeZone().String(), "Europe/Rome")
 }
 
-// TestNewSiteEarthLocation confirms the plain lat/lon/height convenience
-// constructor produces the same Site a caller would get by hand-building a
-// coord.Geodetic via coord.NewEarthLocation + NewSite — the whole point is
-// that a caller no longer needs to import coord for this common case.
-func TestNewSiteEarthLocation(t *testing.T) {
-	site, err := NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+// TestNewSiteKeepsItsLocation: a Site reports the latitude, longitude and
+// height of the location it was built from.
+func TestNewSiteKeepsItsLocation(t *testing.T) {
+	site, err := NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
@@ -49,24 +47,16 @@ func TestNewSiteEarthLocation(t *testing.T) {
 	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
-// TestNewSiteEarthLocation_InvalidLatitude confirms the underlying
-// coord.NewEarthLocation validation error still surfaces (not swallowed).
-func TestNewSiteEarthLocation_InvalidLatitude(t *testing.T) {
-	if _, err := NewSiteEarthLocation("Bad", 200, 0, 0); err == nil {
-		t.Error("expected an error for a latitude outside [-90, 90]")
-	}
-}
-
-// TestNewSiteEarthAddress_Offline confirms remote.SetOffline's ErrOffline
-// surfaces through NewSiteEarthAddress rather than being swallowed — the
+// TestNewSiteFromAddress_Offline confirms remote.SetOffline's ErrOffline
+// surfaces through NewSiteFromAddress rather than being swallowed — the
 // same offline-mode gate every other remote.KindAPI caller respects.
-func TestNewSiteEarthAddress_Offline(t *testing.T) {
+func TestNewSiteFromAddress_Offline(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.Nominatim).Restore)
 	remote.SetOffline(true)
 
-	_, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	_, err := NewSiteFromAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
 	if !errors.Is(err, remote.ErrOffline) {
-		t.Errorf("NewSiteEarthAddress while offline: got %v, want wrapping remote.ErrOffline", err)
+		t.Errorf("NewSiteFromAddress while offline: got %v, want wrapping remote.ErrOffline", err)
 	}
 }
 
@@ -88,11 +78,11 @@ func jsonServer(t *testing.T, body string) *httptest.Server {
 	return srv
 }
 
-// TestNewSiteEarthAddress_Success exercises the full geocode + elevation
+// TestNewSiteFromAddress_Success exercises the full geocode + elevation
 // round trip against mocked Nominatim/Open-Elevation responses — the real
 // live services are covered separately by the network-tagged
-// TestNewSiteEarthAddress_Live.
-func TestNewSiteEarthAddress_Success(t *testing.T) {
+// TestNewSiteFromAddress_Live.
+func TestNewSiteFromAddress_Success(t *testing.T) {
 	geo := jsonServer(t, `[{"lat":"-22.528478","lon":"-46.473002"}]`)
 	elev := jsonServer(t, `{"results":[{"elevation":835.05}]}`)
 
@@ -106,9 +96,9 @@ func TestNewSiteEarthAddress_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	site, err := NewSiteEarthAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
+	site, err := NewSiteFromAddress(context.Background(), "Quinta Calixto", "Extrema, MG, Brazil")
 	if err != nil {
-		t.Fatalf("NewSiteEarthAddress: %v", err)
+		t.Fatalf("NewSiteFromAddress: %v", err)
 	}
 
 	testutil.AssertEqual(t, "Name", site.Name(), "Quinta Calixto")
@@ -117,10 +107,10 @@ func TestNewSiteEarthAddress_Success(t *testing.T) {
 	testutil.AssertEqual(t, "Height", site.Height().Meters(), 835.05)
 }
 
-// TestNewSiteEarthAddress_NoResult confirms ErrGeocodeNoResult surfaces
+// TestNewSiteFromAddress_NoResult confirms ErrGeocodeNoResult surfaces
 // whether the empty result comes from Nominatim (no match for the address)
 // or from Open-Elevation (no elevation for otherwise-valid coordinates).
-func TestNewSiteEarthAddress_NoResult(t *testing.T) {
+func TestNewSiteFromAddress_NoResult(t *testing.T) {
 	cases := []struct {
 		name           string
 		geocodeBody    string
@@ -148,7 +138,7 @@ func TestNewSiteEarthAddress_NoResult(t *testing.T) {
 				}
 			}
 
-			_, err := NewSiteEarthAddress(context.Background(), "Nowhere", "a place that doesn't exist")
+			_, err := NewSiteFromAddress(context.Background(), "Nowhere", "a place that doesn't exist")
 			if !errors.Is(err, ErrGeocodeNoResult) {
 				t.Errorf("got %v, want wrapping ErrGeocodeNoResult", err)
 			}
@@ -156,10 +146,10 @@ func TestNewSiteEarthAddress_NoResult(t *testing.T) {
 	}
 }
 
-// TestNewSiteEarthAddress_BadCoordinates confirms a malformed lat/lon in
+// TestNewSiteFromAddress_BadCoordinates confirms a malformed lat/lon in
 // Nominatim's response surfaces as an error rather than a silently-zeroed
 // coordinate.
-func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
+func TestNewSiteFromAddress_BadCoordinates(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
@@ -178,7 +168,7 @@ func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := NewSiteEarthAddress(context.Background(), "Bad", "somewhere"); err == nil {
+			if _, err := NewSiteFromAddress(context.Background(), "Bad", "somewhere"); err == nil {
 				t.Error("expected a parse error for a non-numeric coordinate")
 			}
 		})
@@ -186,36 +176,51 @@ func TestNewSiteEarthAddress_BadCoordinates(t *testing.T) {
 }
 
 func TestDefaultTimeZone(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	site, _ := NewSite("UTC Site", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
+	site, _ := NewSite("UTC Site", loc.Lat(), loc.Lon(), loc.Height())
 
 	testutil.AssertEqual(t, "Default TZ", site.TimeZone().String(), "UTC")
 }
 
 func TestInvalidHorizon(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
-	_, err := NewSite("Bad Horizon", loc, WithHorizon(angle.Deg(100)))
+	_, err := NewSite("Bad Horizon", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(100)))
 	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 
-	_, err = NewSite("Bad Horizon Low", loc, WithHorizon(angle.Deg(-95)))
+	_, err = NewSite("Bad Horizon Low", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(-95)))
 	if !errors.Is(err, ErrInvalidHorizon) {
 		t.Errorf("Expected ErrInvalidHorizon, got %v", err)
 	}
 }
 
-func TestNilLocation(t *testing.T) {
-	_, err := NewSite("No Location", nil)
-	if !errors.Is(err, ErrNilLocation) {
-		t.Errorf("Expected ErrNilLocation, got %v", err)
+// TestNewSiteRefusesAnImpossibleLocation: a latitude past the pole, or a
+// height that is not a number, is coord.NewGeodetic's error, named for the
+// site.
+func TestNewSiteRefusesAnImpossibleLocation(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		lat    float64
+		height unit.Length
+		want   error
+	}{
+		{"past the pole", 91, unit.Meters(0), coord.ErrLatitudeRange},
+		{"no height", 45, unit.Meters(math.NaN()), coord.ErrNotFinite},
+	} {
+		_, err := NewSite(tc.name, angle.LatDeg(tc.lat), angle.LonDeg(10), tc.height)
+		if !errors.Is(err, tc.want) || !strings.Contains(fmt.Sprint(err), tc.name) {
+			t.Errorf("%s: NewSite error %v, want %v naming the site", tc.name, err, tc.want)
+		}
 	}
 }
 
 func TestString(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
-	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(20)))
 
 	s := site.String()
 	if s == "" {
@@ -224,10 +229,10 @@ func TestString(t *testing.T) {
 }
 
 func TestSiteEqual(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(10), angle.Deg(45), 500)
-	a, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
-	b, _ := NewSite("Test", loc, WithHorizon(angle.Deg(20)))
-	c, _ := NewSite("Other", loc, WithHorizon(angle.Deg(20)))
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
+	a, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(20)))
+	b, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(20)))
+	c, _ := NewSite("Other", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(20)))
 
 	if !a.Equal(b) {
 		t.Error("identical sites should be equal")
@@ -239,8 +244,8 @@ func TestSiteEqual(t *testing.T) {
 }
 
 func TestWithHorizon(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	s2, err := site.WithHorizon(angle.Deg(15))
 	testutil.AssertNoError(t, err)
@@ -255,8 +260,8 @@ func TestWithHorizon(t *testing.T) {
 // scalar Horizon() at every azimuth when no profile was set — the
 // zero-value (nil HorizonProfile) case every existing Site already has.
 func TestHorizonAt_FallsBackToScalar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
-	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(12)))
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(12)))
 
 	if site.HorizonProfile() != nil {
 		t.Errorf("HorizonProfile() = %v, want nil (none set)", site.HorizonProfile())
@@ -273,7 +278,7 @@ func TestHorizonAt_FallsBackToScalar(t *testing.T) {
 // TestHorizonAt_ProfileWinsOverScalar confirms a set profile takes
 // precedence over the scalar Horizon() wherever HorizonAt is consulted.
 func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	// A ridge blocking the eastern sky to 30°, clear (0°) everywhere else.
 	profile := func(az angle.Angle) angle.Angle {
@@ -284,7 +289,7 @@ func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
 		return angle.Zero()
 	}
 
-	site, _ := NewSite("Test", loc, WithHorizon(angle.Deg(5)), WithHorizonProfile(profile))
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizon(angle.Deg(5)), WithHorizonProfile(profile))
 
 	if got := site.HorizonAt(angle.Deg(90)).Degrees(); math.Abs(got-30) > 1e-12 {
 		t.Errorf("HorizonAt(90°) = %v, want 30 (profile, not the 5° scalar)", got)
@@ -306,10 +311,10 @@ func TestHorizonAt_ProfileWinsOverScalar(t *testing.T) {
 // and WithTimeZone (a hand-copied struct literal) must carry the profile
 // forward.
 func TestHorizonProfile_SurvivesCopyConstructors(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 	profile := func(angle.Angle) angle.Angle { return angle.Deg(7) }
 
-	site, _ := NewSite("Test", loc, WithHorizonProfile(profile))
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonProfile(profile))
 	if site.HorizonProfile() == nil {
 		t.Fatal("HorizonProfile() = nil right after construction, want the set profile")
 	}
@@ -337,7 +342,7 @@ func TestHorizonProfile_SurvivesCopyConstructors(t *testing.T) {
 // right at the 0°/360° azimuth wrap boundary — a plausible off-by-wrap bug
 // site for any future CSV/DEM-backed profile implementation to trip on.
 func TestHorizonProfile_AzimuthWrap(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(0), 0)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
 	// Blocked due north (a wrap-straddling band from 350° through 10°).
 	profile := func(az angle.Angle) angle.Angle {
@@ -349,7 +354,7 @@ func TestHorizonProfile_AzimuthWrap(t *testing.T) {
 		return angle.Zero()
 	}
 
-	site, _ := NewSite("Test", loc, WithHorizonProfile(profile))
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height(), WithHorizonProfile(profile))
 
 	for _, az := range []float64{0, 5, 355, 359.9} {
 		if got := site.HorizonAt(angle.Deg(az)).Degrees(); math.Abs(got-25) > 1e-9 {
@@ -365,8 +370,8 @@ func TestHorizonProfile_AzimuthWrap(t *testing.T) {
 func TestLocalSiderealTime(t *testing.T) {
 	// Greenwich (lon=0) at J2000.0 (2000-01-01 12:00:00 UTC = JD 2451545.0)
 	// GAST at J2000.0 is approximately 18.697 hours = 280.46 degrees
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0) // Greenwich
-	site, _ := NewSite("Greenwich", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), 0) // Greenwich
+	site, _ := NewSite("Greenwich", loc.Lat(), loc.Lon(), loc.Height())
 
 	tm := time.FromJD(2451545.0, time.UTC)
 
@@ -576,9 +581,9 @@ func TestSiteHorizonDipIsTheApparentDip(t *testing.T) {
 		{786, 0.822, 0.899},
 		{8849, 2.759, 3.016},
 	} {
-		site, err := NewSiteEarthLocation("dip", 0, 0, 0, WithHorizonHeight(unit.Meters(c.height)))
+		site, err := NewSite("dip", angle.LatDeg(0), angle.LonDeg(0), unit.Meters(0), WithHorizonHeight(unit.Meters(c.height)))
 		if err != nil {
-			t.Fatalf("NewSiteEarthLocation: %v", err)
+			t.Fatalf("NewSite: %v", err)
 		}
 
 		if dip := site.HorizonDip().Degrees(); math.Abs(dip-c.apparent) > 5e-4 {

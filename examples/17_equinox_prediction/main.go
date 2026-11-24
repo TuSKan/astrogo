@@ -19,6 +19,7 @@ import (
 	"log"
 	"math"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -213,7 +214,7 @@ func main() {
 	moonTarget := plan.NewMoon(prov)
 	now := events26[0].Time // Use the actual vernal equinox moment
 
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05), plan.WithTimeZone(brtz))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

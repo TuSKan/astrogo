@@ -111,17 +111,17 @@ func NewMap() *Map {
 
 // IntensityAt implements
 // [github.com/TuSKan/astrogo/skybrightness.DustMap].
-func (m *Map) IntensityAt(l, b angle.Angle) (float64, error) {
+func (m *Map) IntensityAt(b angle.Latitude, l angle.Longitude) (float64, error) {
 	// A non-finite direction has no cell, so no value can have been fetched for
 	// it. Looked up anyway, it would read whichever cell its NaN converts to.
-	if !finiteDirection(l, b) {
+	if !finiteDirection(l.Angle, b.Angle) {
 		return 0, fmt.Errorf("%w: l=%v b=%v is not a direction", ErrNoCoverage, l.Degrees(), b.Degrees())
 	}
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	v, ok := m.values[cellOf(l, b)]
+	v, ok := m.values[cellOf(l.Angle, b.Angle)]
 	if !ok {
 		return 0, fmt.Errorf("%w: l=%.3f b=%.3f", ErrNoCoverage, l.Degrees(), b.Degrees())
 	}
@@ -212,7 +212,7 @@ func Fetch(ctx context.Context, into *Map, directions ...Direction) (*Map, error
 
 		seen[c] = struct{}{}
 
-		if _, err := into.IntensityAt(d.L, d.B); err == nil {
+		if _, err := into.IntensityAt(angle.Latitude{Angle: d.B}, angle.Longitude{Angle: d.L}); err == nil {
 			continue // already held in memory
 		}
 

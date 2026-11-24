@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // TestStarRiseAndSetAgreeWithSkyfield holds a star's rise and set to
@@ -44,9 +45,9 @@ func TestStarRiseAndSetAgreeWithSkyfield(t *testing.T) {
 		{"Sirius", 60, "rise", 14, 53, 50, 733.978},
 		{"Sirius", 60, "set", 22, 52, 15, 894.058},
 	} {
-		site, err := NewSiteEarthLocation("sea level", c.lat, 0, 0)
+		site, err := NewSite("sea level", angle.LatDeg(c.lat), angle.LonDeg(0), unit.Meters(0))
 		if err != nil {
-			t.Fatalf("NewSiteEarthLocation: %v", err)
+			t.Fatalf("NewSite: %v", err)
 		}
 
 		radec := stars[c.star]

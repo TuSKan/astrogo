@@ -15,7 +15,7 @@ import (
 // refusalSite and refusalEpoch are a real site and instant, so a refusal in
 // the tests below is the bad argument's alone.
 var (
-	refusalSite  = coord.MustGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635) // Paranal
+	refusalSite  = coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635) // Paranal
 	refusalEpoch = time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
 )
 

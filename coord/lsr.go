@@ -163,8 +163,8 @@ func solarMotionICRS(kind LSRKind) vector.Vec3 {
 	speed := math.Sqrt(u*u + v*v + w*w)
 
 	dir := GalacticToICRS(NewGalactic(
-		angle.Rad(math.Atan2(v, u)).Wrap360(),
-		angle.Rad(math.Asin(w/speed)),
+		angle.Latitude{Angle: angle.Rad(math.Asin(w / speed))},
+		angle.Longitude{Angle: angle.Rad(math.Atan2(v, u)).Wrap360()},
 	))
 
 	return dir.ToUnitVector().MulScalar(speed)

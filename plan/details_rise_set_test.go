@@ -31,12 +31,12 @@ func TestDetailsRiseAndSetAreTheEventAPIs(t *testing.T) {
 
 	prov := eph.Default()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-0.1278), angle.Deg(51.5074), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(51.5074), angle.LonDeg(-0.1278), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := plan.NewSite("London", loc)
+	site, err := plan.NewSite("London", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

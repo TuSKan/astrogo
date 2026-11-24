@@ -13,7 +13,7 @@ import (
 func geo(t *testing.T, lonDeg, latDeg float64) *coord.Geodetic {
 	t.Helper()
 
-	g, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), 0)
+	g, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.LonDeg(lonDeg), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic(%v, %v): %v", lonDeg, latDeg, err)
 	}

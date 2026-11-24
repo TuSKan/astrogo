@@ -41,12 +41,12 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 	checkedSkips := 0
 
 	for latDeg := -80.0; latDeg <= 80.0; latDeg += 10 {
-		loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(latDeg), 0)
+		loc, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.LonDeg(0), 0)
 		if err != nil {
 			t.Fatalf("NewGeodetic(%g): %v", latDeg, err)
 		}
 
-		site, err := NewSite("sweep", loc)
+		site, err := NewSite("sweep", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}
@@ -126,12 +126,12 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 func TestEpisodeStillSearchesNearTheHorizonBoundary(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(50), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(50), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("boundary", loc)
+	site, err := NewSite("boundary", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -185,12 +185,12 @@ func TestEpisodeStillSearchesNearTheHorizonBoundary(t *testing.T) {
 func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("arctic", loc)
+	site, err := NewSite("arctic", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -249,12 +249,12 @@ func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 // position at every step, finding nothing each time and concluding only by
 // exhaustion — measured at 2.84 s before this change.
 func BenchmarkEpisodeNeverRises(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
 	if err != nil {
 		b.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Arctic", loc)
+	site, err := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		b.Fatalf("NewSite: %v", err)
 	}

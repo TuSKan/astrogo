@@ -20,7 +20,7 @@ func ExampleSkyOffset() {
 	for _, p := range []struct{ lon, lat float64 }{
 		{0, 0}, {+d, +d}, {-d, +d}, {-d, -d}, {+d, -d},
 	} {
-		pointing := f.ToICRS(angle.Deg(p.lon), angle.Deg(p.lat))
+		pointing := f.ToICRS(angle.LatDeg(p.lat), angle.LonDeg(p.lon))
 
 		fmt.Printf("offset (%+.0f\", %+.0f\") -> RA %s Dec %s\n",
 			p.lon*3600, p.lat*3600,
@@ -49,15 +49,15 @@ func ExampleSkyOffset_rotation() {
 	// which is what makes the rotation worth having: a slit laid at 145° has
 	// the companion on axis and nothing to resolve across it.
 	slit := coord.NewSkyOffset(target, angle.Deg(145))
-	companion := slit.ToICRS(0, angle.Arcsec(12))
+	companion := slit.ToICRS(angle.Latitude{Angle: angle.Arcsec(12)}, angle.Longitude{})
 
-	across, along := slit.FromICRS(companion)
+	along, across := slit.FromICRS(companion)
 	fmt.Printf("across the slit %+.2f\", along it %+.2f\"\n",
 		across.Arcseconds(), along.Arcseconds())
 
 	// The same star seen north-up, where 145° is mostly south and a little
 	// east: 12·sin 145° and 12·cos 145°.
-	east, north := coord.NewSkyOffset(target, 0).FromICRS(companion)
+	north, east := coord.NewSkyOffset(target, 0).FromICRS(companion)
 	fmt.Printf("east %+.2f\", north %+.2f\"\n", east.Arcseconds(), north.Arcseconds())
 
 	// Output:

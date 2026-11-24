@@ -75,7 +75,7 @@ func TestUSNO_CelNav(t *testing.T) {
 		t.Run(c.place+" "+c.object, func(t *testing.T) {
 			epoch := celNavEpoch(t, c.date, c.ut1)
 
-			site, err := coord.NewGeodetic(angle.Deg(c.lon), angle.Deg(c.lat), 0)
+			site, err := coord.NewGeodetic(angle.LatDeg(c.lat), angle.LonDeg(c.lon), 0)
 			if err != nil {
 				t.Fatalf("NewGeodetic: %v", err)
 			}

@@ -22,12 +22,12 @@ import (
 func runSkySite(t *testing.T) *Site {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(2.17), angle.Deg(41.39), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("Run sky", loc)
+	site, err := NewSite("Run sky", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

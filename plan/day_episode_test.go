@@ -17,8 +17,8 @@ import (
 // ── DayEvents ────────────────────────────────────────────────────────────
 
 func TestDayEventsFindsSunRiseSetTransit(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	day := time.FromJD(2451545.0, time.UTC) // any instant on the day in question
@@ -39,8 +39,8 @@ func TestDayEventsFindsSunRiseSetTransit(t *testing.T) {
 // in the given loc, not UTC: an instant near local midnight in a
 // non-UTC-aligned timezone must resolve to THAT timezone's calendar day.
 func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	// 2000-01-01 00:30 UTC is still 2000-01-01 in a UTC-based day, but is
@@ -65,8 +65,8 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 }
 
 func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	day := time.FromJD(2451545.0, time.UTC)
@@ -89,8 +89,8 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 // TestDayEventsPolarNight verifies nil-without-error for a day the Sun
 // never rises at all -- not an error, just what that day looked like.
 func TestDayEventsPolarNight(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := NewSite("Arctic", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
+	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	day := time.FromJD(2451727.5, time.UTC) // known midwinter date, per existing TestSunEvents_Polar
@@ -110,8 +110,8 @@ func TestDayEventsPolarNight(t *testing.T) {
 // exactly that pair, matching what a direct solver.Find over the same
 // window would give.
 func TestEpisodeWithinWindowMatchesDirectSearch(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC) // local midday-ish, target below horizon
@@ -166,8 +166,8 @@ func TestEpisodeWithinWindowMatchesDirectSearch(t *testing.T) {
 // report a nil rise, and not confuse this episode's set with some other
 // one's.
 func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	// First locate a real sunrise, then start the Episode window 2 hours
@@ -222,8 +222,8 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 // the target is still up at `to`, Episode must find the real set even
 // though it falls after `to`, not truncate or return nil.
 func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	wideFrom := time.FromJD(2451544.5, time.UTC)
@@ -279,8 +279,8 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 // sets) returns rise == set == nil with no error, rather than searching
 // forever or erroring.
 func TestEpisodeCircumpolarReturnsNilNil(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := NewSite("Arctic", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
+	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	star := NewStar("Circumpolar", angle.Deg(0), angle.Deg(85)) // dec=85, always up from 80N
 
 	from := time.FromJD(2451544.5, time.UTC)
@@ -297,8 +297,8 @@ func TestEpisodeCircumpolarReturnsNilNil(t *testing.T) {
 // TestEpisodeNeverRisesReturnsNilNil is the mirror case: a target that
 // never clears the horizon at all from this site.
 func TestEpisodeNeverRisesReturnsNilNil(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := NewSite("Arctic", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
+	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	star := NewStar("NeverUp", angle.Deg(0), angle.Deg(-85)) // dec=-85, always down from 80N
 
 	from := time.FromJD(2451544.5, time.UTC)
@@ -365,8 +365,8 @@ func (o countingObservable) Position(t time.Time) (coord.ICRS, error) {
 }
 
 func TestDayEventsPropagatesVisibilityError(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	day := time.FromJD(2451545.0, time.UTC)
 
@@ -377,8 +377,8 @@ func TestDayEventsPropagatesVisibilityError(t *testing.T) {
 }
 
 func TestIsAboveHorizonPropagatesPositionError(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	_, err := isAboveHorizon(errObservable{}, site, time.FromJD(2451545.0, time.UTC))
 	if !errors.Is(err, errAlwaysFails) {
@@ -387,8 +387,8 @@ func TestIsAboveHorizonPropagatesPositionError(t *testing.T) {
 }
 
 func TestSearchEventPropagatesVisibilityError(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	from := time.FromJD(2451544.5, time.UTC)
 
@@ -399,8 +399,8 @@ func TestSearchEventPropagatesVisibilityError(t *testing.T) {
 }
 
 func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	from := time.FromJD(2451544.5, time.UTC)
 	to := from.Add(unit.Days(1))
@@ -416,8 +416,8 @@ func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
 // default year still works correctly, using its own (wider) span as the
 // search bound rather than silently truncating to episodeSearchWindow.
 func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC)
@@ -444,8 +444,8 @@ func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
 // single Position call (failAfter=1) succeeds, but every call after that
 // -- all of them inside the rise search's own visibility grid -- fails.
 func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC)
@@ -469,8 +469,8 @@ func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
 // then replays it again through Episode with failures injected starting
 // exactly one call past that boundary -- the set search's own first call.
 func TestEpisodeSetSearchErrorPropagates(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
 	from := time.FromJD(2451544.5, time.UTC)

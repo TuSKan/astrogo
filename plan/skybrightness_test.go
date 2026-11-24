@@ -37,12 +37,12 @@ func (failingDepth) LimitingMagnitudeAt(_ time.Time, _, _ angle.Angle) (float64,
 func skyConstraintFixture(t *testing.T, vmag float64) (*Star, *Site, *coord.Context) {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -197,12 +197,12 @@ func TestLimitingMagnitudeIgnoresTargetsWithNoMagnitude(t *testing.T) {
 func TestLimitingMagnitudeBelowHorizonScoresZero(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

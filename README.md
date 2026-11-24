@@ -43,7 +43,7 @@ import (
 )
 
 func main() {
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}
@@ -531,7 +531,7 @@ rather than yours.
 
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
 `catalog/sbdb`, `catalog/norad`, `catalog/fink`) and
-`plan.NewSiteEarthAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
+`plan.NewSiteFromAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
 site by address) make small request/response API calls, not bulk downloads — those are
 gated by endpoint enable/disable and offline mode, not by download-size consent (the
 network call itself is the explicit purpose of the method you're calling).

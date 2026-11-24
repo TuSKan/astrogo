@@ -33,7 +33,7 @@ func TestAltitudeAgreesWithTheEarthFixedRoute(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

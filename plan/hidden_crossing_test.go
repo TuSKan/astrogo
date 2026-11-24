@@ -32,7 +32,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	}
 
 	site := func(name string, lat, lon float64) *Site {
-		s, err := NewSiteEarthLocation(name, lat, lon, 0)
+		s, err := NewSite(name, angle.LatDeg(lat), angle.LonDeg(lon), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -150,7 +150,7 @@ func TestTheStepDoesNotDecideWhichCrossingsExist(t *testing.T) {
 		{"Paris in July, astronomical twilight", 48.8566, 2.3522, angle.Deg(-18),
 			time.Date(2026, 6, 28, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 7, 6, 0, 0, 0, 0, time.LocationUTC)},
 	} {
-		site, err := NewSiteEarthLocation(c.name, c.lat, c.lon, 0)
+		site, err := NewSite(c.name, angle.LatDeg(c.lat), angle.LonDeg(c.lon), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}

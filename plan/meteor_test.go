@@ -217,12 +217,12 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 
 	// Northern-hemisphere site; a radiant at Dec -89° is always far below
 	// the horizon there.
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Deg(60), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(60), angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -257,12 +257,12 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 		ZHR: 42, PopulationIndex: 2.3,
 	}
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Deg(90), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(90), angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("North Pole", loc)
+	site, err := NewSite("North Pole", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

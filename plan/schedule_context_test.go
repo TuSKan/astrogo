@@ -34,12 +34,12 @@ func everyInstantContexts(tb testing.TB, planner *Planner) func(time.Time) *coor
 func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel) {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("paranal", loc)
+	site, err := NewSite("paranal", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}

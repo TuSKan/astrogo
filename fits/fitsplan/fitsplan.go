@@ -39,7 +39,7 @@ func SiteFromFITS(h *fits.Header) (*plan.Site, error) {
 		obsName = "FITS Site"
 	}
 
-	site, err := plan.NewSite(obsName, geodetic)
+	site, err := plan.NewSite(obsName, geodetic.Lat(), geodetic.Lon(), geodetic.Height())
 	if err != nil {
 		return nil, fmt.Errorf("fits/fitsplan: new site: %w", err)
 	}
@@ -99,7 +99,7 @@ func siteLocation(h *fits.Header) (*coord.Geodetic, error) {
 }
 
 func geodetic(lon, lat angle.Angle, heightMeters float64) (*coord.Geodetic, error) {
-	g, err := coord.NewGeodetic(lon, lat, unit.Meters(heightMeters))
+	g, err := coord.NewGeodetic(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon}, unit.Meters(heightMeters))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidGeodetic, err)
 	}
@@ -235,7 +235,7 @@ func frameCenter(h *fits.Header) (coord.ICRS, error) {
 	}
 
 	if kind == galactic {
-		return coord.GalacticToICRS(coord.NewGalactic(angle.Deg(lon), angle.Deg(lat))), nil
+		return coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(lat), angle.LonDeg(lon))), nil
 	}
 
 	if err := checkEquatorialFrame(h); err != nil {

@@ -73,7 +73,7 @@ func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
 		return nil, fmt.Errorf("coord: subpoint: %w", err)
 	}
 
-	foot, err := NewGeodetic(g.Lon(), g.Lat(), 0)
+	foot, err := NewGeodetic(g.Lat(), g.Lon(), 0)
 	if err != nil {
 		return nil, fmt.Errorf("coord: subpoint: %w", err)
 	}

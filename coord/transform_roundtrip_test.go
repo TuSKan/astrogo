@@ -135,7 +135,7 @@ func TestGalacticAnchors(t *testing.T) {
 	} {
 		gal := coord.ICRSToGalactic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)))
 
-		if sep := separation(gal.L(), gal.B(), angle.Deg(c.wantL), angle.Deg(c.wantB)); sep > tolDeg {
+		if sep := separation(gal.L().Angle, gal.B().Angle, angle.Deg(c.wantL), angle.Deg(c.wantB)); sep > tolDeg {
 			t.Errorf("%s: ICRS (%.5f, %+.5f) gave galactic (%.9f, %+.9f), %.3g degrees from (%.5f, %+.5f)",
 				c.name, c.ra, c.dec, gal.L().Degrees(), gal.B().Degrees(),
 				sep, c.wantL, c.wantB)
@@ -189,7 +189,7 @@ func TestEclipticAnchors(t *testing.T) {
 	} {
 		ecl := coord.ICRSToEcliptic(coord.NewICRS(angle.Deg(c.ra), angle.Deg(c.dec)), at)
 
-		if sep := separation(ecl.Lon(), ecl.Lat(), angle.Deg(c.wantLon), angle.Deg(c.wantLat)); sep > tolDeg {
+		if sep := separation(ecl.Lon().Angle, ecl.Lat().Angle, angle.Deg(c.wantLon), angle.Deg(c.wantLat)); sep > tolDeg {
 			t.Errorf("%s: ICRS (%.1f, %+.7f) gave ecliptic (%.7f, %+.7f), %.4f arcseconds from (%.1f, %+.1f)",
 				c.name, c.ra, c.dec, ecl.Lon().Degrees(), ecl.Lat().Degrees(), sep*3600, c.wantLon, c.wantLat)
 		}
@@ -198,7 +198,7 @@ func TestEclipticAnchors(t *testing.T) {
 	// The north ecliptic pole sits at right ascension 18h and a declination of
 	// ninety degrees less the obliquity. Its longitude is undefined, so the two
 	// are compared as directions.
-	pole := coord.EclipticToICRS(coord.NewEcliptic(angle.Deg(0), angle.Deg(90)), at)
+	pole := coord.EclipticToICRS(coord.NewEcliptic(angle.LatDeg(90), angle.LonDeg(0)), at)
 
 	if sep := separation(pole.RA(), pole.Dec(), angle.Deg(270), angle.Deg(90-obliquity)); sep > tolDeg {
 		t.Errorf("the north ecliptic pole came back at ICRS (%.7f, %+.7f), %.4f arcseconds from (270, %+.7f)",
@@ -236,11 +236,11 @@ func TestEclipticTakesTheInstantNotItsScale(t *testing.T) {
 	a := coord.ICRSToEcliptic(icrs, utc)
 	b := coord.ICRSToEcliptic(icrs, tt)
 
-	if sep := separation(a.Lon(), a.Lat(), b.Lon(), b.Lat()); sep > 1e-12 {
+	if sep := separation(a.Lon().Angle, a.Lat().Angle, b.Lon().Angle, b.Lat().Angle); sep > 1e-12 {
 		t.Errorf("ICRSToEcliptic: the same instant as UTC and as TT differs by %.3g degrees", sep)
 	}
 
-	ecl := coord.NewEcliptic(angle.Deg(210.5), angle.Deg(12.3))
+	ecl := coord.NewEcliptic(angle.LatDeg(12.3), angle.LonDeg(210.5))
 
 	c := coord.EclipticToICRS(ecl, utc)
 	d := coord.EclipticToICRS(ecl, tt)
@@ -260,7 +260,7 @@ func TestEclipticTakesTheInstantNotItsScale(t *testing.T) {
 func TestAltAzICRSRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

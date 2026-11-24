@@ -200,7 +200,7 @@ func (c *frameCache) get(scene *Scene) (*sceneFrame, error) {
 type DustMap interface {
 	// IntensityAt returns the 100 micron intensity in MJy sr^-1 toward the
 	// given galactic longitude and latitude.
-	IntensityAt(l, b angle.Angle) (float64, error)
+	IntensityAt(b angle.Latitude, l angle.Longitude) (float64, error)
 }
 
 // DiffuseGalacticLight is the [Component] for starlight scattered by
@@ -289,7 +289,7 @@ func (d *DiffuseGalacticLight) AddRadiance(
 
 	galactic := coord.ICRSToGalactic(icrs)
 
-	intensity, err := d.dust.IntensityAt(galactic.L(), galactic.B())
+	intensity, err := d.dust.IntensityAt(galactic.B(), galactic.L())
 	if err != nil {
 		// A direction the map does not cover is missing data, not a dark
 		// sightline, so it contributes nothing and says so.
@@ -441,10 +441,10 @@ func (d *DiffuseGalacticLight) capFactor(
 ) (scale float64, flags Flag, err error) {
 	lon, lat := icrs.RA(), icrs.Dec()
 	if d.sky.Galactic() {
-		lon, lat = galactic.L(), galactic.B()
+		lon, lat = galactic.L().Angle, galactic.B().Angle
 	}
 
-	starlight, err := d.sky.RadianceAt(lon, lat)
+	starlight, err := d.sky.RadianceAt(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon})
 
 	switch {
 	case errors.Is(err, ErrNoCoverage):
@@ -534,12 +534,12 @@ func (z *ZodiacalLight) AddRadiance(
 	ecliptic := coord.ICRSToEcliptic(icrs, time.FromGo(scene.Time))
 
 	geom := ZodiacalGeometry{
-		DifferentialLongitude: ecliptic.Lon() - frame.sunEcliptic.Lon(),
-		EclipticLatitude:      ecliptic.Lat(),
+		DifferentialLongitude: ecliptic.Lon().Angle - frame.sunEcliptic.Lon().Angle,
+		EclipticLatitude:      ecliptic.Lat().Angle,
 		SunDistance:           unit.AU(frame.sunDistanceAU),
 		// The Earth sits opposite the Sun as seen from the Sun, which is what
 		// the seasonal term's phase is measured against.
-		EarthLongitude: frame.sunEcliptic.Lon() + angle.Deg(180),
+		EarthLongitude: frame.sunEcliptic.Lon().Angle + angle.Deg(180),
 	}
 
 	scratch, ok := z.scratch.Get().(SpectralRadiance)
@@ -881,7 +881,7 @@ type StarMap interface {
 	// [ErrNoCoverage], not a zero value: zero is a legitimate radiance and
 	// carries no information about whether the map was asked something it
 	// could answer. Any other error is treated as a failure and propagated.
-	RadianceAt(lon, lat angle.Angle) (float64, error)
+	RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, error)
 
 	// Galactic reports whether the map is indexed in galactic coordinates.
 	// An ICRS map returns false. Reading one as the other rotates the Milky
@@ -1016,10 +1016,10 @@ func (s *IntegratedStarlight) AddRadiance(
 	lon, lat := icrs.RA(), icrs.Dec()
 	if s.sky.Galactic() {
 		g := coord.ICRSToGalactic(icrs)
-		lon, lat = g.L(), g.B()
+		lon, lat = g.L().Angle, g.B().Angle
 	}
 
-	value, err := s.sky.RadianceAt(lon, lat)
+	value, err := s.sky.RadianceAt(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon})
 
 	switch {
 	case errors.Is(err, ErrNoCoverage):

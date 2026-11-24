@@ -16,8 +16,6 @@ var (
 	// ErrInvalidHorizonHeight is returned for a height above the horizon
 	// ([WithHorizonHeight]) that is negative or not a finite length.
 	ErrInvalidHorizonHeight = errors.New("plan: height above the horizon must be a finite, non-negative length")
-	// ErrNilLocation is returned when the geodetic location is nil.
-	ErrNilLocation = errors.New("geodetic location must not be nil")
 
 	// ErrNoPrimaryTarget indicates an event spec missing its primary target.
 	ErrNoPrimaryTarget = errors.New("event spec must contain a primary target")
@@ -141,7 +139,7 @@ var (
 	// against every entry's Name — see PlanetaryMoons).
 	ErrUnknownPlanetaryMoon = errors.New("plan: unknown planetary moon name")
 
-	// ErrGeocodeNoResult indicates NewSiteEarthAddress's geocoding query
+	// ErrGeocodeNoResult indicates NewSiteFromAddress's geocoding query
 	// matched no location.
 	ErrGeocodeNoResult = errors.New("plan: geocoding found no match for address")
 

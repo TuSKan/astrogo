@@ -12,9 +12,9 @@ import (
 // TestSwapOptimizedStrategy verifies that the SwapOptimizedStrategy
 // can improve upon a naive greedy schedule.
 func TestSwapOptimizedStrategy(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 
-	site, err := NewSite("TestSite", loc)
+	site, err := NewSite("TestSite", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,9 +81,9 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 // TestSwapOptimizedGapInsertion verifies that the gap insertion pass
 // recovers blocks that the greedy scheduler couldn't place.
 func TestSwapOptimizedGapInsertion(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 
-	site, err := NewSite("TestSite", loc)
+	site, err := NewSite("TestSite", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,8 +190,8 @@ func TestEmptyScheduleGaps(t *testing.T) {
 
 // TestSwapOptimizedWithNilBase verifies the default base strategy fallback.
 func TestSwapOptimizedWithNilBase(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("TestSite", loc)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
+	site, _ := NewSite("TestSite", loc.Lat(), loc.Lon(), loc.Height())
 	planner, _ := NewPlanner(site, nil)
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
@@ -215,8 +215,8 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 
 // TestScoreBlockPlacement verifies that scoring uses altitude + priority.
 func TestScoreBlockPlacement(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	planner, _ := NewPlanner(site, nil)
 
 	b := &Block{

@@ -95,12 +95,12 @@ func TestMoonPlacesKeepWhatTheyComputed(t *testing.T) {
 // instant with another's place would show in the bits; the test checks it is
 // that close first.
 func TestSchedulingWithTheRunsMoonIsBitIdentical(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	site, err := NewSite("Moon places", loc)
+	site, err := NewSite("Moon places", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

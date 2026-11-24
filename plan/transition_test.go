@@ -10,9 +10,9 @@ import (
 )
 
 func TestBasicTransitionModel(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 
-	site, err := NewSite("TestSite", loc)
+	site, err := NewSite("TestSite", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,12 +80,12 @@ func TestBasicTransitionModel(t *testing.T) {
 // as a regression test for Overhead building two Contexts for one instant;
 // the strategy now observes both ends, through one moving Context.
 func TestBasicTransitionModel_SameEpoch(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	site, err := NewSite("TestSite", loc)
+	site, err := NewSite("TestSite", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

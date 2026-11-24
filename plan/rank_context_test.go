@@ -25,12 +25,12 @@ func rcEpoch() time.Time {
 func rcSite(tb testing.TB) *Site {
 	tb.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(2.17), angle.Deg(41.39), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(41.39), angle.LonDeg(2.17), 0)
 	if err != nil {
 		tb.Fatal(err)
 	}
 
-	site, err := NewSite("Barcelona", loc)
+	site, err := NewSite("Barcelona", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		tb.Fatal(err)
 	}

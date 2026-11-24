@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/time"
@@ -50,7 +51,7 @@ func requireTransits(t *testing.T, what string, got, want []time.Time, tol unit.
 func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 	prov := eph.Default()
 
-	north75, err := NewSiteEarthLocation("75N", 75, 0, 0)
+	north75, err := NewSite("75N", angle.LatDeg(75), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 		time.Date(2026, 1, 10, 5, 32, 22, 0, time.LocationUTC),
 	}, unit.Seconds(2))
 
-	north89, err := NewSiteEarthLocation("89N", 89, 15, 0)
+	north89, err := NewSite("89N", angle.LatDeg(89), angle.LonDeg(15), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,7 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 func TestTransitInTheWindowsFirstStep(t *testing.T) {
 	prov := eph.Default()
 
-	brno, err := NewSiteEarthLocation("Brno", 49.195, 16.608, 0)
+	brno, err := NewSite("Brno", angle.LatDeg(49.195), angle.LonDeg(16.608), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +131,7 @@ func TestTransitsDoNotDependOnTheStep(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := NewSiteEarthLocation("69N", 69, 0, 0)
+	site, err := NewSite("69N", angle.LatDeg(69), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +170,7 @@ func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
 
 	prov := eph.Default()
 
-	site, err := NewSiteEarthLocation("85N", 85, 0, 0)
+	site, err := NewSite("85N", angle.LatDeg(85), angle.LonDeg(0), unit.Meters(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +215,7 @@ func TestTransitIsWhereSiderealTimeMeetsRightAscension(t *testing.T) {
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(0.001))
 
 	for _, s := range []struct{ lat, lon float64 }{{49.195, 16.608}, {75, 0}} {
-		site, err := NewSiteEarthLocation("site", s.lat, s.lon, 0)
+		site, err := NewSite("site", angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(0))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -16,12 +16,12 @@ import (
 func crescentSite(tb testing.TB, latDeg, lonDeg float64) *Site {
 	tb.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(lonDeg), angle.Deg(latDeg), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.LonDeg(lonDeg), 0)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}
 
-	site, err := NewSite("crescent", loc)
+	site, err := NewSite("crescent", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		tb.Fatalf("NewSite: %v", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // paranalMoonNight is Paranal at 2026-09-26 00:00 UTC, the Moon at 27°
@@ -16,9 +17,9 @@ import (
 func paranalMoonNight(t *testing.T) (*Site, time.Time) {
 	t.Helper()
 
-	site, err := NewSiteEarthLocation("Paranal", -24.6272, -70.4045, 2635)
+	site, err := NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	return site, time.Date(2026, 9, 26, 0, 0, 0, 0, time.LocationUTC)

@@ -19,7 +19,7 @@ import (
 func equatorSite(t *testing.T) *coord.Geodetic {
 	t.Helper()
 
-	site, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
 	return site
@@ -185,7 +185,7 @@ func TestBarycentricRVCorrection_DiurnalAmplitudeScalesWithLatitude(t *testing.T
 	base := time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC)
 
 	diurnalSwing := func(latDeg float64) float64 {
-		site, err := coord.NewGeodetic(angle.Zero(), angle.Deg(latDeg), 0)
+		site, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.Longitude{}, 0)
 		testutil.AssertNoError(t, err)
 
 		lo, hi := math.Inf(1), math.Inf(-1)
@@ -508,7 +508,7 @@ func TestTopocentricRadialVelocityCarriesTheDiurnalTerm(t *testing.T) {
 	pos := vector.V3(100, 0, 0)
 
 	swing := func(latDeg float64) float64 {
-		site, err := coord.NewGeodetic(angle.Zero(), angle.Deg(latDeg), 0)
+		site, err := coord.NewGeodetic(angle.LatDeg(latDeg), angle.Longitude{}, 0)
 		testutil.AssertNoError(t, err)
 
 		lo, hi := math.Inf(1), math.Inf(-1)

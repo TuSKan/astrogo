@@ -21,7 +21,7 @@ func benchISS(b *testing.B) (*satellite.Satellite, *coord.Geodetic) {
 		b.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := coord.NewGeodetic(angle.Deg(-70.4028), angle.Deg(-24.6251), 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6251), angle.LonDeg(-70.4028), 2635)
 	if err != nil {
 		b.Fatalf("NewGeodetic: %v", err)
 	}

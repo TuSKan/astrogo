@@ -12,6 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 
 	// 4. ICRS -> AltAz, which needs a site and an instant. One Context holds
 	// everything that depends on them, so build it once and reuse it.
-	loc, err := coord.NewEarthLocation(-22.528478, -46.473002, 835.05) // Quinta Calixto
+	loc, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05)) // Quinta Calixto
 	if err != nil {
 		log.Fatalf("loc: %v", err)
 	}
@@ -62,9 +63,9 @@ func main() {
 
 	frames := show.NewTable(show.Left("Frame"), show.Left(""), show.Right("Longitude"), show.Left(""), show.Right("Latitude"))
 	frames.Row("ICRS (J2000)", "RA", deg(sgrA.RA()), "Dec", deg(sgrA.Dec()))
-	frames.Row("Galactic", "l", deg(galactic.L()), "b", deg(galactic.B()))
+	frames.Row("Galactic", "l", deg(galactic.L().Angle), "b", deg(galactic.B().Angle))
 	frames.Row("  and back to ICRS", "RA", deg(back.RA()), "Dec", deg(back.Dec()))
-	frames.Row("Ecliptic of date", "λ", deg(ecliptic.Lon()), "β", deg(ecliptic.Lat()))
+	frames.Row("Ecliptic of date", "λ", deg(ecliptic.Lon().Angle), "β", deg(ecliptic.Lat().Angle))
 	frames.Row("AltAz", "Az", deg(altaz.Az()), "Alt", deg(altaz.Alt()))
 
 	fmt.Println()

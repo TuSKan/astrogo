@@ -4,15 +4,13 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 func ExampleScheduler_BuildSchedule() {
 	// Setup observatory and planner constraints
-	loc, _ := coord.NewEarthLocation(0, 0, 0)
-	site, _ := NewSite("Greenwich", loc)
+	site, _ := NewSite("Greenwich", angle.LatDeg(0), angle.LonDeg(0), unit.Meters(0))
 	planner, _ := NewPlanner(site, []Constraint{Altitude{Threshold: angle.Deg(30)}})
 
 	// Configure transition overheads (slew speeds, filter changes)

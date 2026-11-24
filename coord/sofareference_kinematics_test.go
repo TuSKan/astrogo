@@ -75,7 +75,7 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 	}
 
 	for _, s := range sites {
-		site, err := coord.NewGeodetic(angle.Deg(s.lon), angle.Deg(s.lat), unit.Meters(s.heightM))
+		site, err := coord.NewGeodetic(angle.LatDeg(s.lat), angle.LonDeg(s.lon), unit.Meters(s.heightM))
 		if err != nil {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}

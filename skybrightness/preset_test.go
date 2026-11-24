@@ -725,7 +725,7 @@ func TestMultipleScatteringBrightensOnlyTheScatteredTerm(t *testing.T) {
 			t.Fatalf("atmosphere Build: %v", err)
 		}
 
-		loc, err := coord.NewGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), 2635)
+		loc, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 		if err != nil {
 			t.Fatalf("NewGeodetic: %v", err)
 		}

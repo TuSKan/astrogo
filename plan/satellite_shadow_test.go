@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
@@ -194,9 +195,9 @@ func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Cont
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	site, err := NewSiteEarthLocation("São Paulo", -23.55, -46.63, 760)
+	site, err := NewSite("São Paulo", angle.LatDeg(-23.55), angle.LonDeg(-46.63), unit.Meters(760))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))

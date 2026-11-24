@@ -57,7 +57,7 @@ func solarSpectrumFixture(tb testing.TB) []float64 {
 func moonlightScene(t *testing.T, when time.GoTime) *skybrightness.Scene {
 	t.Helper()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -86,7 +86,7 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 
 	provider := eph.Default()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -446,7 +446,7 @@ func moonDirection(t *testing.T, scene *skybrightness.Scene) coord.AltAz {
 }
 
 func BenchmarkScatteredMoonlight(b *testing.B) {
-	loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
 		b.Fatal(err)
 	}

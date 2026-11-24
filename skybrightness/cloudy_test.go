@@ -61,7 +61,7 @@ func cloudyScene(tb testing.TB, baseM, albedo float64) *skybrightness.Scene {
 		tb.Fatalf("atmosphere Build: %v", err)
 	}
 
-	observer, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(-24.6), 2000)
+	observer, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2000)
 	if err != nil {
 		tb.Fatalf("NewGeodetic: %v", err)
 	}

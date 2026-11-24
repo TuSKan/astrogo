@@ -4,8 +4,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // skyfieldTwilightCrossing is one instant at which the Sun's apparent
@@ -102,9 +104,9 @@ func TestTwilightAgreesWithSkyfield(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			site, err := NewSiteEarthLocation(c.name, c.lat, c.lon, c.elev)
+			site, err := NewSite(c.name, angle.LatDeg(c.lat), angle.LonDeg(c.lon), unit.Meters(c.elev))
 			if err != nil {
-				t.Fatalf("NewSiteEarthLocation: %v", err)
+				t.Fatalf("NewSite: %v", err)
 			}
 
 			start := time.Date(2026, time.Month(c.from[0]), c.from[1], 0, 0, 0, 0, time.LocationUTC)

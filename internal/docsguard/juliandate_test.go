@@ -29,8 +29,7 @@ var gregorianDateLiteral = regexp.MustCompile(`time\.Date\(\s*(-?\d+)\s*,`)
 // # Scope
 //
 // What a user reads to learn the API: the examples/ module, every Markdown
-// file, and every Go file that holds an Example function, as for
-// TestExamplesBuildSitesWithNewEarthLocation. Only a literal year below 1583
+// file, and every Go file that holds an Example function. Only a literal year below 1583
 // is read. A date built from a computed event's own calendar parts is a
 // variable, and passes: the crux example does that, consistently both ways.
 func TestHistoricalDatesUseTheJulianCalendar(t *testing.T) {

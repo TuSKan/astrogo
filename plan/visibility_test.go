@@ -29,12 +29,12 @@ func (m mockObject) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDeta
 
 func TestIsVisible(t *testing.T) {
 	// Site at lat 45
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	site, err := NewSite("Test", loc)
+	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatalf("Failed to create observatory: %v", err)
 	}
@@ -51,12 +51,12 @@ func TestIsVisible(t *testing.T) {
 }
 
 func TestVisibleIntervals(t *testing.T) {
-	loc, err := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
+	loc, err := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	if err != nil {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	site, _ := NewSite("Test", loc)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.Add(unit.Days(1))
@@ -73,8 +73,8 @@ func TestVisibleIntervals(t *testing.T) {
 }
 
 func TestVisibleIntervals_StepTooLarge(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.Add(unit.Days(1))
@@ -90,8 +90,8 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 }
 
 func TestNeverVisible(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	start := time.FromJD(2460000.5, time.UTC)
 	end := start.Add(unit.Days(1))
@@ -108,8 +108,8 @@ func TestNeverVisible(t *testing.T) {
 }
 
 func TestTransitEstimate(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.Add(unit.Days(0.5))
@@ -150,10 +150,10 @@ func TestTransitEstimate(t *testing.T) {
 func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	loc, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("equator", loc)
+	site, err := NewSite("equator", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	// Declination −30°, so it culminates at 60°. A star at 0° would pass
@@ -240,8 +240,8 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	start := time.FromJD(2460000.0, time.UTC)
 	end := start.Add(unit.Days(1))
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}

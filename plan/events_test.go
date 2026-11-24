@@ -17,8 +17,8 @@ import (
 // ── Generic Event Finder Tests ──────────────────────────────────────────────
 
 func TestEventSolver_Visibility_Fixed(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -54,8 +54,8 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 }
 
 func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(80))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -79,8 +79,8 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 }
 
 func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(45), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(-80))
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -106,8 +106,8 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 // ── Sun and Moon Helper Tests ──────────────────────────────────────────────
 
 func TestSunEvents(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -139,8 +139,8 @@ func TestSunEvents(t *testing.T) {
 }
 
 func TestSunEvents_Polar(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(80), 0)
-	site, _ := NewSite("Arctic", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(80), angle.LonDeg(0), 0)
+	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	start := time.FromJD(2451727.5, time.UTC)
@@ -157,8 +157,8 @@ func TestSunEvents_Polar(t *testing.T) {
 }
 
 func TestMoonEvents(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	start := time.FromJD(2451545.0, time.UTC)
@@ -184,8 +184,8 @@ func TestMoonEvents(t *testing.T) {
 }
 
 func TestSunriseSunset(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -202,8 +202,8 @@ func TestSunriseSunset(t *testing.T) {
 // ── Twilight Tests ──────────────────────────────────────────────────────────
 
 func TestTwilightEvents(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	start := time.FromJD(2451544.5, time.UTC)
@@ -244,8 +244,8 @@ func TestTwilightEvents(t *testing.T) {
 // half-populated results, which is what the pre-fix implementation
 // returned (one per solver event, never both set on the same element).
 func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	// A window starting in daylight and running long enough to see one
@@ -284,8 +284,8 @@ func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
 // mid-twilight (not a clean multiple of a full day) reliably produces
 // this at least one edge.
 func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	// First find one real dusk/dawn pair, then shrink the window to start
@@ -416,8 +416,8 @@ func TestGroupTwilightEvents(t *testing.T) {
 // passes 6°, 12° and 18° down, and comes back through 18°, 12° and 6° before
 // it rises. Each kind's NightOf, from the same noon, is that one night.
 func TestTwilight_Sequence(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(40), 0)
-	site, _ := NewSite("Test", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
+	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	noon := time.FromJD(2451545.0, time.UTC) // 2000-01-01 12:00 UTC, midday at 0° longitude
@@ -466,8 +466,8 @@ func TestTwilight_Sequence(t *testing.T) {
 // TestTwilight_HighLat: in early July London has no astronomical night, the
 // Sun going at most 15.5° down, so NightOf finds none. It has a nautical one.
 func TestTwilight_HighLat(t *testing.T) {
-	loc, _ := coord.NewGeodetic(angle.Deg(0), angle.Deg(51.5), 0)
-	site, _ := NewSite("London", loc)
+	loc, _ := coord.NewGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), 0)
+	site, _ := NewSite("London", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
 	noon := time.FromJD(2451728.0, time.UTC) // 2000-07-02 12:00 UTC

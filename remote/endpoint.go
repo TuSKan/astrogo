@@ -107,11 +107,11 @@ const (
 	MPCObsCodes EndpointID = "mpc.obscodes"
 
 	// Nominatim is OpenStreetMap's Nominatim geocoding API, used by
-	// plan.NewSiteEarthAddress to resolve an address to coordinates.
+	// plan.NewSiteFromAddress to resolve an address to coordinates.
 	Nominatim EndpointID = "osm.nominatim"
 
 	// OpenElevation is the Open-Elevation API, used by
-	// plan.NewSiteEarthAddress to resolve coordinates to a height above
+	// plan.NewSiteFromAddress to resolve coordinates to a height above
 	// sea level.
 	OpenElevation EndpointID = "open-elevation"
 

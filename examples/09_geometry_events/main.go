@@ -60,7 +60,7 @@ func main() {
 
 	// 2. An observer, for the one event below that depends on where you are:
 	// a lunar eclipse is seen wherever the Moon is above the horizon.
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05)
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

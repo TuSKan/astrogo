@@ -10,6 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // detailer is the subset of Observable this file needs; every concrete target
@@ -58,9 +59,9 @@ type detailer interface {
 func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("parallax", -23.5, -46.6, 800)
+	site, err := plan.NewSite("parallax", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	prov := eph.Default()
@@ -136,9 +137,9 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 func TestMoonParallaxIsActuallyApplied(t *testing.T) {
 	t.Parallel()
 
-	site, err := plan.NewSiteEarthLocation("parallax", -23.5, -46.6, 800)
+	site, err := plan.NewSite("parallax", angle.LatDeg(-23.5), angle.LonDeg(-46.6), unit.Meters(800))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	moon := plan.NewMoon(eph.Default())

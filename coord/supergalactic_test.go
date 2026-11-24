@@ -27,13 +27,13 @@ func TestSupergalacticPoleAndOriginAreWhereTheLiteraturePutsThem(t *testing.T) {
 	t.Parallel()
 
 	pole := coord.ICRSToSupergalactic(
-		coord.GalacticToICRS(coord.NewGalactic(angle.Deg(47.37), angle.Deg(6.32))))
+		coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(6.32), angle.LonDeg(47.37))))
 
 	// Only the latitude is meaningful at a pole; every longitude names it.
 	testutil.AssertNear(t, "north supergalactic pole, SGB (deg)", pole.SGB().Degrees(), 90, 1e-9)
 
 	origin := coord.ICRSToSupergalactic(
-		coord.GalacticToICRS(coord.NewGalactic(angle.Deg(137.37), angle.Deg(0))))
+		coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(0), angle.LonDeg(137.37))))
 
 	testutil.AssertNear(t, "longitude origin, SGL (deg)",
 		origin.SGL().Wrap180().Degrees(), 0, 1e-9)
@@ -53,8 +53,8 @@ func TestSupergalacticPoleAndOriginAreWhereTheLiteraturePutsThem(t *testing.T) {
 func TestTheSuperclusterPlaneIsNearlyPerpendicularToTheGalacticOne(t *testing.T) {
 	t.Parallel()
 
-	nsgp := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(47.37), angle.Deg(6.32)))
-	ngp := coord.GalacticToICRS(coord.NewGalactic(angle.Deg(0), angle.Deg(90)))
+	nsgp := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(6.32), angle.LonDeg(47.37)))
+	ngp := coord.GalacticToICRS(coord.NewGalactic(angle.LatDeg(90), angle.LonDeg(0)))
 
 	between := coord.Separation(nsgp, ngp).Degrees()
 

@@ -86,7 +86,7 @@ func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
 
-	site, err := NewSite("subsolar", geo)
+	site, err := NewSite("subsolar", geo.Lat(), geo.Lon(), geo.Height())
 	if err != nil {
 		t.Fatalf("NewSite: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 		t.Fatalf("SubsolarPoint: %v", err)
 	}
 
-	subICRS := coord.NewICRS(sub.Lon(), sub.Lat())
+	subICRS := coord.NewICRS(sub.Lon().Angle, sub.Lat().Angle)
 
 	kinds := []TwilightKind{GeometricTwilight, ApparentTwilight, CivilTwilight, NauticalTwilight, AstronomicalTwilight}
 
@@ -237,7 +237,7 @@ func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 		wantSep := kind.zenithAngle().Degrees()
 
 		for i, p := range pts {
-			sep := coord.Separation(subICRS, coord.NewICRS(p.Lon(), p.Lat()))
+			sep := coord.Separation(subICRS, coord.NewICRS(p.Lon().Angle, p.Lat().Angle))
 			if math.Abs(sep.Degrees()-wantSep) > 1e-6 {
 				t.Errorf("%v point %d: separation from subsolar point = %v°, want %v°", kind, i, sep.Degrees(), wantSep)
 			}

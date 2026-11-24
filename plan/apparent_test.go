@@ -99,10 +99,10 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewGeodetic(angle.Deg(-70.40417), angle.Deg(-24.62722), 2635)
+	loc, err := coord.NewGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635)
 	testutil.AssertNoError(t, err)
 
-	site, err := NewSite("Paranal", loc)
+	site, err := NewSite("Paranal", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
 	prov := eph.Default()

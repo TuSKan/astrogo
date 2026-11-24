@@ -71,12 +71,12 @@ func TestHEALPixRoundTrip(t *testing.T) {
 		h := healpix(t, nside)
 
 		for pixel := range h.NumPixels() {
-			lon, lat, err := h.Center(pixel)
+			lat, lon, err := h.Center(pixel)
 			if err != nil {
 				t.Fatalf("nside %d: Center(%d): %v", nside, pixel, err)
 			}
 
-			if got := h.PixelOf(lon, lat); got != pixel {
+			if got := h.PixelOf(lat, lon); got != pixel {
 				t.Fatalf("nside %d: pixel %d has center (%.6f, %.6f) which maps to pixel %d",
 					nside, pixel, lon.Degrees(), lat.Degrees(), got)
 			}
@@ -107,7 +107,7 @@ func TestHEALPixPixelsAreEqualArea(t *testing.T) {
 
 		for j := range steps {
 			lon := angle.Rad(2 * math.Pi * (float64(j) + 0.5) / steps)
-			counts[h.PixelOf(lon, lat)]++
+			counts[h.PixelOf(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon})]++
 		}
 	}
 
@@ -136,7 +136,7 @@ func TestHEALPixCoversTheSphere(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		pixel := h.PixelOf(angle.Deg(tc.lon), angle.Deg(tc.lat))
+		pixel := h.PixelOf(angle.LatDeg(tc.lat), angle.LonDeg(tc.lon))
 		if pixel < 0 || pixel >= h.NumPixels() {
 			t.Errorf("(%v, %v) gave pixel %d, outside [0, %d)", tc.lon, tc.lat, pixel, h.NumPixels())
 		}
@@ -158,10 +158,10 @@ func TestHEALPixLongitudeWrap(t *testing.T) {
 
 	for _, lat := range []float64{-80, -30, 0, 30, 80} {
 		for _, lon := range []float64{7.5, 44.9, 123.4, 200, 358.7} {
-			base := h.PixelOf(angle.Deg(lon), angle.Deg(lat))
+			base := h.PixelOf(angle.LatDeg(lat), angle.LonDeg(lon))
 
 			for _, turn := range []float64{-720, -360, 360, 720} {
-				if got := h.PixelOf(angle.Deg(lon+turn), angle.Deg(lat)); got != base {
+				if got := h.PixelOf(angle.LatDeg(lat), angle.LonDeg(lon+turn)); got != base {
 					t.Errorf("(%v+%v, %v) gave pixel %d, want %d", lon, turn, lat, got, base)
 				}
 			}
@@ -180,12 +180,12 @@ func TestHEALPixNestedHierarchy(t *testing.T) {
 	fine := healpix(t, 8)
 
 	for pixel := range fine.NumPixels() {
-		lon, lat, err := fine.Center(pixel)
+		lat, lon, err := fine.Center(pixel)
 		if err != nil {
 			t.Fatalf("Center(%d): %v", pixel, err)
 		}
 
-		if got, want := coarse.PixelOf(lon, lat), pixel/4; got != want {
+		if got, want := coarse.PixelOf(lat, lon), pixel/4; got != want {
 			t.Fatalf("fine pixel %d sits in coarse pixel %d, want %d", pixel, got, want)
 		}
 	}
@@ -214,6 +214,6 @@ func BenchmarkHEALPixPixelOf(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_ = h.PixelOf(lon, lat)
+		_ = h.PixelOf(angle.Latitude{Angle: lat}, angle.Longitude{Angle: lon})
 	}
 }

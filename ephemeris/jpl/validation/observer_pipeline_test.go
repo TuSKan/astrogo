@@ -26,7 +26,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	// not Greenwich) — see docs/VALIDATION.md's precision-floor section for
 	// why that swap likely explains the historical Az/El deviation
 	// asymmetry this test's own comments below discuss.
-	site, err := coord.NewGeodetic(angle.Zero(), angle.Deg(51.4772), 45.0)
+	site, err := coord.NewGeodetic(angle.LatDeg(51.4772), angle.Longitude{}, 45.0)
 	if err != nil {
 		t.Fatalf("Failed to create site: %v", err)
 	}

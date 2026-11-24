@@ -73,13 +73,13 @@ func TestUnfetchedDirectionReportsNoCoverage(t *testing.T) {
 
 	m := NewMap()
 
-	if _, err := m.IntensityAt(angle.Deg(10), angle.Deg(20)); !errors.Is(err, ErrNoCoverage) {
+	if _, err := m.IntensityAt(angle.LatDeg(20), angle.LonDeg(10)); !errors.Is(err, ErrNoCoverage) {
 		t.Errorf("err = %v, want ErrNoCoverage", err)
 	}
 
 	m.set(angle.Deg(10), angle.Deg(20), 3.5)
 
-	got, err := m.IntensityAt(angle.Deg(10), angle.Deg(20))
+	got, err := m.IntensityAt(angle.LatDeg(20), angle.LonDeg(10))
 	if err != nil {
 		t.Fatalf("IntensityAt: %v", err)
 	}
@@ -98,12 +98,12 @@ func TestNearbyDirectionsShareACell(t *testing.T) {
 	m.set(angle.Deg(120), angle.Deg(30), 1.25)
 
 	// Well inside a tenth of a degree.
-	if _, err := m.IntensityAt(angle.Deg(120.02), angle.Deg(30.01)); err != nil {
+	if _, err := m.IntensityAt(angle.LatDeg(30.01), angle.LonDeg(120.02)); err != nil {
 		t.Errorf("a direction 0.02 deg away should share the cell: %v", err)
 	}
 
 	// Well outside it.
-	if _, err := m.IntensityAt(angle.Deg(120.5), angle.Deg(30)); !errors.Is(err, ErrNoCoverage) {
+	if _, err := m.IntensityAt(angle.LatDeg(30), angle.LonDeg(120.5)); !errors.Is(err, ErrNoCoverage) {
 		t.Error("half a degree away is a different cell and must not be answered")
 	}
 
@@ -118,6 +118,6 @@ func TestMapSatisfiesDustMap(t *testing.T) {
 	t.Parallel()
 
 	var _ interface {
-		IntensityAt(l, b angle.Angle) (float64, error)
+		IntensityAt(b angle.Latitude, l angle.Longitude) (float64, error)
 	} = NewMap()
 }

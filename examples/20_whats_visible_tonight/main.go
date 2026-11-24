@@ -43,6 +43,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
@@ -50,6 +51,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -117,9 +119,9 @@ func main() {
 		log.Fatalf("failed to load timezone: %v", err)
 	}
 
-	site, err := plan.NewSiteEarthLocation("Quinta Calixto", -22.528478, -46.473002, 835.05, plan.WithTimeZone(brtz))
+	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05), plan.WithTimeZone(brtz))
 	if err != nil {
-		log.Fatalf("NewSiteEarthLocation: %v", err)
+		log.Fatalf("NewSite: %v", err)
 	}
 
 	// ── Bright-object sources ───────────────────────────────────────────

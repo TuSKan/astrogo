@@ -209,8 +209,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 	atm := atmosphere.Refraction{Pressure: 0}
 
 	for _, tc := range fixture.Cases {
-		site, err := coord.NewGeodetic(
-			angle.Deg(tc.Site.Lon), angle.Deg(tc.Site.Lat), unit.Meters(tc.Site.HeightM))
+		site, err := coord.NewGeodetic(angle.LatDeg(tc.Site.Lat), angle.LonDeg(tc.Site.Lon), unit.Meters(tc.Site.HeightM))
 		if err != nil {
 			t.Fatalf("%s: %v", tc.Name, err)
 		}

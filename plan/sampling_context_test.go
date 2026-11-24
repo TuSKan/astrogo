@@ -52,12 +52,12 @@ func samplingCases(t *testing.T) []samplingCase {
 	cases := make([]samplingCase, 0, 3*len(lats))
 
 	for _, lat := range lats {
-		loc, err := coord.NewGeodetic(angle.Deg(-70.4), angle.Deg(lat), 2400)
+		loc, err := coord.NewGeodetic(angle.LatDeg(lat), angle.LonDeg(-70.4), 2400)
 		if err != nil {
 			t.Fatalf("NewGeodetic: %v", err)
 		}
 
-		site, err := NewSite("s", loc)
+		site, err := NewSite("s", loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("NewSite: %v", err)
 		}

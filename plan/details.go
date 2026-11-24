@@ -523,10 +523,15 @@ func (o DetailOverrides) apply(d *TargetDetails) {
 // first rise after twelve hours before the Context's time, which was often
 // a pass already over (#704).
 func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
-	site, err := NewSite("Observer", ctx.Site())
+	// No valid location to compute rise/set/transit against leaves those
+	// fields unset rather than proceeding with a broken Observer.
+	loc := ctx.Site()
+	if loc == nil {
+		return
+	}
+
+	site, err := NewSite("Observer", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
-		// No valid location to compute rise/set/transit against; leave
-		// those fields unset rather than proceed with a broken Observer.
 		return
 	}
 

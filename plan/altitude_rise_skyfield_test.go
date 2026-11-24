@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
@@ -38,9 +39,9 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 
 	// The summit looks down on a horizon 8849 m below, which is what makes
 	// the dip in the threshold its own: a height alone dips nothing (#1185).
-	site, err := NewSiteEarthLocation("Everest", 27.9881, 86.925, 8849, WithHorizonHeight(unit.Meters(8849)))
+	site, err := NewSite("Everest", angle.LatDeg(27.9881), angle.LonDeg(86.925), unit.Meters(8849), WithHorizonHeight(unit.Meters(8849)))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	// The thresholds the reference times were computed for.

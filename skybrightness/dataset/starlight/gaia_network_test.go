@@ -122,7 +122,7 @@ func TestFetchAnswersATargetList(t *testing.T) {
 	var covered int
 
 	for _, dir := range dirs {
-		v, err := m.RadianceAt("V", dir.RA(), dir.Dec())
+		v, err := m.RadianceAt("V", angle.Latitude{Angle: dir.Dec()}, angle.Longitude{Angle: dir.RA()})
 		if err != nil {
 			t.Fatalf("RadianceAt: %v", err)
 		}

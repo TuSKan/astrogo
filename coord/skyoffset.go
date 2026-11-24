@@ -79,15 +79,15 @@ func (f SkyOffset) Rotation() angle.Angle { return f.rotation }
 // degenerates to atan2(lon, lat), which is the form worth being careful about,
 // since it is right to a part in 10⁸ at an arcminute and visibly wrong at a
 // degree.
-func (f SkyOffset) FromICRS(c ICRS) (lon, lat angle.Angle) {
+func (f SkyOffset) FromICRS(c ICRS) (lat angle.Latitude, lon angle.Longitude) {
 	x, y := f.toFrame(c.ToUnitVector()).ToSpherical()
 
-	return angle.Rad(x).Wrap180(), angle.Rad(y)
+	return angle.Latitude{Angle: angle.Rad(y)}, angle.Longitude{Angle: angle.Rad(x).Wrap180()}
 }
 
 // ToICRS returns the ICRS position at the given offsets from the frame's
 // origin. It is the exact inverse of [SkyOffset.FromICRS].
-func (f SkyOffset) ToICRS(lon, lat angle.Angle) ICRS {
+func (f SkyOffset) ToICRS(lat angle.Latitude, lon angle.Longitude) ICRS {
 	v := f.toSky(vector.FromSpherical(lon.Radians(), lat.Radians()))
 
 	return ICRSFromUnitVector(v)

@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
@@ -63,12 +64,12 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 		{"Denver", 39.7392, -104.9903, 1609, at(13, 44), at(23, 45), 6},
 		{"Madrid", 40.4168, -3.7038, 667, at(7, 0), at(16, 58), 4},
 	} {
-		loc, err := coord.NewEarthLocation(c.latDeg, c.lonDeg, c.heightM)
+		loc, err := coord.NewGeodetic(angle.LatDeg(c.latDeg), angle.LonDeg(c.lonDeg), unit.Meters(c.heightM))
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
 
-		site, err := plan.NewSite(c.name, loc)
+		site, err := plan.NewSite(c.name, loc.Lat(), loc.Lon(), loc.Height())
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -91,7 +92,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 			}
 		}
 
-		dipped, err := plan.NewSite(c.name, loc, plan.WithHorizonHeight(unit.Meters(c.heightM)))
+		dipped, err := plan.NewSite(c.name, loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(c.heightM)))
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -115,18 +116,18 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 	t.Parallel()
 
-	loc, err := coord.NewEarthLocation(19.8263, -155.47441, 4145)
+	loc, err := coord.NewGeodetic(angle.LatDeg(19.8263), angle.LonDeg(-155.47441), unit.Meters(4145))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, h := range []float64{-1, math.NaN(), math.Inf(1)} {
-		if _, err := plan.NewSite("x", loc, plan.WithHorizonHeight(unit.Meters(h))); !errors.Is(err, plan.ErrInvalidHorizonHeight) {
+		if _, err := plan.NewSite("x", loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(h))); !errors.Is(err, plan.ErrInvalidHorizonHeight) {
 			t.Errorf("WithHorizonHeight(%g m): err = %v, want ErrInvalidHorizonHeight", h, err)
 		}
 	}
 
-	site, err := plan.NewSite("Mauna Kea over the sea", loc, plan.WithHorizonHeight(unit.Meters(4145)))
+	site, err := plan.NewSite("Mauna Kea over the sea", loc.Lat(), loc.Lon(), loc.Height(), plan.WithHorizonHeight(unit.Meters(4145)))
 	if err != nil {
 		t.Fatalf("WithHorizonHeight(4145 m): %v", err)
 	}
@@ -138,7 +139,7 @@ func TestWithHorizonHeightRefusesWhatIsNotALength(t *testing.T) {
 
 	// Two sites that differ only in the height above their horizon rise and
 	// set things at different times, so they are not equal.
-	level, err := plan.NewSite("Mauna Kea over the sea", loc)
+	level, err := plan.NewSite("Mauna Kea over the sea", loc.Lat(), loc.Lon(), loc.Height())
 	if err != nil {
 		t.Fatal(err)
 	}

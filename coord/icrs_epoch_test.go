@@ -41,7 +41,7 @@ func TestAStarIsPlacedFromItsOwnEpoch(t *testing.T) {
 	}
 
 	ctx, err := coord.NewContext(time.Date(2026, 6, 1, 4, 0, 0, 0, time.LocationUTC),
-		coord.MustGeodetic(angle.Deg(-70.4045), angle.Deg(-24.6272), unit.Meters(2635)), atmosphere.Refraction{})
+		coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635)), atmosphere.Refraction{})
 	if err != nil {
 		t.Fatal(err)
 	}

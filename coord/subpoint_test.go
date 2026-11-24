@@ -163,7 +163,7 @@ func TestSubPoint_ZeroVector(t *testing.T) {
 func TestSubPoint_PoleIsLongitudeIndependent(t *testing.T) {
 	tm := time.FromJD(2451545.0, time.UTC)
 
-	site, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	site, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestSubPoint_PoleIsLongitudeIndependent(t *testing.T) {
 // letting coord.Separation measure the angular distance between two
 // Geodetic points for SmallCircle's own tests below.
 func geodeticToICRS(g *coord.Geodetic) coord.ICRS {
-	return coord.NewICRS(g.Lon(), g.Lat())
+	return coord.NewICRS(g.Lon().Angle, g.Lat().Angle)
 }
 
 // TestSmallCircle_PointsAtExactSeparation confirms every returned point is
@@ -207,7 +207,7 @@ func geodeticToICRS(g *coord.Geodetic) coord.ICRS {
 // coord.Separation (a wholly separate code path from SmallCircle's own
 // vector construction).
 func TestSmallCircle_PointsAtExactSeparation(t *testing.T) {
-	center, err := coord.NewGeodetic(angle.Deg(40), angle.Deg(-15), 0)
+	center, err := coord.NewGeodetic(angle.LatDeg(-15), angle.LonDeg(40), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestSmallCircle_PointsAtExactSeparation(t *testing.T) {
 // small-circle construction, not tautological with SmallCircle's own math
 // since it's checking a specific, independently-derivable special case.
 func TestSmallCircle_EquatorialNinetyReachesPoles(t *testing.T) {
-	center, err := coord.NewGeodetic(angle.Deg(10), angle.Zero(), 0)
+	center, err := coord.NewGeodetic(angle.Latitude{}, angle.LonDeg(10), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestSmallCircle_EquatorialNinetyReachesPoles(t *testing.T) {
 // TestSmallCircle_RejectsTooFewPoints and TestSmallCircle_RejectsNilCenter
 // cover SmallCircle's two documented error paths.
 func TestSmallCircle_RejectsTooFewPoints(t *testing.T) {
-	center, err := coord.NewGeodetic(angle.Zero(), angle.Zero(), 0)
+	center, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestSmallCircle_RejectsNilCenter(t *testing.T) {
 // guarding against a naive lon-arithmetic bug that only shows up when the
 // circle straddles the antimeridian.
 func TestSmallCircle_HandlesLongitudeWrap(t *testing.T) {
-	center, err := coord.NewGeodetic(angle.Deg(180), angle.Deg(20), 0)
+	center, err := coord.NewGeodetic(angle.LatDeg(20), angle.LonDeg(180), 0)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
 	}

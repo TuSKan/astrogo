@@ -26,6 +26,7 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 )
 
 // The preset to run. GAMBONSWeb reproduces the GAMBONS web service: the five
@@ -47,7 +48,7 @@ func main() {
 	defer cancel()
 
 	// Cerro Paranal: 2,635 m, and about as dark as a site gets.
-	site, err := coord.NewEarthLocation(-24.6272, -70.4045, 2635)
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}

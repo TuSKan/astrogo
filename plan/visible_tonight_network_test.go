@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
 	"github.com/TuSKan/astrogo/catalog/simbad"
@@ -14,6 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -236,9 +238,9 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 	testutil.RequireReachable(t, "simbad.cds.unistra.fr:80")
 
-	site, err := plan.NewSiteEarthLocation("Paranal", -24.6272, -70.4045, 2640)
+	site, err := plan.NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2640))
 	if err != nil {
-		t.Fatalf("NewSiteEarthLocation: %v", err)
+		t.Fatalf("NewSite: %v", err)
 	}
 
 	night := time.Date(2026, 8, 1, 12, 0, 0, 0, time.LocationUTC)

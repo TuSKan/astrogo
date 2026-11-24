@@ -60,12 +60,12 @@ func TestUSNO_SiderealTime(t *testing.T) {
 		t.Run(c.site+" "+c.date, func(t *testing.T) {
 			epoch := usnoUT1(t, c.date, c.ut1)
 
-			geodetic, err := coord.NewGeodetic(angle.Deg(c.lon), angle.Deg(c.lat), 0)
+			geodetic, err := coord.NewGeodetic(angle.LatDeg(c.lat), angle.LonDeg(c.lon), 0)
 			if err != nil {
 				t.Fatalf("NewGeodetic: %v", err)
 			}
 
-			site, err := plan.NewSite(c.site, geodetic)
+			site, err := plan.NewSite(c.site, geodetic.Lat(), geodetic.Lon(), geodetic.Height())
 			if err != nil {
 				t.Fatalf("NewSite: %v", err)
 			}

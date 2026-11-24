@@ -17,7 +17,7 @@ import (
 // unroutable dial, and a certificate error is none of those.
 //
 // It stopped being hypothetical on 2026-09-20, when api.open-elevation.com's
-// certificate expired and TestNewSiteEarthAddress_Live began failing on every
+// certificate expired and TestNewSiteFromAddress_Live began failing on every
 // run — a red build nothing in this repository could fix, which is the case
 // the network-test policy exists to prevent.
 //
