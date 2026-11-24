@@ -274,3 +274,34 @@ func TestResolver_BridgeFindsTheGaiaRowByItsIdentifier(t *testing.T) {
 		t.Errorf("errors from %q: %+v, want the Gaia row's, with its position", got.Provenance["AstrometricError"], got.AstrometricError)
 	}
 }
+
+// TestResolver_BridgeFindsTheGaiaRowByItsHipparcosNumber: a SIMBAD star that
+// lists its Hipparcos number but no Gaia designation is asked of Gaia by that
+// number, and Gaia's row, which carries the number from Gaia's own
+// cross-match, joins it by that identifier.
+func TestResolver_BridgeFindsTheGaiaRowByItsHipparcosNumber(t *testing.T) {
+	t.Parallel()
+
+	star := at("NAME Barnard's star", "Barnard's star", 269.452, 4.693, 0, resolve.AstrometricError{})
+	star.Aliases = []string{"HIP 87937"}
+
+	row := at("4472832130942575872", "Gaia DR3 4472832130942575872", 269.4485, 4.7394, 0, resolve.AstrometricError{})
+	row.Designation = row.Name
+	row.Aliases = []string{"HIP 87937", "TYC 425-2502-1"}
+
+	ids := &mockIDResolver{targets: []Target{row}}
+	r := resolverOf(0, []resolve.Provider{&mockProvider{name: "simbad", targets: map[string]Target{"star": star}}})
+	r.idResolvers = []idProvider{{name: "gaia", ir: ids}}
+
+	got, err := r.Resolve(context.Background(), "star")
+	testutil.AssertNoError(t, err)
+
+	want := resolve.Identifier{Namespace: "hip", Value: "87937"}
+	if !slices.Contains(ids.asked, want) {
+		t.Errorf("Gaia was asked for %+v, not for %+v", ids.asked, want)
+	}
+
+	if got.Provenance["Coord"] != "gaia" || len(got.Associations) != 1 || got.Associations[0].Evidence != want {
+		t.Errorf("Coord from %q, associations %+v; want Gaia's row joined on %+v", got.Provenance["Coord"], got.Associations, want)
+	}
+}
