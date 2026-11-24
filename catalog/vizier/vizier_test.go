@@ -244,8 +244,6 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	// J1991.25, which moves even a motionless declination in its last digit
 	// (41.269 to 41.269000000000005): the keys never matched, and this test
 	// passed with the table name taken out of the key (#981).
-	defaultEpoch := tableSchemas[defaultTable].Epoch
-	hipEpoch := tableSchemas["I/239/hip_main"].Epoch
 
 	// Each search must reach the service, or the second was answered from the
 	// first's cache entry. Counted per call rather than as a total of 2: a
@@ -256,7 +254,7 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 	// that failed read as a target with every field empty (#1008).
 	var searchErr error
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius, Epoch: defaultEpoch})(func(tar resolve.Target, err error) bool {
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Center: center, Radius: radius})(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			searchErr = err
 
@@ -278,7 +276,7 @@ func TestVizierConeSearch_CacheKeyIncludesTable(t *testing.T) {
 
 	before = calls.Load()
 
-	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius, Epoch: hipEpoch})(func(tar resolve.Target, err error) bool {
+	prov.ConeSearch(context.Background(), resolve.ConeRequest{Table: "I/239/hip_main", Center: center, Radius: radius})(func(tar resolve.Target, err error) bool {
 		if err != nil {
 			searchErr = err
 
@@ -456,9 +454,9 @@ func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
 	redirect(t, server.URL)
 
 	barnard := coord.NewICRSWithKinematics(angle.Deg(269.4520769586), angle.Deg(4.6933649666),
-		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11))
+		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11), time.J2000())
 
-	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: barnard, Epoch: time.J2000(), Radius: angle.Arcsec(5), Limit: 5}
+	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: barnard, Radius: angle.Arcsec(5), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })
 
 	adql := query.Get()

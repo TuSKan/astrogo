@@ -77,7 +77,7 @@ func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 			}
 
 			// A Star's position is at J2000; move it to the night.
-			if now[i], err = coord.PropagateEpoch(pos, time.J2000(), at); err != nil {
+			if now[i], err = coord.PropagateEpoch(pos, at); err != nil {
 				t.Fatalf("%s: PropagateEpoch: %v", c.name, err)
 			}
 		}

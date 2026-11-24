@@ -104,11 +104,7 @@ func Centroid(name string) (coord.ICRS, error) {
 	meanB1875 := vector.V3(sum[0]/float64(n), sum[1]/float64(n), sum[2]/float64(n)).Unit()
 	j2000 := trxp(b1875Matrix, [3]float64{meanB1875.X, meanB1875.Y, meanB1875.Z})
 
-	var out coord.ICRS
-
-	out.FromUnitVector(vector.V3(j2000[0], j2000[1], j2000[2]))
-
-	return out, nil
+	return coord.ICRSFromUnitVector(vector.V3(j2000[0], j2000[1], j2000[2])), nil
 }
 
 // trxp computes Rᵀ·p — the inverse of gofaext.Rxp's R·p for an orthogonal

@@ -204,10 +204,7 @@ func LSRCorrection(target ICRS, kind LSRKind) unit.Velocity {
 func LSRApex(kind LSRKind) (ICRS, unit.Velocity) {
 	v := solarMotionICRS(kind)
 
-	var c ICRS
-	c.FromUnitVector(v)
-
-	return c, unit.KmPerSec(v.Norm())
+	return ICRSFromUnitVector(v), unit.KmPerSec(v.Norm())
 }
 
 // The kinematic LSR apex, as Gordon (1975) publishes it.

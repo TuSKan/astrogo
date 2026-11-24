@@ -44,9 +44,10 @@ func TestACatalogsProperMotionMovesAStarByWhatItSays(t *testing.T) {
 		src := coord.NewICRSWithKinematics(
 			angle.Deg(120), angle.Deg(dec),
 			angle.Arcsec(pmRAMasPerYear/1000), 0, 0, 0,
+			time.J2000(),
 		)
 
-		got, err := coord.PropagateEpoch(src, from, to)
+		got, err := coord.PropagateEpoch(src, to)
 		if err != nil {
 			t.Fatalf("PropagateEpoch at dec %g: %v", dec, err)
 		}
@@ -80,6 +81,7 @@ func TestProperMotionSurvivesAFrameConversion(t *testing.T) {
 		src := coord.NewICRSWithKinematics(
 			angle.Deg(200), angle.Deg(dec),
 			angle.Arcsec(pmRAArcsec), angle.Arcsec(0.1), angle.Arcsec(0.05), unit.KmPerSec(10),
+			time.J2000(),
 		)
 
 		for _, tc := range []struct {
@@ -119,9 +121,10 @@ func TestProperMotionAtThePoleDoesNotExplode(t *testing.T) {
 		src := coord.NewICRSWithKinematics(
 			angle.Deg(0), angle.Deg(dec),
 			angle.Arcsec(1), angle.Arcsec(1), 0, 0,
+			time.J2000(),
 		)
 
-		got, err := coord.PropagateEpoch(src, time.J2000(), time.J2000().Add(unit.Days(3652.5)))
+		got, err := coord.PropagateEpoch(src, time.J2000().Add(unit.Days(3652.5)))
 		if err != nil {
 			t.Fatalf("PropagateEpoch at the pole: %v", err)
 		}

@@ -683,7 +683,7 @@ func anchorCoord(g group) (coord.ICRS, bool) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(posmatch.Coord(c.target), c.target.Epoch, time.J2000())
+		propagated, err := coord.PropagateEpoch(posmatch.Coord(c.target), time.J2000())
 		if err != nil {
 			continue
 		}
@@ -729,7 +729,7 @@ func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group
 			groupIdx, anchor := j.groupIdx, j.anchor
 
 			wg.Go(func() {
-				req := resolve.ConeRequest{Center: anchor, Epoch: time.J2000(), Radius: radius, Limit: 20}
+				req := resolve.ConeRequest{Center: anchor, Radius: radius, Limit: 20}
 
 				var found []candidate
 

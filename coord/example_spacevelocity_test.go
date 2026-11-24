@@ -5,6 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,6 +19,7 @@ func ExampleSpaceVelocity() {
 		angle.Deg(269.452), angle.Deg(4.693),
 		angle.Arcsec(-0.79847), angle.Arcsec(10.33777),
 		angle.Arcsec(0.54698), unit.KmPerSec(-110.6),
+		time.J2000(),
 	)
 
 	v, ok := coord.SpaceVelocity(star)
@@ -53,6 +55,7 @@ func ExampleSpaceVelocity_withoutAParallax() {
 	star := coord.NewICRSWithKinematics(
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(0.150), angle.Arcsec(0.220), 0, unit.KmPerSec(-22.4),
+		time.J2000(),
 	)
 
 	if _, ok := coord.SpaceVelocity(star); !ok {

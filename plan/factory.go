@@ -23,9 +23,9 @@ import (
 // as though its 2016 position were its 2000 one: Barnard's star 166″ off.
 // A zero Epoch means J2000, as everywhere else.
 func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
-	pos := coord.NewICRSWithKinematics(c.Coord.RA(), c.Coord.Dec(), c.PmRA, c.PmDec, c.Parallax, c.RadialVelocity)
+	pos := coord.NewICRSWithKinematics(c.Coord.RA(), c.Coord.Dec(), c.PmRA, c.PmDec, c.Parallax, c.RadialVelocity, c.Epoch)
 
-	moved, err := coord.PropagateEpoch(pos, c.Epoch, time.J2000())
+	moved, err := coord.PropagateEpoch(pos, time.J2000())
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("position at J2000: %w", err)
 	}

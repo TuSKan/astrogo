@@ -130,8 +130,7 @@ func TestLSRCorrectionIsTheProjection(t *testing.T) {
 				ref = vector.V3(1, 0, 0)
 			}
 
-			var side coord.ICRS
-			side.FromUnitVector(a.Cross(ref).Unit())
+			side := coord.ICRSFromUnitVector(a.Cross(ref).Unit())
 
 			testutil.AssertNear(t, "90 degrees from the apex", coord.LSRCorrection(side, kind).KmPerSec(), 0, 1e-12)
 		})

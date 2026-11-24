@@ -101,7 +101,7 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 
 	// The table's positions are at its own epoch, so a moving center is
 	// sought there.
-	center, err := coord.PropagateEpoch(req.Center, req.Epoch, schema.Epoch)
+	center, err := coord.PropagateEpoch(req.Center, schema.Epoch)
 	if err != nil {
 		return func(yield func(resolve.Target, error) bool) {
 			yield(resolve.Target{}, fmt.Errorf("vizier: cone center: %w", err))
