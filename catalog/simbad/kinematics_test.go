@@ -83,6 +83,12 @@ func gaiaAt(t *testing.T, row gaiaDR3Row, epoch time.Time) coord.ICRS {
 // masApart is the separation of two positions in mas.
 func masApart(a, b coord.ICRS) float64 { return coord.Separation(a, b).Arcsec() * 1000 }
 
+// unmovedMas bounds the separation of a position from itself. It is not
+// zero on arm64, whose fused multiply-adds round Separation's arithmetic
+// differently: 6.3e-9 mas was measured there. Any real move of these stars
+// is millions of times larger.
+const unmovedMas = 1e-6
+
 // TestAGaiaDerivedPositionIsReportedAtGaiasEpoch is #1248: SIMBAD moves a
 // Gaia position to J2000.0 without the radial velocity and keeps the proper
 // motion at Gaia's epoch. Read as a star at J2000.0, Barnard's star landed
@@ -163,7 +169,7 @@ func TestAPositionFromElsewhereStaysAtJ2000(t *testing.T) {
 			t.Errorf("a Hipparcos position is reported at %v, want J2000.0", tg.Epoch)
 		}
 
-		if d := masApart(tg.Coord, coord.NewICRS(angle.Deg(84.05338894077023), angle.Deg(-1.2019191358333312))); d != 0 {
+		if d := masApart(tg.Coord, coord.NewICRS(angle.Deg(84.05338894077023), angle.Deg(-1.2019191358333312))); d > unmovedMas {
 			t.Errorf("a Hipparcos position moved %g mas", d)
 		}
 
@@ -258,7 +264,7 @@ func TestAMotionTheSearchMayNotUndoLeavesSIMBADsPositionOrUndoesIt(t *testing.T)
 
 		switch {
 		case tg.Epoch.Equal(time.J2000()):
-			if d := masApart(tg.Coord, simbad); d != 0 {
+			if d := masApart(tg.Coord, simbad); d > unmovedMas {
 				t.Errorf("%s: left at J2000.0, it moved %g mas", tc.name, d)
 			}
 		case tg.Epoch.Equal(gaiaEpoch):
