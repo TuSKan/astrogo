@@ -55,7 +55,7 @@ func TestVisibleTonightListsEachPointOfLightOnce(t *testing.T) {
 		targets: []resolve.Target{alfCen, alfCenA, alfCenB, alf1Cru, alf2Cru},
 	}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 3, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 3)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestVisibleTonightWithoutResolutionListsEveryStar(t *testing.T) {
 		targets: []resolve.Target{alfCen, alfCenA, alfCenB, alf1Cru, alf2Cru},
 	}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 3, sources, ephemeris.Default(),
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 3,
 		plan.WithResolution(0))
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)

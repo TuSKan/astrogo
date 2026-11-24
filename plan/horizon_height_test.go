@@ -18,7 +18,7 @@ import (
 func sunriseSunset(t *testing.T, site *plan.Site, start time.Time) (rise, set time.Time) {
 	t.Helper()
 
-	events, err := plan.SunEvents(start, start.Add(unit.Hours(24)), site, ephemeris.Default())
+	events, err := plan.SunEvents(site, plan.Window{Start: start, End: start.Add(unit.Hours(24))}, ephemeris.Default())
 	if err != nil {
 		t.Fatalf("SunEvents: %v", err)
 	}

@@ -21,7 +21,7 @@ func TestMoonElongationAgainstRealPhaseEvents(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(365))
 
-	events, err := MoonPhases(start, end, prov)
+	events, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	events, err := MoonPhases(start, start.Add(unit.Days(35)), prov)
+	events, err := MoonPhases(Window{Start: start, End: start.Add(unit.Days(35))}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}

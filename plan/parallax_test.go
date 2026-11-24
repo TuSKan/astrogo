@@ -101,7 +101,7 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				eval, err := plan.IsObservable(b.obj, when, site, plan.Altitude{Threshold: angle.Deg(0)})
+				eval, err := plan.IsObservable(b.obj, site, when, plan.Altitude{Threshold: angle.Deg(0)})
 				if err != nil {
 					t.Fatalf("%02dh IsObservable: %v", hour, err)
 				}

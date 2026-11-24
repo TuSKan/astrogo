@@ -39,7 +39,7 @@ func TestFotheringhamTableIsGeocentricAtGeometricSunset(t *testing.T) {
 		{12, 1861, 12, 3, 13.6, 16.6}, {14, 1862, 3, 31, 15.9, 0.4}, {15, 1862, 4, 29, 8.6, 0.1},
 		{17, 1864, 1, 10, 18.4, 6.5}, {18, 1864, 3, 9, 21.1, 2.3},
 	} {
-		r, err := CrescentVisibility(time.Date(o.y, time.Month(o.m), o.d, 10, 0, 0, 0, time.LocationUTC), athens, prov)
+		r, err := CrescentVisibility(athens, time.Date(o.y, time.Month(o.m), o.d, 10, 0, 0, 0, time.LocationUTC), prov)
 		if err != nil {
 			t.Fatalf("No. %d: %v", o.no, err)
 		}
@@ -91,7 +91,7 @@ func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 			t.Fatalf("NewSite: %v", err)
 		}
 
-		r, err := CrescentVisibility(time.Date(o.y, time.Month(o.m), o.d, 18, 0, 0, 0, time.LocationUTC), site, prov)
+		r, err := CrescentVisibility(site, time.Date(o.y, time.Month(o.m), o.d, 18, 0, 0, 0, time.LocationUTC), prov)
 		if err != nil {
 			t.Fatalf("row %d: %v", o.row, err)
 		}
@@ -131,7 +131,7 @@ func TestAlrefayTableIIsTopocentricAtSunset(t *testing.T) {
 	} {
 		site := crescentSite(t, o.lat, o.lon)
 
-		r, err := CrescentVisibility(time.Date(o.y, time.Month(o.m), o.d, 9, 0, 0, 0, time.LocationUTC), site, prov)
+		r, err := CrescentVisibility(site, time.Date(o.y, time.Month(o.m), o.d, 9, 0, 0, 0, time.LocationUTC), prov)
 		if err != nil {
 			t.Fatalf("%d-%02d-%02d: %v", o.y, o.m, o.d, err)
 		}
@@ -160,7 +160,7 @@ func TestGeometricSunsetIsTheSunOnTheHorizon(t *testing.T) {
 	site, evening := portOfSpainEvening(t)
 	prov := eph.Default()
 
-	r, err := CrescentVisibility(evening, site, prov)
+	r, err := CrescentVisibility(site, evening, prov)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 	// past the sunset it finds, Newton's method does.
 	site, evening := portOfSpainEvening(t)
 
-	r, err := CrescentVisibility(evening, site, prov)
+	r, err := CrescentVisibility(site, evening, prov)
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 		return id == eph.Sun && at.Equal(r.Sunset.Add(unit.Seconds(30)))
 	}}
 
-	if _, err := CrescentVisibility(evening, site, failing); !errors.Is(err, errFailingWhen) {
+	if _, err := CrescentVisibility(site, evening, failing); !errors.Is(err, errFailingWhen) {
 		t.Errorf("CrescentVisibility: err = %v, want the lookup's error", err)
 	}
 }
@@ -304,7 +304,7 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 		{"Port of Spain, 4° up", portOfSpain, portOfSpainEvening, 0.15, 0.22},
 		{"Quinta Calixto, on the horizon", calixto, time.Date(2026, 10, 10, 16, 0, 0, 0, time.LocationUTC), 0.40, 0.50},
 	} {
-		r, err := CrescentVisibility(c.evening, c.site, prov)
+		r, err := CrescentVisibility(c.site, c.evening, prov)
 		if err != nil {
 			t.Fatalf("%s: CrescentVisibility: %v", c.name, err)
 		}

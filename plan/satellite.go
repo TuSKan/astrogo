@@ -274,7 +274,7 @@ type SatellitePass struct {
 	Rise        PassEvent     // AOS (Acquisition of Signal), or the window's start
 	Culmination PassEvent     // TCA (Time of Closest Approach / max elevation)
 	Set         PassEvent     // LOS (Loss of Signal), or the window's end
-	Duration    time.Duration // Total pass duration, inside the window
+	Duration    unit.Duration // Total pass duration, inside the window
 
 	// RiseCutOff reports that the satellite was already above the minimum
 	// elevation when the window opened, so Rise is the window's start and the
@@ -311,6 +311,20 @@ type PassEvent struct {
 	SunAltitude angle.Angle
 }
 
+// PassOption configures [SatellitePasses].
+type PassOption func(*passSearch)
+
+// passSearch is what a pass search is configured with.
+type passSearch struct {
+	minElevation angle.Angle
+}
+
+// WithMinElevation sets the elevation the satellite must clear for its time
+// above it to count as a pass. The default is 0°, the geometric horizon.
+func WithMinElevation(e angle.Angle) PassOption {
+	return func(p *passSearch) { p.minElevation = e }
+}
+
 // SatellitePasses computes all passes of a satellite over an observer site
 // within the given time window, filtered by minimum elevation. A pass in
 // progress when the window opens or closes is cut off at that edge and
@@ -324,14 +338,33 @@ type PassEvent struct {
 // maximum below it is refined to its true peak, which finds such a pass
 // wherever the window starts.
 //
-// id is the satellite's NAIF code, the one prov answers for — for a
-// satellite.Satellite, its ID(). name labels the returned passes.
-func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.Time,
-	observer *coord.Geodetic, minElevation angle.Angle,
-) ([]SatellitePass, error) {
+// sat is the satellite and the provider that places it, by its NAIF code, as
+// [NewSatellite] builds it; its name labels the returned passes. A pass is
+// the time the satellite spends above the minimum elevation, 0°, the
+// geometric horizon, unless [WithMinElevation] sets another; the elevations
+// are geometric, without refraction, and the site's own horizon does not
+// change them.
+func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) ([]SatellitePass, error) {
+	if sat == nil {
+		return nil, ErrNilTarget
+	}
+
+	if site == nil {
+		return nil, ErrNilSite
+	}
+
+	start, end := w.Start, w.End
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
+
+	search := passSearch{}
+	for _, opt := range opts {
+		opt(&search)
+	}
+
+	prov, id, name := sat.provider, sat.id, sat.name
+	observer, minElevation := site.Location(), search.minElevation
 
 	step := unit.Seconds(30) // 30s steps for LEO
 	refineTol := unit.Seconds(1)
@@ -451,7 +484,7 @@ func SatellitePasses(prov eph.Provider, id eph.ID, name string, start, end time.
 			return fmt.Errorf("set: %w", err)
 		}
 
-		currentPass.Duration, _ = time.ToGoDuration(setTime.Sub(currentPass.Rise.Time))
+		currentPass.Duration = setTime.Sub(currentPass.Rise.Time)
 
 		if currentPass.Culmination, err = findCulmination(prov, id, observer, ctxAt, currentPass.Rise.Time, setTime); err != nil {
 			return fmt.Errorf("culmination: %w", err)

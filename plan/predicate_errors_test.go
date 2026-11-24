@@ -20,7 +20,7 @@ var errConstraintUnavailable = errors.New("predicate_errors_test: constraint cou
 // failed or a provider that could not be reached.
 type failingConstraint struct{}
 
-func (failingConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
+func (failingConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
 	return Result{}, errConstraintUnavailable
 }
 
@@ -89,7 +89,7 @@ func TestSchedulerReportsAConstraintThatCannotBeEvaluated(t *testing.T) {
 
 	start := fixedEpoch()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
-	block := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	block := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
 
 	for _, tc := range []struct {
 		name     string
@@ -128,8 +128,8 @@ func TestFindReportsAConstraintThatCannotBeEvaluated(t *testing.T) {
 	_, err := Find(
 		mockObject{pos: coord.NewICRS(angle.Zero(), angle.Zero())},
 		site,
-		[]Constraint{failingConstraint{}},
-		start, start.Add(unit.Hours(2)), 10*time.Minute,
+		Window{Start: start, End: start.Add(unit.Hours(2))}, unit.Minutes(10),
+		failingConstraint{},
 	)
 
 	if !errors.Is(err, errConstraintUnavailable) {
@@ -151,10 +151,12 @@ func TestObservableWindowsReportsAFailureDuringRefinement(t *testing.T) {
 
 	_, err := ObservableWindows(
 		NewStar("T", angle.Zero(), angle.Zero()),
-		start, start.Add(unit.Hours(2)), unit.Minutes(10),
-		site,
-		failingConstraint{},
-	)
+
+		site, Window{Start: start, End: start.Add(unit.Hours(2))},
+
+		unit.Minutes(10),
+
+		failingConstraint{})
 
 	if !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("ObservableWindows returned %v, want it to wrap the constraint's error", err)
@@ -234,8 +236,8 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 	start := fixedEpoch()
 	window := Window{Start: start, End: start.Add(unit.Hours(2))}
 
-	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
-	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
+	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
 
 	strategy := &SwapOptimizedStrategy{}
 	transition := &BasicTransitionModel{BaseSetup: 0}
@@ -251,11 +253,11 @@ func TestSwapAndInsertPassesReportAConstraintFailure(t *testing.T) {
 		Unscheduled: []UnscheduledBlock{{Block: b1}},
 	}
 
-	if _, err := strategy.swapPass(sched, planner, transition, time.Minute, plannerContexts(t, planner, start), nil, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.swapPass(sched, planner, transition, unit.Minutes(1), plannerContexts(t, planner, start), nil, newTabuList(2), 0); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("swapPass returned %v, want it to wrap the constraint's error", err)
 	}
 
-	if _, err := strategy.insertPass(sched, planner, window, transition, time.Minute, plannerContexts(t, planner, start), nil); !errors.Is(err, errConstraintUnavailable) {
+	if _, err := strategy.insertPass(sched, planner, window, transition, unit.Minutes(1), plannerContexts(t, planner, start), nil); !errors.Is(err, errConstraintUnavailable) {
 		t.Errorf("insertPass returned %v, want it to wrap the constraint's error", err)
 	}
 }
@@ -293,8 +295,8 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 	start := fixedEpoch()
 	window := Window{Start: start, End: start.Add(unit.Hours(2))}
 
-	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
-	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b1 := &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
+	b2 := &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
 
 	placed := func(b *Block, offset time.Duration) ScheduledBlock {
 		return ScheduledBlock{
@@ -329,7 +331,7 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			strategy := &SwapOptimizedStrategy{Base: seedStrategy{sched: tc.sched}, Step: time.Minute}
+			strategy := &SwapOptimizedStrategy{Base: seedStrategy{sched: tc.sched}, Step: unit.Minutes(1)}
 
 			_, err := strategy.Schedule(planner, window, []*Block{b1, b2}, &BasicTransitionModel{BaseSetup: 0})
 			if !errors.Is(err, errConstraintUnavailable) {
@@ -343,7 +345,7 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 // else.
 type endOnlyFailingConstraint struct{ at time.Time }
 
-func (c endOnlyFailingConstraint) Check(_ Observable, t time.Time, _ *Site) (Result, error) {
+func (c endOnlyFailingConstraint) Check(_ Observable, _ *Site, t time.Time) (Result, error) {
 	if t.Equal(c.at) {
 		return Result{}, errConstraintUnavailable
 	}
@@ -373,7 +375,7 @@ func TestConstraintFailureAtTheExactEndIsReported(t *testing.T) {
 
 	ok, err := checkConstraintsInterval(
 		NewStar("A", angle.Zero(), angle.Zero()),
-		start, end, 10*time.Minute, site, mustMoving(t, start, site.Location(), site.Refraction()), nil,
+		start, end, unit.Minutes(10), site, mustMoving(t, start, site.Location(), site.Refraction()), nil,
 		endOnlyFailingConstraint{at: end},
 	)
 

@@ -14,7 +14,7 @@ type mockConstraint struct {
 	pass bool
 }
 
-func (m mockConstraint) Check(_ Observable, _ time.Time, _ *Site) (Result, error) {
+func (m mockConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
 	return Result{Pass: m.pass}, nil
 }
 
@@ -33,8 +33,8 @@ func TestSchedulerAndStrategies(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
-	b1 := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
-	b2 := &Block{ID: "B2", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}
+	b1 := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
+	b2 := &Block{ID: "B2", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 5.0}
 
 	// 1. Greedy Strategy
 	scheduler := NewScheduler(planner, &GreedyStrategy{}, tm)
@@ -70,7 +70,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 	b3 := &Block{
 		ID:          "B3",
 		Target:      NewStar("T3", angle.Zero(), angle.Zero()),
-		Duration:    20 * time.Minute,
+		Duration:    unit.Minutes(20),
 		Constraints: []Constraint{mockConstraint{pass: false}},
 	}
 

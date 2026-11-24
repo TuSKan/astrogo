@@ -448,7 +448,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				end := start.Add(unit.Hours(24))
 
 				// Compare Sun events
-				sunEvents, err := plan.SunEvents(start, end, site, prov)
+				sunEvents, err := plan.SunEvents(site, plan.Window{Start: start, End: end}, prov)
 				if err != nil {
 					t.Fatalf("SunEvents failed: %v", err)
 				}
@@ -460,7 +460,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 				// USNO prints the date's own morning dawn and evening dusk,
 				// which belong to two nights, so they are the date's
 				// crossings rather than one NightOf.
-				civilNights, err := plan.TwilightEvents(start, end, site, prov, plan.CivilTwilight)
+				civilNights, err := plan.TwilightEvents(site, plan.Window{Start: start, End: end}, prov, plan.CivilTwilight)
 				if err != nil {
 					t.Fatalf("TwilightEvents failed: %v", err)
 				}
@@ -493,7 +493,7 @@ func TestUSNO_SunMoonOneDay(t *testing.T) {
 
 				compareUSNOEvents(t, "Sun", resp.Properties.Data.SunData, sunEvents, sunUp(site), start, tz)
 
-				moonEvents, err := plan.MoonEvents(start, end, site, prov)
+				moonEvents, err := plan.MoonEvents(site, plan.Window{Start: start, End: end}, prov)
 				if err != nil {
 					t.Fatalf("MoonEvents failed: %v", err)
 				}
@@ -527,7 +527,7 @@ func TestUSNO_MoonPhases(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2026, time.May, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	astroPhases, err := plan.MoonPhases(start, end, eph)
+	astroPhases, err := plan.MoonPhases(plan.Window{Start: start, End: end}, eph)
 	if err != nil {
 		t.Fatalf("MoonPhases failed: %v", err)
 	}
@@ -800,7 +800,7 @@ func TestUSNO_Eclipses(t *testing.T) {
 	// Solar:  2026-02-17 (Annular), 2026-08-12 (Total)
 
 	t.Run("LunarEclipses", func(t *testing.T) {
-		eclipses, err := plan.LunarEclipses(year2026Start, year2026End, eph)
+		eclipses, err := plan.LunarEclipses(plan.Window{Start: year2026Start, End: year2026End}, eph)
 		if err != nil {
 			t.Fatalf("LunarEclipses failed: %v", err)
 		}
@@ -830,7 +830,7 @@ func TestUSNO_Eclipses(t *testing.T) {
 	})
 
 	t.Run("SolarEclipses", func(t *testing.T) {
-		eclipses, err := plan.SolarEclipses(year2026Start, year2026End, eph)
+		eclipses, err := plan.SolarEclipses(plan.Window{Start: year2026Start, End: year2026End}, eph)
 		if err != nil {
 			t.Fatalf("SolarEclipses failed: %v", err)
 		}
@@ -945,7 +945,7 @@ func TestUSNO_PolarSun(t *testing.T) {
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, time.LocationUTC)
 			end := start.Add(unit.Hours(24))
 
-			sunEvents, err := plan.SunEvents(start, end, site, eph)
+			sunEvents, err := plan.SunEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
@@ -1017,22 +1017,22 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
 			end := start.Add(unit.Hours(24))
 
-			sunEvents0, err := plan.SunEvents(start, end, site0, eph)
+			sunEvents0, err := plan.SunEvents(site0, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents (0m) failed: %v", err)
 			}
 
-			sunEvents, err := plan.SunEvents(start, end, site, eph)
+			sunEvents, err := plan.SunEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents (8849m) failed: %v", err)
 			}
 
-			moonEvents0, err := plan.MoonEvents(start, end, site0, eph)
+			moonEvents0, err := plan.MoonEvents(site0, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents (0m) failed: %v", err)
 			}
 
-			moonEvents, err := plan.MoonEvents(start, end, site, eph)
+			moonEvents, err := plan.MoonEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents (8849m) failed: %v", err)
 			}
@@ -1048,12 +1048,12 @@ func TestUSNO_HighAltitude(t *testing.T) {
 			// alone dips nothing (#1185) ──
 			high, _ := plan.NewSite(loc.Name+" (8849m, no dip)", geodetic.Lat(), geodetic.Lon(), geodetic.Height(), plan.WithTimeZone(tz))
 
-			sunEventsHigh, err := plan.SunEvents(start, end, high, eph)
+			sunEventsHigh, err := plan.SunEvents(high, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents (8849m, no dip) failed: %v", err)
 			}
 
-			moonEventsHigh, err := plan.MoonEvents(start, end, high, eph)
+			moonEventsHigh, err := plan.MoonEvents(high, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents (8849m, no dip) failed: %v", err)
 			}
@@ -1170,7 +1170,7 @@ func TestUSNO_Equator(t *testing.T) {
 			end := start.Add(unit.Hours(24))
 
 			// Sun events
-			sunEvents, err := plan.SunEvents(start, end, site, eph)
+			sunEvents, err := plan.SunEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents failed: %v", err)
 			}
@@ -1282,7 +1282,7 @@ func TestUSNO_PolarMoon(t *testing.T) {
 			start := time.Date(y, time.Month(mo), d, 0, 0, 0, 0, tz)
 			end := start.Add(unit.Hours(24))
 
-			moonEvents, err := plan.MoonEvents(start, end, site, eph)
+			moonEvents, err := plan.MoonEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("MoonEvents failed: %v", err)
 			}
@@ -1341,7 +1341,7 @@ func TestUSNO_AltitudeShift(t *testing.T) {
 			start := time.Date(2026, time.March, 20, 0, 0, 0, 0, tz)
 			end := start.Add(unit.Hours(24))
 
-			sunEvents, err := plan.SunEvents(start, end, site, eph)
+			sunEvents, err := plan.SunEvents(site, plan.Window{Start: start, End: end}, eph)
 			if err != nil {
 				t.Fatalf("SunEvents failed: %v", err)
 			}

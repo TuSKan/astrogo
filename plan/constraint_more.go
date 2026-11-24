@@ -49,17 +49,17 @@ type SunSep struct {
 }
 
 // Check evaluates Sun separation for a given target and time.
-func (c SunSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c SunSep) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates Sun separation using a pre-built coord.Context.
-func (c SunSep) CheckCtx(obj Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c SunSep) CheckCtx(obj Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget
 	}
@@ -107,13 +107,13 @@ type GalacticLatitude struct {
 }
 
 // Check evaluates Galactic latitude for a given target and time.
-func (c GalacticLatitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c GalacticLatitude) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates Galactic latitude using a pre-built coord.Context.
@@ -123,7 +123,7 @@ func (c GalacticLatitude) Check(obj Observable, t time.Time, site *Site) (Result
 // moving target still moves, which is why the position is taken at the
 // Context's own instant rather than once.
 func (c GalacticLatitude) CheckCtx(
-	obj Observable, _ time.Time, _ *Site, ctx *coord.Context,
+	obj Observable, _ *Site, _ time.Time, ctx *coord.Context,
 ) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget
@@ -148,7 +148,7 @@ func (c GalacticLatitude) CheckCtx(
 	return Result{Pass: pass, Value: val, Reason: reason}, nil
 }
 
-// TimeWindow passes while the evaluated instant lies within [From, To],
+// TimeWindow passes while the evaluated instant lies within [Start, End],
 // inclusive at both ends.
 //
 // The constraint that has nothing to do with the sky: a target of opportunity
@@ -157,24 +157,18 @@ func (c GalacticLatitude) CheckCtx(
 // expressed by slicing the schedule's own span, which conflates "this target
 // cannot be observed then" with "nobody observes then".
 //
-// Zero From or To means unbounded on that side, so a one-sided deadline needs
-// only the field it is about.
-type TimeWindow struct {
-	// From is the earliest acceptable instant. Zero means no lower bound.
-	From time.Time
-
-	// To is the latest acceptable instant. Zero means no upper bound.
-	To time.Time
-}
+// It is a [Window], whose zero Start or End means unbounded on that side, so a
+// one-sided deadline needs only the field it is about.
+type TimeWindow Window
 
 // Check evaluates the window for a given time.
-func (c TimeWindow) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c TimeWindow) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates the window using the Context's instant.
@@ -183,27 +177,27 @@ func (c TimeWindow) Check(obj Observable, t time.Time, site *Site) (Result, erro
 // outside, so a scorer can rank "well inside" above "about to close" without a
 // second call. A window unbounded on both sides reports zero, since there is no
 // edge to measure from.
-func (c TimeWindow) CheckCtx(_ Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c TimeWindow) CheckCtx(_ Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
 	t := ctx.Time()
 
-	beforeStart := !c.From.IsZero() && t.Before(c.From)
-	afterEnd := !c.To.IsZero() && t.After(c.To)
+	beforeStart := !c.Start.IsZero() && t.Before(c.Start)
+	afterEnd := !c.End.IsZero() && t.After(c.End)
 
 	switch {
 	case beforeStart:
 		return Result{
-			Value:  -c.From.Sub(t).Hours(),
-			Reason: fmt.Sprintf("%.2f h before the window opens", c.From.Sub(t).Hours()),
+			Value:  -c.Start.Sub(t).Hours(),
+			Reason: fmt.Sprintf("%.2f h before the window opens", c.Start.Sub(t).Hours()),
 		}, nil
 
 	case afterEnd:
 		return Result{
-			Value:  -t.Sub(c.To).Hours(),
-			Reason: fmt.Sprintf("%.2f h after the window closed", t.Sub(c.To).Hours()),
+			Value:  -t.Sub(c.End).Hours(),
+			Reason: fmt.Sprintf("%.2f h after the window closed", t.Sub(c.End).Hours()),
 		}, nil
 	}
 
-	return Result{Pass: true, Value: hoursToNearerEdge(t, c.From, c.To)}, nil
+	return Result{Pass: true, Value: hoursToNearerEdge(t, c.Start, c.End)}, nil
 }
 
 // hoursToNearerEdge is how much of the window is left on the tighter side.
@@ -246,13 +240,13 @@ type Horizon struct {
 }
 
 // Check evaluates the terrain horizon for a given target and time.
-func (c Horizon) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c Horizon) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates the terrain horizon using a pre-built coord.Context.
@@ -261,7 +255,7 @@ func (c Horizon) Check(obj Observable, t time.Time, site *Site) (Result, error) 
 // is the one constraint in the file that uses its site parameter: two sites can
 // share a constraint set and must not share a horizon.
 func (c Horizon) CheckCtx(
-	obj Observable, t time.Time, site *Site, ctx *coord.Context,
+	obj Observable, site *Site, t time.Time, ctx *coord.Context,
 ) (Result, error) {
 	if site == nil {
 		return Result{}, ErrNilSite

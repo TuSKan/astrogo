@@ -126,7 +126,7 @@ func TestObservedRateFollowsTheDate(t *testing.T) {
 	rate := func(month, day, hour int) float64 {
 		t.Helper()
 
-		r, err := per.ObservedRate(time.Date(2026, time.Month(month), day, hour, 0, 0, 0, time.LocationUTC), site, prov, 6.5)
+		r, err := per.ObservedRate(site, time.Date(2026, time.Month(month), day, hour, 0, 0, 0, time.LocationUTC), prov, 6.5)
 		if err != nil {
 			t.Fatalf("ObservedRate: %v", err)
 		}

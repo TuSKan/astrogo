@@ -246,11 +246,11 @@ type EventSolver struct {
 // quantities, so they are [unit.Duration] — the same type [Solver.Tolerance]
 // takes, which is where tol ends up.
 func NewEventSolver(step, tol unit.Duration) EventSolver {
-	if step <= 0 {
+	if !(step > 0) || !finite(float64(step)) {
 		step = unit.Minutes(15)
 	}
 
-	if tol <= 0 {
+	if !(tol > 0) || !finite(float64(tol)) {
 		tol = unit.Seconds(1)
 	}
 
@@ -264,13 +264,26 @@ func NewEventSolver(step, tol unit.Duration) EventSolver {
 }
 
 // Find searches for events matching the given specification within the interval.
-func (s EventSolver) Find(spec EventSpec, start, end time.Time) ([]Event, error) {
+func (s EventSolver) Find(spec EventSpec, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
+	}
+
+	// A solver built as a literal skips NewEventSolver's defaults, and its
+	// samples are counted as int(span / Step), which Go leaves undefined for
+	// a NaN.
+	if err := checkFinite("Step", s.Step); err != nil {
+		return nil, err
+	}
+
+	if s.Step <= 0 {
+		return nil, fmt.Errorf("%w: %v", ErrStepNotPositive, s.Step)
 	}
 
 	var (
@@ -310,7 +323,7 @@ func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, f1, f2 float64
 
 // refineExtremum delegates to the unified Solver.FindExtremum.
 func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool) (time.Time, float64, error) {
-	return s.Solver.FindExtremum(Evaluator(eval), t1, t3, isMax)
+	return s.Solver.FindExtremum(Evaluator(eval), Window{Start: t1, End: t3}, isMax)
 }
 
 // bracketedExtremum reports whether val, the extremum refined between two
@@ -940,8 +953,10 @@ type TwilightEvent struct {
 // SunEvents returns all rise, set, and transit events for the Sun in the given interval.
 // The threshold accounts for atmospheric refraction (34'), solar semi-diameter (16'),
 // and the horizon dip from the site's elevation.
-func SunEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
-	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewSun(provider), site), start, end)
+func SunEvents(site *Site, w Window, provider eph.Provider) ([]Event, error) {
+	start, end := w.Start, w.End
+
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewSun(provider), site), Window{Start: start, End: end})
 }
 
 // riseSetSpec is the almanac's rise and set for target as seen from site:
@@ -973,8 +988,10 @@ func riseSetSpec(target Observable, site *Site) EventSpec {
 
 // SunriseSunset returns the first sunrise and first sunset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, set *Event, err error) {
-	events, err := SunEvents(start, end, site, prov)
+func SunriseSunset(site *Site, w Window, prov eph.Provider) (rise, set *Event, err error) {
+	start, end := w.Start, w.End
+
+	events, err := SunEvents(site, Window{Start: start, End: end}, prov)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -999,14 +1016,18 @@ func SunriseSunset(start, end time.Time, site *Site, prov eph.Provider) (rise, s
 // [Site.RiseSetThreshold], standard refraction plus the dip from the site's
 // elevation, with the Moon's topocentric position, so its parallax, and its
 // semi-diameter at each instant; see [EventSpec.UpperLimb].
-func MoonEvents(start, end time.Time, site *Site, provider eph.Provider) ([]Event, error) {
-	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewMoon(provider), site), start, end)
+func MoonEvents(site *Site, w Window, provider eph.Provider) ([]Event, error) {
+	start, end := w.Start, w.End
+
+	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(riseSetSpec(NewMoon(provider), site), Window{Start: start, End: end})
 }
 
 // MoonriseMoonset returns the first moonrise and first moonset found in the given interval.
 // If an event is not found, the corresponding pointer will be nil.
-func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise, set *Event, err error) {
-	events, err := MoonEvents(start, end, site, prov)
+func MoonriseMoonset(site *Site, w Window, prov eph.Provider) (rise, set *Event, err error) {
+	start, end := w.Start, w.End
+
+	events, err := MoonEvents(site, Window{Start: start, End: end}, prov)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1032,16 +1053,18 @@ func MoonriseMoonset(start, end time.Time, site *Site, prov eph.Provider) (rise,
 // Sun ascending back through it) — the twilight/darkness span between
 // them, as [Night] frames one night.
 //
-// An event with no partner within [start, end] is still returned, with
-// the missing side left nil rather than dropped: a leading Dawn-only
-// result means its dusk fell before start, a trailing Dusk-only result
-// means its dawn falls after end. Two dusks in a row with no intervening
+// An event with no partner within w is still returned, with the missing
+// side left nil rather than dropped: a leading Dawn-only result means its
+// dusk fell before w.Start, a trailing Dusk-only result means its dawn falls
+// after w.End. Two dusks in a row with no intervening
 // dawn — reachable at high latitude, where the Sun can graze back below a
 // deep threshold (e.g. astronomical, -18°) without completing a full
 // rise — flush the earlier one as its own Dusk-only result rather than
 // silently discarding it; the same happens symmetrically for two dawns in
 // a row.
-func TwilightEvents(start, end time.Time, site *Site, prov eph.Provider, kind TwilightKind) ([]TwilightEvent, error) {
+func TwilightEvents(site *Site, w Window, prov eph.Provider, kind TwilightKind) ([]TwilightEvent, error) {
+	start, end := w.Start, w.End
+
 	threshold, ok := TwilightThreshold(kind)
 	if !ok {
 		return nil, nil
@@ -1067,7 +1090,7 @@ func twilightCrossings(start, end time.Time, site *Site, prov eph.Provider, thre
 		Target:    NewSun(prov),
 		Observer:  site,
 		Threshold: angle.Deg(threshold),
-	}, start, end)
+	}, Window{Start: start, End: end})
 }
 
 // Night is one night at a site for a kind of twilight: from its dusk, the
@@ -1092,7 +1115,7 @@ type Night struct {
 // day, NightOf returns [ErrNoTwilight]: astronomical twilight never ends on a
 // summer night at 51°N, and a polar day or night lasts weeks. A kind
 // [TwilightThreshold] does not know is [ErrUnknownTwilightKind].
-func NightOf(t time.Time, site *Site, prov eph.Provider, kind TwilightKind) (Night, error) {
+func NightOf(site *Site, t time.Time, prov eph.Provider, kind TwilightKind) (Night, error) {
 	threshold, ok := TwilightThreshold(kind)
 	if !ok {
 		return Night{}, fmt.Errorf("%w: %d", ErrUnknownTwilightKind, int(kind))
@@ -1213,7 +1236,9 @@ func groupTwilightEvents(events []Event, kind TwilightKind) []TwilightEvent {
 // target and other: the instants their geocentric apparent right ascensions
 // of date are equal, the definition the almanacs use. Against Skyfield on
 // DE440s these fall within a second.
-func Conjunctions(start, end time.Time, target, other Observable) ([]Event, error) {
+func Conjunctions(target, other Observable, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -1222,12 +1247,14 @@ func Conjunctions(start, end time.Time, target, other Observable) ([]Event, erro
 		Other:  other,
 	}
 
-	return solver.Find(spec, start, end)
+	return solver.Find(spec, Window{Start: start, End: end})
 }
 
 // ConjunctionsEcliptic returns all ecliptic longitude conjunction events (Δλ = 0).
 // This is the classical definition used in most historical astronomical literature.
-func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Event, error) {
+func ConjunctionsEcliptic(target, other Observable, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -1236,12 +1263,14 @@ func ConjunctionsEcliptic(start, end time.Time, target, other Observable) ([]Eve
 		Other:  other,
 	}
 
-	return solver.Find(spec, start, end)
+	return solver.Find(spec, Window{Start: start, End: end})
 }
 
 // Appulses returns all moments of minimum angular separation between target and other.
 // The returned Event.Value contains the minimum separation in degrees.
-func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
+func Appulses(target, other Observable, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 	spec := EventSpec{
 		Family: EventFamilyRelativeGeometry,
@@ -1250,11 +1279,13 @@ func Appulses(start, end time.Time, target, other Observable) ([]Event, error) {
 		Other:  other,
 	}
 
-	return solver.Find(spec, start, end)
+	return solver.Find(spec, Window{Start: start, End: end})
 }
 
 // GreatestElongations returns all Greatest Elongation events (both East and West) for a planet relative to the Sun.
-func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event, error) {
+func GreatestElongations(target, sun Observable, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
 
 	specEast := EventSpec{
@@ -1273,14 +1304,14 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 
 	var allEvents []Event
 
-	eastEvents, err := solver.Find(specEast, start, end)
+	eastEvents, err := solver.Find(specEast, Window{Start: start, End: end})
 	if err != nil {
 		return nil, err
 	}
 
 	allEvents = append(allEvents, eastEvents...)
 
-	westEvents, err := solver.Find(specWest, start, end)
+	westEvents, err := solver.Find(specWest, Window{Start: start, End: end})
 	if err != nil {
 		return nil, err
 	}
@@ -1297,7 +1328,9 @@ func GreatestElongations(start, end time.Time, target, sun Observable) ([]Event,
 // VisibilityEvents returns all rise, transit, and set events for a target at the given site.
 // The rise/set threshold is the almanac horizon for a point source: 34' of standard
 // refraction plus the dip from the site's elevation. See [Site.RiseSetThreshold].
-func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Event, error) {
+func VisibilityEvents(target Observable, site *Site, w Window) ([]Event, error) {
+	start, end := w.Start, w.End
+
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{
 		Family:    EventFamilyVisibility,
@@ -1307,7 +1340,7 @@ func VisibilityEvents(start, end time.Time, target Observable, site *Site) ([]Ev
 		Threshold: site.RiseSetThreshold(),
 	}
 
-	return solver.Find(spec, start, end)
+	return solver.Find(spec, Window{Start: start, End: end})
 }
 
 // ── Illumination Solver ──────────────────────────────────────────────────────
@@ -1454,7 +1487,7 @@ func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 		Target: moon,
 	}
 
-	events, err := solver.Find(spec, start, end)
+	events, err := solver.Find(spec, Window{Start: start, End: end})
 	if err != nil {
 		return nil, err
 	}
@@ -1478,7 +1511,7 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 		Target: moon,
 	}
 
-	events, err := solver.Find(spec, start, end)
+	events, err := solver.Find(spec, Window{Start: start, End: end})
 	if err != nil {
 		return nil, err
 	}

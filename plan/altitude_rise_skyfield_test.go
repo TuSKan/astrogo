@@ -85,7 +85,7 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 			events = moonCenterEvents
 		}
 
-		got, err := events(start, end, site, eph.Default())
+		got, err := events(site, Window{Start: start, End: end}, eph.Default())
 		if err != nil {
 			t.Fatalf("%s events on %v: %v", c.body, start, err)
 		}
@@ -124,12 +124,12 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 // moonCenterEvents is MoonEvents with the Moon's center held to
 // MoonRiseSetThreshold, the fixed horizon a reference computed that way was
 // given, rather than its upper limb to RiseSetThreshold.
-func moonCenterEvents(start, end time.Time, site *Site, prov eph.Provider) ([]Event, error) {
+func moonCenterEvents(site *Site, w Window, prov eph.Provider) ([]Event, error) {
 	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
 		Target:    NewMoon(prov),
 		Observer:  site,
 		Threshold: site.MoonRiseSetThreshold(),
-	}, start, end)
+	}, w)
 }

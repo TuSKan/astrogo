@@ -86,7 +86,7 @@ func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, 
 		}
 
 		if CrossesIncreasing(prevLon, curLon, target, 360) {
-			refined, _, err := DefaultSolver().FindRoot(eval, prevT, tm)
+			refined, _, err := DefaultSolver().FindRoot(eval, Window{Start: prevT, End: tm})
 			if err != nil {
 				t.Fatalf("FindRoot: %v", err)
 			}
@@ -230,7 +230,7 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 	// The limiting magnitude is now a direct input, so these tests pin it
 	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
 	// arithmetic from any sky-brightness model.
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
+	rate, err := m.ObservedRate(site, time.FromJD(2451545.0, time.UTC), prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 	// The limiting magnitude is now a direct input, so these tests pin it
 	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
 	// arithmetic from any sky-brightness model.
-	rate, err := m.ObservedRate(time.FromJD(2451545.0, time.UTC), site, prov, 6.5)
+	rate, err := m.ObservedRate(site, time.FromJD(2451545.0, time.UTC), prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}

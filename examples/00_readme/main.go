@@ -23,12 +23,12 @@ func main() {
 
 	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
 
-	eval, err := plan.IsObservable(mars, tonight, site, plan.Altitude{Threshold: angle.Deg(30)})
+	eval, err := plan.IsObservable(mars, site, tonight, plan.Altitude{Threshold: angle.Deg(30)})
 	if err != nil {
 		log.Fatalf("eval: %v", err)
 	}
 
-	events, err := plan.VisibilityEvents(tonight, tonight.Add(unit.Days(1)), mars, site)
+	events, err := plan.VisibilityEvents(mars, site, plan.Window{Start: tonight, End: tonight.Add(unit.Days(1))})
 	if err != nil {
 		log.Fatalf("events: %v", err)
 	}

@@ -26,7 +26,7 @@ func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 
 	from := time.Date(2026, 7, 13, 19, 4, 0, 0, time.LocationUTC)
 
-	rise, set, err := Episode(from, from.Add(unit.Hours(10)), NewMoon(eph.Default()), site)
+	rise, set, err := Episode(NewMoon(eph.Default()), site, Window{Start: from, End: from.Add(unit.Hours(10))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestEpisodeJustBeforeARiseIsThatRise(t *testing.T) {
 		}
 
 		for _, at := range rises {
-			rise, _, err := Episode(at.Add(unit.Seconds(-30)), at.Add(unit.Hours(1)), c.target, site)
+			rise, _, err := Episode(c.target, site, Window{Start: at.Add(unit.Seconds(-30)), End: at.Add(unit.Hours(1))})
 			if err != nil {
 				t.Fatal(err)
 			}

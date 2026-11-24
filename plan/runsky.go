@@ -72,9 +72,9 @@ func checkConstraint(c Constraint, obj Observable, t time.Time, site *Site, ctx 
 	case skyConstraint:
 		return c.checkSky(obj, t, ctx, sky)
 	case ConstraintCtx:
-		return c.CheckCtx(obj, t, site, ctx) //nolint:wrapcheck // both callers wrap it, with the instant or as a constraint check
+		return c.CheckCtx(obj, site, t, ctx) //nolint:wrapcheck // both callers wrap it, with the instant or as a constraint check
 	default:
-		return c.Check(obj, t, site) //nolint:wrapcheck // both callers wrap it, with the instant or as a constraint check
+		return c.Check(obj, site, t) //nolint:wrapcheck // both callers wrap it, with the instant or as a constraint check
 	}
 }
 

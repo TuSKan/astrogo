@@ -48,40 +48,58 @@ func intervalSearches(t *testing.T) map[string]func(start, end time.Time) error 
 		"EventSolver.Find": func(s, e time.Time) error {
 			return errOf(plan.NewEventSolver(0, 0).Find(plan.EventSpec{
 				Family: plan.EventFamilyVisibility, Kind: plan.EventRise, Target: sun, Observer: site,
-			}, s, e))
+			}, plan.Window{Start: s, End: e}))
 		},
-		"SunEvents":       func(s, e time.Time) error { return errOf(plan.SunEvents(s, e, site, prov)) },
-		"SunriseSunset":   func(s, e time.Time) error { return errOf2(plan.SunriseSunset(s, e, site, prov)) },
-		"MoonEvents":      func(s, e time.Time) error { return errOf(plan.MoonEvents(s, e, site, prov)) },
-		"MoonriseMoonset": func(s, e time.Time) error { return errOf2(plan.MoonriseMoonset(s, e, site, prov)) },
+		"SunEvents": func(s, e time.Time) error { return errOf(plan.SunEvents(site, plan.Window{Start: s, End: e}, prov)) },
+		"SunriseSunset": func(s, e time.Time) error {
+			return errOf2(plan.SunriseSunset(site, plan.Window{Start: s, End: e}, prov))
+		},
+		"MoonEvents": func(s, e time.Time) error { return errOf(plan.MoonEvents(site, plan.Window{Start: s, End: e}, prov)) },
+		"MoonriseMoonset": func(s, e time.Time) error {
+			return errOf2(plan.MoonriseMoonset(site, plan.Window{Start: s, End: e}, prov))
+		},
 		"TwilightEvents": func(s, e time.Time) error {
-			return errOf(plan.TwilightEvents(s, e, site, prov, plan.CivilTwilight))
+			return errOf(plan.TwilightEvents(site, plan.Window{Start: s, End: e}, prov, plan.CivilTwilight))
 		},
-		"Conjunctions":         func(s, e time.Time) error { return errOf(plan.Conjunctions(s, e, mars, sun)) },
-		"ConjunctionsEcliptic": func(s, e time.Time) error { return errOf(plan.ConjunctionsEcliptic(s, e, mars, sun)) },
-		"Appulses":             func(s, e time.Time) error { return errOf(plan.Appulses(s, e, moon, mars)) },
-		"Oppositions":          func(s, e time.Time) error { return errOf(plan.Oppositions(s, e, mars, sun)) },
-		"GreatestElongations":  func(s, e time.Time) error { return errOf(plan.GreatestElongations(s, e, mars, sun)) },
-		"FullMoonOppositions":  func(s, e time.Time) error { return errOf(plan.FullMoonOppositions(s, e, prov)) },
-		"VisibilityEvents":     func(s, e time.Time) error { return errOf(plan.VisibilityEvents(s, e, star, site)) },
-		"MoonPhases":           func(s, e time.Time) error { return errOf(plan.MoonPhases(s, e, prov)) },
-		"LunarEclipses":        func(s, e time.Time) error { return errOf(plan.LunarEclipses(s, e, prov)) },
-		"SolarEclipses":        func(s, e time.Time) error { return errOf(plan.SolarEclipses(s, e, prov)) },
+		"Conjunctions": func(s, e time.Time) error { return errOf(plan.Conjunctions(mars, sun, plan.Window{Start: s, End: e})) },
+		"ConjunctionsEcliptic": func(s, e time.Time) error {
+			return errOf(plan.ConjunctionsEcliptic(mars, sun, plan.Window{Start: s, End: e}))
+		},
+		"Appulses":    func(s, e time.Time) error { return errOf(plan.Appulses(moon, mars, plan.Window{Start: s, End: e})) },
+		"Oppositions": func(s, e time.Time) error { return errOf(plan.Oppositions(mars, sun, plan.Window{Start: s, End: e})) },
+		"GreatestElongations": func(s, e time.Time) error {
+			return errOf(plan.GreatestElongations(mars, sun, plan.Window{Start: s, End: e}))
+		},
+		"FullMoonOppositions": func(s, e time.Time) error {
+			return errOf(plan.FullMoonOppositions(plan.Window{Start: s, End: e}, prov))
+		},
+		"VisibilityEvents": func(s, e time.Time) error {
+			return errOf(plan.VisibilityEvents(star, site, plan.Window{Start: s, End: e}))
+		},
+		"MoonPhases":    func(s, e time.Time) error { return errOf(plan.MoonPhases(plan.Window{Start: s, End: e}, prov)) },
+		"LunarEclipses": func(s, e time.Time) error { return errOf(plan.LunarEclipses(plan.Window{Start: s, End: e}, prov)) },
+		"SolarEclipses": func(s, e time.Time) error { return errOf(plan.SolarEclipses(plan.Window{Start: s, End: e}, prov)) },
 		"RankObservable": func(s, e time.Time) error {
-			return errOf(planner.RankObservable([]plan.Observable{star}, s, e))
+			return errOf(planner.RankObservable([]plan.Observable{star}, plan.Window{Start: s, End: e}))
 		},
 		"SatellitePasses": func(s, e time.Time) error {
-			return errOf(plan.SatellitePasses(prov, eph.Moon, "ISS", s, e, site.Location(), angle.Deg(10)))
+			return errOf(plan.SatellitePasses(plan.NewSatellite("ISS", eph.Moon, prov), site, plan.Window{Start: s, End: e}, plan.WithMinElevation(angle.Deg(10))))
 		},
-		"TransitEstimate":     func(s, e time.Time) error { return errOf2(plan.TransitEstimate(vega, site, s, e)) },
-		"MaxAltitudeInWindow": func(s, e time.Time) error { return errOf(plan.MaxAltitudeInWindow(vega, site, s, e)) },
-		"Episode":             func(s, e time.Time) error { return errOf2(plan.Episode(s, e, star, site)) },
-		"Find":                func(s, e time.Time) error { return errOf(plan.Find(vega, site, nil, s, e, 5*time.Minute)) },
+		"TransitEstimate": func(s, e time.Time) error {
+			return errOf2(plan.TransitEstimate(vega, site, plan.Window{Start: s, End: e}))
+		},
+		"MaxAltitudeInWindow": func(s, e time.Time) error {
+			return errOf(plan.MaxAltitudeInWindow(vega, site, plan.Window{Start: s, End: e}))
+		},
+		"Episode": func(s, e time.Time) error { return errOf2(plan.Episode(star, site, plan.Window{Start: s, End: e})) },
+		"Find": func(s, e time.Time) error {
+			return errOf(plan.Find(vega, site, plan.Window{Start: s, End: e}, unit.Minutes(5)))
+		},
 		"VisibleIntervals": func(s, e time.Time) error {
-			return errOf(plan.VisibleIntervals(vega, site, s, e, 5*time.Minute, angle.Deg(10)))
+			return errOf(plan.VisibleIntervals(vega, site, plan.Window{Start: s, End: e}, unit.Minutes(5), angle.Deg(10)))
 		},
 		"ObservableWindows": func(s, e time.Time) error {
-			return errOf(plan.ObservableWindows(star, s, e, unit.Minutes(5), site))
+			return errOf(plan.ObservableWindows(star, site, plan.Window{Start: s, End: e}, unit.Minutes(5)))
 		},
 	}
 }
@@ -158,11 +176,11 @@ func TestAnEmptyIntervalIsNotReversed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := plan.SunEvents(at, at, site, eph.Default()); err != nil {
+	if _, err := plan.SunEvents(site, plan.Window{Start: at, End: at}, eph.Default()); err != nil {
 		t.Errorf("SunEvents over an empty interval: %v", err)
 	}
 
-	if phases, err := plan.MoonPhases(at, at, eph.Default()); err != nil || len(phases) != 0 {
+	if phases, err := plan.MoonPhases(plan.Window{Start: at, End: at}, eph.Default()); err != nil || len(phases) != 0 {
 		t.Errorf("MoonPhases over an empty interval: %v, err %v", phases, err)
 	}
 }

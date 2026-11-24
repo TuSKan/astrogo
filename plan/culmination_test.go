@@ -89,7 +89,7 @@ func TestCulminationThroughTheContextCache(t *testing.T) {
 
 	// Four days rather than the week measured: the reference builds a full
 	// Context at every sample, and plan's race job has little time to spare.
-	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Hours(24*4)), site, angle.Deg(10))
+	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, site), Window{Start: start, End: start.Add(unit.Hours(24 * 4))}, WithMinElevation(angle.Deg(10)))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}

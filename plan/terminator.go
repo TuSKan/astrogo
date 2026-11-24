@@ -37,7 +37,7 @@ func (k TwilightKind) zenithAngle() angle.Angle {
 // It is taken to first order, from one State call rather than the four
 // apparentVec iterates, which agrees to 0.04 mas for the Sun and 0.01 mas
 // for the Moon (TestFirstOrderApparentPlaceAgrees).
-func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
+func SubsolarPoint(t time.Time, p eph.Provider) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()
 	}
@@ -64,7 +64,7 @@ func SubsolarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // geocentric direction, which treats the Moon as infinitely far: at 60 Earth
 // radii that leaves the Moon up to about 10″ from the zenith, 0.3 km from
 // this point.
-func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
+func SublunarPoint(t time.Time, p eph.Provider) (*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()
 	}
@@ -87,12 +87,12 @@ func SublunarPoint(p eph.Provider, t time.Time) (*coord.Geodetic, error) {
 // centered on the subsolar point (see coord.SmallCircle for the sampling
 // geometry and its documented, negligible ellipsoidal approximation).
 // Returns ErrTooFewPoints (via coord.SmallCircle) if n < 3.
-func Terminator(p eph.Provider, t time.Time, kind TwilightKind, n int) ([]*coord.Geodetic, error) {
+func Terminator(t time.Time, p eph.Provider, kind TwilightKind, n int) ([]*coord.Geodetic, error) {
 	if p == nil {
 		p = eph.Default()
 	}
 
-	sub, err := SubsolarPoint(p, t)
+	sub, err := SubsolarPoint(t, p)
 	if err != nil {
 		return nil, fmt.Errorf("plan: terminator: %w", err)
 	}

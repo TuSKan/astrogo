@@ -20,7 +20,7 @@ type failingTransition struct {
 	calls  int
 }
 
-func (m *failingTransition) Overhead(_ Transition) (time.Duration, error) {
+func (m *failingTransition) Overhead(_ Transition) (unit.Duration, error) {
 	m.calls++
 	if m.failAt == 0 || m.calls == m.failAt {
 		return 0, errOverheadUnknown
@@ -41,8 +41,8 @@ func overheadFixture(t *testing.T) (planner *Planner, window Window, b1, b2 *Blo
 
 	start := fixedEpoch()
 	window = Window{Start: start, End: start.Add(unit.Hours(2))}
-	b1 = &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
-	b2 = &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute}
+	b1 = &Block{ID: "B1", Target: NewStar("A", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
+	b2 = &Block{ID: "B2", Target: NewStar("B", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}
 
 	return planner, window, b1, b2
 }
@@ -119,7 +119,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 	} {
 		swap := &Schedule{Window: window, Blocks: []ScheduledBlock{placed(b1, 0), placed(b2, 10*time.Minute)}}
 
-		_, err := strategy.swapPass(swap, planner, &failingTransition{failAt: tc.failAt}, time.Minute,
+		_, err := strategy.swapPass(swap, planner, &failingTransition{failAt: tc.failAt}, unit.Minutes(1),
 			plannerContexts(t, planner, start), nil, newTabuList(2), 0)
 		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
 			t.Errorf("swapPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",
@@ -143,7 +143,7 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 			Unscheduled: []UnscheduledBlock{{Block: b2}},
 		}
 
-		_, err := strategy.insertPass(insert, planner, window, &failingTransition{failAt: tc.failAt}, time.Minute,
+		_, err := strategy.insertPass(insert, planner, window, &failingTransition{failAt: tc.failAt}, unit.Minutes(1),
 			plannerContexts(t, planner, start), nil)
 		if !errors.Is(err, errOverheadUnknown) || !strings.Contains(err.Error(), tc.names) {
 			t.Errorf("insertPass, call %d failing: %v, want it to wrap the overhead's error and name the %s",

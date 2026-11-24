@@ -58,7 +58,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 
 		start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 
-		events, err := plan.MoonEvents(start, start.Add(span), site, prov)
+		events, err := plan.MoonEvents(site, plan.Window{Start: start, End: start.Add(span)}, prov)
 		if err != nil {
 			t.Fatalf("%s: MoonEvents: %v", s.name, err)
 		}

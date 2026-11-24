@@ -15,7 +15,7 @@ import (
 // could not evaluate and returns what it found, with a non-nil error wrapping
 // this sentinel that names each skip and why:
 //
-//	objects, err := plan.VisibleTonight(ctx, site, night, 6.0, sources, prov)
+//	objects, err := plan.VisibleTonight(ctx, site, night, sources, prov, 6.0)
 //	if errors.Is(err, plan.ErrIncomplete) {
 //	    // objects is valid, and something was dropped. err says what.
 //	} else if err != nil {

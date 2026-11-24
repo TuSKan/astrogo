@@ -57,7 +57,7 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		eval, err := plan.IsObservable(iss, when, site, plan.Altitude{Threshold: angle.Deg(0)})
+		eval, err := plan.IsObservable(iss, site, when, plan.Altitude{Threshold: angle.Deg(0)})
 		if err != nil {
 			t.Fatalf("+%dmin IsObservable: %v", minute, err)
 		}
@@ -130,7 +130,7 @@ func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2026, time.March, 21, 0, 0, 0, 0, time.LocationUTC)
 
-	events, err := plan.MoonEvents(start, end, site, prov)
+	events, err := plan.MoonEvents(site, plan.Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("MoonEvents: %v", err)
 	}

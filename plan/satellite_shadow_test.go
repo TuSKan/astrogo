@@ -254,7 +254,7 @@ func TestLimitingMagnitudeRejectsAnEclipsedSatellite(t *testing.T) {
 
 	hard := LimitingMagnitudeConstraint{Sky: fixedDepth(30), Boolean: true}
 
-	got, err := hard.CheckCtx(sat, dark, site, ctx)
+	got, err := hard.CheckCtx(sat, site, dark, ctx)
 	if err != nil {
 		t.Fatalf("CheckCtx: %v", err)
 	}

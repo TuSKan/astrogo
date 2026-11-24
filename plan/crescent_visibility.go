@@ -83,7 +83,7 @@ const (
 //
 // It fails when the Sun does not set within a day of evening, or the Moon
 // neither sets within a day after sunset nor set within a day before it.
-func CrescentVisibility(evening time.Time, site *Site, prov eph.Provider) (CrescentResult, error) {
+func CrescentVisibility(site *Site, evening time.Time, prov eph.Provider) (CrescentResult, error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
@@ -250,8 +250,8 @@ func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 	spec := EventSpec{Family: EventFamilyVisibility, Kind: EventSet, Target: NewSun(prov), Observer: site}
 
-	sets := func(start, end time.Time, _ *Site, _ eph.Provider) ([]Event, error) {
-		return solver.Find(spec, start, end)
+	sets := func(_ *Site, w Window, _ eph.Provider) ([]Event, error) {
+		return solver.Find(spec, w)
 	}
 
 	e, found, err := lastEvent(sets, sunset, 1, site, prov, isSet)
@@ -288,7 +288,7 @@ func crescentWidth(sd, arclDeg float64) float64 {
 }
 
 // eventsFunc finds a body's events in a window, as SunEvents and MoonEvents do.
-type eventsFunc func(start, end time.Time, site *Site, prov eph.Provider) ([]Event, error)
+type eventsFunc func(site *Site, w Window, prov eph.Provider) ([]Event, error)
 
 func isSet(e Event) bool { return e.Kind == EventSet }
 
@@ -306,7 +306,7 @@ func firstEvent(events eventsFunc, start time.Time, days float64, site *Site, pr
 			to = end
 		}
 
-		evs, err := events(from, to, site, prov)
+		evs, err := events(site, Window{Start: from, End: to}, prov)
 		if err != nil {
 			return Event{}, false, fmt.Errorf("crescent: %w", err)
 		}
@@ -333,7 +333,7 @@ func lastEvent(events eventsFunc, end time.Time, days float64, site *Site, prov 
 			from = start
 		}
 
-		evs, err := events(from, to, site, prov)
+		evs, err := events(site, Window{Start: from, End: to}, prov)
 		if err != nil {
 			return Event{}, false, fmt.Errorf("crescent: %w", err)
 		}
@@ -395,7 +395,7 @@ func moonAgeHours(t time.Time, prov eph.Provider) (float64, error) {
 		to = t
 	}
 
-	phases, err := MoonPhases(from, to, prov)
+	phases, err := MoonPhases(Window{Start: from, End: to}, prov)
 	if err != nil {
 		return 0, fmt.Errorf("crescent: moon phases: %w", err)
 	}

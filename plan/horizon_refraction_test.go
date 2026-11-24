@@ -101,7 +101,7 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 			t.Fatalf("NewSite: %v", err)
 		}
 
-		evs, err := VisibilityEvents(start, end, sirius, site)
+		evs, err := VisibilityEvents(sirius, site, Window{Start: start, End: end})
 		if err != nil {
 			t.Fatalf("VisibilityEvents: %v", err)
 		}

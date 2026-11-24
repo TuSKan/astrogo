@@ -38,29 +38,29 @@ func TestWindowFindersSampleTheEnd(t *testing.T) {
 	// Midnight, so the star rises and sets once inside the reference day.
 	day := time.Date(2024, time.June, 15, 0, 0, 0, 0, time.LocationUTC)
 
-	whole, err := VisibleIntervals(obj, site, day, day.Add(unit.Days(1)), 5*time.Minute, angle.Zero())
+	whole, err := VisibleIntervals(obj, site, Window{Start: day, End: day.Add(unit.Days(1))}, unit.Minutes(5), angle.Zero())
 	if err != nil || len(whole) != 1 {
 		t.Fatalf("reference day: %d windows, %v; want one", len(whole), err)
 	}
 
-	rise, set := whole[0].Window.Start, whole[0].Window.End
+	rise, set := whole[0].Start, whole[0].End
 
 	finders := []struct {
 		name string
 		find func(start, end time.Time) ([]Window, error)
 	}{
 		{"VisibleIntervals", func(start, end time.Time) ([]Window, error) {
-			iv, err := VisibleIntervals(obj, site, start, end, 5*time.Minute, angle.Zero())
+			iv, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(5), angle.Zero())
 
-			return windowsOf(iv), err
+			return iv, err
 		}},
 		{"ObservableWindows", func(start, end time.Time) ([]Window, error) {
-			return ObservableWindows(obj, start, end, unit.Minutes(5), site, Altitude{Threshold: angle.Zero()})
+			return ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(5), Altitude{Threshold: angle.Zero()})
 		}},
 		{"Find", func(start, end time.Time) ([]Window, error) {
-			iv, err := Find(obj, site, []Constraint{Altitude{Threshold: angle.Zero()}}, start, end, 5*time.Minute)
+			iv, err := Find(obj, site, Window{Start: start, End: end}, unit.Minutes(5), Altitude{Threshold: angle.Zero()})
 
-			return windowsOf(iv), err
+			return iv, err
 		}},
 	}
 

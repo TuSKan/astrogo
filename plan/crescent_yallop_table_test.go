@@ -63,7 +63,7 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 		best := 2400000 + o.jdNew + o.age/24
 		evening := time.FromJD(best-3.0/24, time.UTC)
 
-		r, err := CrescentVisibility(evening, site, eph.Default())
+		r, err := CrescentVisibility(site, evening, eph.Default())
 		if err != nil {
 			t.Fatalf("No %d: %v", o.no, err)
 		}

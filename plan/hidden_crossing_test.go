@@ -46,7 +46,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	// degree above the rise/set threshold at its highest.
 	start := time.Date(2026, 6, 28, 19, 0, 0, 0, time.LocationUTC)
 
-	rise, set, err := SunriseSunset(start, start.Add(unit.Days(1)), site("Mawson", -67.6027, 62.8738), prov)
+	rise, set, err := SunriseSunset(site("Mawson", -67.6027, 62.8738), Window{Start: start, End: start.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	// Paris in June: ten minutes of astronomical night, 0.009° deep.
 	start = time.Date(2026, 6, 11, 10, 0, 0, 0, time.LocationUTC)
 
-	nights, err := TwilightEvents(start, start.Add(unit.Days(1)), site("Paris", 48.8566, 2.3522), prov, AstronomicalTwilight)
+	nights, err := TwilightEvents(site("Paris", 48.8566, 2.3522), Window{Start: start, End: start.Add(unit.Days(1))}, prov, AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,11 +84,11 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	start = time.Date(2026, 6, 17, 22, 0, 0, 0, time.LocationUTC)
 	alta := site("Alta", 69.9689, 23.2716)
 
-	if r, s, err := MoonriseMoonset(start, start.Add(unit.Days(1)), alta, prov); err != nil || r != nil || s != nil {
+	if r, s, err := MoonriseMoonset(alta, Window{Start: start, End: start.Add(unit.Days(1))}, prov); err != nil || r != nil || s != nil {
 		t.Errorf("Alta: MoonriseMoonset gives %v and %v (%v), want neither: the upper limb stays up", r, s, err)
 	}
 
-	centerEvents, err := moonCenterEvents(start, start.Add(unit.Days(1)), alta, prov)
+	centerEvents, err := moonCenterEvents(alta, Window{Start: start, End: start.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestTheStepDoesNotDecideWhichCrossingsExist(t *testing.T) {
 		var runs [2][]Event
 
 		for k, step := range []unit.Duration{unit.Minutes(2), unit.Minutes(15)} {
-			events, err := NewEventSolver(step, unit.Seconds(1)).Find(spec, c.start, c.end)
+			events, err := NewEventSolver(step, unit.Seconds(1)).Find(spec, Window{Start: c.start, End: c.end})
 			if err != nil {
 				t.Fatal(err)
 			}

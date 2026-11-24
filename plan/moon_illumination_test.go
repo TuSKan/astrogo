@@ -91,7 +91,7 @@ func TestQuarterMoonsAreNotExactlyHalfLit(t *testing.T) {
 	for _, kind := range []EventKind{EventFirstQuarter, EventLastQuarter} {
 		events, err := NewEventSolver(unit.Hours(6), unit.Seconds(1)).Find(EventSpec{
 			Family: EventFamilyIllumination, Kind: kind, Target: NewMoon(prov),
-		}, start, start.Add(unit.Days(365)))
+		}, Window{Start: start, End: start.Add(unit.Days(365))})
 		if err != nil {
 			t.Fatal(err)
 		}

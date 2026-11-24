@@ -82,7 +82,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	tight, err := plan.VisibleTonight(ctx, site, testNight, 2, sources, ephemeris.Default())
+	tight, err := plan.VisibleTonight(ctx, site, testNight, sources, ephemeris.Default(), 2)
 	acceptOnlySBDBsCut(t, "VisibleTonight (magLimit=2)", err)
 
 	for _, r := range tight {
@@ -91,7 +91,7 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 		}
 	}
 
-	loose, err := plan.VisibleTonight(ctx, site, testNight, 5, sources, ephemeris.Default())
+	loose, err := plan.VisibleTonight(ctx, site, testNight, sources, ephemeris.Default(), 5)
 	acceptOnlySBDBsCut(t, "VisibleTonight (magLimit=5)", err)
 
 	for _, r := range loose {
@@ -196,7 +196,7 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	results, err := plan.VisibleTonight(ctx, site, testNight, 16, nil, ephemeris.Default(), plan.WithPlanetaryMoons())
+	results, err := plan.VisibleTonight(ctx, site, testNight, nil, ephemeris.Default(), 16, plan.WithPlanetaryMoons())
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
 
@@ -249,8 +249,8 @@ func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 
 	night := time.Date(2026, 8, 1, 12, 0, 0, 0, time.LocationUTC)
 
-	results, err := plan.VisibleTonight(context.Background(), site, night, 4.5,
-		[]resolve.BrightObjectSearcher{simbad.New()}, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), site, night, []resolve.BrightObjectSearcher{simbad.New()}, ephemeris.Default(), 4.5)
+
 	testutil.SkipOnDegradedService(t, err, simbadControl(t))
 
 	if err != nil {

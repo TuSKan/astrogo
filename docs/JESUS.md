@@ -267,7 +267,7 @@ defer prov.Close()
 start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
 end   := time.DateJulianCal(2, 1, 1, 0, 0, 0)
 
-eclipses, _ := plan.LunarEclipses(start, end, prov)
+eclipses, _ := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 for _, e := range eclipses {
     fmt.Printf("Eclipse: %s  |β|=%.3f°  γ=%.3f\n",
         e.Time.FormatJulian("2006-01-02 15:04"), e.EclipticLatitude.Degrees(), e.Gamma)
@@ -356,7 +356,7 @@ venus   := plan.NewVenus(prov)
 s := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
 e := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
-conjs, _ := plan.Conjunctions(s, e, jupiter, venus)
+conjs, _ := plan.Conjunctions(jupiter, venus, plan.Window{Start: s, End: e})
 for _, c := range conjs {
     jPos, _ := jupiter.Position(c.Time)
     vPos, _ := venus.Position(c.Time)
@@ -569,7 +569,7 @@ defer prov.Close()
 start := time.DateJulianCal(33, 3, 1, 0, 0, 0)
 end   := time.DateJulianCal(33, 5, 1, 0, 0, 0)
 
-eclipses, _ := plan.LunarEclipses(start, end, prov)
+eclipses, _ := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 for _, e := range eclipses {
     fmt.Printf("Lunar Eclipse: %s\n", e.Time.FormatJulian("2006-01-02 15:04 MST"))
     fmt.Printf("  Ecliptic Latitude: %.3f°\n", e.EclipticLatitude.Degrees())
@@ -605,7 +605,7 @@ site, _ := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137
 dayStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
 dayEnd   := time.DateJulianCal(33, 4, 3, 20, 0, 0)
 
-rise, _, _ := plan.MoonriseMoonset(dayStart, dayEnd, site, prov)
+rise, _, _ := plan.MoonriseMoonset(site, plan.Window{Start: dayStart, End: dayEnd}, prov)
 if rise != nil {
     fmt.Printf("Moonrise: %s (Az: %s)\n",
         rise.Time.FormatJulian("15:04:05 MST"),

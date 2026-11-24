@@ -49,7 +49,7 @@ func randomSet(r *rand.Rand, n int) []plan.Window {
 
 // total is TotalDuration in hours, for readable failure messages.
 func totalHours(ws []plan.Window) float64 {
-	return float64(plan.TotalDuration(ws)) / float64(time.Hour)
+	return plan.TotalDuration(ws).Hours()
 }
 
 // Union must produce a normalized set: sorted, pairwise disjoint, covering

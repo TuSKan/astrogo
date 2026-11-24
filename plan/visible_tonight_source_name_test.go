@@ -33,8 +33,7 @@ func TestVisibleTonightNamesAFailedSource(t *testing.T) {
 		{&namedFailingBrightSource{failingBrightSource{good: sirius}}, `"Fake Catalog"`},
 		{&failingBrightSource{good: sirius}, `"*plan_test.failingBrightSource"`},
 	} {
-		_, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2,
-			[]resolve.BrightObjectSearcher{c.src}, ephemeris.Default())
+		_, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, []resolve.BrightObjectSearcher{c.src}, ephemeris.Default(), 2)
 
 		if !errors.Is(err, plan.ErrIncomplete) {
 			t.Fatalf("err = %v, want ErrIncomplete for a source that failed", err)

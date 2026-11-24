@@ -46,7 +46,7 @@ func TestMoonSepIsTheSeparationTheSiteSees(t *testing.T) {
 		{"north of the Moon", 354.229381, 29.937454, 30.0023},
 		{"east of the Moon", 24.229381, -0.062546, 30.0049},
 	} {
-		got, err := MoonSep{Threshold: angle.Deg(30.5)}.Check(NewStar(c.name, angle.Deg(c.ra), angle.Deg(c.dec)), at, site)
+		got, err := MoonSep{Threshold: angle.Deg(30.5)}.Check(NewStar(c.name, angle.Deg(c.ra), angle.Deg(c.dec)), site, at)
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}

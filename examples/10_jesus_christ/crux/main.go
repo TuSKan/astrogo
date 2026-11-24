@@ -104,7 +104,7 @@ func main() {
 		searchStart := equinox.Add(unit.Days(-45))
 		searchEnd := equinox.Add(unit.Days(45))
 
-		phases, err := plan.MoonPhases(searchStart, searchEnd, prov)
+		phases, err := plan.MoonPhases(plan.Window{Start: searchStart, End: searchEnd}, prov)
 		if err != nil {
 			fmt.Printf("  AD %d: moon phases error: %v\n", year, err)
 			continue
@@ -131,7 +131,7 @@ func main() {
 					conjYear, time.Month(conjMonth), conjDay+dayOff,
 					9, 39, 0, 0, time.LocationUTC)
 
-				result, err := plan.CrescentVisibility(noon, site, prov)
+				result, err := plan.CrescentVisibility(site, noon, prov)
 				if err != nil {
 					continue
 				}

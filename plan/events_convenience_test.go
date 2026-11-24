@@ -26,7 +26,7 @@ func TestConjunctions_MarsJupiter(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(730)) // 2 years: conjunctions are infrequent for outer planets
 
-	events, err := Conjunctions(start, end, mars, jupiter)
+	events, err := Conjunctions(mars, jupiter, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Conjunctions: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestConjunctionsEcliptic_MarsJupiter(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(730))
 
-	events, err := ConjunctionsEcliptic(start, end, mars, jupiter)
+	events, err := ConjunctionsEcliptic(mars, jupiter, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("ConjunctionsEcliptic: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestAppulses_MarsJupiter(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(730))
 
-	events, err := Appulses(start, end, mars, jupiter)
+	events, err := Appulses(mars, jupiter, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Appulses: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestOppositions_MarsSun(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(365 * 3)) // Mars oppositions occur roughly every ~26 months
 
-	events, err := Oppositions(start, end, mars, sun)
+	events, err := Oppositions(mars, sun, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("Oppositions: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestGreatestElongations_Venus(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(584)) // one full Venus synodic period
 
-	events, err := GreatestElongations(start, end, venus, sun)
+	events, err := GreatestElongations(venus, sun, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("GreatestElongations: %v", err)
 	}
@@ -144,12 +144,12 @@ func TestFullMoonOppositions_MatchesMoonPhases(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(90))
 
-	events, err := FullMoonOppositions(start, end, prov)
+	events, err := FullMoonOppositions(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("FullMoonOppositions: %v", err)
 	}
 
-	phases, err := MoonPhases(start, end, prov)
+	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestVisibilityEvents_Star(t *testing.T) {
 	start := time.Date(2026, 6, 15, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(1))
 
-	events, err := VisibilityEvents(start, end, star, site)
+	events, err := VisibilityEvents(star, site, Window{Start: start, End: end})
 	if err != nil {
 		t.Fatalf("VisibilityEvents: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestNextNewMoonAndNextFullMoon(t *testing.T) {
 	}
 
 	// Cross-check against MoonPhases over a matching window.
-	phases, err := MoonPhases(start, start.Add(unit.Days(35)), prov)
+	phases, err := MoonPhases(Window{Start: start, End: start.Add(unit.Days(35))}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}

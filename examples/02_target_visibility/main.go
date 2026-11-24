@@ -51,7 +51,7 @@ func main() {
 		// 5. Check Visibility! IsObservable reports each constraint's result,
 		// so a "no" comes with its reason. (plan.Planner.Observable gives the
 		// yes or no alone.)
-		eval, err := plan.IsObservable(target, tm, site, constraints...)
+		eval, err := plan.IsObservable(target, site, tm, constraints...)
 		if err != nil {
 			log.Fatalf("visibility: %v", err)
 		}

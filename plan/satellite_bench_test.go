@@ -76,7 +76,7 @@ func BenchmarkSatellitePasses_6h(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		if _, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, site, angle.Deg(10)); err != nil {
+		if _, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(b, site), Window{Start: start, End: end}, WithMinElevation(angle.Deg(10))); err != nil {
 			b.Fatalf("SatellitePasses: %v", err)
 		}
 	}

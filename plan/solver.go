@@ -76,9 +76,10 @@ func sameSign(a, b float64) bool {
 	return (a > 0 && b > 0) || (a < 0 && b < 0)
 }
 
-// FindRoot finds the time t in [t1, t2] where eval(t) ≈ 0 using Chandrupatla's method.
+// FindRoot finds the time t in bracket where eval(t) ≈ 0 using Chandrupatla's method.
 //
-// Precondition: eval(t1) and eval(t2) must have opposite signs (bracketing condition).
+// Precondition: eval at bracket.Start and at bracket.End must have opposite
+// signs (bracketing condition).
 // If this is violated, FindRoot returns an error.
 //
 // Chandrupatla's method maintains three points {a, b, c} where:
@@ -90,7 +91,9 @@ func sameSign(a, b float64) bool {
 // determines whether inverse quadratic interpolation (IQI) through all three
 // points would produce a well-conditioned step. If not, bisection is used.
 // The bracket is guaranteed to shrink on every iteration.
-func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, error) {
+func (s Solver) FindRoot(eval Evaluator, bracket Window) (time.Time, float64, error) {
+	t1, t2 := bracket.Start, bracket.End
+
 	fa, err := eval(t1)
 	if err != nil {
 		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
@@ -104,17 +107,19 @@ func (s Solver) FindRoot(eval Evaluator, t1, t2 time.Time) (time.Time, float64, 
 	return s.findRootFrom(eval, t1, t2, fa, fb)
 }
 
-// FindExtremum finds the time t in [a, b] where eval(t) reaches a local
+// FindExtremum finds the time t in bracket where eval(t) reaches a local
 // maximum (if isMax is true) or minimum (if isMax is false).
 //
 // Uses Brent's method for minimization (parabolic interpolation with golden
-// section fallback). The bracket [a, b] must contain a single extremum.
+// section fallback). The bracket must contain a single extremum.
 //
 // Returns the time of the extremum and the function value at that time
 // (the actual value, not negated even for maximization).
 //
 // Reference: Brent, R. P. (1973). Algorithms for Minimization Without Derivatives, Ch. 5.
-func (s Solver) FindExtremum(eval Evaluator, t1, t3 time.Time, isMax bool) (time.Time, float64, error) {
+func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.Time, float64, error) {
+	t1, t3 := bracket.Start, bracket.End
+
 	const goldenRatio = 0.3819660112501051 // (3 - sqrt(5)) / 2
 
 	a, b := t1, t3

@@ -57,12 +57,12 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 		blocks = append(blocks, &Block{
 			ID:       fmt.Sprintf("B%d", i),
 			Target:   NewStar(fmt.Sprintf("T%d", i), angle.Hour(6+1.3*float64(i)), angle.Deg(-60+11*float64(i))),
-			Duration: time.Duration(10+7*i) * time.Minute,
+			Duration: unit.Minutes(float64(10 + 7*i)),
 			Priority: float64(10 - i),
 		})
 	}
 
-	return planner, window, blocks, &BasicTransitionModel{BaseSetup: time.Minute, SlewRate: unit.DegreesPerSec(2)}
+	return planner, window, blocks, &BasicTransitionModel{BaseSetup: unit.Minutes(1), SlewRate: unit.DegreesPerSec(2)}
 }
 
 // TestScheduleThroughTheContextCache holds the greedy and swap-optimized
@@ -143,11 +143,11 @@ func TestBlockIsScoredAtItsMidpoint(t *testing.T) {
 	block := &Block{
 		ID:       "rising",
 		Target:   NewStar("rising", angle.Hour(8.5), angle.Deg(-20)),
-		Duration: 15 * time.Minute,
+		Duration: unit.Minutes(15),
 		Priority: 1,
 	}
 
-	sched, err := (&GreedyStrategy{Step: 10 * time.Minute}).Schedule(planner, window, []*Block{block}, &BasicTransitionModel{BaseSetup: time.Minute})
+	sched, err := (&GreedyStrategy{Step: unit.Minutes(10)}).Schedule(planner, window, []*Block{block}, &BasicTransitionModel{BaseSetup: unit.Minutes(1)})
 	if err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}

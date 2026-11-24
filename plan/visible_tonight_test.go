@@ -113,7 +113,7 @@ func TestVisibleTonight_FiltersAndReturnsVisibleStar(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius, faint}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 2)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestVisibleTonight_PeakConsistentWithTransit(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{vega}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 2)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), midnightNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), midnightNight, sources, ephemeris.Default(), 2)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 	night := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{grazer}}}
 
-	results, err := plan.VisibleTonight(context.Background(), site, night, 8, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), site, night, sources, ephemeris.Default(), 8)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestVisibleTonight_ExcludesObjectNeverAboveHorizon(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{polaris}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 5, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 5)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestVisibleTonight_ExcludesObjectNeverAboveHorizon(t *testing.T) {
 
 func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 	// No star sources at all — this isolates the Moon/planet path.
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -5, nil, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, nil, ephemeris.Default(), -5)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestVisibleTonight_MoonAppearsWhenBright(t *testing.T) {
 // moonNote's illumination/separation path, which is where the direct
 // eph.Position call lives.
 func TestVisibleTonight_NilPlanetProviderDoesNotPanic(t *testing.T) {
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -5, nil, nil)
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, nil, nil, -5)
 	if err != nil {
 		t.Fatalf("VisibleTonight(nil planetProvider): %v", err)
 	}
@@ -343,7 +343,7 @@ func TestVisibleTonight_NilPlanetProviderDoesNotPanic(t *testing.T) {
 func TestVisibleTonight_SortedByApparentMag(t *testing.T) {
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -1, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), -1)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestVisibleTonight_ExtinctionCanPushBorderlineStarOverMagLimit(t *testing.T
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{borderline}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, magLimit, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), magLimit)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}
@@ -409,7 +409,7 @@ func TestVisibleTonight_WithMinAltitude(t *testing.T) {
 
 	site := quintaCalixtoSite(t)
 
-	loose, err := plan.VisibleTonight(context.Background(), site, testNight, 2, sources(), ephemeris.Default())
+	loose, err := plan.VisibleTonight(context.Background(), site, testNight, sources(), ephemeris.Default(), 2)
 	if err != nil {
 		t.Fatalf("VisibleTonight (default threshold): %v", err)
 	}
@@ -418,7 +418,7 @@ func TestVisibleTonight_WithMinAltitude(t *testing.T) {
 		t.Fatalf("expected Sirius visible at the default (near-0°) threshold, got %+v", loose)
 	}
 
-	tight, err := plan.VisibleTonight(context.Background(), site, testNight, 2, sources(), ephemeris.Default(),
+	tight, err := plan.VisibleTonight(context.Background(), site, testNight, sources(), ephemeris.Default(), 2,
 		plan.WithMinAltitude(angle.Deg(80)))
 	if err != nil {
 		t.Fatalf("VisibleTonight (80° threshold): %v", err)
@@ -434,7 +434,7 @@ func TestVisibleTonight_EmptySourcesAndNoPlanetsStillSucceeds(t *testing.T) {
 	// can't support any planet (ephemeris.Default() is Sun/Moon-only, and
 	// mag -30 excludes even the Moon) should return an empty, error-free
 	// result — not a panic or a spurious error.
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, -30, nil, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, nil, ephemeris.Default(), -30)
 	if err != nil {
 		t.Fatalf("VisibleTonight: %v", err)
 	}

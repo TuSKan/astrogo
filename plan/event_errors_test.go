@@ -38,15 +38,17 @@ func TestEventSearchesReturnEveryProviderFailure(t *testing.T) {
 		//
 		// Sunrise at Barcelona, 05:40:41 UTC.
 		"SunEvents, a rise": func(prov eph.Provider) (int, error) {
-			events, err := SunEvents(time.Date(2026, 9, 24, 5, 30, 0, 0, time.LocationUTC),
-				time.Date(2026, 9, 24, 5, 50, 0, 0, time.LocationUTC), site, prov)
+			events, err := SunEvents(
+				site, Window{Start: time.Date(2026, 9, 24, 5, 30, 0, 0, time.LocationUTC), End: time.Date(2026, 9, 24, 5, 50, 0, 0, time.LocationUTC)},
+				prov)
 
 			return len(events), err
 		},
 		// The Sun's transit there, 11:43:20 UTC.
 		"SunEvents, a transit": func(prov eph.Provider) (int, error) {
-			events, err := SunEvents(time.Date(2026, 9, 24, 11, 35, 0, 0, time.LocationUTC),
-				time.Date(2026, 9, 24, 11, 55, 0, 0, time.LocationUTC), site, prov)
+			events, err := SunEvents(
+				site, Window{Start: time.Date(2026, 9, 24, 11, 35, 0, 0, time.LocationUTC), End: time.Date(2026, 9, 24, 11, 55, 0, 0, time.LocationUTC)},
+				prov)
 
 			return len(events), err
 		},
@@ -54,14 +56,14 @@ func TestEventSearchesReturnEveryProviderFailure(t *testing.T) {
 		"lunar phases": func(prov eph.Provider) (int, error) {
 			events, err := NewEventSolver(unit.Hours(6), unit.Seconds(1)).Find(EventSpec{
 				Family: EventFamilyIllumination, Kind: EventAnyPhase, Target: NewMoon(prov),
-			}, time.Date(2026, 9, 18, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 19, 12, 0, 0, 0, time.LocationUTC))
+			}, Window{Start: time.Date(2026, 9, 18, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 9, 19, 12, 0, 0, 0, time.LocationUTC)})
 
 			return len(events), err
 		},
 		// Mercury's greatest eastern elongation, 2026-06-15 19:59 UTC.
 		"GreatestElongations": func(prov eph.Provider) (int, error) {
-			events, err := GreatestElongations(time.Date(2026, 6, 15, 12, 0, 0, 0, time.LocationUTC),
-				time.Date(2026, 6, 16, 6, 0, 0, 0, time.LocationUTC), NewMercury(prov), NewSun(prov))
+			events, err := GreatestElongations(
+				NewMercury(prov), NewSun(prov), Window{Start: time.Date(2026, 6, 15, 12, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 6, 16, 6, 0, 0, 0, time.LocationUTC)})
 
 			return len(events), err
 		},

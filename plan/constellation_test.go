@@ -124,7 +124,7 @@ func TestNewConstellation_GetDetailsAndWindows(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(unit.Hours(24))
 
-	if _, err := ObservableWindows(c, start, end, unit.Minutes(10), site); err != nil {
+	if _, err := ObservableWindows(c, site, Window{Start: start, End: end}, unit.Minutes(10)); err != nil {
 		t.Fatalf("ObservableWindows: %v", err)
 	}
 }

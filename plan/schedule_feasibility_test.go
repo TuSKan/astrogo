@@ -5,7 +5,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -15,15 +14,15 @@ import (
 // it depend on the epoch.
 type pairTransition struct{ a, b string }
 
-func (m pairTransition) Overhead(tr Transition) (time.Duration, error) {
+func (m pairTransition) Overhead(tr Transition) (unit.Duration, error) {
 	if tr.FromBlock != nil {
 		from, to := tr.FromBlock.ID, tr.ToBlock.ID
 		if (from == m.a && to == m.b) || (from == m.b && to == m.a) {
-			return 30 * time.Minute, nil
+			return unit.Minutes(30), nil
 		}
 	}
 
-	return time.Minute, nil
+	return unit.Minutes(1), nil
 }
 
 // assertExecutable checks the property a schedule exists to have: every block
@@ -85,7 +84,7 @@ func TestSwapOptimizedLeavesTimeForEverySlew(t *testing.T) {
 	window := Window{Start: start, End: start.Add(unit.Minutes(65))}
 	star := NewStar("T", angle.Zero(), angle.Zero())
 	block := func(id string, priority float64) *Block {
-		return &Block{ID: id, Target: star, Duration: 20 * time.Minute, Priority: priority}
+		return &Block{ID: id, Target: star, Duration: unit.Minutes(20), Priority: priority}
 	}
 
 	model := pairTransition{"X", "B"}
@@ -110,27 +109,27 @@ func TestInsertPassLeavesTimeForTheNextSlew(t *testing.T) {
 	start := window.Start
 	star := NewStar("T", angle.Zero(), angle.Zero())
 
-	at := func(id string, from, to time.Duration) ScheduledBlock {
+	at := func(id string, from, to unit.Duration) ScheduledBlock {
 		return ScheduledBlock{
 			Block: &Block{ID: id, Target: star, Duration: to - from},
 			Window: Window{
-				Start: start.Add(time.FromGoDuration(from)),
-				End:   start.Add(time.FromGoDuration(to)),
+				Start: start.Add(from),
+				End:   start.Add(to),
 			},
-			SetupTime: time.Minute,
+			SetupTime: unit.Minutes(1),
 		}
 	}
 
 	model := pairTransition{"U", "N"}
 	sched := &Schedule{
 		Window: window,
-		Blocks: []ScheduledBlock{at("P", time.Minute, 21*time.Minute), at("N", 31*time.Minute, 51*time.Minute)},
+		Blocks: []ScheduledBlock{at("P", unit.Minutes(1), unit.Minutes(21)), at("N", unit.Minutes(31), unit.Minutes(51))},
 		Unscheduled: []UnscheduledBlock{{
-			Block: &Block{ID: "U", Target: star, Duration: 5 * time.Minute},
+			Block: &Block{ID: "U", Target: star, Duration: unit.Minutes(5)},
 		}},
 	}
 
-	inserted, err := (&SwapOptimizedStrategy{}).insertPass(sched, planner, window, model, time.Minute, plannerContexts(t, planner, window.Start), nil)
+	inserted, err := (&SwapOptimizedStrategy{}).insertPass(sched, planner, window, model, unit.Minutes(1), plannerContexts(t, planner, window.Start), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

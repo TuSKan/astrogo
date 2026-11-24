@@ -35,27 +35,27 @@ func main() {
 
 	// 2. Configure Transition Overheads
 	transition := &plan.BasicTransitionModel{
-		BaseSetup:           1 * time.Minute,
+		BaseSetup:           unit.Minutes(1),
 		SlewRate:            unit.DegreesPerSec(2.0), // degrees per second
-		FilterChangePenalty: 30 * time.Second,
+		FilterChangePenalty: unit.Seconds(30),
 	}
 
 	// Create a scheduler using a simple priority-based strategy checking every 5 mins
-	scheduler := plan.NewScheduler(planner, &plan.PriorityStrategy{Step: 5 * time.Minute}, transition)
+	scheduler := plan.NewScheduler(planner, &plan.PriorityStrategy{Step: unit.Minutes(5)}, transition)
 
 	// 3. Define the Observing Blocks (Our "Plan")
 	blocks := []*plan.Block{
 		{
 			ID:       "Alpha Centauri",
 			Target:   plan.NewStar("Alpha Cen", angle.Hour(14.66), angle.Deg(-60.83)),
-			Duration: 30 * time.Minute,
+			Duration: unit.Minutes(30),
 			Priority: 2.0, // High priority
 			Config:   plan.Configuration{Filter: "V"},
 		},
 		{
 			ID:       "Omega Centauri",
 			Target:   plan.NewStar("Omega Cen", angle.Hour(13.44), angle.Deg(-47.47)),
-			Duration: 45 * time.Minute,
+			Duration: unit.Minutes(45),
 			Priority: 1.0, // Lower priority
 			Config:   plan.Configuration{Filter: "R"},
 		},

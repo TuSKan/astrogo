@@ -121,7 +121,7 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		eval, err := IsObservable(mars, tm, site)
+		eval, err := IsObservable(mars, site, tm)
 		testutil.AssertNoError(t, err)
 
 		if eval.AltAz.Alt().Degrees() < 10 {

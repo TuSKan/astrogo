@@ -56,7 +56,7 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 
 			s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: tc.maxIter}
 
-			got, val, err := s.FindRoot(eval, t1, t2)
+			got, val, err := s.FindRoot(eval, plan.Window{Start: t1, End: t2})
 
 			switch {
 			case tc.wantErr && !errors.Is(err, plan.ErrNoConvergence):
@@ -109,7 +109,7 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 
 			s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: tc.maxIter}
 
-			got, val, err := s.FindExtremum(eval, t1, t3, true)
+			got, val, err := s.FindExtremum(eval, plan.Window{Start: t1, End: t3}, true)
 
 			switch {
 			case tc.wantErr && !errors.Is(err, plan.ErrNoConvergence):
@@ -144,7 +144,7 @@ func TestNoConvergenceNamesWhatRanOut(t *testing.T) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 
-	_, _, err := s.FindRoot(eval, t1, t1.Add(unit.Days(1)))
+	_, _, err := s.FindRoot(eval, plan.Window{Start: t1, End: t1.Add(unit.Days(1))})
 	if err == nil {
 		t.Fatal("expected ErrNoConvergence")
 	}

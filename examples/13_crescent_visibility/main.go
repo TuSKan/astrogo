@@ -62,7 +62,7 @@ func main() {
 	// Yallop's best time between them, 4/9 of the lag after sunset, when
 	// the sky is dark enough to see a thin crescent but the Moon is still
 	// above the horizon.
-	result, err := plan.CrescentVisibility(newMoon.Time, site, prov)
+	result, err := plan.CrescentVisibility(site, newMoon.Time, prov)
 	if err != nil {
 		log.Fatalf("CrescentVisibility: %v", err)
 	}

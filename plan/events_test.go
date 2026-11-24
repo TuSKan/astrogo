@@ -31,7 +31,8 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 		Target:    obj,
 		Observer:  site,
 		Threshold: angle.Deg(20),
-	}, start, end)
+	}, Window{Start: start, End: end})
+
 	testutil.AssertNoError(t, err)
 
 	if len(events) == 0 {
@@ -68,7 +69,8 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 		Target:    obj,
 		Observer:  site,
 		Threshold: angle.Deg(10),
-	}, start, end)
+	}, Window{Start: start, End: end})
+
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
@@ -93,7 +95,8 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 		Target:    obj,
 		Observer:  site,
 		Threshold: angle.Deg(0),
-	}, start, end)
+	}, Window{Start: start, End: end})
+
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
@@ -113,7 +116,7 @@ func TestSunEvents(t *testing.T) {
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(unit.Hours(24))
 
-	events, err := SunEvents(start, end, site, eph)
+	events, err := SunEvents(site, Window{Start: start, End: end}, eph)
 	testutil.AssertNoError(t, err)
 
 	hasRise, hasSet, hasTransit := false, false, false
@@ -146,7 +149,7 @@ func TestSunEvents_Polar(t *testing.T) {
 	start := time.FromJD(2451727.5, time.UTC)
 	end := start.Add(unit.Hours(24))
 
-	events, err := SunEvents(start, end, site, eph)
+	events, err := SunEvents(site, Window{Start: start, End: end}, eph)
 	testutil.AssertNoError(t, err)
 
 	for _, e := range events {
@@ -164,7 +167,7 @@ func TestMoonEvents(t *testing.T) {
 	start := time.FromJD(2451545.0, time.UTC)
 	end := start.Add(unit.Hours(24))
 
-	events, err := MoonEvents(start, end, site, eph)
+	events, err := MoonEvents(site, Window{Start: start, End: end}, eph)
 	testutil.AssertNoError(t, err)
 
 	// The upper limb is on the horizon: the center sits the Moon's
@@ -191,7 +194,7 @@ func TestSunriseSunset(t *testing.T) {
 	start := time.FromJD(2451544.5, time.UTC)
 	end := start.Add(unit.Hours(24))
 
-	rise, set, err := SunriseSunset(start, end, site, eph)
+	rise, set, err := SunriseSunset(site, Window{Start: start, End: end}, eph)
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil {
@@ -217,7 +220,7 @@ func TestTwilightEvents(t *testing.T) {
 
 	for _, kind := range kinds {
 		t.Run(kind.String(), func(t *testing.T) {
-			events, err := TwilightEvents(start, end, site, eph, kind)
+			events, err := TwilightEvents(site, Window{Start: start, End: end}, eph, kind)
 			testutil.AssertNoError(t, err)
 
 			if len(events) == 0 {
@@ -254,7 +257,7 @@ func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
 	start := time.FromJD(2451544.5, time.UTC) // local midday-ish
 	end := start.Add(unit.Hours(36))
 
-	events, err := TwilightEvents(start, end, site, eph, AstronomicalTwilight)
+	events, err := TwilightEvents(site, Window{Start: start, End: end}, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
 	var fullyPaired int
@@ -292,7 +295,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 	// strictly between them -- guaranteeing the leading result in the
 	// narrowed window is Dawn-only (its dusk fell before the new start).
 	wide := time.FromJD(2451544.5, time.UTC)
-	events, err := TwilightEvents(wide, wide.Add(unit.Hours(36)), site, eph, AstronomicalTwilight)
+	events, err := TwilightEvents(site, Window{Start: wide, End: wide.Add(unit.Hours(36))}, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
 	var pair *TwilightEvent
@@ -311,7 +314,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 
 	mid := pair.Dusk.Time.Add(pair.Dawn.Time.Sub(pair.Dusk.Time) / 2)
 
-	narrowed, err := TwilightEvents(mid, wide.Add(unit.Hours(36)), site, eph, AstronomicalTwilight)
+	narrowed, err := TwilightEvents(site, Window{Start: mid, End: wide.Add(unit.Hours(36))}, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
 	if len(narrowed) == 0 {
@@ -425,7 +428,7 @@ func TestTwilight_Sequence(t *testing.T) {
 	nights := map[TwilightKind]Night{}
 
 	for _, kind := range []TwilightKind{CivilTwilight, NauticalTwilight, AstronomicalTwilight} {
-		n, err := NightOf(noon, site, eph, kind)
+		n, err := NightOf(site, noon, eph, kind)
 		if err != nil {
 			t.Fatalf("NightOf %s: %v", kind, err)
 		}
@@ -437,7 +440,7 @@ func TestTwilight_Sequence(t *testing.T) {
 		nights[kind] = n
 	}
 
-	rise, set, err := SunriseSunset(noon, noon.Add(unit.Hours(24)), site, eph)
+	rise, set, err := SunriseSunset(site, Window{Start: noon, End: noon.Add(unit.Hours(24))}, eph)
 	if err != nil || rise == nil || set == nil {
 		t.Fatalf("SunriseSunset: %v, %v, %v", rise, set, err)
 	}
@@ -472,11 +475,11 @@ func TestTwilight_HighLat(t *testing.T) {
 
 	noon := time.FromJD(2451728.0, time.UTC) // 2000-07-02 12:00 UTC
 
-	if n, err := NightOf(noon, site, eph, AstronomicalTwilight); !errors.Is(err, ErrNoTwilight) {
+	if n, err := NightOf(site, noon, eph, AstronomicalTwilight); !errors.Is(err, ErrNoTwilight) {
 		t.Errorf("NightOf in a London summer = %+v, %v, want ErrNoTwilight", n, err)
 	}
 
-	if _, err := NightOf(noon, site, eph, NauticalTwilight); err != nil {
+	if _, err := NightOf(site, noon, eph, NauticalTwilight); err != nil {
 		t.Errorf("NightOf nautical in a London summer: %v", err)
 	}
 }
@@ -534,7 +537,8 @@ func TestEventSolver_Find_UnimplementedFamily(t *testing.T) {
 		Kind:   EventConjunction,
 		Target: t1,
 		Other:  t2,
-	}, start, end)
+	}, Window{Start: start, End: end})
+
 	if !errors.Is(err, ErrFamilyNotImpl) {
 		t.Errorf("expected ErrFamilyNotImpl for EventFamilyOverlap, got %v", err)
 	}
@@ -556,7 +560,7 @@ func TestSolveGeometry_Conjunction(t *testing.T) {
 		Other:  t2,
 	}
 
-	events, err := solver.Find(spec, start, end)
+	events, err := solver.Find(spec, Window{Start: start, End: end})
 	testutil.AssertNoError(t, err)
 
 	if len(events) != 1 {
@@ -588,7 +592,7 @@ func TestSolveGeometry_Opposition(t *testing.T) {
 		Other:  t2,
 	}
 
-	events, err := solver.Find(spec, start, end)
+	events, err := solver.Find(spec, Window{Start: start, End: end})
 	testutil.AssertNoError(t, err)
 
 	if len(events) != 1 {
@@ -651,7 +655,7 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 		Other:  t2,
 	}
 
-	events, err := solver.Find(spec, start, end)
+	events, err := solver.Find(spec, Window{Start: start, End: end})
 	testutil.AssertNoError(t, err)
 
 	if len(events) != 1 {

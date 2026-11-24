@@ -93,18 +93,18 @@ type LimitingMagnitudeConstraint struct {
 var _ ConstraintCtx = LimitingMagnitudeConstraint{}
 
 // Check evaluates the constraint, building a coord.Context for (t, site).
-func (c LimitingMagnitudeConstraint) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c LimitingMagnitudeConstraint) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates the constraint using a pre-built coord.Context.
 func (c LimitingMagnitudeConstraint) CheckCtx(
-	obj Observable, _ time.Time, _ *Site, ctx *coord.Context,
+	obj Observable, _ *Site, _ time.Time, ctx *coord.Context,
 ) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget

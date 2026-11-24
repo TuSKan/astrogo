@@ -45,7 +45,7 @@ func TestSatellitePassEventsSayWhetherTheSatelliteIsSunlit(t *testing.T) {
 
 	start := time.Date(2026, time.April, 19, 12, 0, 0, 0, time.LocationUTC)
 
-	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, start.Add(unit.Days(1)), site, angle.Deg(10))
+	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, site), Window{Start: start, End: start.Add(unit.Days(1))}, WithMinElevation(angle.Deg(10)))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}

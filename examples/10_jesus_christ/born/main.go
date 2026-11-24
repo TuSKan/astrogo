@@ -63,7 +63,7 @@ func main() {
 	s1 := time.DateJulianCal(-6, 1, 1, 0, 0, 0)
 	e1 := time.DateJulianCal(-5, 1, 1, 0, 0, 0)
 
-	conjs, err := plan.Conjunctions(s1, e1, jupiter, saturn)
+	conjs, err := plan.Conjunctions(jupiter, saturn, plan.Window{Start: s1, End: e1})
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
 	} else if len(conjs) == 0 {
@@ -101,7 +101,7 @@ func main() {
 	// ── Ecliptic longitude conjunctions (classical definition) ──
 	fmt.Println("\n  Ecliptic longitude conjunctions (classical definition, Δλ=0):")
 
-	eclConjs, err := plan.ConjunctionsEcliptic(s1, e1, jupiter, saturn)
+	eclConjs, err := plan.ConjunctionsEcliptic(jupiter, saturn, plan.Window{Start: s1, End: e1})
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
 	} else {
@@ -114,7 +114,7 @@ func main() {
 	// ── Appulses (minimum angular separation) ──
 	fmt.Println("\n  Appulses (closest visual approach):")
 
-	appulses, err := plan.Appulses(s1, e1, jupiter, saturn)
+	appulses, err := plan.Appulses(jupiter, saturn, plan.Window{Start: s1, End: e1})
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
 	} else {
@@ -134,7 +134,7 @@ func main() {
 	s2 := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
 	e2 := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
-	conjs2, err := plan.Conjunctions(s2, e2, jupiter, venus)
+	conjs2, err := plan.Conjunctions(jupiter, venus, plan.Window{Start: s2, End: e2})
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
 	} else if len(conjs2) == 0 {
@@ -166,7 +166,7 @@ func main() {
 	s3 := time.DateJulianCal(-2, 1, 1, 0, 0, 0)
 	e3 := time.DateJulianCal(0, 1, 1, 0, 0, 0)
 
-	conjs3, err := plan.Conjunctions(s3, e3, jupiter, saturn)
+	conjs3, err := plan.Conjunctions(jupiter, saturn, plan.Window{Start: s3, End: e3})
 	if err != nil {
 		fmt.Printf("  Error: %v\n", err)
 	} else if len(conjs3) == 0 {

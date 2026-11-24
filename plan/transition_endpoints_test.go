@@ -59,7 +59,7 @@ func TestNewTransitionReportsAnEndItCannotObserve(t *testing.T) {
 		{"from AltAz", moving, star},
 		{"to AltAz", star, moving},
 	} {
-		_, err := NewTransition(c.from, c.to, start, start, site)
+		_, err := NewTransition(c.from, c.to, site, Window{Start: start, End: start})
 		if !errors.Is(err, errMovingBodyFails) || !strings.Contains(err.Error(), c.name) {
 			t.Errorf("%s: NewTransition returned %v, want the %s failure", c.name, err, c.name)
 		}
@@ -93,7 +93,7 @@ func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {
 		build func(toTime time.Time) (Transition, error)
 	}{
 		{"NewTransition", func(toTime time.Time) (Transition, error) {
-			return NewTransition(from, to, start, toTime, site)
+			return NewTransition(from, to, site, Window{Start: start, End: toTime})
 		}},
 		{"a strategy's moving Context", func(toTime time.Time) (Transition, error) {
 			return newTransition(from, to, start, toTime, site, ctxAt)

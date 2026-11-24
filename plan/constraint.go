@@ -36,7 +36,7 @@ func (r Result) String() string {
 // Constraint defines the interface for an observing requirement.
 type Constraint interface {
 	// Check evaluates the constraint for a given target, time, and site.
-	Check(obj Observable, t time.Time, site *Site) (Result, error)
+	Check(obj Observable, site *Site, t time.Time) (Result, error)
 }
 
 // ConstraintCtx is an optional extension of Constraint that accepts a
@@ -56,7 +56,7 @@ type ConstraintCtx interface {
 	// constraint that needs another instant takes a copy (c := *ctx) and moves
 	// that; calling ctx.SetTime on the one it was given corrupts what everything
 	// else sees, and is a data race under RankObservables.
-	CheckCtx(obj Observable, t time.Time, site *Site, ctx *coord.Context) (Result, error)
+	CheckCtx(obj Observable, site *Site, t time.Time, ctx *coord.Context) (Result, error)
 }
 
 // Compile-time assertions that every built-in constraint actually
@@ -79,17 +79,17 @@ type Altitude struct {
 }
 
 // Check evaluates whether the target's altitude meets the threshold.
-func (c Altitude) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c Altitude) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates altitude using a pre-built coord.Context.
-func (c Altitude) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c Altitude) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
 	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return Result{}, err
@@ -117,17 +117,17 @@ type Airmass struct {
 }
 
 // Check evaluates whether the target's airmass is within the threshold.
-func (c Airmass) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c Airmass) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates airmass using a pre-built coord.Context.
-func (c Airmass) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c Airmass) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
 	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
 		if errors.Is(err, atmosphere.ErrBelowHorizon) {
@@ -160,18 +160,18 @@ type Sun struct {
 }
 
 // Check evaluates whether the Sun's altitude meets the threshold.
-func (c Sun) Check(_ Observable, t time.Time, site *Site) (Result, error) {
+func (c Sun) Check(_ Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(nil, t, site, ctx)
+	return c.CheckCtx(nil, site, t, ctx)
 }
 
 // CheckCtx evaluates Sun altitude using a pre-built coord.Context.
 // The obj parameter is ignored — the Sun position is always computed internally.
-func (c Sun) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c Sun) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 
@@ -211,19 +211,19 @@ type MoonSep struct {
 }
 
 // Check evaluates Moon separation for a given target and time.
-func (c MoonSep) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c MoonSep) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates Moon separation using a pre-built coord.Context. The
 // separation is the one the site sees, from both positions as the observer
 // has them (see topocentricPosition).
-func (c MoonSep) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c MoonSep) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 
@@ -289,17 +289,17 @@ type MoonIllum struct {
 }
 
 // Check evaluates Moon illumination for a given target and time.
-func (c MoonIllum) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (c MoonIllum) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return c.CheckCtx(obj, t, site, ctx)
+	return c.CheckCtx(obj, site, t, ctx)
 }
 
 // CheckCtx evaluates Moon illumination using a pre-built coord.Context.
-func (c MoonIllum) CheckCtx(obj Observable, t time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (c MoonIllum) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 

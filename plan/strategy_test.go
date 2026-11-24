@@ -26,9 +26,9 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
-	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 1.0}
-	b2 := &Block{ID: "B2", Target: NewStar("T2", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}
-	b3 := &Block{ID: "B3", Target: NewStar("T3", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute, Priority: 3.0}
+	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 1.0}
+	b2 := &Block{ID: "B2", Target: NewStar("T2", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 5.0}
+	b3 := &Block{ID: "B3", Target: NewStar("T3", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10), Priority: 3.0}
 
 	// SwapOptimized with PriorityStrategy base
 	strategy := &SwapOptimizedStrategy{
@@ -99,12 +99,12 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 	b1 := &Block{
 		ID:          "Failing",
 		Target:      NewStar("T1", angle.Zero(), angle.Zero()),
-		Duration:    10 * time.Minute,
+		Duration:    unit.Minutes(10),
 		Priority:    10.0,
 		Constraints: []Constraint{mockConstraint{pass: false}},
 	}
-	b2 := &Block{ID: "B2", Target: NewStar("T2", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 5.0}
-	b3 := &Block{ID: "B3", Target: NewStar("T3", angle.Zero(), angle.Zero()), Duration: 10 * time.Minute, Priority: 1.0}
+	b2 := &Block{ID: "B2", Target: NewStar("T2", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 5.0}
+	b3 := &Block{ID: "B3", Target: NewStar("T3", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10), Priority: 1.0}
 
 	strategy := &SwapOptimizedStrategy{
 		Base:      &PriorityStrategy{},
@@ -157,8 +157,10 @@ func TestScheduleGaps(t *testing.T) {
 		t.Error("first gap should have nil prevBlock")
 	}
 
-	expectedDur := 10 * time.Minute
-	if gaps[0].window.Duration() != expectedDur {
+	expectedDur := unit.Minutes(10)
+	// A window's Duration is a difference of two Julian dates, exact to
+	// microseconds, not to the last bit.
+	if d := gaps[0].window.Duration() - expectedDur; d.Abs() > unit.Seconds(1e-3) {
 		t.Errorf("first gap duration: got %v, want %v", gaps[0].window.Duration(), expectedDur)
 	}
 
@@ -183,7 +185,7 @@ func TestEmptyScheduleGaps(t *testing.T) {
 		t.Fatalf("expected 1 gap for empty schedule, got %d", len(gaps))
 	}
 
-	if gaps[0].window.Duration() != 1*time.Hour {
+	if d := gaps[0].window.Duration() - unit.Hours(1); d.Abs() > unit.Seconds(1e-3) {
 		t.Errorf("gap duration: got %v, want 1h", gaps[0].window.Duration())
 	}
 }
@@ -199,7 +201,7 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 	start := time.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
-	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: 20 * time.Minute, Priority: 1.0}
+	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 1.0}
 
 	strategy := &SwapOptimizedStrategy{} // nil Base → defaults to PriorityStrategy
 
@@ -222,7 +224,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 	b := &Block{
 		ID:       "B1",
 		Target:   NewStar("T1", angle.Zero(), angle.Zero()),
-		Duration: 20 * time.Minute,
+		Duration: unit.Minutes(20),
 		Priority: 2.0,
 	}
 

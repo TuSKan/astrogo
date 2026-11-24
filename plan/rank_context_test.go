@@ -61,16 +61,16 @@ type contextRecorder struct {
 	seen map[*coord.Context]struct{}
 }
 
-func (r *contextRecorder) Check(obj Observable, t time.Time, site *Site) (Result, error) {
+func (r *contextRecorder) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 	ctx, err := coord.NewContext(t, site.Location(), site.Refraction())
 	if err != nil {
 		return Result{}, fmt.Errorf("context: %w", err)
 	}
 
-	return r.CheckCtx(obj, t, site, ctx)
+	return r.CheckCtx(obj, site, t, ctx)
 }
 
-func (r *contextRecorder) CheckCtx(_ Observable, _ time.Time, _ *Site, ctx *coord.Context) (Result, error) {
+func (r *contextRecorder) CheckCtx(_ Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
 	r.mu.Lock()
 	r.seen[ctx] = struct{}{}
 	r.mu.Unlock()
@@ -84,7 +84,7 @@ func (r *contextRecorder) CheckCtx(_ Observable, _ time.Time, _ *Site, ctx *coor
 func TestRankObservablesBuildsOneContext(t *testing.T) {
 	rec := &contextRecorder{seen: map[*coord.Context]struct{}{}}
 
-	ranked, err := RankObservables(rcObjects(200), rcEpoch(), rcSite(t), rec)
+	ranked, err := RankObservables(rcObjects(200), rcSite(t), rcEpoch(), rec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestRankObservablesMatchesScoringEachTarget(t *testing.T) {
 		t.Fatal("Jupiter does not score: the fixture no longer has a moving body in the ranking")
 	}
 
-	got, err := RankObservables(objs, when, site, constraints...)
+	got, err := RankObservables(objs, site, when, constraints...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestRankObservablesMatchesScoringEachTarget(t *testing.T) {
 // TestRankObservablesEmptyListBuildsNothing: nothing to score is not an
 // occasion to build a Context, or to need a site.
 func TestRankObservablesEmptyListBuildsNothing(t *testing.T) {
-	ranked, err := RankObservables(nil, rcEpoch(), nil)
+	ranked, err := RankObservables(nil, nil, rcEpoch())
 	if err != nil {
 		t.Fatal(err)
 	}

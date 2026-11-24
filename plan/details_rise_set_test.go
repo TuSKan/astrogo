@@ -48,9 +48,15 @@ func TestDetailsRiseAndSetAreTheEventAPIs(t *testing.T) {
 		target plan.Observable
 		events func(start, end time.Time) ([]plan.Event, error)
 	}{
-		{"Sun", plan.NewSun(prov), func(s, e time.Time) ([]plan.Event, error) { return plan.SunEvents(s, e, site, prov) }},
-		{"Moon", plan.NewMoon(prov), func(s, e time.Time) ([]plan.Event, error) { return plan.MoonEvents(s, e, site, prov) }},
-		{"Sirius", sirius, func(s, e time.Time) ([]plan.Event, error) { return plan.VisibilityEvents(s, e, sirius, site) }},
+		{"Sun", plan.NewSun(prov), func(s, e time.Time) ([]plan.Event, error) {
+			return plan.SunEvents(site, plan.Window{Start: s, End: e}, prov)
+		}},
+		{"Moon", plan.NewMoon(prov), func(s, e time.Time) ([]plan.Event, error) {
+			return plan.MoonEvents(site, plan.Window{Start: s, End: e}, prov)
+		}},
+		{"Sirius", sirius, func(s, e time.Time) ([]plan.Event, error) {
+			return plan.VisibilityEvents(sirius, site, plan.Window{Start: s, End: e})
+		}},
 	} {
 		start := time.Date(2026, time.March, 3, 0, 0, 0, 0, time.LocationUTC)
 		end := start.Add(unit.Days(3))

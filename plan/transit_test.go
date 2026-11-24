@@ -56,8 +56,9 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	moon, err := MoonEvents(time.Date(2026, 1, 8, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, 1, 11, 0, 0, 0, 0, time.LocationUTC), north75, prov)
+	moon, err := MoonEvents(
+		north75, Window{Start: time.Date(2026, 1, 8, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 1, 11, 0, 0, 0, 0, time.LocationUTC)},
+		prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 
 	day := time.Date(2026, 1, 28, 0, 0, 0, 0, time.LocationUTC)
 
-	sun, err := SunEvents(day, day.Add(unit.Days(1)), north89, prov)
+	sun, err := SunEvents(north89, Window{Start: day, End: day.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +100,7 @@ func TestTransitInTheWindowsFirstStep(t *testing.T) {
 	// The Sun transits at 10:45:36, three minutes in.
 	start := time.Date(2026, 9, 24, 10, 42, 36, 0, time.LocationUTC)
 
-	sun, err := SunEvents(start, start.Add(unit.Hours(12)), brno, prov)
+	sun, err := SunEvents(brno, Window{Start: start, End: start.Add(unit.Hours(12))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestTransitInTheWindowsFirstStep(t *testing.T) {
 	// the day.
 	start = time.Date(2026, 3, 31, 22, 0, 0, 0, time.LocationUTC)
 
-	moon, err := MoonEvents(start, start.Add(unit.Hours(24)), brno, prov)
+	moon, err := MoonEvents(brno, Window{Start: start, End: start.Add(unit.Hours(24))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +145,7 @@ func TestTransitsDoNotDependOnTheStep(t *testing.T) {
 	runs := make([][]time.Time, 0, len(steps))
 
 	for _, step := range steps {
-		events, err := NewEventSolver(step, unit.Seconds(1)).Find(spec, start, end)
+		events, err := NewEventSolver(step, unit.Seconds(1)).Find(spec, Window{Start: start, End: end})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,7 +179,7 @@ func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := time.Date(2026, 4, 1, 0, 0, 0, 0, time.LocationUTC)
 
-	events, err := MoonEvents(start, end, site, prov)
+	events, err := MoonEvents(site, Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestTransitIsWhereSiderealTimeMeetsRightAscension(t *testing.T) {
 		for _, id := range []eph.ID{eph.Sun, eph.Moon} {
 			events, err := solver.Find(EventSpec{
 				Family: EventFamilyVisibility, Kind: EventTransit, Target: NewPlanet(id.String(), id, prov), Observer: site,
-			}, start, start.Add(unit.Days(3)))
+			}, Window{Start: start, End: start.Add(unit.Days(3))})
 			if err != nil {
 				t.Fatal(err)
 			}

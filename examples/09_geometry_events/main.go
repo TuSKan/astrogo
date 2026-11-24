@@ -69,7 +69,7 @@ func main() {
 	// Conjunction: Mars and Venus having the same Right Ascension
 	fmt.Println("\nConjunctions of Venus and Mars:")
 
-	events, err := plan.Conjunctions(start, end, venus, mars)
+	events, err := plan.Conjunctions(venus, mars, plan.Window{Start: start, End: end})
 	if err != nil {
 		log.Fatalf("failed to find conjunctions: %v", err)
 	}
@@ -86,7 +86,7 @@ func main() {
 	// Greatest Elongation: Venus reaching peak angular distance from the Sun
 	fmt.Println("\nGreatest elongations of Venus:")
 
-	elongEvents, err := plan.GreatestElongations(start, end, venus, sun)
+	elongEvents, err := plan.GreatestElongations(venus, sun, plan.Window{Start: start, End: end})
 	if err != nil {
 		log.Fatalf("failed to find elongation events: %v", err)
 	}
@@ -106,7 +106,7 @@ func main() {
 
 	fmt.Printf("\nConjunctions of Jupiter and Saturn, %d to %d:\n", year, year+20)
 
-	jupSatEvents, err := plan.Conjunctions(start, jupSatEnd, jupiter, saturn)
+	jupSatEvents, err := plan.Conjunctions(jupiter, saturn, plan.Window{Start: start, End: jupSatEnd})
 	if err != nil {
 		log.Fatalf("failed to find Jupiter-Saturn conjunctions: %v", err)
 	}
@@ -125,7 +125,7 @@ func main() {
 	// shadow at maximum, in Earth radii, positive when it passes north of it.
 	fmt.Printf("\nLunar eclipses (visibility from %s):\n", site.Name())
 
-	lunarEclipses, err := plan.LunarEclipses(start, end, prov)
+	lunarEclipses, err := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 	if err != nil {
 		log.Fatalf("failed to find lunar eclipses: %v", err)
 	}
@@ -135,7 +135,7 @@ func main() {
 	}
 
 	for i, ecl := range lunarEclipses {
-		res, err := plan.Altitude{Threshold: angle.Zero()}.Check(moon, ecl.Time, site)
+		res, err := plan.Altitude{Threshold: angle.Zero()}.Check(moon, site, ecl.Time)
 		if err != nil {
 			log.Fatalf("moon altitude: %v", err)
 		}
@@ -155,7 +155,7 @@ func main() {
 	// only the instant of greatest eclipse.
 	fmt.Println("\nSolar eclipses (instant of greatest eclipse):")
 
-	solarEclipses, err := plan.SolarEclipses(start, end, prov)
+	solarEclipses, err := plan.SolarEclipses(plan.Window{Start: start, End: end}, prov)
 	if err != nil {
 		log.Fatalf("failed to find solar eclipses: %v", err)
 	}

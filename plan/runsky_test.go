@@ -259,7 +259,7 @@ func TestSchedulingWithTheRunsSkyIsBitIdentical(t *testing.T) {
 	}{{0, false}, {3, false}, {5, true}} {
 		at := start.Add(unit.Hours(premise.hours))
 
-		r, err := moonSep.Check(trailing, at, site)
+		r, err := moonSep.Check(trailing, site, at)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,7 +275,7 @@ func TestSchedulingWithTheRunsSkyIsBitIdentical(t *testing.T) {
 	blocks := func() []*Block {
 		bs := make([]*Block, len(targets))
 		for i, tgt := range targets {
-			bs[i] = &Block{ID: tgt.Name(), Target: tgt, Duration: 20 * time.Minute, Priority: float64(len(targets) - i)}
+			bs[i] = &Block{ID: tgt.Name(), Target: tgt, Duration: unit.Minutes(20), Priority: float64(len(targets) - i)}
 		}
 
 		return bs

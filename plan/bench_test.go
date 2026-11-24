@@ -36,7 +36,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		if _, err := VisibleIntervals(obj, site, start, end, 10*time.Minute, angle.Deg(20)); err != nil {
+		if _, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(10), angle.Deg(20)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -50,7 +50,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
-		if _, err := VisibleIntervals(obj, site, start, end, 1*time.Minute, angle.Deg(20)); err != nil {
+		if _, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(1), angle.Deg(20)); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -68,7 +68,7 @@ func BenchmarkOppositions(b *testing.B) {
 	end := start.Add(unit.Days(365))
 
 	for b.Loop() {
-		if _, err := Oppositions(start, end, mars, sun); err != nil {
+		if _, err := Oppositions(mars, sun, Window{Start: start, End: end}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -90,7 +90,7 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 	}
 
 	for b.Loop() {
-		if _, err := solver.Find(spec, start, end); err != nil {
+		if _, err := solver.Find(spec, Window{Start: start, End: end}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -107,7 +107,7 @@ func BenchmarkObservableWindows(b *testing.B) {
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
 	for b.Loop() {
-		if _, err := ObservableWindows(obj, start, end, unit.Minutes(5), site, constraints...); err != nil {
+		if _, err := ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(5), constraints...); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -122,7 +122,7 @@ func makeBlocks(n int) []*Block {
 		blocks[i] = &Block{
 			ID:       fmt.Sprintf("B%d", i),
 			Target:   NewStar(fmt.Sprintf("T%d", i), angle.Deg(0), angle.Deg(0)),
-			Duration: 10 * time.Minute,
+			Duration: unit.Minutes(10),
 			Priority: float64(n - i), // descending priority
 		}
 	}
@@ -215,7 +215,7 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	end := start.Add(unit.Days(0.5))
 
 	for b.Loop() {
-		if _, _, err := TransitEstimate(obj, site, start, end); err != nil {
+		if _, _, err := TransitEstimate(obj, site, Window{Start: start, End: end}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -254,18 +254,18 @@ func BenchmarkFortnightEvents(b *testing.B) {
 			day := start.AddDate(0, 0, d)
 			next := day.AddDate(0, 0, 1)
 
-			if _, err := SunEvents(day, next, site, provider); err != nil {
+			if _, err := SunEvents(site, Window{Start: day, End: next}, provider); err != nil {
 				b.Fatal(err)
 			}
 
 			// That evening's night, from local noon.
 			for _, kind := range []TwilightKind{CivilTwilight, NauticalTwilight, AstronomicalTwilight} {
-				if _, err := NightOf(day.Add(unit.Hours(12)), site, provider, kind); err != nil {
+				if _, err := NightOf(site, day.Add(unit.Hours(12)), provider, kind); err != nil {
 					b.Fatal(err)
 				}
 			}
 
-			if _, err := MoonEvents(day, next, site, provider); err != nil {
+			if _, err := MoonEvents(site, Window{Start: day, End: next}, provider); err != nil {
 				b.Fatal(err)
 			}
 		}

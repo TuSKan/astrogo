@@ -21,7 +21,7 @@ func TestMoonPhases_KnownYear(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(365))
 
-	events, err := MoonPhases(start, end, prov)
+	events, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestMoonIllumination_NewAndFull(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(60))
 
-	phases, err := MoonPhases(start, end, prov)
+	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestEclipses_KnownYear(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		find       func(start, end time.Time, prov eph.Provider) ([]EclipseEvent, error)
+		find       func(w Window, prov eph.Provider) ([]EclipseEvent, error)
 		wantType   EclipseType
 		wantString string
 		limitDeg   float64
@@ -202,7 +202,7 @@ func TestEclipses_KnownYear(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			prov := eph.Default()
 
-			eclipses, err := c.find(start, end, prov)
+			eclipses, err := c.find(Window{Start: start, End: end}, prov)
 			if err != nil {
 				t.Fatalf("%s: %v", c.name, err)
 			}
@@ -253,7 +253,7 @@ func TestPhasesFunctions_NilProviderDefaults(t *testing.T) {
 	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
 	end := start.Add(unit.Days(35))
 
-	if _, err := MoonPhases(start, end, nil); err != nil {
+	if _, err := MoonPhases(Window{Start: start, End: end}, nil); err != nil {
 		t.Errorf("MoonPhases(nil): unexpected error: %v", err)
 	}
 
@@ -269,11 +269,11 @@ func TestPhasesFunctions_NilProviderDefaults(t *testing.T) {
 		t.Errorf("Apsides(nil): unexpected error: %v", err)
 	}
 
-	if _, err := LunarEclipses(start, end, nil); err != nil {
+	if _, err := LunarEclipses(Window{Start: start, End: end}, nil); err != nil {
 		t.Errorf("LunarEclipses(nil): unexpected error: %v", err)
 	}
 
-	if _, err := SolarEclipses(start, end, nil); err != nil {
+	if _, err := SolarEclipses(Window{Start: start, End: end}, nil); err != nil {
 		t.Errorf("SolarEclipses(nil): unexpected error: %v", err)
 	}
 }

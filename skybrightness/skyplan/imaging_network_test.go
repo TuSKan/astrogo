@@ -174,7 +174,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 
 	c := plan.LimitingMagnitudeConstraint{Sky: depth, Boolean: true}
 
-	got, err := c.Check(bright, when, planSite)
+	got, err := c.Check(bright, planSite, when)
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 		t.Errorf("a magnitude-8 star was rejected: %v", got)
 	}
 
-	got, err = c.Check(faint, when, planSite)
+	got, err = c.Check(faint, planSite, when)
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}

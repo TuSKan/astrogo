@@ -28,7 +28,7 @@ func TestARefinementStartsFromTheSampledBracket(t *testing.T) {
 		return -1e-7 - at.Sub(a).Seconds()/900, nil
 	}
 
-	if _, _, err := DefaultSolver().FindRoot(f, a, b); !errors.Is(err, ErrBracketingViolated) {
+	if _, _, err := DefaultSolver().FindRoot(f, Window{Start: a, End: b}); !errors.Is(err, ErrBracketingViolated) {
 		t.Fatalf("FindRoot re-evaluating the ends: %v, want ErrBracketingViolated", err)
 	}
 
@@ -107,7 +107,7 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		nights, err := TwilightEvents(start, end, site, prov, AstronomicalTwilight)
+		nights, err := TwilightEvents(site, Window{Start: start, End: end}, prov, AstronomicalTwilight)
 		if err != nil || len(nights) != 1 || nights[0].Dusk == nil || nights[0].Dawn == nil {
 			if failed++; failed <= 3 {
 				t.Errorf("latitude %.10f: %d nights %v, err %v, want one with a dusk and a dawn", lat, len(nights), nights, err)

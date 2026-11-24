@@ -55,7 +55,7 @@ func TestVisibleTonightReportsAnIncompleteResult(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&failingBrightSource{good: sirius}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 2)
 
 	if !errors.Is(err, plan.ErrIncomplete) {
 		t.Errorf("VisibleTonight returned err = %v, want it to wrap ErrIncomplete.\n"+
@@ -89,7 +89,7 @@ func TestVisibleTonightReturnsNilErrorWhenComplete(t *testing.T) {
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius, faint}}}
 
-	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, 2, sources, ephemeris.Default())
+	results, err := plan.VisibleTonight(context.Background(), quintaCalixtoSite(t), testNight, sources, ephemeris.Default(), 2)
 	if err != nil {
 		t.Fatalf("a run in which nothing failed returned %v, want nil.\n"+
 			"  A signal that is always on is not a signal.", err)

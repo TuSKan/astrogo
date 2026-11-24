@@ -155,7 +155,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	end := start.Add(unit.Hours(6))
 	minEl := angle.Deg(10)
 
-	passes, err := SatellitePasses(sat, sat.ID(), "ISS", start, end, site, minEl)
+	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, site), Window{Start: start, End: end}, WithMinElevation(minEl))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}

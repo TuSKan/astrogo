@@ -112,7 +112,7 @@ func TestTwilightAgreesWithSkyfield(t *testing.T) {
 			start := time.Date(2026, time.Month(c.from[0]), c.from[1], 0, 0, 0, 0, time.LocationUTC)
 			end := time.Date(2026, time.Month(c.to[0]), c.to[1], 0, 0, 0, 0, time.LocationUTC)
 
-			groups, err := TwilightEvents(start, end, site, eph.Default(), c.kind)
+			groups, err := TwilightEvents(site, Window{Start: start, End: end}, eph.Default(), c.kind)
 			if err != nil {
 				t.Fatalf("TwilightEvents: %v", err)
 			}

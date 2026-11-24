@@ -56,7 +56,7 @@ func TestStarRiseAndSetAgreeWithSkyfield(t *testing.T) {
 		start := time.Date(2026, 3, 20, 0, 0, 0, 0, time.LocationUTC)
 		end := time.Date(2026, 3, 21, 0, 0, 0, 0, time.LocationUTC)
 
-		events, err := VisibilityEvents(start, end, star, site)
+		events, err := VisibilityEvents(star, site, Window{Start: start, End: end})
 		if err != nil {
 			t.Fatalf("%s at %g°: VisibilityEvents: %v", c.star, c.lat, err)
 		}
