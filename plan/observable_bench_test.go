@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,7 +20,7 @@ import (
 // illumination constraint on a target, and never rank more than a handful.
 //
 // Every one is deterministic and offline: a fixed epoch rather than
-// time.NowUTC, the analytical ephemeris, a site and a sky built here. Each
+// epoch.Now, the analytical ephemeris, a site and a sky built here. Each
 // checks its result once before the timed loop, because a benchmark whose call
 // quietly fails or returns nothing reports a fast time for no work.
 
@@ -43,8 +44,8 @@ func benchSite(b *testing.B) *Site {
 
 // benchEpoch is 22:00 UTC on the March equinox 2026, local night at benchSite.
 // Fixed, so a result can be compared with the one before it.
-func benchEpoch() time.Time {
-	return time.Date(2026, time.March, 20, 22, 0, 0, 0, time.LocationUTC)
+func benchEpoch() epoch.Time {
+	return epoch.Date(2026, time.March, 20, 22, 0, 0, 0, time.UTC)
 }
 
 // benchStars is n stars spread over the sky: RA by the golden angle and
@@ -196,8 +197,8 @@ func BenchmarkScorerScore(b *testing.B) {
 
 // nightWindow is twelve hours across the benchmark's night, long enough to hold
 // dusk and dawn and short enough to be quick.
-func nightWindow() (start, end time.Time) {
-	start = time.Date(2026, time.March, 20, 16, 0, 0, 0, time.LocationUTC)
+func nightWindow() (start, end epoch.Time) {
+	start = epoch.Date(2026, time.March, 20, 16, 0, 0, 0, time.UTC)
 
 	return start, start.Add(unit.Hours(12))
 }

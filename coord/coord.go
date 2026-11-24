@@ -6,8 +6,8 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -38,7 +38,7 @@ var (
 // on the sky.
 type Object interface {
 	// ICRS returns the high-precision ICRS coordinates of the object at time t.
-	ICRS(t time.Time) (ICRS, error)
+	ICRS(t epoch.Time) (ICRS, error)
 }
 
 // ObserversLocation carries the minimal terrestrial metadata needed for
@@ -90,7 +90,7 @@ type ICRS struct {
 
 	// epoch is the instant the position holds at, for a position with
 	// kinematics; zero reads as J2000.0.
-	epoch time.Time
+	epoch epoch.Time
 
 	// hasKinematics records whether a caller supplied kinematics, as distinct
 	// from their happening to be zero.
@@ -153,7 +153,7 @@ func NewICRS(ra, dec angle.Angle) ICRS { return ICRS{ra: ra, dec: dec} }
 // and happens at the one boundary where SOFA is called. Handed to SOFA
 // directly, a catalog value would lose a factor of cos(dec), which is 30% at
 // δ = 45° and 83% at δ = 80°.
-func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity, epoch time.Time) ICRS {
+func NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity, epoch epoch.Time) ICRS {
 	return ICRS{
 		ra: ra, dec: dec,
 		pmRA: pmRA, pmDec: pmDec,
@@ -240,7 +240,7 @@ func (c ICRS) RV() unit.Velocity { return c.rv }
 // Epoch returns the instant the position holds at, as
 // [NewICRSWithKinematics] was given it. It is zero, read as J2000.0, for a
 // position with no kinematics, which holds at every instant alike.
-func (c ICRS) Epoch() time.Time { return c.epoch }
+func (c ICRS) Epoch() epoch.Time { return c.epoch }
 
 // IsZero reports whether this ICRS is the zero value (no coordinates set).
 func (c ICRS) IsZero() bool { return c.ra == 0 && c.dec == 0 && c.dist == 0 }
@@ -681,14 +681,14 @@ func PositionAngle(from, to ICRS) angle.Angle {
 // needs) — a different problem from Context.SetTime's O(1) approximate
 // short-span Earth-rotation update, which re-derives observer-frame state,
 // not a star's own kinematics.
-func PropagateEpoch(c ICRS, to time.Time) (ICRS, error) {
+func PropagateEpoch(c ICRS, to epoch.Time) (ICRS, error) {
 	fromEpoch, toEpoch := c.epoch, to
 	if fromEpoch.IsZero() {
-		fromEpoch = time.J2000()
+		fromEpoch = epoch.J2000()
 	}
 
 	if toEpoch.IsZero() {
-		toEpoch = time.J2000()
+		toEpoch = epoch.J2000()
 	}
 
 	if fromEpoch.Equal(toEpoch) {
@@ -727,11 +727,11 @@ func PropagateEpoch(c ICRS, to time.Time) (ICRS, error) {
 // Pmsafe fails only with SOFA's "system error, should not occur"; c is
 // returned as it is then, since this has no error to report it through.
 func (c ICRS) atJ2000() ICRS {
-	if !c.hasKinematics || c.epoch.IsZero() || c.epoch.Equal(time.J2000()) {
+	if !c.hasKinematics || c.epoch.IsZero() || c.epoch.Equal(epoch.J2000()) {
 		return c
 	}
 
-	moved, err := PropagateEpoch(c, time.J2000())
+	moved, err := PropagateEpoch(c, epoch.J2000())
 	if err != nil {
 		return c
 	}

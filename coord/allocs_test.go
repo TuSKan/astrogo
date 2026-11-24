@@ -6,7 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -52,9 +52,9 @@ func TestCachedContextTransformsDoNotAllocate(t *testing.T) {
 	}
 
 	atm := atmosphere.AtAltitude(2635)
-	epoch := time.FromJD(2460000.5, time.UTC)
+	instant := epoch.FromJD(2460000.5, epoch.UTC)
 
-	ctx := mustContext(t, epoch, loc, atm)
+	ctx := mustContext(t, instant, loc, atm)
 
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
 	vec := vector.Vec3{X: 0.5, Y: 0.5, Z: 0.7071}
@@ -87,7 +87,7 @@ func TestBatchTransformDoesNotAllocate(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	ctx := mustContext(t, time.FromJD(2460000.5, time.UTC), loc, atmosphere.AtAltitude(2635))
+	ctx := mustContext(t, epoch.FromJD(2460000.5, epoch.UTC), loc, atmosphere.AtAltitude(2635))
 
 	const n = 512
 
@@ -119,14 +119,14 @@ func TestNewContextAllocationIsBounded(t *testing.T) {
 	}
 
 	atm := atmosphere.AtAltitude(2635)
-	epoch := time.FromJD(2460000.5, time.UTC)
+	instant := epoch.FromJD(2460000.5, epoch.UTC)
 
 	// Measured: 1. The headroom is for an implementation that legitimately
 	// splits that one structure, not for a regression — 8 is still far below
 	// anything that would make per-epoch setup look like per-target work.
 	const maxAllocs = 8
 
-	if got := testing.AllocsPerRun(200, func() { _, _ = coord.NewContext(epoch, loc, atm) }); got > maxAllocs {
+	if got := testing.AllocsPerRun(200, func() { _, _ = coord.NewContext(instant, loc, atm) }); got > maxAllocs {
 		t.Errorf("NewContext allocates %v times per call, want at most %d (measured 1)",
 			got, maxAllocs)
 	}
@@ -145,22 +145,22 @@ func TestSetTimeDoesNotAllocate(t *testing.T) {
 	}
 
 	atm := atmosphere.AtAltitude(2635)
-	epoch := time.FromJD(2460000.5, time.UTC)
+	instant := epoch.FromJD(2460000.5, epoch.UTC)
 
-	ctx := mustContext(t, epoch, loc, atm)
+	ctx := mustContext(t, instant, loc, atm)
 
-	near := []time.Time{epoch.Add(unit.Minutes(5)), epoch.Add(unit.Minutes(-20))}
-	far := []time.Time{epoch.Add(unit.Hours(3)), epoch.Add(unit.Hours(-3))}
+	near := []epoch.Time{instant.Add(unit.Minutes(5)), instant.Add(unit.Minutes(-20))}
+	far := []epoch.Time{instant.Add(unit.Hours(3)), instant.Add(unit.Hours(-3))}
 
 	for _, tc := range []struct {
 		name string
-		at   []time.Time
+		at   []epoch.Time
 	}{
 		{"inside the hour", near},
 		{"rebuilding", far},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx.SetTime(epoch)
+			ctx.SetTime(instant)
 
 			i := 0
 			step := func() {

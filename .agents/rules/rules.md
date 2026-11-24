@@ -110,8 +110,7 @@ A `//nolint` is acceptable only when:
 Good example:
 
 ```go
-//nolint:revive // Public duration unit constants; unit names are intentional in astrogo/time.
-const Minute time.Duration = time.Minute
+return nil //nolint:nilerr // an unreadable path is skipped, not fatal
 ```
 
 Bad example:
@@ -156,7 +155,7 @@ Do not loosen tolerances without explaining why.
 
 This codebase has no `go:generate` step, and no package uses `go:embed` — do
 not reintroduce either. Every data source is obtained at runtime through
-`remote.GetFile`: `catalog/openngc` fetches explicitly on `New()`; `time`'s
+`remote.GetFile`: `catalog/openngc` fetches explicitly on `New()`; `epoch`'s
 Earth Orientation Parameters load lazily and automatically on first
 `Time.EOP()`/`Time.UTC()`/`Time.UT1()` query (pre-seeded disk cache, then a
 `remote.EnableDownloads`-gated network fetch). Populate data by pre-seeding

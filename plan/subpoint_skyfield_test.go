@@ -5,11 +5,12 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestSubpointsAgreeWithSkyfield holds the subsolar and sublunar points to
@@ -32,13 +33,13 @@ func TestSubpointsAgreeWithSkyfield(t *testing.T) {
 
 	t.Cleanup(func() { _ = prov.Close() })
 
-	march := time.Date(2026, 3, 20, 12, 0, 0, 0, time.LocationUTC)
-	june := time.Date(2026, 6, 21, 6, 30, 0, 0, time.LocationUTC)
+	march := epoch.Date(2026, 3, 20, 12, 0, 0, 0, time.UTC)
+	june := epoch.Date(2026, 6, 21, 6, 30, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		name     string
-		point    func(time.Time, eph.Provider) (*coord.Geodetic, error)
-		at       time.Time
+		point    func(epoch.Time, eph.Provider) (*coord.Geodetic, error)
+		at       epoch.Time
 		lat, lon float64 // Skyfield's, degrees
 	}{
 		{"Sun", plan.SubsolarPoint, march, -0.045488, 1.858895},

@@ -3,13 +3,14 @@ package satellite_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -40,7 +41,7 @@ func TestAltitudeAgreesWithTheEarthFixedRoute(t *testing.T) {
 
 	metersPerAU := constants.IAU.AstronomicalUnit.Value
 
-	start := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC)
 
 	var worst float64
 
@@ -87,7 +88,7 @@ func BenchmarkAltitude(b *testing.B) {
 		b.Fatalf("NewFromTLE: %v", err)
 	}
 
-	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	for b.Loop() {
 		if _, err := sat.Altitude(tm); err != nil {

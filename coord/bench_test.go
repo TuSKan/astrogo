@@ -2,11 +2,12 @@ package coord_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -19,7 +20,7 @@ import (
 func BenchmarkNewContext(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	for b.Loop() {
 		if _, err := coord.NewContext(t, loc, atm); err != nil {
@@ -31,7 +32,7 @@ func BenchmarkNewContext(b *testing.B) {
 func BenchmarkNewContext_SeaLevel(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	atm := atmosphere.StandardRefraction()
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	for b.Loop() {
 		if _, err := coord.NewContext(t, loc, atm); err != nil {
@@ -47,7 +48,7 @@ func BenchmarkNewContext_SeaLevel(b *testing.B) {
 // series evaluations a fresh Context makes over a day.
 func BenchmarkSetTime(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
-	start := time.FromJD(2461056.25, time.UTC)
+	start := epoch.FromJD(2461056.25, epoch.UTC)
 
 	for _, c := range []struct {
 		name  string
@@ -56,7 +57,7 @@ func BenchmarkSetTime(b *testing.B) {
 		b.Run(c.name, func(b *testing.B) {
 			ctx := mustContext(b, start, loc, atmosphere.StandardRefraction())
 
-			steps := make([]time.Time, c.steps)
+			steps := make([]epoch.Time, c.steps)
 			for i := range steps {
 				steps[i] = start.Add(unit.Minutes(5 * float64(i+1)))
 			}
@@ -80,7 +81,7 @@ func BenchmarkSetTime(b *testing.B) {
 // of movement makes are counted in it rather than amortized away.
 func BenchmarkAltitudeCurve(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(50), angle.LonDeg(15), 0)
-	start := time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.June, 15, 12, 0, 0, 0, time.UTC)
 	m31 := coord.NewICRS(angle.Hour(0.7122), angle.Deg(41.269))
 	atm := atmosphere.StandardRefraction()
 
@@ -89,7 +90,7 @@ func BenchmarkAltitudeCurve(b *testing.B) {
 		step unit.Duration
 	}{{"1min", unit.Minutes(1)}, {"15min", unit.Minutes(15)}, {"2h", unit.Hours(2)}} {
 		b.Run(c.name, func(b *testing.B) {
-			ticks := make([]time.Time, int(unit.Days(1)/c.step))
+			ticks := make([]epoch.Time, int(unit.Days(1)/c.step))
 			for i := range ticks {
 				ticks[i] = start.Add(c.step * unit.Duration(i))
 			}
@@ -118,7 +119,7 @@ func BenchmarkAltitudeCurve(b *testing.B) {
 func BenchmarkICRSToAltAz(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 	pos := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4)) // Orion
 
 	for b.Loop() {
@@ -134,7 +135,7 @@ func BenchmarkICRSToAltAz(b *testing.B) {
 func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	ctx := mustContext(b, t, loc, atm)
 
@@ -152,7 +153,7 @@ func BenchmarkICRSToAltAz_CachedContext(b *testing.B) {
 func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	stars := make([]coord.ICRS, 100)
 	for i := range stars {
@@ -174,7 +175,7 @@ func BenchmarkICRSToAltAz_100Stars_NewContext(b *testing.B) {
 func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	stars := make([]coord.ICRS, 100)
 	for i := range stars {
@@ -199,7 +200,7 @@ func BenchmarkICRSToAltAz_100Stars_CachedContext(b *testing.B) {
 func BenchmarkReducer(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 	// Simulate a geocentric Moon-like vector (in AU)
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
@@ -218,7 +219,7 @@ func BenchmarkReducer(b *testing.B) {
 func BenchmarkReducer_Cached(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 	v := vector.Vec3{X: 0.00257, Y: 0.00010, Z: 0.00005}
 
 	r, err := coord.NewReducer(loc, t, atm)
@@ -238,7 +239,7 @@ func BenchmarkReducer_Cached(b *testing.B) {
 func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	ctx := mustContext(b, t, loc, atm)
 
@@ -268,7 +269,7 @@ func BenchmarkICRSBatchToAltAz_10k(b *testing.B) {
 func BenchmarkReduceBatch_10k(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	t := time.FromJD(2460000.5, time.UTC)
+	t := epoch.FromJD(2460000.5, epoch.UTC)
 
 	ctx := mustContext(b, t, loc, atm)
 

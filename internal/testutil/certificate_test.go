@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // The two non-certificate errors the negative case below is built from, as
@@ -24,14 +25,7 @@ var (
 	errConnectionRefused  = errors.New("connection refused")
 )
 
-// The three dates the fixtures below are built from, as offsets in years from
-// the standard library's zero time.Time — year 1.
-//
-// Reached that way rather than from a clock because this package sits below
-// astrogo/time and cannot import either spelling of the time package (see
-// ReachableTimeout for the same constraint stated at a constant, and
-// docsguard's TestNoStandardLibraryTimeOutsideTimePackage for the rule). A
-// composite literal's field gives the zero value without naming the type.
+// The three dates the fixtures below are built from.
 //
 // Fixed dates, not offsets from now, so these tests answer the same on any day
 // they run. Real ones, not year 1 and year 3001: Windows verifies through the
@@ -44,9 +38,9 @@ var (
 // The valid-until year is 2200. Nothing here survives that, but it is the sort
 // of thing that should be written down rather than discovered.
 var (
-	certValidFrom  = x509.Certificate{}.NotBefore.AddDate(1999, 0, 0) // 2000-01-01
-	certExpiredAt  = x509.Certificate{}.NotBefore.AddDate(2019, 0, 0) // 2020-01-01
-	certValidUntil = x509.Certificate{}.NotBefore.AddDate(2199, 0, 0) // 2200-01-01
+	certValidFrom  = time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
+	certExpiredAt  = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	certValidUntil = time.Date(2200, time.January, 1, 0, 0, 0, 0, time.UTC)
 )
 
 // certFixture describes one bad handshake: which name the certificate is

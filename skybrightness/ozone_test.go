@@ -9,8 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -133,7 +133,7 @@ func TestOzoneDimsWhatCrossesTheLayer(t *testing.T) {
 func moonOzoneAirmass(t *testing.T, scene *skybrightness.Scene) float64 {
 	t.Helper()
 
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 	if err != nil {

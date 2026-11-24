@@ -4,12 +4,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // hubbleVisit is one of Buie et al.'s (2010) twelve visit-averaged V
@@ -114,7 +115,7 @@ func TestPlutoCharonGeometryMatchesThePaper(t *testing.T) {
 	p := defaultProvider()
 
 	for _, v := range hubbleVisits {
-		_, _, phase, lon, err := magnitude.PlutoCharonGeometry(p, time.FromJD(v.jd, time.UTC))
+		_, _, phase, lon, err := magnitude.PlutoCharonGeometry(p, epoch.FromJD(v.jd, epoch.UTC))
 		if err != nil {
 			t.Fatalf("JD %.3f: %v", v.jd, err)
 		}
@@ -185,12 +186,12 @@ func TestPlutoCharonPhaseCurves(t *testing.T) {
 func TestPlutoCharonDisagreesWithTheHistoricalLawAsDocumented(t *testing.T) {
 	p := defaultProvider()
 
-	for _, d := range []time.Time{
-		time.Date(2020, 1, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2022, 4, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2024, 7, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, 12, 20, 0, 0, 0, 0, time.LocationUTC),
+	for _, d := range []epoch.Time{
+		epoch.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2022, 4, 1, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2024, 7, 1, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, 12, 20, 0, 0, 0, 0, time.UTC),
 	} {
 		buie, err := magnitude.PlutoCharonApparent(p, d)
 		if err != nil {
@@ -213,7 +214,7 @@ var errNoState = errors.New("stateless provider")
 
 type statelessProvider struct{}
 
-func (statelessProvider) Locate(eph.ID, time.Time) (core.State, error) {
+func (statelessProvider) Locate(eph.ID, epoch.Time) (core.State, error) {
 	return core.State{}, errNoState
 }
 
@@ -222,7 +223,7 @@ func (statelessProvider) Close() error { return nil }
 // TestPlutoCharonApparentReturnsTheProviderError: no position, no magnitude,
 // and the cause is kept.
 func TestPlutoCharonApparentReturnsTheProviderError(t *testing.T) {
-	if _, err := magnitude.PlutoCharonApparent(statelessProvider{}, time.J2000()); !errors.Is(err, errNoState) {
+	if _, err := magnitude.PlutoCharonApparent(statelessProvider{}, epoch.J2000()); !errors.Is(err, errNoState) {
 		t.Errorf("err = %v, want it to wrap the provider's error", err)
 	}
 }

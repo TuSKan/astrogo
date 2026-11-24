@@ -6,12 +6,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
 	// to 13.5 arcsec, 0.004°. For full accuracy, blank-import remote/eop and
 	// consent to the IERS bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Start with an ICRS coordinate: Sgr A*, the Galactic center
 	// (J2000 position from SIMBAD).
@@ -36,7 +37,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	t := time.Date(2026, 7, 15, 22, 0, 0, 0, tz)
+	t := epoch.Date(2026, 7, 15, 22, 0, 0, 0, tz)
 	ecliptic := coord.ICRSToEcliptic(sgrA, t)
 
 	// 4. ICRS -> AltAz, which needs a site and an instant. One Context holds
@@ -57,7 +58,7 @@ func main() {
 	}
 
 	show.Title("Coordinate conversions for Sgr A*",
-		"AltAz from Quinta Calixto at "+t.Format("2006-01-02 15:04 MST")+" ("+t.In(time.LocationUTC).Format("15:04 MST")+")")
+		"AltAz from Quinta Calixto at "+t.Format("2006-01-02 15:04 MST")+" ("+t.In(time.UTC).Format("15:04 MST")+")")
 
 	deg := func(a angle.Angle) string { return fmt.Sprintf("%.5f°", a.Degrees()) }
 

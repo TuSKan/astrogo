@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -70,7 +70,7 @@ func (s *SwapOptimizedStrategy) schedule(
 	window Window,
 	blocks []*Block,
 	transition TransitionModel,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 ) (*Schedule, error) {
 	// Checked here as well as in the greedy base, since a caller's own Base
@@ -145,7 +145,7 @@ func (s *SwapOptimizedStrategy) swapPass(
 	planner *Planner,
 	transition TransitionModel,
 	step unit.Duration,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 	tabu *tabuList,
 	passNum int,
@@ -295,7 +295,7 @@ func (s *SwapOptimizedStrategy) insertPass(
 	window Window,
 	transition TransitionModel,
 	step unit.Duration,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 ) (bool, error) {
 	if len(sched.Unscheduled) == 0 {
@@ -436,7 +436,7 @@ func mergeConstraints(a, b []Constraint) []Constraint {
 //
 // Falls back to static block priority if scoring fails.
 func scoreBlockPlacement(
-	block *Block, start, end time.Time, planner *Planner, ctxAt func(time.Time) *coord.Context, sky *runSky,
+	block *Block, start, end epoch.Time, planner *Planner, ctxAt func(epoch.Time) *coord.Context, sky *runSky,
 ) float64 {
 	mid := start.Add(end.Sub(start) / 2)
 
@@ -468,9 +468,9 @@ type gapInfo struct {
 func transitionOverhead(
 	transition TransitionModel,
 	from, to *Block,
-	fromTime, toTime time.Time,
+	fromTime, toTime epoch.Time,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 ) (unit.Duration, error) {
 	if transition == nil {
 		return 0, nil

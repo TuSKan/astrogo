@@ -2,8 +2,8 @@ package coord
 
 import (
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ── ICRS <-> Galactic ────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ func GalacticToICRS(c Galactic) ICRS {
 //
 // The date is taken as TT, which is what the ecliptic of date is defined on,
 // whatever scale t holds.
-func ICRSToEcliptic(c ICRS, t time.Time) Ecliptic {
+func ICRSToEcliptic(c ICRS, t epoch.Time) Ecliptic {
 	jd1, jd2 := t.TT().JDParts()
 	lon, lat := gofaext.Eqec06(jd1, jd2, c.RA().Radians(), c.Dec().Radians())
 
@@ -36,7 +36,7 @@ func ICRSToEcliptic(c ICRS, t time.Time) Ecliptic {
 
 // EclipticToICRS converts Geocentric Ecliptic coordinates of the given date
 // to ICRS coordinates. The date is taken as TT, as for [ICRSToEcliptic].
-func EclipticToICRS(c Ecliptic, t time.Time) ICRS {
+func EclipticToICRS(c Ecliptic, t epoch.Time) ICRS {
 	jd1, jd2 := t.TT().JDParts()
 	ra, dec := gofaext.Eceq06(jd1, jd2, c.Lon().Radians(), c.Lat().Radians())
 

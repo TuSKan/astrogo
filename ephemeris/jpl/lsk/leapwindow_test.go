@@ -6,9 +6,10 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // leapWindowLSK carries naif0012.tls's DELTET constants and the DELTA_AT
@@ -32,7 +33,7 @@ DELTET/DELTA_AT        = ( 10,   @1972-JAN-1
 \begintext
 `
 
-// TestUTCToETHoldsTheOldCountUntilTheStep holds UTCToET to time's own TDB in
+// TestUTCToETHoldsTheOldCountUntilTheStep holds UTCToET to epoch's own TDB in
 // the minutes either side of a leap second (#756).
 //
 // The kernel's DELTA_AT entries are midnight UTC, and the lookup added
@@ -52,10 +53,10 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 
 	const bound = 1e-3 // seconds
 
-	steps := []time.GoTime{
-		time.GoDate(2012, time.July, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.GoDate(2015, time.July, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.GoDate(2017, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	steps := []time.Time{
+		time.Date(2012, time.July, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2015, time.July, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2017, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
 
 	offsets := []time.Duration{
@@ -67,7 +68,7 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 
 	for _, step := range steps {
 		for _, off := range offsets {
-			check(t, r, time.FromGo(step.Add(off)), step.Add(off).Format("2006-01-02 15:04:05.000"), bound)
+			check(t, r, epoch.FromGo(step.Add(off)), step.Add(off).Format("2006-01-02 15:04:05.000"), bound)
 
 			checked++
 		}
@@ -79,7 +80,7 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 		y, m, d := step.Add(-time.Hour).Date()
 
 		for _, us := range []int{0, 500_000, 999_000, 999_990} {
-			leap := time.Date(y, m, d, 23, 59, 60, us*1000, time.LocationUTC)
+			leap := epoch.Date(y, m, d, 23, 59, 60, us*1000, time.UTC)
 			check(t, r, leap, fmt.Sprintf("%d-%02d-%02d 23:59:60.%06d", y, m, d, us), bound)
 
 			checked++
@@ -89,7 +90,7 @@ func TestUTCToETHoldsTheOldCountUntilTheStep(t *testing.T) {
 	t.Logf("%d instants within ten minutes of three leap seconds", checked)
 }
 
-func check(t *testing.T, r *lsk.Reader, when time.Time, label string, bound float64) {
+func check(t *testing.T, r *lsk.Reader, when epoch.Time, label string, bound float64) {
 	t.Helper()
 
 	d1, d2 := when.TDB().JDParts()

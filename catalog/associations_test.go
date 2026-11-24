@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestConsolidateRecordsWhyRecordsAreOne: a merged Target names every record
@@ -123,10 +123,10 @@ func TestResolverRecordsAPositionalAssociation(t *testing.T) {
 	near := coord.NewICRS(angle.Deg(101.287155), angle.Deg(-16.716116+angle.Arcsec(0.5).Degrees()))
 
 	p1 := &mockProvider{name: "simbad", targets: map[string]Target{
-		"target": {ID: "* alf CMa", Coord: at, HasCoord: true, Epoch: time.J2000()},
+		"target": {ID: "* alf CMa", Coord: at, HasCoord: true, Epoch: epoch.J2000()},
 	}}
 	p2 := &mockProvider{name: "vizier", targets: map[string]Target{
-		"target": {ID: "row-17", Coord: near, HasCoord: true, Epoch: time.J2000()},
+		"target": {ID: "row-17", Coord: near, HasCoord: true, Epoch: epoch.J2000()},
 	}}
 
 	r := &Resolver{
@@ -160,10 +160,10 @@ func TestResolverRecordsAConeSearchAssociation(t *testing.T) {
 	t.Parallel()
 
 	p1 := &mockProvider{name: "simbad", targets: map[string]Target{
-		"star": {ID: "S1", Coord: coord.NewICRS(angle.Deg(50), angle.Deg(10)), HasCoord: true, Epoch: time.J2000()},
+		"star": {ID: "S1", Coord: coord.NewICRS(angle.Deg(50), angle.Deg(10)), HasCoord: true, Epoch: epoch.J2000()},
 	}}
 	cs := &mockConeSearcher{targets: []Target{
-		{ID: "GAIA123", Coord: coord.NewICRS(angle.Deg(50.0001), angle.Deg(10.0001)), HasCoord: true, Epoch: time.J2000(), Catalog: "Gaia DR3"},
+		{ID: "GAIA123", Coord: coord.NewICRS(angle.Deg(50.0001), angle.Deg(10.0001)), HasCoord: true, Epoch: epoch.J2000(), Catalog: "Gaia DR3"},
 	}}
 
 	r := &Resolver{

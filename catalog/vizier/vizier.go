@@ -16,8 +16,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrUnexpectedSchema indicates the CSV response is missing a column the
@@ -260,7 +260,7 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 
 		// A row's own epoch is the date its position was measured. Its time
 		// scale is immaterial here: a minute is nothing to a proper motion.
-		epoch := schema.Epoch
+		rowEpoch := schema.Epoch
 
 		if schema.EpochCol != "" {
 			jd, ok := finite.Parse(strings.TrimSpace(record[epochIdx]))
@@ -268,7 +268,7 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 				return nil, fmt.Errorf("%w: epoch %q is not a number", ErrUnexpectedSchema, record[epochIdx])
 			}
 
-			epoch = time.FromJD(jd, time.UTC)
+			rowEpoch = epoch.FromJD(jd, epoch.UTC)
 		}
 
 		targets = append(targets, resolve.Target{
@@ -279,7 +279,7 @@ func parseCSV(body io.Reader, schema tableSchema) ([]resolve.Target, error) {
 			Kind:        schema.Kind,
 			Coord:       coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg)),
 			HasCoord:    true,
-			Epoch:       epoch,
+			Epoch:       rowEpoch,
 		})
 	}
 

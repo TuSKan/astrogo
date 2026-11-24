@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -67,7 +67,7 @@ func BodyEquatorialRadius(id eph.ID) (unit.Length, bool) {
 // doesn't implement the PhysicalRadius optional capability — a comet or
 // satellite, for instance, since this library has no general-purpose
 // physical-size catalog for either.
-func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angle, error) {
+func AngularDiameter(mb MovingBody, t epoch.Time, ctx *coord.Context) (angle.Angle, error) {
 	radius, ok := BodyEquatorialRadius(mb.EphID())
 	if !ok {
 		if pr, isPR := mb.(PhysicalRadius); isPR {
@@ -104,7 +104,7 @@ func AngularDiameter(mb MovingBody, t time.Time, ctx *coord.Context) (angle.Angl
 // AngularDiameter is a convenience wrapper around the package-level
 // AngularDiameter for *Planet, mirroring ApparentMagnitude/
 // ApparentMagnitudeCtx's existing pattern on this type.
-func (p *Planet) AngularDiameter(t time.Time, ctx *coord.Context) (angle.Angle, error) {
+func (p *Planet) AngularDiameter(t epoch.Time, ctx *coord.Context) (angle.Angle, error) {
 	return AngularDiameter(p, t, ctx)
 }
 

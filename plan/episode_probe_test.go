@@ -2,10 +2,11 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -24,7 +25,7 @@ func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	from := time.Date(2026, 7, 13, 19, 4, 0, 0, time.LocationUTC)
+	from := epoch.Date(2026, 7, 13, 19, 4, 0, 0, time.UTC)
 
 	rise, set, err := Episode(NewMoon(eph.Default()), site, Window{Start: from, End: from.Add(unit.Hours(10))})
 	if err != nil {
@@ -37,10 +38,10 @@ func TestEpisodeJustAfterASetIsTheNextOne(t *testing.T) {
 
 	for _, c := range []struct {
 		what      string
-		got, want time.Time
+		got, want epoch.Time
 	}{
-		{"rise", rise.Time, time.Date(2026, 7, 14, 4, 8, 23, 453e6, time.LocationUTC)},
-		{"set", set.Time, time.Date(2026, 7, 14, 19, 50, 30, 236e6, time.LocationUTC)},
+		{"rise", rise.Time, epoch.Date(2026, 7, 14, 4, 8, 23, 453e6, time.UTC)},
+		{"set", set.Time, epoch.Date(2026, 7, 14, 19, 50, 30, 236e6, time.UTC)},
 	} {
 		if d := c.got.Sub(c.want).Abs(); d > unit.Seconds(2) {
 			t.Errorf("%s %v, Skyfield gives %v (off by %v)", c.what, c.got, c.want, d)
@@ -66,19 +67,19 @@ func TestEpisodeJustBeforeARiseIsThatRise(t *testing.T) {
 	for _, c := range []struct {
 		name       string
 		target     Observable
-		start, end time.Time
+		start, end epoch.Time
 		want       int
 	}{
 		// 31 days of lunar days of 24h 50m.
-		{"Moon", NewMoon(prov), time.Date(2026, 5, 1, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 6, 1, 0, 0, 0, 0, time.LocationUTC), 30},
-		{"Sirius", sirius, time.Date(2026, 9, 1, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 11, 0, 0, 0, 0, time.LocationUTC), 10},
+		{"Moon", NewMoon(prov), epoch.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC), 30},
+		{"Sirius", sirius, epoch.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC), 10},
 	} {
 		events, err := visibilityEvents(c.target, site, c.start, c.end)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		var rises []time.Time
+		var rises []epoch.Time
 
 		for _, e := range events {
 			if e.Kind == EventRise {

@@ -9,20 +9,21 @@ import (
 	"testing"
 )
 
-// gregorianDateLiteral matches a time.Date call written with a literal year,
-// and captures the year.
-var gregorianDateLiteral = regexp.MustCompile(`time\.Date\(\s*(-?\d+)\s*,`)
+// gregorianDateLiteral matches an epoch.Date or time.Date call written with a
+// literal year, and captures the package and the year. Both are the proleptic
+// Gregorian calendar.
+var gregorianDateLiteral = regexp.MustCompile(`\b(epoch|time)\.Date\(\s*(-?\d+)\s*,`)
 
 // TestHistoricalDatesUseTheJulianCalendar keeps the code a user copies from
 // building a historical date with the wrong calendar.
 //
 // # Why
 //
-// time.Date is the proleptic Gregorian calendar. A date a historical source
-// gives before the reform of 15 October 1582 is a Julian one, and
-// time.DateJulianCal builds it. In the first century the two are two days
+// epoch.Date is the proleptic Gregorian calendar, as the standard library's
+// time.Date is. A date a historical source gives before the reform of
+// 15 October 1582 is a Julian one, and epoch.DateJulianCal builds it. In the first century the two are two days
 // apart. examples/10_jesus_christ/eclipse found the eclipse of 3 April AD 33
-// correctly, then built its evening with time.Date and printed the sunset and
+// correctly, then built its evening with time.Date (now epoch.Date) and printed the sunset and
 // moonrise of Julian 5 April: a moonrise 1 h 50 min late, with the Moon 21°
 // up when it printed "rises" (#841).
 //
@@ -79,9 +80,9 @@ func TestHistoricalDatesUseTheJulianCalendar(t *testing.T) {
 
 		for i, line := range strings.Split(text, "\n") {
 			for _, m := range gregorianDateLiteral.FindAllStringSubmatch(line, -1) {
-				if year, aerr := strconv.Atoi(m[1]); aerr == nil && year < 1583 {
-					t.Errorf("%s:%d: time.Date(%d, …) in code a user copies is the proleptic Gregorian calendar; "+
-						"a date before the 1582 reform is a Julian one: build it with time.DateJulianCal", rel, i+1, year)
+				if year, aerr := strconv.Atoi(m[2]); aerr == nil && year < 1583 {
+					t.Errorf("%s:%d: %s.Date(%d, …) in code a user copies is the proleptic Gregorian calendar; "+
+						"a date before the 1582 reform is a Julian one: build it with epoch.DateJulianCal", rel, i+1, m[1], year)
 				}
 			}
 		}

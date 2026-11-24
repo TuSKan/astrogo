@@ -13,9 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // What these tests serve and cache. A read accepts goodCopy and nothing else;
@@ -78,7 +78,7 @@ func serveVersioned(t *testing.T, id EndpointID, body, etag string) *versionedSo
 
 		// A zero modification time sends no Last-Modified, so an etag of ""
 		// leaves the object with no validator at all.
-		http.ServeContent(w, r, readName, time.GoTime{}, strings.NewReader(body))
+		http.ServeContent(w, r, readName, time.Time{}, strings.NewReader(body))
 	}))
 	t.Cleanup(srv.Close)
 

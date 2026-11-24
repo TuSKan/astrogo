@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -78,7 +79,7 @@ type moonScratch struct {
 // viewing direction.
 type moonGeometry struct {
 	observer *coord.Geodetic
-	at       time.GoTime
+	at       time.Time
 
 	direction  coord.AltAz
 	airmass    float64
@@ -404,7 +405,7 @@ func (m *ScatteredMoonlight) computeGeometry(scene *Scene) (*moonGeometry, error
 		return nil, ErrNoEphemeris
 	}
 
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	in := eph.At(scene.Ephemeris, at)
 

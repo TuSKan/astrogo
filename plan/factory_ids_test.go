@@ -2,11 +2,12 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestFromCatalogNamesSatellitesByTheirNAIFCode: a NORAD target's ID is its
@@ -35,7 +36,7 @@ func TestFromCatalogNamesSatellitesByTheirNAIFCode(t *testing.T) {
 		t.Errorf("EphID() = %v, want %v", sat.EphID(), prov.ID())
 	}
 
-	if _, err := sat.Position(time.Date(2026, 4, 20, 0, 0, 0, 0, time.LocationUTC)); err != nil {
+	if _, err := sat.Position(epoch.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)); err != nil {
 		t.Errorf("Position: %v", err)
 	}
 }

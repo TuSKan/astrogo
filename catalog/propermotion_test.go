@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/posmatch"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -17,14 +17,14 @@ import (
 // are at J2000 and Gaia DR3's at J2016.0; 2MASS observed Barnard's star on
 // JD 2451692.9284, 2000 May 28.
 
-var gaiaDR3EpochForTest = time.FromJD(2457389.0, time.TT)
+var gaiaDR3EpochForTest = epoch.FromJD(2457389.0, epoch.TT)
 
 // simbadRow is a Target as catalog/simbad builds one: RA and Dec in Coord,
 // the motion in the Target's own fields.
 func simbadRow(id string, ra, dec, pmRAmas, pmDecmas, plxmas, rvkms float64) Target {
 	return Target{
 		ID: id, Name: id, Catalog: "SIMBAD", Kind: resolve.KindStar,
-		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)), HasCoord: true, Epoch: time.J2000(),
+		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)), HasCoord: true, Epoch: epoch.J2000(),
 		PmRA: angle.Arcsec(pmRAmas / 1000), PmDec: angle.Arcsec(pmDecmas / 1000),
 		Parallax: angle.Arcsec(plxmas / 1000), RadialVelocity: unit.KmPerSec(rvkms), HasRadialVelocity: true,
 	}
@@ -54,14 +54,14 @@ func TestSeparationAtCommonEpoch(t *testing.T) {
 
 	// 2MASS publishes no motion; its row is where the star was on the night.
 	twoMASS := coord.NewICRS(angle.Deg(269.452044), angle.Deg(4.694597))
-	twoMASSEpoch := time.FromJD(2451692.9284, time.TT)
+	twoMASSEpoch := epoch.FromJD(2451692.9284, epoch.TT)
 
 	for _, c := range []struct {
 		name       string
 		a          coord.ICRS
-		aEpoch     time.Time
+		aEpoch     epoch.Time
 		b          coord.ICRS
-		bEpoch     time.Time
+		bEpoch     epoch.Time
 		maxArcsec  float64
 		minArcsec  float64
 		whyMeasure string
@@ -140,20 +140,20 @@ func TestResolverMatchesAMovingStarsGaiaRow(t *testing.T) {
 func TestResolverMatchesAStarsTwoMASSRowAtItsOwnDate(t *testing.T) {
 	t.Parallel()
 
-	row := func(epoch time.Time) Target {
+	row := func(at epoch.Time) Target {
 		return Target{
 			ID: "17574849+0441405", Name: "17574849+0441405", Catalog: "vizier", Kind: resolve.KindStar,
-			Coord: coord.NewICRS(angle.Deg(269.452044), angle.Deg(4.694597)), HasCoord: true, Epoch: epoch,
+			Coord: coord.NewICRS(angle.Deg(269.452044), angle.Deg(4.694597)), HasCoord: true, Epoch: at,
 		}
 	}
 
 	for _, c := range []struct {
 		name    string
-		epoch   time.Time
+		epoch   epoch.Time
 		matches bool
 	}{
-		{"stamped with its own date", time.FromJD(2451692.9284, time.UTC), true},
-		{"stamped J2000, as every row used to be", time.J2000(), false},
+		{"stamped with its own date", epoch.FromJD(2451692.9284, epoch.UTC), true},
+		{"stamped J2000, as every row used to be", epoch.J2000(), false},
 	} {
 		r := &Resolver{
 			providers: []Provider{&mockProvider{name: "simbad", targets: map[string]Target{
@@ -172,7 +172,7 @@ func TestResolverMatchesAStarsTwoMASSRowAtItsOwnDate(t *testing.T) {
 			t.Errorf("%s: 2MASS row in the group = %v, want %v (aliases %v)", c.name, matched, c.matches, got.Aliases)
 		}
 
-		if got.Provenance["Epoch"] != "simbad" || !got.Epoch.Equal(time.J2000()) {
+		if got.Provenance["Epoch"] != "simbad" || !got.Epoch.Equal(epoch.J2000()) {
 			t.Errorf("%s: Epoch = %v from %q, want SIMBAD's J2000, the epoch of the Coord it chose",
 				c.name, got.Epoch, got.Provenance["Epoch"])
 		}

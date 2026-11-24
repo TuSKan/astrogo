@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -28,11 +29,11 @@ const siderealArcsecPerSecond = 15.041069
 // the measured shift would mix Earth rotation with a tilted local zenith and
 // could not attribute either.
 type dut1Override struct {
-	base time.Model
+	base epoch.Model
 	dut1 float64
 }
 
-func (m dut1Override) EOP(mjd float64) (time.EOP, error) {
+func (m dut1Override) EOP(mjd float64) (epoch.EOP, error) {
 	e, err := m.base.EOP(mjd)
 	if err != nil {
 		return e, fmt.Errorf("dut1Override: underlying model: %w", err)
@@ -80,9 +81,9 @@ func (m dut1Override) EOP(mjd float64) (time.EOP, error) {
 // about the *data*, since the coupling that turns data into an angle is exact.
 func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	base := time.GetModel()
+	base := epoch.GetModel()
 
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -96,14 +97,14 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 	// time, nothing that could move for a reason other than the one under
 	// test.
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
-	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	instant := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	hourAngleWith := func(dut1 float64) float64 {
 		t.Helper()
 
-		time.RegisterModel(dut1Override{base: base, dut1: dut1})
+		epoch.RegisterModel(dut1Override{base: base, dut1: dut1})
 
-		ha, err := mustContext(t, epoch, site, atm).ICRSToHourAngle(star)
+		ha, err := mustContext(t, instant, site, atm).ICRSToHourAngle(star)
 		if err != nil {
 			t.Fatalf("ICRSToHourAngle at DUT1=%v: %v", dut1, err)
 		}
@@ -147,7 +148,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 // # Why the pole is injected rather than read
 //
 // Because coord's test binary has no Earth-orientation data at all. It does
-// not import remote, so no loader is registered and time.GetModel returns
+// not import remote, so no loader is registered and epoch.GetModel returns
 // ZeroModel — a first version of this test compared real EOP against zeroed
 // EOP and measured exactly 0.000000 arcsec, because both sides were zero.
 //
@@ -157,7 +158,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 // deterministic as well as honest — it asserts astrogo's response to a known
 // pole rather than to whatever a bulletin happens to say today.
 func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -168,17 +169,17 @@ func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
 	atm.Model = atmosphere.RefractionNone{}
 
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-5.4))
-	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	instant := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	observed := func(xpArcsec, ypArcsec float64) coord.AltAz {
 		t.Helper()
 
-		time.RegisterModel(fixedEOP{
+		epoch.RegisterModel(fixedEOP{
 			xp: angle.Arcsec(xpArcsec).Radians(),
 			yp: angle.Arcsec(ypArcsec).Radians(),
 		})
 
-		aa, err := mustContext(t, epoch, site, atm).ICRSToAltAz(star)
+		aa, err := mustContext(t, instant, site, atm).ICRSToAltAz(star)
 		if err != nil {
 			t.Fatalf("ICRSToAltAz: %v", err)
 		}
@@ -226,8 +227,8 @@ type fixedEOP struct {
 	xp, yp float64
 }
 
-func (m fixedEOP) EOP(_ float64) (time.EOP, error) {
-	return time.EOP{DUT1: m.dut1, XP: m.xp, YP: m.yp}, nil
+func (m fixedEOP) EOP(_ float64) (epoch.EOP, error) {
+	return epoch.EOP{DUT1: m.dut1, XP: m.xp, YP: m.yp}, nil
 }
 
 // altAzSeparationArcsec is the angle between two horizontal directions.
@@ -285,7 +286,7 @@ func altAzSeparationArcsec(a, b coord.AltAz) float64 {
 // gives zero, a doubled one gives twice — both are 100% away from a bound of
 // 0.1%.
 func TestObserverVectorRotatesWithUT1(t *testing.T) {
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -295,14 +296,14 @@ func TestObserverVectorRotatesWithUT1(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
-	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	instant := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	longitudeWith := func(dut1 float64) float64 {
 		t.Helper()
 
-		time.RegisterModel(fixedEOP{dut1: dut1})
+		epoch.RegisterModel(fixedEOP{dut1: dut1})
 
-		v := mustContext(t, epoch, site, atm).ObsVec()
+		v := mustContext(t, instant, site, atm).ObsVec()
 
 		return math.Atan2(v.Y, v.X) / math.Pi * 180 * 3600
 	}
@@ -372,7 +373,7 @@ func wrapArcsec(d float64) float64 {
 // arcseconds for the Moon and nothing at all for anything further away. Small,
 // and silent, which is the combination worth a test.
 func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -382,17 +383,17 @@ func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
-	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	instant := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	obsVecWith := func(xpArcsec, ypArcsec float64) vector.Vec3 {
 		t.Helper()
 
-		time.RegisterModel(fixedEOP{
+		epoch.RegisterModel(fixedEOP{
 			xp: angle.Arcsec(xpArcsec).Radians(),
 			yp: angle.Arcsec(ypArcsec).Radians(),
 		})
 
-		return mustContext(t, epoch, site, atm).ObsVec()
+		return mustContext(t, instant, site, atm).ObsVec()
 	}
 
 	const (

@@ -3,11 +3,12 @@ package plan
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -43,7 +44,7 @@ const maxEpisodeSearchSteps = 10
 // the way SunEvents/MoonEvents do for their specific bodies; a caller
 // wanting that runs its own solver with site.SunRiseSetThreshold(), or for
 // the Moon with RiseSetThreshold() and EventSpec.UpperLimb.
-func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Event, error) {
+func visibilityEvents(target Observable, site *Site, start, end epoch.Time) ([]Event, error) {
 	return NewEventSolver(unit.Minutes(15), unit.Seconds(1)).Find(EventSpec{
 		Family:    EventFamilyVisibility,
 		Kind:      EventAnyVisibility,
@@ -66,15 +67,15 @@ func visibilityEvents(target Observable, site *Site, start, end time.Time) ([]Ev
 // calendar day is measured in; site's location (via site.Location()) is
 // used for the geometry, and the two need not agree (a caller may
 // legitimately want "Paris's calendar day" applied to "Mauna Kea's sky").
-func DayEvents(target Observable, site *Site, day time.Time, loc *time.Location) (rise, set, transit *Event, err error) {
+func DayEvents(target Observable, site *Site, day epoch.Time, loc *time.Location) (rise, set, transit *Event, err error) {
 	if loc == nil {
-		loc = time.LocationUTC
+		loc = time.UTC
 	}
 
 	local := day.GoTime().In(loc)
 	y, m, d := local.Date()
 
-	start := time.FromGo(time.GoDate(y, m, d, 0, 0, 0, 0, loc))
+	start := epoch.FromGo(time.Date(y, m, d, 0, 0, 0, 0, loc))
 	end := start.Add(unit.Days(1))
 
 	events, err := visibilityEvents(target, site, start, end)
@@ -113,7 +114,7 @@ func DayEvents(target Observable, site *Site, day time.Time, loc *time.Location)
 // the Moon 0.18° higher than the solver did at every moonrise, so just before
 // a rise or just after a set it said "up" where the solver said "down", and
 // Episode returned the episode that had already ended (#422).
-func isAboveHorizon(target Observable, site *Site, t time.Time) (bool, error) {
+func isAboveHorizon(target Observable, site *Site, t epoch.Time) (bool, error) {
 	pos, err := target.Position(t)
 	if err != nil {
 		return false, fmt.Errorf("plan: position: %w", err)
@@ -141,7 +142,7 @@ func isAboveHorizon(target Observable, site *Site, t time.Time) (bool, error) {
 // horizon for a long stretch still terminates instead of searching
 // forever. A nil, nil return means none was found within that bound — the
 // circumpolar/never-rises case — not an error.
-func searchEvent(target Observable, site *Site, from time.Time, k EventKind, forward bool, maxSpanDays float64) (*Event, error) {
+func searchEvent(target Observable, site *Site, from epoch.Time, k EventKind, forward bool, maxSpanDays float64) (*Event, error) {
 	edge := from
 	step := initialSearchStepDays
 
@@ -150,7 +151,7 @@ func searchEvent(target Observable, site *Site, from time.Time, k EventKind, for
 			step = maxSpanDays
 		}
 
-		var start, end time.Time
+		var start, end epoch.Time
 
 		if forward {
 			start, end = edge, edge.Add(unit.Days(step))
@@ -301,7 +302,7 @@ const episodeClosedFormMargin = 1.0 // degrees
 // culmination altitudes bounds nothing — the Moon moves 28 degrees of
 // declination in a fortnight, and a body below the horizon today may rise next
 // week. Those keep searching.
-func culminationSkipsSearch(target Observable, site *Site, at time.Time) bool {
+func culminationSkipsSearch(target Observable, site *Site, at epoch.Time) bool {
 	if _, moving := target.(MovingBody); moving {
 		return false
 	}

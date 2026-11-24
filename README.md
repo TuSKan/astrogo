@@ -21,10 +21,10 @@ Scale-aware time arithmetic · SOFA-rigorous coordinate transforms · rise/set w
 
 Fifteen lines: where's Mars right now, and when does it rise, transit, and set from your backyard?
 
-> **One thing to know before your first file.** `astrogo/time` is named `time`, so a file that
-> also needs the standard library's will not compile until one of them is aliased:
-> `atime "github.com/TuSKan/astrogo/time"` is the convention here. The example below needs only
-> astrogo's, so it imports it plain.
+> **One thing to know before your first file.** astrogo's instants are in `epoch` and Go's clock
+> is in `time`, side by side under their own names: `epoch.Time` is an instant on an astronomical
+> time scale and `time.Time` is the standard library's, and `epoch.UTC` (a scale) sits beside
+> `time.UTC` (a location). The example below uses both.
 
 ```go
 // Package main is the README's first example: where Mars is tonight from
@@ -34,11 +34,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -50,7 +51,7 @@ func main() {
 
 	mars := plan.NewMars(ephemeris.Default())
 
-	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	tonight := epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC)
 
 	eval, err := plan.IsObservable(mars, site, tonight, plan.Altitude{Threshold: angle.Deg(30)})
 	if err != nil {
@@ -107,7 +108,7 @@ catalog's proper motion, parallax and radial velocity into km/s on the ICRS axes
 
 Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
 
-Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`time.RegisterModel`, `time.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else astrogo owns is reassignable: `time` exports no mutable function values, its layout strings are constants, and `time.J2000()` is a function precisely so the standard epoch cannot be moved process-wide. The one exception is `time.LocationUTC`, and it is Go's own — the standard library declares `var UTC *Location`, so wrapping it would hand back the same reassignable pointer and remove nothing. `internal/docsguard` keeps an inventory of every remaining `var`, each with the reason Go offers no alternative, so the next one has to be argued for rather than added.
+Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`epoch.RegisterModel`, `epoch.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else astrogo owns is reassignable: `epoch` exports no mutable function values and re-exports nothing from the standard library, and `epoch.J2000()` is a function precisely so the standard epoch cannot be moved process-wide. `internal/docsguard` keeps an inventory of every remaining `var`, each with the reason Go offers no alternative, so the next one has to be argued for rather than added.
 
 ---
 
@@ -211,7 +212,7 @@ tables you can check against published references.
   - Fairhead & Bretagnon (1990) TDB correction, its leading 37 terms (≤0.79 µs over 1900–2100, ≤3 µs over −1000 to 3000)
   - Cross-scale comparisons auto-unify via TT (2 ns same-scale fast path)
   - `UT1()` returns `(Time, error)`: an error when a loaded IERS bulletin starts after the epoch; past its end, ΔT held at its last measured value; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
-  - One ΔT = TT − UT1 for every conversion, `time.DeltaT`: Espenak & Meeus (2006) before 1960, the IERS bulletin's measured value where it covers, and that value held past its end, with `time.DeltaTUncertainty` growing from there
+  - One ΔT = TT − UT1 for every conversion, `epoch.DeltaT`: Espenak & Meeus (2006) before 1960, the IERS bulletin's measured value where it covers, and that value held past its end, with `epoch.DeltaTUncertainty` growing from there
 
 ### Coordinate systems
 - ICRS
@@ -440,7 +441,7 @@ be able to break an API until 1.0 says otherwise.
 | `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) |
 | `angle` | Angular types, HMS/DMS parsing |
 | `vector` | 3D geometry primitives |
-| `time` | Astronomical time scales (JD-based: UTC/TAI/TT/TDB/UT1, the GNSS system times GPST/BDT, and the coordinate times TCG/TCB), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
+| `epoch` | Astronomical time scales (JD-based: UTC/TAI/TT/TDB/UT1, the GNSS system times GPST/BDT, and the coordinate times TCG/TCB), Earth Orientation Parameters (DUT1, polar motion), epoch arithmetic (MJD, GAST, Julian epoch year, day-of-year) |
 | `atmosphere` | Refraction models, airmass, dispersion |
 | `coord` | Coordinate frames (ICRS, AltAz, Galactic, Ecliptic, FK4/B1950, FK5/J2000, CIRS and TETE apparent places, ITRS, HCRS, Supergalactic, Galactocentric, and `SkyOffset` centered on a target), topocentric reduction, Local Standard of Rest radial velocities |
 | `ephemeris` | Solar system ephemerides (SOFA + JPL SPK) |
@@ -672,7 +673,7 @@ at runtime, lazily the first time it's needed: a pre-seeded
 finals2000A file on disk, then (consent-gated via `remote.EnableDownloads`) a network
 fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
 
-That fetch is supplied by `remote/eop`, not reached for by `time`, and it is one
+That fetch is supplied by `remote/eop`, not reached for by `epoch`, and it is one
 blank import:
 
 ```go
@@ -686,11 +687,11 @@ which cannot then import it back. Naming it is what turns EOP on.
 The lazy load cannot report a failure, since `Time.EOP` returns no error: a
 missing import, or consent granted after the first lookup, costs every result up
 to 13.5″ with only a log line to say so. To load the bulletin when you choose,
-under your context, and learn whether it worked, call `time.LoadEOP`:
+under your context, and learn whether it worked, call `epoch.LoadEOP`:
 
 ```go
 remote.EnableDownloads(0, remote.IERSFinals2000A) // or pre-seed finals2000A.data
-if err := time.LoadEOP(ctx); err != nil {
+if err := epoch.LoadEOP(ctx); err != nil {
     log.Fatal(err) // no loader imported, no consent and nothing cached, or the IERS unreachable
 }
 ```
@@ -700,7 +701,7 @@ bulletin, and what it loads stays the model. A `coord.Context` then reports what
 its places were built with: `ctx.EOPSource()` gives `"network"` or `"cache"`, and
 whether the instant is inside the bulletin, or `"zero"` when nothing was loaded.
 
-A program that imports `astrogo/time` without it links no network stack at
+A program that imports `astrogo/epoch` without it links no network stack at
 all — measured with go1.27 on windows/amd64, a binary computing a Julian date is
 **3.0 MB rather than 6.3 MB** — and degrades to zero EOP with a one-time warning,
 which costs about an arcsecond of topocentric position. To read a pre-seeded file
@@ -793,11 +794,11 @@ For this library 0.5 s is 0.3 arcsec of lunar motion, 7.5 arcsec of Earth rotati
 
 This is the host's clock, not astrogo's, so there is nothing to fix — only something to know:
 
-- An epoch built with `time.Date` or `time.FromJD` never touches a clock and is never smeared. Anything meant to be reproducible should be doing this regardless.
+- An epoch built with `epoch.Date` or `epoch.FromJD` never touches a clock and is never smeared. Anything meant to be reproducible should be doing this regardless.
 - PTP (IEEE 1588) distributes TAI plus the current UTC offset, so there is no step to smear. NTP distributes UTC and may.
 - `Time.LeapSmearWindow` reports whether an epoch falls within a day of a leap second and names the step, so a caller can treat those as good to 0.5 s rather than to the microsecond. It is false for every instant since 2016-12-31.
 
-See [`time`'s package documentation](https://pkg.go.dev/github.com/TuSKan/astrogo/time) for the full account.
+See [`epoch`'s package documentation](https://pkg.go.dev/github.com/TuSKan/astrogo/epoch) for the full account.
 
 ### Scheduler Optimality
 
@@ -819,7 +820,7 @@ The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the
 
 The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `time.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 
@@ -827,7 +828,7 @@ The TDB−TT correction is Fairhead & Bretagnon (1990) truncated to its leading 
 - Deep-space probe telemetry (needs full JPL DE-based TDB)
 - Sub-microsecond timing array work
 
-Full ephemeris-based TDB would add ~500× overhead per call. This trade-off is documented in `time/time.go`.
+Full ephemeris-based TDB would add ~500× overhead per call. This trade-off is documented in `epoch/time.go`.
 
 ---
 

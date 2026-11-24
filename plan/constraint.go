@@ -10,7 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/vector"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Result represents the outcome of a constraint check.
@@ -36,7 +36,7 @@ func (r Result) String() string {
 // Constraint defines the interface for an observing requirement.
 type Constraint interface {
 	// Check evaluates the constraint for a given target, time, and site.
-	Check(obj Observable, site *Site, t time.Time) (Result, error)
+	Check(obj Observable, site *Site, t epoch.Time) (Result, error)
 }
 
 // ConstraintCtx is an optional extension of Constraint that accepts a
@@ -56,7 +56,7 @@ type ConstraintCtx interface {
 	// constraint that needs another instant takes a copy (c := *ctx) and moves
 	// that; calling ctx.SetTime on the one it was given corrupts what everything
 	// else sees, and is a data race under RankObservables.
-	CheckCtx(obj Observable, site *Site, t time.Time, ctx *coord.Context) (Result, error)
+	CheckCtx(obj Observable, site *Site, t epoch.Time, ctx *coord.Context) (Result, error)
 }
 
 // Compile-time assertions that every built-in constraint actually
@@ -79,7 +79,7 @@ type Altitude struct {
 }
 
 // Check evaluates whether the target's altitude meets the threshold.
-func (c Altitude) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c Altitude) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -89,7 +89,7 @@ func (c Altitude) Check(obj Observable, site *Site, t time.Time) (Result, error)
 }
 
 // CheckCtx evaluates altitude using a pre-built coord.Context.
-func (c Altitude) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
+func (c Altitude) CheckCtx(obj Observable, _ *Site, t epoch.Time, ctx *coord.Context) (Result, error) {
 	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return Result{}, err
@@ -117,7 +117,7 @@ type Airmass struct {
 }
 
 // Check evaluates whether the target's airmass is within the threshold.
-func (c Airmass) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c Airmass) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -127,7 +127,7 @@ func (c Airmass) Check(obj Observable, site *Site, t time.Time) (Result, error) 
 }
 
 // CheckCtx evaluates airmass using a pre-built coord.Context.
-func (c Airmass) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
+func (c Airmass) CheckCtx(obj Observable, _ *Site, t epoch.Time, ctx *coord.Context) (Result, error) {
 	am, err := skyAirmassCtx(obj, t, ctx)
 	if err != nil {
 		if errors.Is(err, atmosphere.ErrBelowHorizon) {
@@ -160,7 +160,7 @@ type Sun struct {
 }
 
 // Check evaluates whether the Sun's altitude meets the threshold.
-func (c Sun) Check(_ Observable, site *Site, t time.Time) (Result, error) {
+func (c Sun) Check(_ Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -171,13 +171,13 @@ func (c Sun) Check(_ Observable, site *Site, t time.Time) (Result, error) {
 
 // CheckCtx evaluates Sun altitude using a pre-built coord.Context.
 // The obj parameter is ignored — the Sun position is always computed internally.
-func (c Sun) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
+func (c Sun) CheckCtx(obj Observable, _ *Site, t epoch.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 
 // checkSky is CheckCtx with the Sun's altitude taken from a scheduling run's
 // record, which every target at t shares (#913). A nil sky computes it.
-func (c Sun) checkSky(obj Observable, t time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
+func (c Sun) checkSky(obj Observable, t epoch.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	// If we are checking the Sun itself against a Sun constraint, don't penalize.
 	if p, ok := obj.(*Planet); ok && p.IsSun() {
 		return Result{Pass: true, Value: 0}, nil
@@ -211,7 +211,7 @@ type MoonSep struct {
 }
 
 // Check evaluates Moon separation for a given target and time.
-func (c MoonSep) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c MoonSep) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -223,14 +223,14 @@ func (c MoonSep) Check(obj Observable, site *Site, t time.Time) (Result, error) 
 // CheckCtx evaluates Moon separation using a pre-built coord.Context. The
 // separation is the one the site sees, from both positions as the observer
 // has them (see topocentricPosition).
-func (c MoonSep) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
+func (c MoonSep) CheckCtx(obj Observable, _ *Site, t epoch.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 
 // checkSky is CheckCtx with the Moon's place taken from a scheduling run's
 // record, which every target at the instant shares (#913). A nil sky computes
 // it.
-func (c MoonSep) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
+func (c MoonSep) checkSky(obj Observable, _ epoch.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget
 	}
@@ -289,7 +289,7 @@ type MoonIllum struct {
 }
 
 // Check evaluates Moon illumination for a given target and time.
-func (c MoonIllum) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c MoonIllum) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -299,7 +299,7 @@ func (c MoonIllum) Check(obj Observable, site *Site, t time.Time) (Result, error
 }
 
 // CheckCtx evaluates Moon illumination using a pre-built coord.Context.
-func (c MoonIllum) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Context) (Result, error) {
+func (c MoonIllum) CheckCtx(obj Observable, _ *Site, t epoch.Time, ctx *coord.Context) (Result, error) {
 	return c.checkSky(obj, t, ctx, nil)
 }
 
@@ -307,7 +307,7 @@ func (c MoonIllum) CheckCtx(obj Observable, _ *Site, t time.Time, ctx *coord.Con
 // run's record, which every target at the instant shares (#913). A nil sky
 // computes it. So does a caller's own Provider, since the record holds the
 // default ephemeris's answer.
-func (c MoonIllum) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky *runSky) (Result, error) {
+func (c MoonIllum) checkSky(obj Observable, _ epoch.Time, ctx *coord.Context, sky *runSky) (Result, error) {
 	if p, ok := obj.(*Planet); ok && p.IsMoon() {
 		return Result{Pass: true, Value: 0}, nil
 	}
@@ -381,7 +381,7 @@ func (c MoonIllum) checkSky(obj Observable, _ time.Time, ctx *coord.Context, sky
 // cached rotation matrix and observer vector the Context already holds, so
 // this is the ~325 ns transform either way — the 91 µs Apco13 computation
 // happens once per epoch and is untouched.
-func observedAltAz(obj any, t time.Time, ctx *coord.Context, pos coord.ICRS) (coord.AltAz, error) {
+func observedAltAz(obj any, t epoch.Time, ctx *coord.Context, pos coord.ICRS) (coord.AltAz, error) {
 	mb, ok := obj.(MovingBody)
 	if !ok {
 		aa, err := ctx.ICRSToAltAz(pos)
@@ -406,7 +406,7 @@ func observedAltAz(obj any, t time.Time, ctx *coord.Context, pos coord.ICRS) (co
 // the Moon at 30.76° (#634). Unlike observedAltAz this leaves out
 // refraction, which would bend two directions near the horizon by different
 // amounts, so the result is comparable with any topocentric separation.
-func topocentricPosition(obj Observable, t time.Time, ctx *coord.Context) (coord.ICRS, error) {
+func topocentricPosition(obj Observable, t epoch.Time, ctx *coord.Context) (coord.ICRS, error) {
 	mb, ok := obj.(MovingBody)
 	if !ok {
 		pos, err := obj.Position(t)
@@ -432,7 +432,7 @@ func topocentricDirection(v vector.Vec3, ctx *coord.Context) coord.ICRS {
 }
 
 // skyAltAzCtx computes alt/az using a pre-built coord.Context.
-func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+func skyAltAzCtx(obj Observable, t epoch.Time, ctx *coord.Context) (coord.AltAz, error) {
 	if obj == nil {
 		return coord.AltAz{}, ErrNilTarget
 	}
@@ -451,7 +451,7 @@ func skyAltAzCtx(obj Observable, t time.Time, ctx *coord.Context) (coord.AltAz, 
 }
 
 // skyAirmassCtx computes airmass using a pre-built coord.Context.
-func skyAirmassCtx(obj Observable, t time.Time, ctx *coord.Context) (float64, error) {
+func skyAirmassCtx(obj Observable, t epoch.Time, ctx *coord.Context) (float64, error) {
 	aa, err := skyAltAzCtx(obj, t, ctx)
 	if err != nil {
 		return 0, err

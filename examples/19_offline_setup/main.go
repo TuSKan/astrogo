@@ -21,11 +21,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -99,7 +100,7 @@ func main() {
 	} else {
 		defer p.Close() //nolint:errcheck // best-effort cleanup in example code
 
-		state, err := eph.At(p, time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC)).Geometric(eph.MarsBarycenter, eph.Earth)
+		state, err := eph.At(p, epoch.Date(2026, 4, 6, 22, 0, 0, 0, time.UTC)).Geometric(eph.MarsBarycenter, eph.Earth)
 		if err != nil {
 			show.Fields(show.KV("Geometric", "%v", err))
 		} else {
@@ -111,26 +112,26 @@ func main() {
 		}
 	}
 
-	// ── 3. time.LoadEOP — local Earth-orientation data, loaded explicitly ──
-	show.Section("3. Earth orientation, loaded by time.LoadEOP")
+	// ── 3. epoch.LoadEOP — local Earth-orientation data, loaded explicitly ──
+	show.Section("3. Earth orientation, loaded by epoch.LoadEOP")
 
 	iersLoc := cacheLocation(ctx, remote.IERSFinals2000A, "finals2000A.data")
 
 	// No consent was granted for the bulletin, so LoadEOP's network step is
 	// refused before any request and it reads the cache. Unlike the lazy load
 	// a Time.EOP() triggers, it says when there is nothing to read.
-	if err := time.LoadEOP(ctx); err != nil {
+	if err := epoch.LoadEOP(ctx); err != nil {
 		show.Note(fmt.Sprintf("No local EOP cache at %s.", iersLoc),
 			"Call remote.EnableDownloads(0, remote.IERSFinals2000A) once, with",
 			"network access, to populate it, or ship finals2000A.data with your",
 			"deployment.",
-			fmt.Sprintf("time.LoadEOP: %v", err))
+			fmt.Sprintf("epoch.LoadEOP: %v", err))
 	} else {
-		lo, hi, _ := time.Coverage()
+		lo, hi, _ := epoch.Coverage()
 		show.Fields(
 			show.KV("Coverage", "MJD %.0f–%.0f", lo, hi),
 			show.KV("Bulletin", "%s", iersLoc),
-			show.KV("Source", "%s", time.EOPSource()),
+			show.KV("Source", "%s", epoch.EOPSource()),
 		)
 	}
 

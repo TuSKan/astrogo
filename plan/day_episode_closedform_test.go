@@ -2,11 +2,12 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -31,7 +32,7 @@ import (
 func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 	t.Parallel()
 
-	base := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 
 	const (
 		sweepSteps = 96 // 15-minute steps across a day: every hour angle
@@ -56,7 +57,7 @@ func TestCulminationSkipsSearchIsNeverAFalsePositive(t *testing.T) {
 		// this the test would pay an Apco13 solve per (latitude, declination,
 		// step) and take minutes.
 		ctxs := make([]*coord.Context, sweepSteps)
-		times := make([]time.Time, sweepSteps)
+		times := make([]epoch.Time, sweepSteps)
 
 		for i := range ctxs {
 			times[i] = base.Add(unit.Minutes(float64(i * dayMinutes / sweepSteps)))
@@ -136,7 +137,7 @@ func TestEpisodeStillSearchesNearTheHorizonBoundary(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	base := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 
 	// At latitude 50N a star culminates at dec + 40 above and dec − 40 below
 	// the horizon, so against the rise/set threshold h (34′ of refraction
@@ -195,7 +196,7 @@ func TestEpisodeDoesNotShortCircuitAMovingBody(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	base := time.Date(2026, time.March, 11, 0, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC)
 	moon := NewMoon(eph.Default())
 
 	if _, isMoving := Observable(moon).(MovingBody); !isMoving {
@@ -260,7 +261,7 @@ func BenchmarkEpisodeNeverRises(b *testing.B) {
 	}
 
 	star := NewStar("NeverUp", angle.Deg(0), angle.Deg(-85))
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(1))
 
 	b.ResetTimer()

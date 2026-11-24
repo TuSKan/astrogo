@@ -3,9 +3,10 @@ package plan
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -24,7 +25,7 @@ func TestSatellitePassesReturnEveryPropagationFailure(t *testing.T) {
 
 	// The first pass in six hours, and a window around just it, so the calls
 	// are few enough to fail in turn.
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 
 	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, site), Window{Start: start, End: start.Add(unit.Hours(6))}, WithMinElevation(minEl))
 	if err != nil || len(passes) == 0 {

@@ -15,9 +15,9 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -138,7 +138,7 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 
 	for _, body := range smallBodies() {
 		t.Run(body.name, func(t *testing.T) {
-			el, epoch, ok := smallBodyElements(t, provider, body)
+			el, at, ok := smallBodyElements(t, provider, body)
 			if !ok {
 				return
 			}
@@ -149,8 +149,8 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			// requested epoch".
 			const marginDays = 5
 
-			start := epoch.Add(unit.Days(-keplerSmallBodySpanDays - marginDays))
-			stop := epoch.Add(unit.Days(keplerSmallBodySpanDays + marginDays))
+			start := at.Add(unit.Days(-keplerSmallBodySpanDays - marginDays))
+			stop := at.Add(unit.Days(keplerSmallBodySpanDays + marginDays))
 
 			p, err := jpl.NewProvider(context.Background(), core.SmallBody, body.designation,
 				jpl.WithTimeInterval(start, stop))
@@ -171,7 +171,7 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 			sbID, _ := core.SmallBodyID(body.id)
 
 			for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
-				at := epoch.Add(unit.Days(float64(dt)))
+				at := at.Add(unit.Days(float64(dt)))
 
 				want, werr := eph.At(p, at).Geometric(sbID, core.Earth)
 				if werr != nil {
@@ -210,7 +210,7 @@ func TestKeplerSmallBodyAgainstSPK(t *testing.T) {
 
 // smallBodyElements resolves one body's published osculating elements.
 func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
-	kepler.Elements, time.Time, bool,
+	kepler.Elements, epoch.Time, bool,
 ) {
 	t.Helper()
 
@@ -219,13 +219,13 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("Resolve(%d) for %s: %v", body.id, body.name, err)
 
-		return kepler.Elements{}, time.Time{}, false
+		return kepler.Elements{}, epoch.Time{}, false
 	}
 
 	if !target.HasElements {
 		t.Skipf("SBDB returned no elements for %s", body.name)
 
-		return kepler.Elements{}, time.Time{}, false
+		return kepler.Elements{}, epoch.Time{}, false
 	}
 
 	el, err := kepler.NewElements(target.Epoch, target.SemiMajorAxis, target.Eccentricity,
@@ -233,7 +233,7 @@ func smallBodyElements(t *testing.T, provider *sbdb.Provider, body smallBody) (
 	if err != nil {
 		t.Errorf("%s: NewElements from SBDB: %v", body.name, err)
 
-		return kepler.Elements{}, time.Time{}, false
+		return kepler.Elements{}, epoch.Time{}, false
 	}
 
 	return el, target.Epoch, true
@@ -278,13 +278,13 @@ func TestSmallBodyElementsCarryTheObliquityRotation(t *testing.T) {
 	smallest := math.Inf(1)
 
 	for _, body := range smallBodies() {
-		el, epoch, ok := smallBodyElements(t, provider, body)
+		el, at, ok := smallBodyElements(t, provider, body)
 		if !ok {
 			continue
 		}
 
 		for dt := -keplerSmallBodySpanDays; dt <= keplerSmallBodySpanDays; dt += 5 {
-			pos, _, err := el.StateAt(epoch.Add(unit.Days(float64(dt))))
+			pos, _, err := el.StateAt(at.Add(unit.Days(float64(dt))))
 			if err != nil {
 				t.Errorf("%s: StateAt: %v", body.name, err)
 

@@ -12,13 +12,14 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -50,7 +51,7 @@ func main() {
 	}()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
-	site, err := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.LocationUTC))
+	site, err := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.UTC))
 	if err != nil {
 		panic(err)
 	}
@@ -63,8 +64,8 @@ func main() {
 
 	// Search for all lunar eclipses from 5 BC to AD 1
 	// Astronomical years: 5 BC = -4, 1 BC = 0, AD 1 = 1
-	start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
-	end := time.DateJulianCal(2, 1, 1, 0, 0, 0)
+	start := epoch.DateJulianCal(-4, 1, 1, 0, 0, 0)
+	end := epoch.DateJulianCal(2, 1, 1, 0, 0, 0)
 
 	eclipses, err := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 	if err != nil {

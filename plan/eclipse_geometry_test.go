@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -41,15 +42,15 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 
 	lunar := []struct {
 		name      string
-		td        time.Time
+		td        epoch.Time
 		magnitude float64
 	}{
-		{"2026-03-03 total", time.Date(2026, 3, 3, 11, 34, 52, 0, time.LocationUTC), 2.1838},
-		{"2026-08-28 partial", time.Date(2026, 8, 28, 4, 14, 4, 0, time.LocationUTC), 1.9645},
+		{"2026-03-03 total", epoch.Date(2026, 3, 3, 11, 34, 52, 0, time.UTC), 2.1838},
+		{"2026-08-28 partial", epoch.Date(2026, 8, 28, 4, 14, 4, 0, time.UTC), 1.9645},
 	}
 
 	for _, c := range lunar {
-		td := time.FromJD(c.td.JD(), time.TDB)
+		td := epoch.FromJD(c.td.JD(), epoch.TDB)
 
 		g, err := newEclipseGeometry(td, prov)
 		if err != nil {
@@ -66,15 +67,15 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 
 	solar := []struct {
 		name  string
-		td    time.Time
+		td    epoch.Time
 		gamma float64
 	}{
-		{"2026-02-17 annular", time.Date(2026, 2, 17, 12, 13, 6, 0, time.LocationUTC), 0.9743},
-		{"2026-08-12 total", time.Date(2026, 8, 12, 17, 47, 6, 0, time.LocationUTC), 0.8977},
+		{"2026-02-17 annular", epoch.Date(2026, 2, 17, 12, 13, 6, 0, time.UTC), 0.9743},
+		{"2026-08-12 total", epoch.Date(2026, 8, 12, 17, 47, 6, 0, time.UTC), 0.8977},
 	}
 
 	for _, c := range solar {
-		td := time.FromJD(c.td.JD(), time.TDB)
+		td := epoch.FromJD(c.td.JD(), epoch.TDB)
 
 		g, err := newEclipseGeometry(td, prov)
 		if err != nil {
@@ -92,7 +93,7 @@ func TestEclipseGeometryReproducesNASA2026(t *testing.T) {
 // checkGreatestEclipse finds the one eclipse within three days of td and
 // checks its time against td.
 func checkGreatestEclipse(t *testing.T, name string, find func(w Window, prov eph.Provider) ([]EclipseEvent, error),
-	td time.Time, prov eph.Provider, tolMinutes float64,
+	td epoch.Time, prov eph.Provider, tolMinutes float64,
 ) {
 	t.Helper()
 
@@ -121,7 +122,7 @@ func TestSolarPenumbraMarginSeesTheFlattenedLimb(t *testing.T) {
 	// At J2000 the true pole is GCRS z to within the frame bias and a few
 	// arcseconds of nutation, so the axis along x has declination ~0 and the
 	// outline's short axis is z.
-	at := time.J2000()
+	at := epoch.J2000()
 	sun := vector.Vec3{X: -auKm}
 
 	toPole := eclipseGeometry{sun: sun, moon: vector.Vec3{X: -moonKm, Z: offsetKm}}.solarPenumbraMargin(at)
@@ -183,23 +184,23 @@ func TestEclipsesAreDecidedByTheShadow(t *testing.T) {
 	cases := []struct {
 		name string
 		find func(w Window, prov eph.Provider) ([]EclipseEvent, error)
-		at   time.Time
+		at   epoch.Time
 		want bool
 	}{
 		// NASA: 09553, type Ne, penumbral magnitude 0.0135, gamma -1.5380,
 		// greatest eclipse 04:00:15 TD. Latitude at the syzygy 1.580°, just
 		// past the old limit.
-		{"1958-04-04 penumbral lunar eclipse", LunarEclipses, time.Date(1958, 4, 4, 4, 0, 15, 0, time.LocationUTC), true},
+		{"1958-04-04 penumbral lunar eclipse", LunarEclipses, epoch.Date(1958, 4, 4, 4, 0, 15, 0, time.UTC), true},
 		// Latitude 1.546°: inside the old limit, outside the penumbra by 0.12
 		// of the Moon's diameter.
-		{"1987-03-15 Full Moon", LunarEclipses, time.Date(1987, 3, 15, 13, 31, 0, 0, time.LocationUTC), false},
+		{"1987-03-15 Full Moon", LunarEclipses, epoch.Date(1987, 3, 15, 13, 31, 0, 0, time.UTC), false},
 		// Latitude 1.533°: inside the old limit, the penumbra 0.11 Earth
 		// radii short of the limb.
-		{"1978-09-02 New Moon", SolarEclipses, time.Date(1978, 9, 2, 16, 28, 0, 0, time.LocationUTC), false},
+		{"1978-09-02 New Moon", SolarEclipses, epoch.Date(1978, 9, 2, 16, 28, 0, 0, time.UTC), false},
 	}
 
 	for _, c := range cases {
-		at := time.FromJD(c.at.JD(), time.TDB)
+		at := epoch.FromJD(c.at.JD(), epoch.TDB)
 
 		events, err := c.find(Window{Start: at.Add(unit.Days(-10)), End: at.Add(unit.Days(10))}, prov)
 		if err != nil {
@@ -245,10 +246,10 @@ func TestEclipseSearchReturnsEveryProviderFailure(t *testing.T) {
 	cases := []struct {
 		name       string
 		find       func(w Window, prov eph.Provider) ([]EclipseEvent, error)
-		start, end time.Time
+		start, end epoch.Time
 	}{
-		{"lunar", LunarEclipses, time.Date(2026, 2, 25, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 3, 10, 0, 0, 0, 0, time.LocationUTC)},
-		{"solar", SolarEclipses, time.Date(2026, 2, 10, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 2, 24, 0, 0, 0, 0, time.LocationUTC)},
+		{"lunar", LunarEclipses, epoch.Date(2026, 2, 25, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)},
+		{"solar", SolarEclipses, epoch.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 2, 24, 0, 0, 0, 0, time.UTC)},
 	}
 
 	for _, c := range cases {
@@ -287,23 +288,23 @@ func TestEclipseKindsAndMagnitudesMatchNASA(t *testing.T) {
 	for _, c := range []struct {
 		name      string
 		find      func(w Window, prov eph.Provider) ([]EclipseEvent, error)
-		td        time.Time
+		td        epoch.Time
 		kind      EclipseKind
 		magnitude float64
 		penumbral float64
 	}{
-		{"2024-03-25 penumbral", LunarEclipses, time.Date(2024, 3, 25, 7, 13, 59, 0, time.LocationUTC), EclipsePenumbral, -0.1325, 0.9557},
-		{"2024-09-18 partial", LunarEclipses, time.Date(2024, 9, 18, 2, 45, 25, 0, time.LocationUTC), EclipsePartial, 0.0848, 1.0372},
-		{"2025-03-14 total", LunarEclipses, time.Date(2025, 3, 14, 6, 59, 56, 0, time.LocationUTC), EclipseTotal, 1.1784, 2.2595},
-		{"2026-08-28 partial", LunarEclipses, time.Date(2026, 8, 28, 4, 14, 4, 0, time.LocationUTC), EclipsePartial, 0.9299, 1.9645},
-		{"2023-04-20 hybrid", SolarEclipses, time.Date(2023, 4, 20, 4, 17, 56, 0, time.LocationUTC), EclipseHybrid, 1.0132, 0},
-		{"2023-10-14 annular", SolarEclipses, time.Date(2023, 10, 14, 18, 0, 41, 0, time.LocationUTC), EclipseAnnular, 0.9520, 0},
-		{"2026-08-12 total", SolarEclipses, time.Date(2026, 8, 12, 17, 47, 6, 0, time.LocationUTC), EclipseTotal, 1.0386, 0},
-		{"2025-03-29 partial", SolarEclipses, time.Date(2025, 3, 29, 10, 48, 36, 0, time.LocationUTC), EclipsePartial, 0.9376, 0},
-		{"2043-04-09 non-central total", SolarEclipses, time.Date(2043, 4, 9, 18, 57, 49, 0, time.LocationUTC), EclipseTotal, 1.0095, 0},
-		{"2043-10-03 non-central annular", SolarEclipses, time.Date(2043, 10, 3, 3, 1, 49, 0, time.LocationUTC), EclipseAnnular, 0.9497, 0},
+		{"2024-03-25 penumbral", LunarEclipses, epoch.Date(2024, 3, 25, 7, 13, 59, 0, time.UTC), EclipsePenumbral, -0.1325, 0.9557},
+		{"2024-09-18 partial", LunarEclipses, epoch.Date(2024, 9, 18, 2, 45, 25, 0, time.UTC), EclipsePartial, 0.0848, 1.0372},
+		{"2025-03-14 total", LunarEclipses, epoch.Date(2025, 3, 14, 6, 59, 56, 0, time.UTC), EclipseTotal, 1.1784, 2.2595},
+		{"2026-08-28 partial", LunarEclipses, epoch.Date(2026, 8, 28, 4, 14, 4, 0, time.UTC), EclipsePartial, 0.9299, 1.9645},
+		{"2023-04-20 hybrid", SolarEclipses, epoch.Date(2023, 4, 20, 4, 17, 56, 0, time.UTC), EclipseHybrid, 1.0132, 0},
+		{"2023-10-14 annular", SolarEclipses, epoch.Date(2023, 10, 14, 18, 0, 41, 0, time.UTC), EclipseAnnular, 0.9520, 0},
+		{"2026-08-12 total", SolarEclipses, epoch.Date(2026, 8, 12, 17, 47, 6, 0, time.UTC), EclipseTotal, 1.0386, 0},
+		{"2025-03-29 partial", SolarEclipses, epoch.Date(2025, 3, 29, 10, 48, 36, 0, time.UTC), EclipsePartial, 0.9376, 0},
+		{"2043-04-09 non-central total", SolarEclipses, epoch.Date(2043, 4, 9, 18, 57, 49, 0, time.UTC), EclipseTotal, 1.0095, 0},
+		{"2043-10-03 non-central annular", SolarEclipses, epoch.Date(2043, 10, 3, 3, 1, 49, 0, time.UTC), EclipseAnnular, 0.9497, 0},
 	} {
-		td := time.FromJD(c.td.JD(), time.TDB)
+		td := epoch.FromJD(c.td.JD(), epoch.TDB)
 
 		events, err := c.find(Window{Start: td.Add(unit.Days(-3)), End: td.Add(unit.Days(3))}, prov)
 		if err != nil || len(events) != 1 {

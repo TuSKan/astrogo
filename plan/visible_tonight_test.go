@@ -4,13 +4,14 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -85,7 +86,7 @@ var vega = resolve.Target{
 	HasCoord: true, VMag: 0.03, HasVMag: true, Catalog: "SIMBAD",
 }
 
-var testNight = time.Date(2026, 8, 1, 12, 0, 0, 0, time.LocationUTC)
+var testNight = epoch.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 
 // findByName returns the result named name, if present. ephemeris.Default()
 // supports all 8 major planets via SOFA's Plan94 (not just Sun/Moon), so at
@@ -205,7 +206,7 @@ func TestVisibleTonight_MidnightNightOrdersDawnAfterDusk(t *testing.T) {
 	t.Parallel()
 
 	// Local midnight at Quinta Calixto (UTC-3) on 2026-08-01 is 2026-08-01T03:00:00Z.
-	midnightNight := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
+	midnightNight := epoch.Date(2026, time.August, 1, 3, 0, 0, 0, time.UTC)
 
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{sirius}}}
 
@@ -245,7 +246,7 @@ func TestVisibleTonight_PeakBelowTheAstronomicalHorizon(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	night := time.Date(2026, time.August, 1, 3, 0, 0, 0, time.LocationUTC)
+	night := epoch.Date(2026, time.August, 1, 3, 0, 0, 0, time.UTC)
 	sources := []resolve.BrightObjectSearcher{&mockBrightSource{targets: []resolve.Target{grazer}}}
 
 	results, err := plan.VisibleTonight(context.Background(), site, night, sources, ephemeris.Default(), 8)

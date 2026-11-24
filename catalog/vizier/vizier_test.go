@@ -18,8 +18,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/remote"
@@ -412,7 +412,7 @@ func TestTableEpochsAreTheirJulianEpochs(t *testing.T) {
 
 	for _, c := range []struct {
 		name  string
-		epoch time.Time
+		epoch epoch.Time
 		years float64
 	}{
 		{"2MASS", epoch2MASS, 0},
@@ -454,7 +454,7 @@ func TestVizierConeCenterIsMovedToTheTablesEpoch(t *testing.T) {
 	redirect(t, server.URL)
 
 	barnard := coord.NewICRSWithKinematics(angle.Deg(269.4520769586), angle.Deg(4.6933649666),
-		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11), time.J2000())
+		angle.Arcsec(-0.8015510), angle.Arcsec(10.3623940), angle.Arcsec(0.5469759), unit.KmPerSec(-110.11), epoch.J2000())
 
 	req := resolve.ConeRequest{Table: "I/239/hip_main", Center: barnard, Radius: angle.Arcsec(5), Limit: 5}
 	prov.ConeSearch(context.Background(), req)(func(resolve.Target, error) bool { return true })

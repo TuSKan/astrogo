@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -19,7 +19,7 @@ type fixedVecProvider struct {
 	vec vector.Vec3
 }
 
-func (p *fixedVecProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+func (p *fixedVecProvider) Locate(id eph.ID, _ epoch.Time) (eph.State, error) {
 	return geocentricMock(id, p.vec, vector.Vec3{})
 }
 
@@ -169,7 +169,7 @@ type atObserver struct {
 	at vector.Vec3
 }
 
-func (a atObserver) GeocentricVec(time.Time) (vector.Vec3, error) { return a.at, nil }
+func (a atObserver) GeocentricVec(epoch.Time) (vector.Vec3, error) { return a.at, nil }
 
 // TestAngularDiameter_DetailsAutoPopulateAndOverride confirms the
 // plan/details.go wiring: TargetDetails.AngularSize is populated

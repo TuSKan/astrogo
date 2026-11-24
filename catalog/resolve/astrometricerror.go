@@ -2,7 +2,7 @@ package resolve
 
 import (
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // AstrometricError is the published uncertainty of a position and its proper
@@ -27,5 +27,5 @@ type AstrometricError struct {
 	// another: a catalog that moves a position and not its errors, as SIMBAD
 	// does a position it takes from Gaia, states the epoch the errors still
 	// hold at.
-	Epoch time.Time
+	Epoch epoch.Time
 }

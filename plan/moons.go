@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/parallel"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // PlanetaryMoon is a natural satellite of a planet other than Earth,
@@ -150,7 +150,7 @@ var moonSpecs = map[string]moonSpec{
 // moons finishes evaluating would break the others still using it. The
 // caller must Close every returned provider once ALL candidates (not just
 // these) have finished evaluating.
-func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64, dropped *skips) ([]visibleCandidate, []eph.Provider) {
+func gatherPlanetaryMoons(ctx context.Context, at epoch.Time, magLimit float64, dropped *skips) ([]visibleCandidate, []eph.Provider) {
 	byKernel := make(map[string][]moonSpec)
 
 	var kernels []string
@@ -204,7 +204,7 @@ func gatherPlanetaryMoons(ctx context.Context, at time.Time, magLimit float64, d
 // brighter than magLimit at the instant at is a candidate, and each one whose
 // magnitude cannot be computed is recorded in dropped rather than left out as
 // though it were too faint (#407).
-func moonCandidates(p eph.Provider, specs []moonSpec, at time.Time, magLimit float64, dropped *skips) []visibleCandidate {
+func moonCandidates(p eph.Provider, specs []moonSpec, at epoch.Time, magLimit float64, dropped *skips) []visibleCandidate {
 	var out []visibleCandidate
 
 	for _, m := range specs {

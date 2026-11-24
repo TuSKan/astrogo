@@ -21,7 +21,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/catalog/vizier"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Source represents an astronomical data provider type.
@@ -752,7 +752,7 @@ func anchor(g group) (candidate, coord.ICRS, bool) {
 			continue
 		}
 
-		propagated, err := coord.PropagateEpoch(posmatch.Coord(c.target), time.J2000())
+		propagated, err := coord.PropagateEpoch(posmatch.Coord(c.target), epoch.J2000())
 		if err != nil {
 			continue
 		}

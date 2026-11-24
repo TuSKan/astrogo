@@ -2,10 +2,11 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,7 +20,7 @@ import (
 // geometric place it replaces in moonElongation is 20″ off for the Sun.
 func TestFirstOrderApparentPlaceAgrees(t *testing.T) {
 	prov := eph.Default()
-	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 
 	worst := map[eph.ID]float64{}
 

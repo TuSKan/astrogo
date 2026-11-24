@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -16,11 +17,11 @@ import (
 type failingNearProvider struct {
 	eph.Provider
 
-	around time.Time
+	around epoch.Time
 	failed bool
 }
 
-func (p *failingNearProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
+func (p *failingNearProvider) Locate(id eph.ID, t epoch.Time) (core.State, error) {
 	if !p.failed && t.Sub(p.around).Abs() < unit.Hours(1) {
 		p.failed = true
 
@@ -42,7 +43,7 @@ func (p *failingNearProvider) Locate(id eph.ID, t time.Time) (core.State, error)
 // skipped the season instead and returned the other three with a nil error,
 // which no caller can tell from a year missing its equinox (#453).
 func TestSeasonsReturnARefinementFailure(t *testing.T) {
-	equinox := time.Date(2026, 3, 20, 14, 46, 0, 0, time.LocationUTC)
+	equinox := epoch.Date(2026, 3, 20, 14, 46, 0, 0, time.UTC)
 	prov := &failingNearProvider{Provider: eph.Default(), around: equinox}
 
 	seasons, err := Seasons(2026, prov)

@@ -18,10 +18,10 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Provider implements resolve.Provider and resolve.ConeSearcher
@@ -95,7 +95,7 @@ func (p *Provider) Search(_ context.Context, _ string) ([]resolve.Target, error)
 // 365.25 = 2457389.0. It was JD 2457388.5, midnight on 2016 January 1, half a
 // day early (#611). Gaia's epoch is in TCB; TT is 20 s from it, which no
 // proper motion notices.
-var gaiaDR3Epoch = time.FromJD(2457389.0, time.TT)
+var gaiaDR3Epoch = epoch.FromJD(2457389.0, epoch.TT)
 
 // ConeSearch performs a spatial cone search via the Gaia DR3 TAP service.
 //

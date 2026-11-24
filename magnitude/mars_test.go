@@ -3,11 +3,12 @@ package magnitude_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestMarsReproducesItsAuthorsTestData runs the Mars test cases Mallama and
@@ -127,7 +128,7 @@ func TestMarsGeometryAgreesWithHorizons(t *testing.T) {
 	)
 
 	for _, h := range marsHorizons {
-		tm := time.Date(h.y, time.Month(h.m), h.d, 0, 0, 0, 0, time.LocationUTC)
+		tm := epoch.Date(h.y, time.Month(h.m), h.d, 0, 0, 0, 0, time.UTC)
 		sunToPlanet, observerToPlanet, delta := marsVectors(t, p, tm)
 
 		subObserver, subSolar := magnitude.MarsSubLongitudes(sunToPlanet, observerToPlanet, delta, tm)
@@ -152,7 +153,7 @@ func TestMarsGeometryAgreesWithHorizons(t *testing.T) {
 
 // marsVectors is the geometry PlanetApparent builds for Mars at tm: the
 // heliocentric and geocentric vectors to Mars and the geocentric distance.
-func marsVectors(t *testing.T, p eph.Provider, tm time.Time) (sunToPlanet, observerToPlanet [3]float64, delta float64) {
+func marsVectors(t *testing.T, p eph.Provider, tm epoch.Time) (sunToPlanet, observerToPlanet [3]float64, delta float64) {
 	t.Helper()
 
 	mars, err := eph.At(p, tm).Geometric(eph.MarsBarycenter, eph.Earth)

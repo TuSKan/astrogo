@@ -6,8 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -82,7 +82,7 @@ var earthEquatorialRadiusKm = constants.WGS84.SemiMajorAxis.Value / 1000
 // auKm is the astronomical unit.
 var auKm = constants.IAU.AstronomicalUnit.Value / 1000
 
-func newEclipseGeometry(t time.Time, prov eph.Provider) (eclipseGeometry, error) {
+func newEclipseGeometry(t epoch.Time, prov eph.Provider) (eclipseGeometry, error) {
 	sun, err := eph.At(prov, t).Apparent(eph.Sun, eph.Geocenter())
 	if err != nil {
 		return eclipseGeometry{}, fmt.Errorf("eclipse: sun position: %w", err)
@@ -130,7 +130,7 @@ func (g eclipseGeometry) lunarMagnitudes() (penumbral, umbral float64) {
 // measured in the plane through the Moon perpendicular to the axis. It is
 // positive when the Moon is north of the axis, toward Earth's true pole of
 // date, as the canon's "+" for a central total eclipse is.
-func (g eclipseGeometry) lunarGamma(t time.Time) float64 {
+func (g eclipseGeometry) lunarGamma(t epoch.Time) float64 {
 	axis := g.sun.MulScalar(-1).Unit()
 	offset := g.moon.Sub(axis.MulScalar(g.moon.Dot(axis)))
 
@@ -139,7 +139,7 @@ func (g eclipseGeometry) lunarGamma(t time.Time) float64 {
 
 // truePole is the direction of Earth's true pole of date in GCRS: the third
 // row of the bias-precession-nutation matrix.
-func truePole(t time.Time) vector.Vec3 {
+func truePole(t epoch.Time) vector.Vec3 {
 	tt1, tt2 := t.TT().JDParts()
 	bpn := gofaext.Pnm06a(tt1, tt2)
 
@@ -212,7 +212,7 @@ type solarShadow struct {
 // is second order in it. Stretching the plane until the outline is a circle,
 // as Besselian elements do, would stretch the penumbra too, by up to 0.0018
 // Earth radii.
-func (g eclipseGeometry) solarShadow(t time.Time) solarShadow {
+func (g eclipseGeometry) solarShadow(t epoch.Time) solarShadow {
 	axis, crossing := g.solarShadowAxis()
 
 	// The cones: the penumbra's half-angle f1 and the umbra's f2, and their
@@ -260,7 +260,7 @@ func (g eclipseGeometry) solarShadow(t time.Time) solarShadow {
 // solarPenumbraMargin is how far, in Earth equatorial radii, the Moon's
 // penumbra reaches past Earth's limb as seen along the shadow axis: positive
 // when it falls on the Earth, which is an eclipse.
-func (g eclipseGeometry) solarPenumbraMargin(t time.Time) float64 {
+func (g eclipseGeometry) solarPenumbraMargin(t epoch.Time) float64 {
 	return g.solarShadow(t).margin()
 }
 
@@ -363,7 +363,7 @@ func (s solarShadow) surfaceHeight() float64 {
 // middle's. Against the canon — the six centuries plan's NASA test reads,
 // and 2001–2100 — this finds all 85 hybrids, 4 of which the instant alone
 // calls total.
-func solarEclipseKind(prov eph.Provider, t time.Time, s solarShadow) (EclipseKind, float64, error) {
+func solarEclipseKind(prov eph.Provider, t epoch.Time, s solarShadow) (EclipseKind, float64, error) {
 	kind, magnitude := s.greatest()
 	if !s.central() || (kind != EclipseTotal && kind != EclipseAnnular) {
 		return kind, magnitude, nil
@@ -396,7 +396,7 @@ func solarEclipseKind(prov eph.Provider, t time.Time, s solarShadow) (EclipseKin
 // +1), at which the shadow axis still meets the Earth: stepping out five
 // minutes at a time for up to five hours, longer than any central path, then
 // bisecting to well under a second. ok is false if the axis never leaves.
-func centralPathEnd(prov eph.Provider, t time.Time, dir float64) (end time.Time, ok bool, err error) {
+func centralPathEnd(prov eph.Provider, t epoch.Time, dir float64) (end epoch.Time, ok bool, err error) {
 	central := func(minutes float64) (bool, error) {
 		at := t.Add(unit.Minutes(dir * minutes))
 
@@ -413,7 +413,7 @@ func centralPathEnd(prov eph.Provider, t time.Time, dir float64) (end time.Time,
 	for step := 5.0; step <= 300; step += 5 {
 		c, err := central(step)
 		if err != nil {
-			return time.Time{}, false, err
+			return epoch.Time{}, false, err
 		}
 
 		if !c {
@@ -426,7 +426,7 @@ func centralPathEnd(prov eph.Provider, t time.Time, dir float64) (end time.Time,
 	}
 
 	if !ok {
-		return time.Time{}, false, nil
+		return epoch.Time{}, false, nil
 	}
 
 	for range 20 {
@@ -434,7 +434,7 @@ func centralPathEnd(prov eph.Provider, t time.Time, dir float64) (end time.Time,
 
 		c, err := central(mid)
 		if err != nil {
-			return time.Time{}, false, err
+			return epoch.Time{}, false, err
 		}
 
 		if c {

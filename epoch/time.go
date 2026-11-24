@@ -1,0 +1,1502 @@
+package epoch
+
+import (
+	"fmt"
+	"math"
+	"strings"
+	"time"
+
+	"github.com/TuSKan/astrogo/internal/gofaext"
+	"github.com/TuSKan/astrogo/unit"
+)
+
+// Weekday represents a day of the week (0=Sunday, 6=Saturday).
+type Weekday int
+
+const (
+	// Sunday is the first day of the week.
+	Sunday Weekday = 0
+	// Monday is the second day of the week.
+	Monday Weekday = 1
+	// Tuesday is the third day of the week.
+	Tuesday Weekday = 2
+	// Wednesday is the fourth day of the week.
+	Wednesday Weekday = 3
+	// Thursday is the fifth day of the week.
+	Thursday Weekday = 4
+	// Friday is the sixth day of the week.
+	Friday Weekday = 5
+	// Saturday is the seventh day of the week.
+	Saturday Weekday = 6
+
+	// NoWeekday is the weekday of a time that has none, one whose Julian Date
+	// is NaN or infinite. Its String is "".
+	NoWeekday Weekday = -1
+)
+
+// String returns the English name of the day ("Sunday", "Monday", ...), or ""
+// for NoWeekday.
+func (w Weekday) String() string {
+	switch w {
+	case NoWeekday:
+		return ""
+	case Sunday:
+		return "Sunday"
+	case Monday:
+		return "Monday"
+	case Tuesday:
+		return "Tuesday"
+	case Wednesday:
+		return "Wednesday"
+	case Thursday:
+		return "Thursday"
+	case Friday:
+		return "Friday"
+	case Saturday:
+		return "Saturday"
+	default:
+		return fmt.Sprintf("Weekday(%d)", w)
+	}
+}
+
+// J2000 is the standard epoch J2000.0 (JD 2451545.0 TT) — the reference
+// epoch most star catalogs (Gaia excepted, at J2016.0) and orbital-element
+// sources assume when they don't report their own epoch explicitly.
+//
+// It is a function rather than a var so that no importer can reassign the
+// standard epoch for every other package in the process: Go offers no way to
+// declare a struct value immutable. The stored value is computed once; the
+// call is a copy of a small struct and costs nothing.
+func J2000() Time { return j2000 }
+
+// j2000 backs [J2000]. Unexported, so nothing outside this package can reach
+// it, and computed once rather than on every call.
+var j2000 = FromJD(2451545.0, TT)
+
+// Scale represents an astronomical time scale.
+type Scale uint8
+
+const (
+	// UTC is Coordinated Universal Time.
+	UTC Scale = iota
+	// TAI is International Atomic Time.
+	TAI
+	// TT is Terrestrial Time.
+	TT
+	// UT1 is Universal Time.
+	UT1
+	// TDB is Barycentric Dynamical Time.
+	TDB
+
+	// GPST is GPS system time, and the scale a satellite user most often
+	// actually holds.
+	//
+	// # Why it is a scale rather than an offset a caller applies
+	//
+	// GNSS system times were synchronized to UTC once and then told to ignore
+	// leap seconds, so each has drifted from UTC by a whole number of seconds
+	// that grows at every leap event. GPS was set to UTC on 1980-01-06, when
+	// TAI−UTC was 19 s, and has run at the TAI rate since:
+	//
+	//	TAI − GPST = 19 s, exactly and for ever
+	//	GPST − UTC = ΔAT − 19 s, which is 18 s today
+	//
+	// A receiver timestamp called UTC is wrong by 18 s, 138 km of ISS ground
+	// track, and satellite work is exactly the population holding GNSS
+	// timestamps.
+	//
+	// Galileo System Time shares this scale: it is also TAI − 19 s, and agrees
+	// with GPST to within nanoseconds by design. BeiDou does not, and has
+	// [BDT]. GLONASS needs no scale here at all, being UTC plus three hours
+	// with leap seconds applied — a caller holding one applies a fixed zone
+	// offset and is already in UTC.
+	//
+	// Reference: Levine, Tavella & Milton (2023), "Towards a consensus on a
+	// continuous coordinated universal time", Metrologia 60 014001, table 1.
+	GPST
+
+	// BDT is BeiDou Navigation Satellite System time.
+	//
+	// The same construction as [GPST] with a different constant, because the
+	// constellation was synchronized later: BDT was set to UTC on 2006-01-01,
+	// when TAI−UTC was 33 s, and has run at the TAI rate since.
+	//
+	//	TAI − BDT = 33 s, exactly and for ever
+	//	BDT − UTC = ΔAT − 33 s, which is 4 s today
+	//	GPST − BDT = 14 s, and will stay 14 s
+	//
+	// Four seconds is small enough to look like nothing and is 30 km of ISS
+	// ground track. It is also the offset most easily mistaken for a rounding
+	// difference, which is the argument for expressing it rather than leaving a
+	// caller to subtract it: GPST and BDT differ by a constant that neither
+	// timestamp carries.
+	BDT
+
+	// TCG is Geocentric Coordinate Time, the coordinate time of the
+	// geocentric celestial reference system.
+	//
+	// # What it is, against TT
+	//
+	// TT and TCG measure the same thing at different rates. TCG is the
+	// coordinate time of the geocentric frame; TT is TCG rescaled to tick at
+	// the rate of an ideal clock on the rotating geoid, which is the rate a
+	// clock in an observatory actually keeps. The ratio is fixed by the IAU:
+	//
+	//	TCG − TT = L_G / (1 − L_G) × (JD − 2443144.5003725) × 86400 s
+	//	L_G = 6.969290134e-10, exactly, by IAU 2000 Resolution B1.9
+	//
+	// That is about 22 ms per year, zero at 1977-01-01 TAI where the two were
+	// set equal, and roughly 1.1 s today.
+	//
+	// # When a caller needs it
+	//
+	// Relativistic geodesy and satellite-orbit work integrate equations of
+	// motion in the geocentric frame, whose time argument is TCG rather than
+	// TT. Pulsar timing quotes TCB (see [Time.TCB]) for the same reason one
+	// frame up. A terrestrial observation is timed in TT and stays there.
+	TCG
+
+	// TCB is Barycentric Coordinate Time, the coordinate time of the
+	// barycentric celestial reference system.
+	//
+	// # What it is, against TDB
+	//
+	// The same relationship TCG has to TT, one frame out: TCB is the
+	// unscaled coordinate time of the solar-system barycentric frame, and TDB
+	// is TCB rescaled so it stays close to TT rather than drifting away from
+	// it.
+	//
+	//	TCB − TDB ≈ L_B × (JD − 2443144.5003725) × 86400 s + TDB0
+	//	L_B = 1.550519768e-8, by IAU 2006 Resolution B3
+	//
+	// That is about 0.49 s per year — half a minute since 1977 — which is why
+	// a planetary ephemeris is argued in TDB and not in TCB: TDB was defined
+	// to keep the difference from TT bounded at milliseconds.
+	//
+	// It is the scale a pulsar timing solution or a barycentric dynamical
+	// model is often quoted in.
+	TCB
+)
+
+// gpstMinusTAI is the fixed offset that defines GPS time.
+//
+// Negative because GPST runs behind TAI: TAI = GPST + 19 s. It is the value of
+// TAI−UTC at the 1980-01-06 synchronization, frozen, and it is a constant of
+// the system rather than a table lookup — which is what makes this scale cheap
+// to support correctly.
+const gpstMinusTAI = -19.0
+
+// bdtMinusTAI is the fixed offset that defines BeiDou time — the value of
+// TAI−UTC at BeiDou's 2006-01-01 synchronization, frozen. See [BDT].
+const bdtMinusTAI = -33.0
+
+func (s Scale) String() string {
+	switch s {
+	case UTC:
+		return "UTC"
+	case TAI:
+		return "TAI"
+	case TT:
+		return "TT"
+	case UT1:
+		return "UT1"
+	case TDB:
+		return "TDB"
+	case GPST:
+		return "GPST"
+	case BDT:
+		return "BDT"
+	case TCG:
+		return "TCG"
+	case TCB:
+		return "TCB"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// uniform reports whether one unit of s is one SI second, everywhere.
+//
+// TAI, TT and TDB are uniform: they run at a constant rate by construction, so
+// advancing a label by d and advancing the physical instant by d are the same
+// operation, and the difference of two labels is elapsed time. Duration
+// arithmetic in these scales needs no conversion at all — which is why the
+// hot paths that use them pay nothing for [Time.Add] and [Time.Sub].
+//
+// UTC and UT1 are not. UTC is a step function of TAI: it absorbs a leap second
+// twice a decade, so the difference of two UTC labels is short by every step
+// between them. UT1 tracks Earth's rotation, which is neither constant nor
+// predictable. For these two, duration arithmetic goes through TT.
+//
+// TDB is uniform in its own frame but not synchronous with TT — the periodic
+// term between them varies by ±1.7 ms, so a TDB interval and the TT interval
+// it spans differ by up to a microsecond per hour. Arithmetic in TDB stays in
+// TDB, which is what an ephemeris interpolating in TDB days wants.
+func (s Scale) uniform() bool {
+	return s == TAI || s == TT || s == TDB || s == GPST || s == BDT ||
+		s == TCG || s == TCB
+}
+
+// Time represents a high-precision astronomical timestamp.
+//
+// Internal representation uses a two-part Julian Date (jd1 + jd2) to maintain
+// precision. The split is typically at the nearest day.
+//
+// An optional display location (loc) is carried for presentation purposes.
+// It affects only [Time.ToGo], [Time.Format], and [Time.String] and never
+// influences scientific computation or scale conversions.
+type Time struct {
+	loc   *time.Location
+	jd1   float64
+	jd2   float64
+	scale Scale
+}
+
+// ── Constructors ──────────────────────────────────────────────────────────────
+
+// FromJD creates a Time from a single-float Julian Date.
+func FromJD(jd float64, s Scale) Time {
+	return FromJDParts(jd, 0, s)
+}
+
+// FromJDParts creates a Time from a two-part Julian Date.
+// It automatically normalizes the components.
+func FromJDParts(jd1, jd2 float64, s Scale) Time {
+	t := Time{jd1: jd1, jd2: jd2, scale: s}
+	t.normalize()
+
+	return t
+}
+
+// FromGo creates a Time from a Go standard library time.Time.
+// The input is interpreted as being in the UTC scale.
+// The original time.Location is preserved for display purposes.
+func FromGo(t time.Time) Time {
+	loc := t.Location()
+	utc := t.UTC()
+	unixSec := float64(utc.Unix())
+	unixNsec := float64(utc.Nanosecond()) / 1e9
+
+	// Unix epoch 1970-01-01 is JD 2440587.5
+	days := math.Floor(unixSec / 86400.0)
+	frac := (unixSec-days*86400.0)/86400.0 + unixNsec/86400.0
+
+	// On a UTC day ending in a leap second the fraction is of that day's own
+	// length — see utcday.go. A Unix timestamp has no label for the leap
+	// second itself, so this never produces one; it only places the day's
+	// other 86400 seconds where the representation expects them.
+	if leap := currentUTCSteps().leapAtEnd(int(days) + unixEpochMJD); leap != 0 {
+		frac *= daySeconds / (daySeconds + leap)
+	}
+
+	result := FromJDParts(2440587.5+days, frac, UTC)
+	result.loc = loc
+
+	return result
+}
+
+// Now returns the current time in the UTC scale, displayed in UTC: its
+// [Time.String], [Time.Format] and [Time.ToGo] show the UTC clock. For the
+// current instant shown on the local clock, use
+// FromGo(Now()), or call [Time.In] with the zone wanted.
+func Now() Time {
+	return FromGo(time.Now().UTC())
+}
+
+// ZeroTime returns the zero time, defined as JD 0 in the UTC scale.
+func ZeroTime() Time {
+	return FromJD(0, UTC)
+}
+
+// ── Methods ───────────────────────────────────────────────────────────────────
+
+// JD returns the total Julian Date as a single float64.
+func (t Time) JD() float64 {
+	return t.jd1 + t.jd2
+}
+
+// JulianDate is an alias for JD().
+func (t Time) JulianDate() float64 {
+	return t.JD()
+}
+
+// JDParts returns the underlying two-part Julian Date components.
+func (t Time) JDParts() (float64, float64) {
+	return t.jd1, t.jd2
+}
+
+// Scale returns the time scale of the timestamp.
+func (t Time) Scale() Scale {
+	return t.scale
+}
+
+// String returns a human-readable representation.
+// If a display location is set, the civil time in that timezone is shown;
+// otherwise the raw JD and scale are returned.
+func (t Time) String() string {
+	// A non-finite time has no civil time to show in any zone, so it keeps
+	// the JD form, which prints its NaN honestly (#986).
+	if t.loc != nil && t.loc != time.UTC && !t.nonFinite() {
+		return t.ToGo().Format("2006-01-02 15:04:05 MST")
+	}
+
+	return fmt.Sprintf("JD %.8f (%s)", t.JD(), t.scale)
+}
+
+// ToGo converts the Time to a standard library time.Time.
+// If a display location was set (via [FromGo], [Date], or [Time.In]),
+// the result is expressed in that timezone; otherwise it defaults to UTC.
+//
+// # The scale conversion
+//
+// time.Time is an instant on the UTC timeline, so a Time on any other scale is
+// converted to UTC first: one instant gives one time.Time, whichever scale it
+// is held in. ToGo backs [Time.String], [Time.Format] and every formatted
+// event time in plan.
+//
+// # The one cost
+//
+// Converting a UT1-scale Time needs DUT1, so it can trigger epoch's lazy
+// Earth-orientation load. That path
+// degrades rather than fails (disk cache, then a consent-gated fetch, then
+// zero EOP with a warning), and |DUT1| < 0.9 s bounds the error even when it
+// degrades. UTC, TAI, TT and TDB convert by arithmetic alone and reach no
+// data at all. Printing the right instant is worth the one scale that has to
+// ask.
+func (t Time) ToGo() time.Time {
+	// A non-finite time has no instant on the UTC timeline, and the standard
+	// library's own "no time" is the zero Time, which IsZero reports. It used to
+	// come out as the year 292277019622 on amd64, where its NaN converts to
+	// MinInt64 (#986). Checked first, so a non-finite UT1 time asks no EOP.
+	if t.nonFinite() {
+		return time.Time{}
+	}
+
+	utc := t.UTC()
+
+	// A standard-library time is a count of uniform seconds, so a leap-second
+	// day's fraction is stretched back to 86400 first — see utcday.go. The
+	// leap second itself has no such count and comes out as the following
+	// midnight, which is also what the standard library's own time.Date makes
+	// of a second of 60.
+	jd1, jd2 := utcToLabel(utc.jd1, utc.jd2)
+
+	// Whole days and the fractions of both parts are kept apart until the
+	// fractions are in seconds. Summed first, as they were until #420, the
+	// parts made one float64 count of seconds since 1970, some 1.8e9 in 2026,
+	// whose 238 ns spacing lost up to 119 ns. Whole days are exact as
+	// integers; the fractions, with the half day that puts JD 2440587.5 at
+	// 1970-01-01 00:00:00, sum to under 2.5 days, which in seconds a float64
+	// resolves to 29 ps.
+	w1, w2 := math.Floor(jd1), math.Floor(jd2)
+	days := int64(w1) + int64(w2) - 2440588
+	secs := ((jd1 - w1) + (jd2 - w2) + 0.5) * 86400
+	whole := math.Floor(secs)
+
+	// time.Unix normalizes a nanosecond count that rounds up to 1e9.
+	gt := time.Unix(days*86400+int64(whole), int64(math.Round((secs-whole)*1e9))).UTC()
+
+	// The display location rides on t rather than on the converted copy,
+	// though UTC() preserves it either way.
+	if t.loc != nil {
+		return gt.In(t.loc)
+	}
+
+	return gt
+}
+
+// GoTime is an alias for [Time.ToGo].
+func (t Time) GoTime() time.Time { return t.ToGo() }
+
+// Year returns the Gregorian calendar year of t.
+// Uses SOFA's JD→calendar conversion for proper proleptic calendar support.
+func (t Time) Year() int {
+	y, _, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return y
+}
+
+// Month returns the month of t (1=January, ..., 12=December).
+func (t Time) Month() time.Month {
+	_, m, _, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return time.Month(m)
+}
+
+// Day returns the day of the month of t.
+func (t Time) Day() int {
+	_, _, d, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return d
+}
+
+// Calendar returns the full calendar decomposition of t:
+// year, month, day, and the fractional part of the day [0, 1).
+// This uses SOFA's JD→calendar conversion and correctly handles
+// the proleptic Gregorian calendar (negative/zero years).
+func (t Time) Calendar() (year, month, day int, dayFrac float64) {
+	y, m, d, f, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	return y, m, d, f
+}
+
+// JulianCalendar returns the Julian calendar decomposition of t:
+// year, month, day, and the fractional part of the day [0, 1).
+// This is the correct calendar system for all dates before October 15, 1582.
+// Historical and biblical references (Josephus, Passover dates, etc.)
+// use the Julian calendar exclusively.
+func (t Time) JulianCalendar() (year, month, day int, dayFrac float64) {
+	return julianCalendar(t.jd1, t.jd2)
+}
+
+// julianCalendar is [Time.JulianCalendar] for a two-part Julian Date.
+//
+// The parts are not summed first. jd1+jd2 is one float64 near 1.7e6 for an
+// ancient date, spaced 2.3e-10 days — 20 µs — apart, which put a whole second
+// on the wrong side of the minute often enough to matter (#439). Whole days
+// are taken from each part as integers and only the fractions are added,
+// where a float64 resolves picoseconds.
+func julianCalendar(jd1, jd2 float64) (year, month, day int, dayFrac float64) {
+	// A non-finite date has no calendar: zeros, as Calendar answers through
+	// gofaext.JdToDate. Converted to int unchecked, it came out as a definite
+	// -4712-01-01 on amd64 (#986).
+	if dj := jd1 + jd2; math.IsNaN(dj) || math.IsInf(dj, 0) {
+		return 0, 0, 0, 0
+	}
+
+	w1, w2 := math.Floor(jd1), math.Floor(jd2)
+
+	// Fractional day from midnight, which is noon plus a half: under 2.5.
+	f := (jd1 - w1) + (jd2 - w2) + 0.5
+	wf := math.Floor(f)
+	f -= wf
+
+	// Integer JD at noon
+	z := int(w1) + int(w2) + int(wf)
+
+	// Julian calendar: no Gregorian correction (b=0)
+	c := z + 32082
+	d := (4*c + 3) / 1461
+	e := c - (1461*d)/4
+	m := (5*e + 2) / 153
+
+	day = e - (153*m+2)/5 + 1
+	month = m + 3 - 12*(m/10)
+	year = d - 4800 + m/10
+
+	return year, month, day, f
+}
+
+// FormatJulian returns a string representation of the time in the given
+// layout using the Julian calendar. This should be used for all dates
+// before October 15, 1582 (e.g., biblical and ancient historical dates).
+//
+// The time is rounded to the nearest second, not truncated: an instant held a
+// few microseconds short of 12:30:00 prints as 12:30:00, and one a few short
+// of midnight as the next day's 00:00:00.
+//
+// The clock is UTC's, whatever scale t holds, as [Time.Format]'s is: the two
+// differ only in calendar. MST reads "UTC".
+func (t Time) FormatJulian(format string) string {
+	jd1, jd2 := t.clockParts()
+	y, m, d, frac := julianCalendar(jd1, jd2+halfSecondDays)
+	hour, minute, second := clockOf(frac)
+
+	yearStr := fmt.Sprintf("%04d", y)
+	if y < 0 {
+		yearStr = fmt.Sprintf("%+05d", y)
+	}
+
+	r := strings.NewReplacer(
+		"2006", yearStr,
+		"Jan", time.Month(m).String()[:3],
+		"01", fmt.Sprintf("%02d", m),
+		"02", fmt.Sprintf("%02d", d),
+		"15", fmt.Sprintf("%02d", hour),
+		"04", fmt.Sprintf("%02d", minute),
+		"05", fmt.Sprintf("%02d", second),
+		"MST", UTC.String(),
+	)
+
+	return r.Replace(format)
+}
+
+// Weekday returns the day of the week for time t.
+// 0=Sunday, 1=Monday, ..., 6=Saturday.
+// This is computed directly from the Julian Date and works for all epochs.
+// A time whose Julian Date is NaN or infinite has no day and gets NoWeekday.
+func (t Time) Weekday() Weekday {
+	// The Julian Date at noon on Monday 1 Jan 4713 BC is 0.0.
+	// JD 0.0 was a Monday. So JD mod 7 gives:
+	//   0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+	// We want 0=Sunday, so we shift by +1.
+	jd := t.JD()
+
+	// Converting a non-finite JD to an int gives MinInt64 on amd64 and 0 on
+	// arm64, so it used to land on Sunday on one and Monday on the other (#982).
+	if math.IsNaN(jd) || math.IsInf(jd, 0) {
+		return NoWeekday
+	}
+	// Floor to get the nearest noon JD (integer), then shift
+	// The day of the week = (floor(JD + 0.5) + 1) mod 7
+	d := int(math.Floor(jd+0.5)) + 1
+
+	d %= 7
+	if d < 0 {
+		d += 7
+	}
+
+	return Weekday(d)
+}
+
+// AddDate returns the time corresponding to adding the given number of
+// years, months, and days to t. It operates on the calendar date directly
+// using SOFA conversions, supporting the full proleptic Gregorian calendar.
+func (t Time) AddDate(years, months, days int) Time {
+	if years == 0 && months == 0 {
+		// Pure day offset — just add via JD arithmetic (most efficient,
+		// and avoids Dtf2d day-overflow issues).
+		return t.Add(unit.Days(float64(days)))
+	}
+
+	y, m, _, frac, _ := gofaext.JdToDate(t.jd1, t.jd2)
+	y += years
+	m += months
+
+	// Normalize month overflow
+	for m > 12 {
+		y++
+		m -= 12
+	}
+
+	for m < 1 {
+		y--
+		m += 12
+	}
+
+	// Keep original day-of-month from the source date.
+	_, _, origDay, _, _ := gofaext.JdToDate(t.jd1, t.jd2)
+
+	// Convert hours from fractional day. A UTC fraction is of the day's own
+	// length, which is 86401 seconds on a leap-second day — see utcday.go.
+	secondsPerDay := 86400.0
+
+	if t.scale == UTC {
+		mjd, _ := utcDayOf(t.jd1, t.jd2)
+		secondsPerDay += currentUTCSteps().leapAtEnd(mjd)
+	}
+
+	totalSec := frac * secondsPerDay
+
+	// Capped at 23:59 so that an epoch inside a leap second keeps its second
+	// of 60 rather than becoming an hour of 24, which Dtf2d rejects outright.
+	// Carried onto a month with no leap second, 23:59:60 is past the end of
+	// the day and lands on the following midnight, as a second of 60 does
+	// anywhere else.
+	hour := min(int(totalSec/3600), 23)
+	totalSec -= float64(hour) * 3600
+	minute := min(int(totalSec/60), 59)
+	second := totalSec - float64(minute)*60
+
+	// Use day 1 of the target month to get a base JD, then add
+	// the original day-of-month - 1 + extra days via JD arithmetic.
+	jd1, jd2, _ := gofaext.Dtf2d(t.scale.String(), y, m, 1, hour, minute, second)
+	result := FromJDParts(jd1, jd2, t.scale)
+	result = result.Add(unit.Days(float64(origDay - 1 + days)))
+	result.loc = t.loc
+
+	return result
+}
+
+// Add returns a new Time with the duration added to its label.
+// The display location is preserved.
+//
+// It takes a [unit.Duration] rather than the standard library's: an epoch here
+// can sit in 4713 BC, and an int64 nanosecond count saturates past ±292 years.
+//
+// # This advances the label, and [Time.Sub] measures physical time
+//
+// In a uniform scale (TAI, TT, TDB) those are the same thing and the two are
+// exact inverses. In UTC they are not: adding 86400 s to a label that spans a
+// leap second advances the clock by 86401 SI seconds, so t.Add(unit.Days(1)).Sub(t)
+// reports 86401 s — correctly, because that is how much time passed.
+//
+// The asymmetry is deliberate rather than an oversight, and it is bounded:
+//
+//   - Add is label arithmetic. t.Add(d).Add(-d) returns exactly t for every
+//     instant that has a label in the uniform count — everything but the leap
+//     second itself, where an Add starting inside one lands on the following
+//     midnight.
+//   - Sub is physical because it returns a [unit.Duration], which is a count
+//     of SI seconds by type.
+//
+// To advance a UTC epoch by physical time, do the arithmetic in a uniform
+// scale:
+// t.TAI().Add(d).UTC().
+func (t Time) Add(d unit.Duration) Time {
+	if t.scale == UTC {
+		// Label arithmetic is arithmetic on labels, and on a leap-second day
+		// the Julian Date's fraction is of 86401 seconds rather than 86400 —
+		// so a whole day added to noon on 2016-12-30 would otherwise land at
+		// 12:00:00.5 on the 31st. Re-expressing with an 86400-second day,
+		// adding, and converting back keeps every label exactly where it
+		// always went. See utcday.go.
+		jd1, jd2 := utcToLabel(t.jd1, t.jd2)
+		jd1, jd2 = utcFromLabel(jd1, jd2+d.Days())
+
+		result := FromJDParts(jd1, jd2, UTC)
+		result.loc = t.loc
+
+		return result
+	}
+
+	result := FromJDParts(t.jd1, t.jd2+d.Days(), t.scale)
+	result.loc = t.loc
+
+	return result
+}
+
+// Date creates a Time from calendar components and a timezone.
+// Unlike Go's time.Date, this function correctly handles the full
+// proleptic Gregorian calendar including negative (astronomical) years.
+// Year 0 = 1 BC, year -1 = 2 BC, etc.
+// The timezone location is preserved for display purposes.
+//
+// A second of 60 on a day that ends in a leap second is that leap second, and
+// is built as the instant it is: 2016-12-31 23:59:60 is one SI second after
+// 23:59:59 and one before the following midnight. See utcday.go.
+//
+// A second UTC never labeled — 60 on a day that gained no leap second, 61 or
+// more, or 23:59:59 on the day of a negative leap second — is normalized into
+// the following minute as the standard library does, and reported through
+// [logging], since this constructor has no error to return. See
+// leapsecond_alias.go.
+func Date(year int, month time.Month, day, hour, minute, second, nanosecond int, loc *time.Location) Time {
+	switch {
+	case second >= 60:
+		if leap, ok := dateInLeapSecond(year, month, day, hour, minute, second, nanosecond, loc); ok {
+			return leap
+		}
+
+		warnSecondOutOfRange(year, month, day, hour, minute, second, loc)
+
+	// Only the last second of a UTC day can be one a negative leap second
+	// removed. Which second that is depends on the caller's zone, so the hour
+	// and minute are checked after converting rather than here — see
+	// warnIfSecondRemoved.
+	case second == 59:
+		warnIfSecondRemoved(year, month, day, hour, minute, loc)
+	}
+
+	// For years within Go's time.Time range, delegate to FromGo which
+	// handles timezone offsets exactly.
+	if year >= 1 && year <= 9999 {
+		return FromGo(time.Date(year, month, day, hour, minute, second, nanosecond, loc))
+	}
+
+	// For deep historical years (negative/zero), use SOFA's Dtf2d.
+	// Timezone offsets are irrelevant for ancient astronomical dates
+	// (they're always specified in UTC or local solar time).
+	fracSec := float64(second) + float64(nanosecond)/1e9
+	jd1, jd2, _ := gofaext.Dtf2d("UTC", year, int(month), day, hour, minute, fracSec)
+	result := FromJDParts(jd1, jd2, UTC)
+	result.loc = loc
+
+	return result
+}
+
+// DateJulianCal creates a Time from Julian calendar components.
+// This is the correct constructor for all dates before October 15, 1582
+// (the start of the Gregorian calendar). Historical sources, ancient records,
+// and biblical references use the Julian calendar exclusively.
+//
+// The time is created in the UTC scale. For astronomical computation on
+// historical dates, chain with ApplyDeltaT() to convert to TT:
+//
+//	t := epoch.DateJulianCal(33, 4, 3, 15, 0, 0).ApplyDeltaT()
+func DateJulianCal(year, month, day, hour, minute, second int) Time {
+	// Julian calendar to JD conversion (Meeus, Astronomical Algorithms)
+	a := (14 - month) / 12
+	y := year + 4800 - a
+	m := month + 12*a - 3
+	jdn := day + (153*m+2)/5 + 365*y + y/4 - 32083
+
+	// The day number and the time of day as the two parts: summed into one
+	// float64 they lost up to 10 µs (#439).
+	return FromJDParts(float64(jdn)-0.5, float64(hour*3600+minute*60+second)/86400.0, UTC)
+}
+
+// DecimalYear returns t as a fractional year: its calendar year plus the
+// fraction of that year elapsed at t, the day of the year and the day's
+// fraction over the year's 365 or 366 days, in the proleptic Gregorian
+// calendar [Time.Calendar] reads. ΔT is read at it before 1960.
+func (t Time) DecimalYear() float64 {
+	y, m, d, f := t.Calendar()
+
+	// A Julian Date that is not finite has no calendar date, and month 0
+	// indexed daysBeforeMonth at −1: a panic in Time.TT (#961). Its fractional
+	// year is its own non-finite value, which the Julian epoch year carries.
+	if m == 0 {
+		return t.JulianEpochYear()
+	}
+
+	leap := y%4 == 0 && (y%100 != 0 || y%400 == 0)
+
+	days, doy := 365.0, daysBeforeMonth[m-1]+d
+	if leap {
+		days = 366
+
+		if m > 2 {
+			doy++
+		}
+	}
+
+	return float64(y) + (float64(doy-1)+f)/days
+}
+
+// daysBeforeMonth is the number of days in a common year before the first of
+// each month.
+var daysBeforeMonth = [12]int{0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334}
+
+// ApplyDeltaT reads t's label as UT1 and converts it to TT: TT = UT1 + ΔT,
+// with ΔT from [DeltaT] at t, the one value every conversion here uses. That
+// is the Espenak & Meeus (2006) model before 1960, the IERS bulletin's
+// measured value where it covers t, and the held value past its end.
+//
+// ΔT = TT − UT1 encodes the accumulated drift in Earth's rotation rate due to
+// tidal friction. For a UTC label from 1960 on, [Time.TT] is the conversion:
+// it goes through the leap seconds instead of reading the label as UT1.
+//
+// The returned scale is TT.
+func (t Time) ApplyDeltaT() Time {
+	dt := DeltaT(t).Seconds()
+
+	return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
+}
+
+// Location returns the display timezone associated with this Time.
+// Returns time.UTC if none was set.
+func (t Time) Location() *time.Location {
+	if t.loc != nil {
+		return t.loc
+	}
+
+	return time.UTC
+}
+
+// In returns a copy of t with the display location set to loc.
+// This does not change the underlying instant; only how it is displayed
+// by [Time.ToGo], [Time.Format], and [Time.String].
+func (t Time) In(loc *time.Location) Time {
+	t.loc = loc
+	return t
+}
+
+// Format returns a string representation of the time in the given layout.
+// For dates within Go's time.Time range (~year 0 to 9999), this delegates
+// to the standard library. For dates outside that range (e.g., negative years),
+// it formats manually using the SOFA-derived calendar components.
+//
+// Either way the clock is UTC's, whatever scale t holds, as [Time.ToGo]
+// explains; on the manual path MST reads "UTC". The display location applies only
+// within the standard library's years.
+func (t Time) Format(format string) string {
+	// A non-finite time has no date or clock to lay out. Its calendar year
+	// reads as 0, inside the range handed to ToGo below, so it used to format a
+	// year of 292277019622, and would format 0001-01-01 from ToGo's zero Time.
+	// It formats as String does instead (#986).
+	if t.nonFinite() {
+		return t.String()
+	}
+
+	jd1, jd2 := t.clockParts()
+
+	y, _, _, _, _ := gofaext.JdToDate(jd1, jd2)
+	// If year is within Go's time.Time range, delegate to standard formatting
+	if y >= 0 && y <= 9999 {
+		return t.ToGo().Format(format)
+	}
+
+	// Rounded to the nearest second, as FormatJulian is.
+	y, m, d, frac, _ := gofaext.JdToDate(jd1, jd2+halfSecondDays)
+	hour, minute, second := clockOf(frac)
+	// Manual formatting for out-of-range dates.
+	// Uses strings.NewReplacer for single-pass replacement to avoid
+	// infinite loops when replaced values contain other format tokens
+	// (e.g., year "-0018" contains "01" which would match month token).
+
+	r := strings.NewReplacer(
+		"2006", fmt.Sprintf("%+05d", y),
+		"Jan", time.Month(m).String()[:3],
+		"01", fmt.Sprintf("%02d", m),
+		"02", fmt.Sprintf("%02d", d),
+		"15", fmt.Sprintf("%02d", hour),
+		"04", fmt.Sprintf("%02d", minute),
+		"05", fmt.Sprintf("%02d", second),
+		"MST", UTC.String(),
+	)
+
+	return r.Replace(format)
+}
+
+// Before reports whether t is chronologically before other.
+// If t and other are in different time scales, both are automatically
+// converted to TT for comparison. Same-scale comparisons have zero overhead.
+func (t Time) Before(other Time) bool {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
+
+	if t.jd1 < other.jd1 {
+		return true
+	}
+
+	if t.jd1 > other.jd1 {
+		return false
+	}
+
+	return t.jd2 < other.jd2
+}
+
+// After reports whether t is chronologically after other.
+// Cross-scale times are automatically unified via TT.
+func (t Time) After(other Time) bool {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
+
+	if t.jd1 > other.jd1 {
+		return true
+	}
+
+	if t.jd1 < other.jd1 {
+		return false
+	}
+
+	return t.jd2 > other.jd2
+}
+
+// Equal reports whether t and other represent the same physical instant
+// to within 1 nanosecond precision.
+//
+// Cross-scale times are automatically unified via TT before comparison.
+// A tolerance of 1 ns (≈1.16×10⁻¹⁴ Julian days) is used instead of exact
+// bitwise equality because floating-point paths through different time scales
+// routinely differ by 1 ULP for the same physical instant.
+func (t Time) Equal(other Time) bool {
+	if t.scale != other.scale {
+		t, other = t.TT(), other.TT()
+	}
+	// 1 nanosecond in Julian days: 1e-9 / 86400 ≈ 1.157e-14
+	const nsInJD = 1e-9 / 86400.0
+
+	diff := (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
+	if diff < 0 {
+		diff = -diff
+	}
+
+	return diff < nsInJD
+}
+
+// IsZero reports whether t represents the zero-value Julian Date.
+func (t Time) IsZero() bool {
+	return t.jd1 == 0 && t.jd2 == 0
+}
+
+// ToGoDuration converts an astrogo duration to the standard library's, for a
+// timeout, a ticker, or anything else that measures wall-clock time.
+//
+// It saturates at ±292 years rather than wrapping, because [time.Duration] is
+// an int64 nanosecond count and cannot hold more. That ceiling is why
+// [Time.Sub] returns a [unit.Duration] and not this: an epoch here can sit in
+// 4713 BC.
+//
+// The second return says whether the value fit. A caller converting a
+// scheduling interval can ignore it; one converting an epoch difference should
+// not.
+func ToGoDuration(d unit.Duration) (time.Duration, bool) {
+	const maxSeconds = float64(math.MaxInt64) / float64(time.Second)
+
+	switch s := d.Seconds(); {
+	case s >= maxSeconds:
+		return time.Duration(math.MaxInt64), false
+	case s <= -maxSeconds:
+		return time.Duration(math.MinInt64), false
+	default:
+		// Round rather than truncate. A conversion that lands a part in 1e13
+		// below a whole second — which a scale round-trip routinely does,
+		// since it adds and removes an offset of ~69 s — truncates to one
+		// nanosecond short, so an exactly-ten-minute interval reports
+		// 9m59.999999999s. Truncation also biases every result downward.
+		return time.Duration(math.Round(s * float64(time.Second))), true
+	}
+}
+
+// FromGoDuration converts a standard-library duration to an astrogo one.
+//
+// Exact to the nanosecond up to 2^22 s, about 48.5 days. A [unit.Duration] is
+// float64 seconds, whose spacing grows with the value: past 2^22 s it exceeds
+// half a nanosecond, and the count rounds — by up to 4 ns at a year, measured.
+func FromGoDuration(d time.Duration) unit.Duration {
+	return unit.Seconds(d.Seconds())
+}
+
+// Sub returns the physical time elapsed from other to t, in SI seconds.
+//
+// # Not the difference of the calendar labels
+//
+// Both operands are converted to TT first, whatever scale they are in. For two
+// UTC epochs that is the whole point: UTC is not a uniform scale, so the
+// difference of two UTC labels is short by every leap second between them —
+// 27 s across 1972-2026, which is 207 km of ISS track and about 16 arcsec of
+// lunar motion.
+//
+// # Range
+//
+// It does not saturate, which is the reason it returns a [unit.Duration]
+// rather than the standard library's: time.Duration is an int64 nanosecond
+// count and stops just past ±292 years.
+//
+// A caller who needs the standard library's type — for a timeout, a ticker —
+// converts explicitly with [ToGoDuration], which saturates and says so.
+func (t Time) Sub(other Time) unit.Duration {
+	return unit.Days(t.subDays(other))
+}
+
+// ── Scale Conversion Helpers ─────────────────────────────────────────────────
+
+// fromPartsPreserveLoc creates a Time in the given scale from a two-part JD,
+// preserving the display location of the source time.
+func fromPartsPreserveLoc(src Time, jd1, jd2 float64, s Scale) Time {
+	result := FromJDParts(jd1, jd2, s)
+	result.loc = src.loc
+
+	return result
+}
+
+// mjdFromJDParts converts a two-part Julian Date to a Modified Julian
+// Date. The sole implementation of this formula — Time.MJD (epoch.go),
+// dut1ForUTC, dut1OrFallback, and UT1's error path all call it rather
+// than each recomputing (jd1-2400000.5)+jd2 independently.
+func mjdFromJDParts(jd1, jd2 float64) float64 {
+	return (jd1 - 2400000.5) + jd2
+}
+
+// dut1ForUTC retrieves DUT1 for the given UTC two-part JD, with
+// [lookupEOP]'s two failures: err when a loaded model does not cover the
+// epoch, defaulted when nothing was loaded and the zero default answered.
+func dut1ForUTC(jd1, jd2 float64) (dut1 float64, defaulted, err error) {
+	eop, defaulted, err := lookupEOP(mjdFromJDParts(jd1, jd2))
+	if err != nil {
+		return 0, nil, fmt.Errorf("epoch: EOP lookup: %w", err)
+	}
+
+	return eop.DUT1, defaulted, nil
+}
+
+// dut1OrFallback retrieves DUT1 with a fallback to 0.0 on error.
+// Logs a one-time warning (shared with Time.EOP()) when falling back, or
+// when the zero default answered because nothing was loaded (#518).
+func dut1OrFallback(jd1, jd2 float64) float64 {
+	mjd := mjdFromJDParts(jd1, jd2)
+
+	dut1, defaulted, err := dut1ForUTC(jd1, jd2)
+
+	switch {
+	case err != nil:
+		warnEOPUnavailable(mjd, err)
+
+		return 0
+	case defaulted != nil:
+		warnEOPUnavailable(mjd, defaulted)
+	}
+
+	return dut1
+}
+
+// ── Scale Conversions ────────────────────────────────────────────────────────
+//
+// Conversion graph:
+//
+//	UTC ←→ TAI ←→ TT ←→ TDB
+//	 ↕
+//	UT1
+//
+// All conversions except those involving UT1 are deterministic.
+// UT1 depends on IERS Earth Orientation Parameters (DUT1).
+
+// UTC returns a new Time converted to the Coordinated Universal Time scale.
+//
+// For UT1 input, the conversion uses IERS DUT1 data when available. Past the
+// bulletin's end it uses the DUT1 that holds ΔT at its value on the bulletin's
+// last day, and with no data at all it falls back to DUT1=0 (max error 0.9 s
+// while leap seconds last); either way with a one-time log warning.
+func (t Time) UTC() Time {
+	if t.scale == UTC {
+		return t
+	}
+
+	switch t.scale { //nolint:exhaustive // UTC is identity; only TAI/TT/TDB/UT1 convert
+	case TAI:
+		// UTC = TAI − ΔAT, landing on a leap second's own label when the
+		// instant is inside one — see utcday.go.
+		jd1, jd2 := taiToUTC(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, jd1, jd2, UTC)
+	case TT:
+		// Pre-1972 the forward conversion uses the Delta-T polynomial rather
+		// than Delta-AT — see [Time.TT] — and this direction has to gate on
+		// the same epoch or the two stop being inverses.
+		//
+		// They did stop. UTC->TT->UTC on a 1600 date returned an instant
+		// 85.7 seconds later than it started, which is Delta-T(1600) minus
+		// the 32.184 s this branch removed on the way back, with Delta-AT
+		// contributing nothing because leap seconds do not exist there. A
+		// round trip through a scale conversion is the one thing a time
+		// library must not lose, and historical work — eclipse canons,
+		// ancient observations — is exactly where it was losing it.
+		//
+		// Delta-T is a function of the UT year, and this branch starts from
+		// TT — so a single evaluation would use a year that is wrong by
+		// Delta-T itself. That is minutes in 1600 and hours in antiquity,
+		// and against a polynomial with real slope it left the round trip
+		// 0.097 s out at AD 33.
+		//
+		// One correction step removes it: evaluate at TT, subtract, then
+		// re-evaluate at the UT year that produces. Delta-T changes slowly
+		// enough that the second estimate is exact to well below a
+		// microsecond, and the forward direction in [Time.TT] evaluates at
+		// the same UT year, so the two now agree by construction rather
+		// than by luck.
+		//
+		// The gate is the TT of 1960-01-01 0h UTC, where [Time.TT] switches
+		// from ΔT to ΔAT (#479). The two readings differ there by a fraction
+		// of a second, so a TT inside that sliver has no UTC on the ΔAT side
+		// and is read through ΔT, the side it is nearer.
+		if t.jd1+t.jd2 < jd1960+(deltaAT(1960, 1, 1, 0)+32.184)/daySeconds {
+			dt := deltaTModel(t.DecimalYear())
+			approx := fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
+			dt = deltaTModel(approx.DecimalYear())
+
+			return fromPartsPreserveLoc(t, t.jd1, t.jd2-dt/86400.0, UTC)
+		}
+
+		// TT → TAI → UTC: TAI = TT − 32.184s
+		tai := fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+
+		return tai.UTC()
+	case TDB:
+		// TDB → TT → TAI → UTC
+		tt := fromPartsPreserveLoc(t, t.jd1, t.jd2-tdbMinusTT(t.jd1, t.jd2)/86400.0, TT)
+		return tt.UTC()
+	case UT1:
+		// UTC = UT1 − DUT1. Since |DUT1| < 0.9s, UT1 ≈ UTC for lookup; near a
+		// leap second the inverse is iterated — see utcFromUT1.
+		jd1, jd2 := utcFromUT1(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, jd1, jd2, UTC)
+	case GPST, BDT:
+		// GNSS → TAI → UTC. The first step is a constant and the second is
+		// the leap-second table, which is where the seconds a GNSS user is
+		// missing actually come from.
+		return t.TAI().UTC()
+	case TCG:
+		return t.TT().UTC()
+	case TCB:
+		return t.TDB().UTC()
+	}
+
+	return t // unreachable with current scales
+}
+
+// TAI returns a new Time converted to the International Atomic Time scale.
+func (t Time) TAI() Time {
+	if t.scale == TAI {
+		return t
+	}
+
+	switch t.scale { //nolint:exhaustive // only UTC/TT/TDB convert to TAI
+	case UTC:
+		// TAI = UTC + ΔAT, reading the UTC fraction as a fraction of that
+		// day's own length — see utcday.go.
+		//
+		// The ordinary day is handled inline, exactly as it always was, and
+		// only a day of the month that can end in a leap second pays for the
+		// call: measured, routing every conversion through utcToTAI cost
+		// BenchmarkUTCToTAI 14%, where the precedent in leapsecond.go is
+		// that 22% was too much.
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		if stepDays()&(1<<uint(d)) != 0 {
+			return t.fromUTCOnStepDay(0, TAI)
+		}
+
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+deltaAT(y, m, d, fd)/86400.0, TAI)
+	case TT:
+		// TAI = TT − 32.184s
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-32.184/86400.0, TAI)
+	case TDB:
+		// TDB → TT → TAI, all arithmetic.
+		//
+		// This used to route through UTC with UT1, which is wrong for a
+		// conversion between two scales that differ from TAI by a constant
+		// and a periodic term. Going via UTC drags in Delta-AT — and, before
+		// 1972, Delta-T — neither of which is symmetric here, so
+		// TAI->TDB->TAI came back 10,170 seconds late in AD 33: the whole of
+		// Delta-T at that epoch, applied on the way home and never on the way
+		// out. Measured by TestScaleRoundTripMatrix.
+		return t.TT().TAI()
+	case TCG:
+		// TCG → TT → TAI. Without this the switch below falls through to
+		// "return t", and the caller then reads a TCG date as though it were
+		// TAI — which is the defect TestScaleRoundTripMatrix reported as
+		// BDT->TCG->BDT losing 34.95 s at 1900, that being TCG−TAI at the
+		// epoch.
+		return t.TT().TAI()
+	case TCB:
+		// TCB → TDB → TT → TAI, for the same reason.
+		return t.TDB().TAI()
+	case GPST:
+		// TAI = GPST + 19 s, exactly. No table, no epoch dependence: the
+		// offset was frozen at the 1980-01-06 synchronization and GPS time
+		// has ignored leap seconds ever since.
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-gpstMinusTAI/86400.0, TAI)
+	case BDT:
+		// TAI = BDT + 33 s, exactly, frozen at BeiDou's 2006-01-01
+		// synchronization for the same reason.
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-bdtMinusTAI/86400.0, TAI)
+	default:
+		// UT1 → UTC → TAI. UT1 genuinely has to go this way: DUT1 is defined
+		// against UTC, so there is no arithmetic path.
+		//
+		// Only UT1 reaches here. Every other scale has a case above, and it
+		// must stay that way: a scale that falls through to this branch is
+		// converted as though it were UT1, and one that UTC() also does not
+		// know would recurse between the two.
+		return t.UTC().TAI()
+	}
+}
+
+// TT returns a new Time converted to the Terrestrial Time scale.
+//
+// From 1960, when UTC began, the conversion applies leap seconds:
+// TT = UTC + ΔAT + 32.184s. Before 1960 there is no UTC, and the label is read
+// as UT through the Espenak & Meeus (2006) model [DeltaT] returns there:
+// TT = UT + ΔT. This means .TT() and .TDB() produce correct results for any
+// epoch from -1999 to +3000 without requiring the user to call
+// ApplyDeltaT() explicitly.
+//
+// # Where ΔAT comes from
+//
+// From SOFA's own table, via gofa's Dat — not from a NAIF leap-second kernel.
+// Earlier revisions of this comment said "the NAIF LSK", which was never true
+// of this package: nothing under epoch/ reads a kernel, and no LSK loader is
+// registered here. The kernel is read only by ephemeris/jpl, which uses it to
+// compute the ET its own SPK segments are indexed by (see lsk.UTCToET). The
+// two tables agree — TestLeapSecondSourcesAgree pins that — but they are
+// separate sources, and whether time should consume the kernel instead is an
+// open question rather than the current behavior.
+func (t Time) TT() Time {
+	if t.scale == TT {
+		return t
+	}
+
+	switch t.scale { //nolint:exhaustive // only UTC/TAI/TDB convert to TT
+	case UTC:
+		// UTC began in 1960, defined against TAI: from then TT = UTC + ΔAT +
+		// 32.184 s, with SOFA's ΔAT, which drifts through the 1960s and jumps
+		// by fractions of a second on the days utcday.go stretches. Before
+		// 1960 there is no UTC, and a UTC label is read as UT through ΔT.
+		//
+		// The gate was 1972, reading 1960–1971 as UT too. That put TT 0.1 s
+		// from SOFA's on those dates, and from this package's own TAI: TT()
+		// and TAI().TT() disagreed for the same instant (#479).
+		//
+		// Gated on a Julian Date rather than on a calendar year, which needs a
+		// JdToDate this branch then does again inside utcToTAI — measured,
+		// that duplicate made UTC->TT half as slow again.
+		//
+		// TT steps at 1960-01-01 0h by the difference of the two readings,
+		// ΔAT + 32.184 s against ΔT(1960): two conventions meeting, as SOFA's
+		// own TAI−UTC does there.
+		if t.jd1+t.jd2 < jd1960 {
+			// Historical date: use ΔT polynomial (TT = UT + ΔT)
+			dt := deltaTModel(t.DecimalYear())
+			return fromPartsPreserveLoc(t, t.jd1, t.jd2+dt/86400.0, TT)
+		}
+		// Modern date: TT = UTC + ΔAT + 32.184s, the first step through
+		// utcday.go so that a leap-second day is read at its own length. This
+		// branch used to add ΔAT itself, a second copy of the arithmetic in
+		// [Time.TAI] that would have gone on assuming 86400 seconds.
+		// Inline on an ordinary day for the same reason as [Time.TAI].
+		y, m, d, fd, _ := gofaext.JdToDate(t.jd1, t.jd2)
+		if stepDays()&(1<<uint(d)) != 0 {
+			return t.fromUTCOnStepDay(32.184, TT)
+		}
+
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+(deltaAT(y, m, d, fd)+32.184)/86400.0, TT)
+	case TAI:
+		// TT = TAI + 32.184s
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2+32.184/86400.0, TT)
+	case TDB:
+		// TT = TDB − (TDB−TT). Use TDB JD as TT approximation for the
+		// correction term (residual error ≈ 4 ns, negligible).
+		return fromPartsPreserveLoc(t, t.jd1, t.jd2-tdbMinusTT(t.jd1, t.jd2)/86400.0, TT)
+	case UT1:
+		// UT1 → UTC (with fallback) → TT
+		return t.UTC().TT()
+	case GPST, BDT:
+		// GNSS → TAI → TT, both steps constant.
+		return t.TAI().TT()
+	case TCG:
+		// TCG → TT is the defining rate scaling, and the only edge TCG has:
+		// it is TT's coordinate time, so every other scale is reached through
+		// TT rather than by a second formula that could disagree with this
+		// one.
+		tt1, tt2, _ := gofaext.TCGToTT(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, tt1, tt2, TT)
+	case TCB:
+		// TCB → TDB → TT. TCB's only edge is to TDB, for the same reason.
+		return t.TDB().TT()
+	}
+
+	return t // unreachable
+}
+
+// GPST returns a new Time converted to GPS system time.
+//
+// GPS time is TAI − 19 s exactly, so this conversion is arithmetic and cannot
+// fail: the offset was fixed at the 1980-01-06 synchronization and GPS has
+// ignored leap seconds since. Against UTC the gap therefore grows at every leap
+// event, and is 18 s today.
+//
+// The direction that matters most is the other one. A receiver hands a caller
+// GPS time; building it with [FromJD] or [Date] and this scale, rather than
+// calling it UTC, is what stops those 18 seconds becoming 138 km of ISS track.
+//
+// Galileo System Time is the same scale to within nanoseconds. BeiDou is not:
+// see [Time.BDT].
+func (t Time) GPST() Time {
+	if t.scale == GPST {
+		return t
+	}
+
+	tai := t.TAI()
+
+	return fromPartsPreserveLoc(t, tai.jd1, tai.jd2+gpstMinusTAI/86400.0, GPST)
+}
+
+// BDT returns a new Time converted to BeiDou system time.
+//
+// TAI − 33 s exactly, so like [Time.GPST] this is arithmetic and cannot fail.
+// Against UTC the gap is 4 s today and grows at every leap event; against GPST
+// it is a flat 14 s that will never change, since both were frozen against TAI.
+//
+// The direction that matters is the other one: a receiver on a BeiDou-capable
+// device hands out BDT, and building that instant with this scale rather than
+// calling it UTC is what stops four seconds becoming 30 km of ISS track. Four
+// seconds is small enough to read as a rounding difference, which is exactly
+// why it needs a name.
+func (t Time) BDT() Time {
+	if t.scale == BDT {
+		return t
+	}
+
+	tai := t.TAI()
+
+	return fromPartsPreserveLoc(t, tai.jd1, tai.jd2+bdtMinusTAI/86400.0, BDT)
+}
+
+// TDB returns a new Time converted to the Barycentric Dynamical Time scale.
+//
+// TDB−TT is the leading 37 terms of Fairhead & Bretagnon (1990), within 1 µs
+// of SOFA's iauDtdb over 1600–2400 — see tdbMinusTT.
+func (t Time) TDB() Time {
+	if t.scale == TDB {
+		return t
+	}
+
+	// TCB is TDB's own coordinate time, so the two are one rate scaling
+	// apart. Routing that through TT instead would go out through the
+	// periodic TDB−TT term and back again, which is not symmetric.
+	if t.scale == TCB {
+		tdb1, tdb2, _ := gofaext.TCBToTDB(t.jd1, t.jd2)
+
+		return fromPartsPreserveLoc(t, tdb1, tdb2, TDB)
+	}
+
+	tt := t.TT()
+	correction := tdbMinusTT(tt.jd1, tt.jd2) / 86400.0
+
+	return fromPartsPreserveLoc(t, tt.jd1, tt.jd2+correction, TDB)
+}
+
+// TCG returns a new Time converted to Geocentric Coordinate Time.
+//
+// The conversion is a rate scaling against TT and nothing else — no table, no
+// Earth orientation, no epoch-dependent lookup — so it is exact in both
+// directions and cannot fail. Every other scale reaches TCG through TT, which
+// is what keeps one definition of the TT↔TCG rate rather than several that
+// could drift apart.
+//
+// See [TCG] for what the scale is and when a caller wants it.
+func (t Time) TCG() Time {
+	if t.scale == TCG {
+		return t
+	}
+
+	tt := t.TT()
+
+	tcg1, tcg2, _ := gofaext.TTToTCG(tt.jd1, tt.jd2)
+
+	return fromPartsPreserveLoc(t, tcg1, tcg2, TCG)
+}
+
+// TCB returns a new Time converted to Barycentric Coordinate Time.
+//
+// As [Time.TCG] is to TT, this is to TDB: a rate scaling, exact both ways,
+// reached from every other scale through TDB.
+//
+// See [TCB] for what the scale is and why an ephemeris is argued in TDB
+// instead.
+func (t Time) TCB() Time {
+	if t.scale == TCB {
+		return t
+	}
+
+	tdb := t.TDB()
+
+	tcb1, tcb2, _ := gofaext.TDBToTCB(tdb.jd1, tdb.jd2)
+
+	return fromPartsPreserveLoc(t, tcb1, tcb2, TCB)
+}
+
+// UT1 returns a new Time converted to the Universal Time (UT1) scale.
+//
+// This conversion requires IERS Earth Orientation Parameters for DUT1,
+// which are loaded automatically and lazily on first need once
+// [github.com/TuSKan/astrogo/remote/eop] is imported: a pre-seeded on-disk
+// cache file, then (if [github.com/TuSKan/astrogo/remote.EnableDownloads]
+// was called for [github.com/TuSKan/astrogo/remote.IERSFinals2000A]) a
+// network fetch.
+//
+// Past the bulletin's end it answers with ΔT held at its value on the
+// bulletin's last day, the forecast every conversion uses there, and the
+// one-time notice saying so. See [DeltaT].
+//
+// Returns an error when a loaded bulletin starts after the epoch: unlike
+// [Time.EOP] and [Time.UTC]'s UT1 branch, this method propagates that
+// failure rather than degrading to DUT1=0. When nothing was loaded at all,
+// as in a program that never imported remote/eop, it degrades like them,
+// to DUT1=0 with the one-time EOP warning, and returns no error; so does a
+// caller that registered ZeroModel deliberately, without the warning.
+func (t Time) UT1() (Time, error) {
+	if t.scale == UT1 {
+		return t, nil
+	}
+
+	utc := t.UTC() // deterministic route to UTC
+
+	dut1, defaulted, err := dut1ForUTC(utc.jd1, utc.jd2)
+	if err != nil {
+		return Time{}, fmt.Errorf("epoch: UT1 conversion failed (MJD %.1f): %w",
+			mjdFromJDParts(utc.jd1, utc.jd2), err)
+	}
+
+	if defaulted != nil {
+		warnEOPUnavailable(mjdFromJDParts(utc.jd1, utc.jd2), defaulted)
+	}
+
+	return utc.UT1Using(dut1), nil
+}
+
+// UT1Using returns t on the UT1 scale using dut1 as UT1 − UTC in seconds,
+// rather than looking it up.
+//
+// For a caller that already holds Earth Orientation Parameters — coord.Context
+// fetches them once per epoch and reuses them for polar motion as well — and
+// must not pay for, or disagree with, a second lookup. [Time.UT1] is this with
+// the lookup done for it.
+//
+// # Why the addition is not the caller's to do
+//
+// UT1 = UTC + DUT1 is true of the labels, and a UTC Julian Date is a label
+// only on an ordinary day. On one ending in a leap second its fraction is of
+// 86401 seconds (SOFA's convention; see utcday.go), so adding DUT1 to it
+// directly misplaces UT1 by up to a second — 15 arcsec of Earth rotation. This
+// forms the sum in TAI on those days, as iauUtcut1 does; the only place that
+// knows which days they are is this package.
+func (t Time) UT1Using(dut1 float64) Time {
+	utc := t.UTC()
+	jd1, jd2 := ut1FromUTC(utc.jd1, utc.jd2, dut1)
+
+	return fromPartsPreserveLoc(t, jd1, jd2, UT1)
+}
+
+// normalize ensures that |jd2| < 1.0, and both components are properly balanced.
+func (t *Time) normalize() {
+	if math.IsNaN(t.jd1) || math.IsNaN(t.jd2) {
+		return
+	}
+	// Move integer days from jd2 to jd1
+	extraDays := math.Floor(t.jd2)
+	t.jd1 += extraDays
+	t.jd2 -= extraDays
+
+	// If jd1 is not an integer (user passed fractional jd1), move its fraction to jd2
+	jd1Int, jd1Frac := math.Modf(t.jd1)
+	t.jd1 = jd1Int
+	t.jd2 += jd1Frac
+
+	// Re-normalize in case jd2 overflowed past 1.0 (e.g. 0.5 + 0.5)
+	extraDays = math.Floor(t.jd2)
+	t.jd1 += extraDays
+	t.jd2 -= extraDays
+}
+
+// clockParts returns the two-part Julian Date the formatters read a calendar
+// and a clock from: t on the UTC timeline, as [Time.ToGo] reads it, with a
+// leap-second day's fraction stretched back to 86400 seconds.
+func (t Time) clockParts() (jd1, jd2 float64) {
+	u := t.UTC()
+
+	return utcToLabel(u.jd1, u.jd2)
+}
+
+// subDays returns the physical time elapsed from other to t, in days of 86400
+// SI seconds.
+//
+// It is the primitive [Time.Sub] is expressed in, kept in days because that is
+// what the two-part Julian date it reads is stored in: converting to seconds
+// before the subtraction would round the larger part away.
+func (t Time) subDays(other Time) float64 {
+	// Two epochs in one uniform scale need no conversion: their labels already
+	// differ by elapsed SI time. Anything else goes through TT — a mismatched
+	// pair because they must be made comparable, and a matched non-uniform
+	// pair (two UTC epochs, two UT1 epochs) because that is the whole bug.
+	if t.scale != other.scale || !t.scale.uniform() {
+		t, other = t.TT(), other.TT()
+	}
+
+	return (t.jd1 - other.jd1) + (t.jd2 - other.jd2)
+}
+
+// nonFinite reports whether t's Julian Date is NaN or infinite: a Time with no
+// instant, which FromJD(math.NaN(), …) builds and an infinite JD becomes when
+// it is split. Its calendar, clock and day of the year have no value, and
+// converting its parts to int gives MinInt64 on amd64 and 0 on arm64 (#986).
+func (t Time) nonFinite() bool {
+	j := t.jd1 + t.jd2
+
+	return math.IsNaN(j) || math.IsInf(j, 0)
+}
+
+// halfSecondDays is half a second in days: added to an instant before it is
+// split into a date and a clock, it makes the clock's truncation a rounding,
+// and lets the date carry when that rounds up to midnight.
+const halfSecondDays = 0.5 / 86400
+
+// clockOf splits a fraction of a day into hours, minutes and whole seconds,
+// truncating. A fraction a rounding error short of 1 would give 86400 s, so
+// the second is capped at the day's last.
+func clockOf(frac float64) (hour, minute, second int) {
+	s := min(int(frac*86400), 86399)
+
+	return s / 3600, s / 60 % 60, s % 60
+}

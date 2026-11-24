@@ -2,8 +2,9 @@ package plan
 
 import (
 	"testing"
+	"time"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -15,8 +16,8 @@ import (
 func TestPassAtPicksThePassAtTheInstant(t *testing.T) {
 	t.Parallel()
 
-	t0 := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
-	at := func(h float64) time.Time { return t0.Add(unit.Hours(h)) }
+	t0 := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
+	at := func(h float64) epoch.Time { return t0.Add(unit.Hours(h)) }
 	ev := func(k EventKind, h float64) Event { return Event{Kind: k, Time: at(h)} }
 
 	// A day of a target that rises at 6, culminates at 12, sets at 18, and

@@ -3,9 +3,10 @@ package lsk_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // taiMinusUTCSeconds measures ΔAT as the scale conversion actually applies it.
@@ -25,7 +26,7 @@ import (
 // was relying on the old one. The standard library's count of seconds is the
 // uniform UTC label, so the UTC side comes from there, split into whole days
 // and seconds of the day so that nothing near 2.46e6 is subtracted.
-func taiMinusUTCSeconds(when time.Time) float64 {
+func taiMinusUTCSeconds(when epoch.Time) float64 {
 	const unixEpochJD = 2440587.5
 
 	g := when.UTC().ToGo()
@@ -48,13 +49,13 @@ func taiMinusUTCSeconds(when time.Time) float64 {
 // depend on which tests ran before it, which is exactly the kind of coupling
 // that later gets "fixed" by loosening the assertion.
 func TestRegisterLeapSecondsRejectsAnEmptyTable(t *testing.T) {
-	before := time.LeapSecondSource()
+	before := epoch.LeapSecondSource()
 
 	if err := lsk.RegisterLeapSeconds(&lsk.Reader{}); err == nil {
 		t.Error("an empty DELTA_AT table was accepted")
 	}
 
-	if got := time.LeapSecondSource(); got != before {
+	if got := epoch.LeapSecondSource(); got != before {
 		t.Errorf("a rejected registration changed the source from %q to %q",
 			before, got)
 	}
@@ -64,7 +65,7 @@ func TestRegisterLeapSecondsRejectsAnEmptyTable(t *testing.T) {
 // registry reach real callers.
 //
 // A provider drives its epochs from the kernel's DELTA_AT and DELTA_T_A blocks
-// — that is what UTCToET does. If time's UTC↔TAI↔TT conversions kept following
+// — that is what UTCToET does. If epoch's UTC↔TAI↔TT conversions kept following
 // a table pinned by go.mod while the SPK was evaluated at an ET derived from
 // the kernel, the two would disagree by a second the moment a new leap second
 // was announced, in opposite directions, with nothing to say so.
@@ -72,11 +73,11 @@ func TestRegisterLeapSecondsRejectsAnEmptyTable(t *testing.T) {
 // openKernel builds a provider, so by the time it returns the registration has
 // already happened; that is exactly what this asserts.
 func TestProviderRegistersItsKernelsLeapSeconds(t *testing.T) {
-	defer time.ResetLeapSeconds()
+	defer epoch.ResetLeapSeconds()
 
 	_ = openKernel(t)
 
-	if got := time.LeapSecondSource(); got != "kernel" {
+	if got := epoch.LeapSecondSource(); got != "kernel" {
 		t.Errorf("after jpl.NewProvider, LeapSecondSource() = %q, want %q.\n"+
 			"  The provider computes ET from the kernel's own tables, so time must "+
 			"be using the same kernel's leap seconds.", got, "kernel")
@@ -94,33 +95,33 @@ func TestProviderRegistersItsKernelsLeapSeconds(t *testing.T) {
 // That makes this a strong test of the *plumbing* and a weak one of the data:
 // gofa's table, NAIF's kernel and the discontinuities in IERS finals2000A are
 // three republications of one IERS source, so their agreement is a consistency
-// check rather than validation — see time's leapSecondRecord doc comment and
+// check rather than validation — see epoch's leapSecondRecord doc comment and
 // metrology.Reference.SharedAncestor. What it does prove is that a real
 // kernel's block survives parsing, JD-to-calendar conversion and the superset
 // check intact, and that is the part that could silently break.
 func TestRealKernelTableMatchesTheBuiltinRecord(t *testing.T) {
-	defer time.ResetLeapSeconds()
+	defer epoch.ResetLeapSeconds()
 
 	r := openKernel(t)
 
 	// openKernel builds a provider, which registers already. Undo that so the
 	// baseline below is genuinely the built-in table — otherwise the
 	// before/after comparison compares the kernel against itself.
-	time.ResetLeapSeconds()
+	epoch.ResetLeapSeconds()
 
 	probes := []struct {
-		when time.Time
+		when epoch.Time
 		want float64
 	}{
-		{time.Date(1972, time.January, 1, 0, 0, 1, 0, time.LocationUTC), 10},
-		{time.Date(1972, time.June, 30, 12, 0, 0, 0, time.LocationUTC), 10},
-		{time.Date(1972, time.July, 1, 0, 0, 1, 0, time.LocationUTC), 11},
-		{time.Date(1985, time.July, 1, 0, 0, 1, 0, time.LocationUTC), 23},
-		{time.Date(1999, time.January, 1, 0, 0, 1, 0, time.LocationUTC), 32},
-		{time.Date(2015, time.July, 1, 0, 0, 1, 0, time.LocationUTC), 36},
-		{time.Date(2016, time.December, 31, 12, 0, 0, 0, time.LocationUTC), 36},
-		{time.Date(2017, time.January, 1, 0, 0, 1, 0, time.LocationUTC), 37},
-		{time.Date(2026, time.June, 1, 12, 0, 0, 0, time.LocationUTC), 37},
+		{epoch.Date(1972, time.January, 1, 0, 0, 1, 0, time.UTC), 10},
+		{epoch.Date(1972, time.June, 30, 12, 0, 0, 0, time.UTC), 10},
+		{epoch.Date(1972, time.July, 1, 0, 0, 1, 0, time.UTC), 11},
+		{epoch.Date(1985, time.July, 1, 0, 0, 1, 0, time.UTC), 23},
+		{epoch.Date(1999, time.January, 1, 0, 0, 1, 0, time.UTC), 32},
+		{epoch.Date(2015, time.July, 1, 0, 0, 1, 0, time.UTC), 36},
+		{epoch.Date(2016, time.December, 31, 12, 0, 0, 0, time.UTC), 36},
+		{epoch.Date(2017, time.January, 1, 0, 0, 1, 0, time.UTC), 37},
+		{epoch.Date(2026, time.June, 1, 12, 0, 0, 0, time.UTC), 37},
 	}
 
 	const tolerance = 1e-6 // seconds; see taiMinusUTCSeconds
@@ -137,7 +138,7 @@ func TestRealKernelTableMatchesTheBuiltinRecord(t *testing.T) {
 			"shifting entries.", err)
 	}
 
-	if got := time.LeapSecondSource(); got != "kernel" {
+	if got := epoch.LeapSecondSource(); got != "kernel" {
 		t.Fatalf("LeapSecondSource() = %q, want %q", got, "kernel")
 	}
 

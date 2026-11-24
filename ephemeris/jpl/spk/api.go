@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // DOC: https://ssd-api.jpl.nasa.gov/doc/horizons.html
@@ -86,7 +86,7 @@ func commandCandidates(kernel string) []string {
 // Storage is a fsys and key prefix, never a directory path: a generated
 // kernel lands wherever remote's cache lives, which need not be local
 // disk.
-func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startTime, endTime time.Time) ([]*Reader, error) {
+func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startTime, endTime epoch.Time) ([]*Reader, error) {
 	var readers []*Reader
 
 	spkFile := prefix + kernel + ".bsp"
@@ -259,7 +259,7 @@ func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startT
 	return readers, nil
 }
 
-func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime time.Time) (*HorizonsResponse, error) {
+func apiHorizonsRequest(ctx context.Context, command string, startTime, endTime epoch.Time) (*HorizonsResponse, error) {
 	params := url.Values{}
 	params.Set("format", "json")
 	params.Set("COMMAND", "'"+command+"'")

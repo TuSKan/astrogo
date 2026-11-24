@@ -3,8 +3,9 @@ package lsk_test
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
@@ -57,7 +58,7 @@ func TestLSKReader(t *testing.T) {
 
 	// Test UTC to TDB conversion
 	// Difference between UTC and TDB is roughly 64 seconds + periodic terms at J2000
-	j2000 := time.FromJD(2451545.0, time.UTC)
+	j2000 := epoch.FromJD(2451545.0, epoch.UTC)
 	diffSeconds := tdbMinusUTC(j2000, r)
 	// TDB is ahead of UTC by ~64.184 seconds at J2000
 	testutil.AssertNear(t, "TDB-UTC at J2000", diffSeconds, 64.184, 1.0)

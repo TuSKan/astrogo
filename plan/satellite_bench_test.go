@@ -2,11 +2,12 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -39,7 +40,7 @@ func benchISS(b *testing.B) (*satellite.Satellite, *coord.Geodetic) {
 func BenchmarkLookAngle(b *testing.B) {
 	sat, site := benchISS(b)
 
-	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 
 	ctx, err := coord.NewContext(when, site, defaultAtm)
 	if err != nil {
@@ -70,7 +71,7 @@ func BenchmarkLookAngle(b *testing.B) {
 func BenchmarkSatellitePasses_6h(b *testing.B) {
 	sat, site := benchISS(b)
 
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Hours(6))
 
 	b.ResetTimer()

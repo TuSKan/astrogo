@@ -6,14 +6,14 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // withErrors is a still Target at (10°, 20° + northArcsec) at J2000, with a
 // position error of sigmaArcsec on each axis.
 func withErrors(id string, northArcsec, sigmaArcsec float64) resolve.Target {
 	return resolve.Target{
-		ID: id, HasCoord: true, Epoch: time.J2000(),
+		ID: id, HasCoord: true, Epoch: epoch.J2000(),
 		Coord:            coord.NewICRS(angle.Deg(10), angle.Deg(20).Add(angle.Arcsec(northArcsec))),
 		AstrometricError: resolve.AstrometricError{RA: angle.Arcsec(sigmaArcsec), Dec: angle.Arcsec(sigmaArcsec)},
 	}

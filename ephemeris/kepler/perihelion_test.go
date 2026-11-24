@@ -10,8 +10,8 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -27,7 +27,7 @@ type cometElements struct {
 func (c cometElements) build(t *testing.T) kepler.Elements {
 	t.Helper()
 
-	el, err := kepler.FromPerihelion(time.FromJDParts(c.tp, 0, time.TDB), time.FromJDParts(c.tp, 0, time.TDB), unit.AU(c.q), c.e,
+	el, err := kepler.FromPerihelion(epoch.FromJDParts(c.tp, 0, epoch.TDB), epoch.FromJDParts(c.tp, 0, epoch.TDB), unit.AU(c.q), c.e,
 		angle.Deg(c.incl), angle.Deg(c.node), angle.Deg(c.argPeri))
 	if err != nil {
 		t.Fatalf("%s: FromPerihelion: %v", c.name, err)
@@ -139,7 +139,7 @@ func TestFromPerihelionReproducesHorizonsOwnConversion(t *testing.T) {
 		t.Run(tc.el.name, func(t *testing.T) {
 			el := tc.el.build(t).WithCentralBody(kepler.CentralBody{ID: core.Sun, GM: jplGM})
 
-			pos, vel, err := el.StateAt(time.FromJDParts(tc.epoch, 0, time.TDB))
+			pos, vel, err := el.StateAt(epoch.FromJDParts(tc.epoch, 0, epoch.TDB))
 			testutil.AssertNoError(t, err)
 
 			dr := pos.Sub(tc.pos).Norm()
@@ -414,7 +414,7 @@ func TestFromPerihelionStartsAtPerihelion(t *testing.T) {
 // ErrInvalidElements, indistinguishable from bad data.
 func TestNewElementsReportsAnOpenOrbitAsUnsupported(t *testing.T) {
 	c := tsuchinshanATLAS
-	tp := time.FromJDParts(c.tp, 0, time.TDB)
+	tp := epoch.FromJDParts(c.tp, 0, epoch.TDB)
 
 	cases := []struct {
 		name string
@@ -438,7 +438,7 @@ func TestNewElementsReportsAnOpenOrbitAsUnsupported(t *testing.T) {
 // TestFromPerihelionRejectsWhatNoOrbitHas checks the constructor's own
 // validation.
 func TestFromPerihelionRejectsWhatNoOrbitHas(t *testing.T) {
-	tp := time.FromJDParts(2460000.5, 0, time.TDB)
+	tp := epoch.FromJDParts(2460000.5, 0, epoch.TDB)
 
 	cases := []struct {
 		name string
@@ -494,7 +494,7 @@ func TestAPeriodAppliesOnlyToAClosedOrbit(t *testing.T) {
 		}
 	}
 
-	_, _, err = oumuamua.build(t).WithPeriod(periodDays).StateAt(time.FromJDParts(oumuamua.tp, 0, time.TDB))
+	_, _, err = oumuamua.build(t).WithPeriod(periodDays).StateAt(epoch.FromJDParts(oumuamua.tp, 0, epoch.TDB))
 	testutil.AssertErrorIs(t, err, kepler.ErrInvalidElements)
 }
 
@@ -506,7 +506,7 @@ func TestPerihelionFormAccessors(t *testing.T) {
 	testutil.AssertRelNear(t, "hyperbola a", hyperbola.SemiMajorAxis().AU(), oumuamua.q/(1-oumuamua.e), 1e-15)
 	testutil.AssertRelNear(t, "hyperbola q", hyperbola.PerihelionDistance().AU(), oumuamua.q, 1e-15)
 	testutil.AssertExact(t, "hyperbola M", hyperbola.MeanAnomaly().Radians(), 0)
-	testutil.AssertExact(t, "hyperbola epoch", hyperbola.Epoch().JD(), time.FromJDParts(oumuamua.tp, 0, time.TDB).JD())
+	testutil.AssertExact(t, "hyperbola epoch", hyperbola.Epoch().JD(), epoch.FromJDParts(oumuamua.tp, 0, epoch.TDB).JD())
 
 	if hyperbola.SemiMajorAxis() >= 0 {
 		t.Errorf("a hyperbola's semi-major axis is %v; by convention it is negative", hyperbola.SemiMajorAxis())

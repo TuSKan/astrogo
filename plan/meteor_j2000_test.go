@@ -3,9 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestSunLongitudeJ2000MatchesSkyfield checks the solar longitude meteor
@@ -14,13 +15,13 @@ import (
 // 0.0004° at worst on the analytical ephemeris, about half a minute of time.
 func TestSunLongitudeJ2000MatchesSkyfield(t *testing.T) {
 	for _, c := range []struct {
-		at   time.Time
+		at   epoch.Time
 		want float64
 	}{
-		{time.Date(2026, 7, 16, 21, 50, 0, 0, time.LocationUTC), 114.009},
-		{time.Date(2026, 8, 24, 23, 54, 0, 0, time.LocationUTC), 151.461},
-		{time.Date(2026, 8, 12, 16, 52, 0, 0, time.LocationUTC), 139.634},
-		{time.Date(2026, 8, 13, 2, 0, 33, 0, time.LocationUTC), 140.000},
+		{epoch.Date(2026, 7, 16, 21, 50, 0, 0, time.UTC), 114.009},
+		{epoch.Date(2026, 8, 24, 23, 54, 0, 0, time.UTC), 151.461},
+		{epoch.Date(2026, 8, 12, 16, 52, 0, 0, time.UTC), 139.634},
+		{epoch.Date(2026, 8, 13, 2, 0, 33, 0, time.UTC), 140.000},
 	} {
 		got, err := sunLongitudeJ2000(c.at, eph.Default())
 		if err != nil {
@@ -45,11 +46,11 @@ func TestPerseidsFollowIMOsJ2000Longitudes(t *testing.T) {
 	per := meteorShowers["perseids"]
 
 	for _, c := range []struct {
-		at   time.Time
+		at   epoch.Time
 		want bool
 	}{
-		{time.Date(2026, 7, 16, 13, 0, 0, 0, time.LocationUTC), false},
-		{time.Date(2026, 7, 16, 22, 0, 0, 0, time.LocationUTC), true},
+		{epoch.Date(2026, 7, 16, 13, 0, 0, 0, time.UTC), false},
+		{epoch.Date(2026, 7, 16, 22, 0, 0, 0, time.UTC), true},
 	} {
 		active, err := per.IsActive(c.at, prov)
 		if err != nil {
@@ -63,7 +64,7 @@ func TestPerseidsFollowIMOsJ2000Longitudes(t *testing.T) {
 
 	// At λ☉ (J2000) = 140.0°, 2026-08-13 02:00:33 UT by Skyfield, the radiant
 	// is the tabulated peak radiant.
-	ra, dec, err := per.RadiantAt(time.Date(2026, 8, 13, 2, 0, 33, 0, time.LocationUTC), prov)
+	ra, dec, err := per.RadiantAt(epoch.Date(2026, 8, 13, 2, 0, 33, 0, time.UTC), prov)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +133,7 @@ func TestMeteorShowersAreIMOs2027WorkingList(t *testing.T) {
 			{"start", c.first, 0, m.ActiveStartSolarLon},
 			{"end", c.last, 1, m.ActiveEndSolarLon},
 		} {
-			at := time.Date(w.date[0], time.Month(w.date[1]), w.date[2]+w.day, 0, 0, 0, 0, time.LocationUTC)
+			at := epoch.Date(w.date[0], time.Month(w.date[1]), w.date[2]+w.day, 0, 0, 0, 0, time.UTC)
 
 			want, err := sunLongitudeJ2000(at, prov)
 			if err != nil {

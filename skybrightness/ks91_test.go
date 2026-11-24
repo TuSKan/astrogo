@@ -4,15 +4,16 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -26,7 +27,7 @@ import (
 // component is held to (#935, #938). Angles are as tabulated, rounded to the
 // nearest degree.
 type ks91Observation struct {
-	when          time.GoTime
+	when          time.Time
 	skyAz, skyZ   float64 // the observed sky position, degrees
 	moonAz, moonZ float64 // the Moon, degrees
 	rho           float64 // the Moon's distance from the sky position, degrees
@@ -35,8 +36,8 @@ type ks91Observation struct {
 	bMoon         float64 // the moonlight alone, nanoLamberts
 }
 
-func ks91At(year int, month time.Month, day, hour, minute int) time.GoTime {
-	return time.GoDate(year, month, day, hour, minute, 0, 0, time.LocationUTC)
+func ks91At(year int, month time.Month, day, hour, minute int) time.Time {
+	return time.Date(year, month, day, hour, minute, 0, 0, time.UTC)
 }
 
 // ks91Table1 is Table 1, all twelve rows, read from the ADS scan.
@@ -272,7 +273,7 @@ func TestKS91GeometryMatchesTheEphemeris(t *testing.T) {
 	geometric := atmosphere.Refraction{Model: atmosphere.RefractionNone{}}
 
 	for _, o := range ks91Table1 {
-		at := time.FromGo(o.when)
+		at := epoch.FromGo(o.when)
 		in := eph.At(eph.Default(), at)
 
 		ctx, err := coord.NewContext(at, loc, geometric)

@@ -5,12 +5,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -97,9 +98,9 @@ func TestZodiacalLightBesideTheSunIsNoContribution(t *testing.T) {
 	grid := skybrightness.DefaultOpticalGrid()
 	scene := auditScene(t)
 	// Local noon at the audit site, so the Sun is above the horizon.
-	scene.Time = time.GoDate(2026, 3, 20, 17, 0, 0, 0, time.LocationUTC)
+	scene.Time = time.Date(2026, 3, 20, 17, 0, 0, 0, time.UTC)
 
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 	if err != nil {

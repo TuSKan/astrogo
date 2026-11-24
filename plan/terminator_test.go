@@ -8,8 +8,8 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestSubsolarPoint_SolsticeLatitude confirms the subsolar latitude at the
@@ -70,7 +70,7 @@ func TestSubsolarPoint_SolsticeLatitude(t *testing.T) {
 // side carries, is zero here because no EOP are loaded.
 func TestSubsolarPoint_LongitudeMatchesLocalSiderealTime(t *testing.T) {
 	prov := eph.Default()
-	tm := time.FromJD(2461000.25, time.UTC) // arbitrary date, no special significance
+	tm := epoch.FromJD(2461000.25, epoch.UTC) // arbitrary date, no special significance
 
 	sun, err := apparentVec(prov, eph.Sun, tm)
 	if err != nil {
@@ -172,7 +172,7 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 	for _, body := range []struct {
 		name      string
 		id        eph.ID
-		point     func(time.Time, eph.Provider) (*coord.Geodetic, error)
+		point     func(epoch.Time, eph.Provider) (*coord.Geodetic, error)
 		tolArcsec float64
 	}{
 		{"Sun", eph.Sun, SubsolarPoint, 1},
@@ -181,7 +181,7 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 		var worst float64
 
 		for _, jd := range []float64{2451545.0, 2455197.5, 2461318.0, 2469807.5} {
-			tm := time.FromJD(jd, time.UTC)
+			tm := epoch.FromJD(jd, epoch.UTC)
 
 			geo, err := body.point(tm, prov)
 			if err != nil {
@@ -217,7 +217,7 @@ func TestSubsolarAndSublunarPointsAreOverhead(t *testing.T) {
 // of both SubsolarPoint and coord.SmallCircle's own construction.
 func TestTerminator_PointsAtCorrectSeparationFromSubsolarPoint(t *testing.T) {
 	prov := eph.Default()
-	tm := time.FromJD(2461000.25, time.UTC)
+	tm := epoch.FromJD(2461000.25, epoch.UTC)
 
 	sub, err := SubsolarPoint(tm, prov)
 	if err != nil {
@@ -302,7 +302,7 @@ func TestTerminator_EquinoxGeometricPassesNearPoles(t *testing.T) {
 // propagates through Terminator unwrapped-but-reachable via errors.Is.
 func TestTerminator_TooFewPoints(t *testing.T) {
 	prov := eph.Default()
-	tm := time.FromJD(2461000.25, time.UTC)
+	tm := epoch.FromJD(2461000.25, epoch.UTC)
 
 	if _, err := Terminator(tm, prov, GeometricTwilight, 2); !errors.Is(err, coord.ErrTooFewPoints) {
 		t.Errorf("Terminator(n=2) error = %v, want ErrTooFewPoints", err)
@@ -315,7 +315,7 @@ func TestTerminator_TooFewPoints(t *testing.T) {
 // tight known-value check is attempted here, only structural validity.
 func TestSublunarPoint_Basic(t *testing.T) {
 	prov := eph.Default()
-	tm := time.FromJD(2461000.25, time.UTC)
+	tm := epoch.FromJD(2461000.25, epoch.UTC)
 
 	geo, err := SublunarPoint(tm, prov)
 	if err != nil {
@@ -332,7 +332,7 @@ func TestSublunarPoint_Basic(t *testing.T) {
 // directly (bypassing plan.NewSun/NewMoon), so each needs its own
 // nil-provider guard.
 func TestTerminatorFunctions_NilProviderDefaults(t *testing.T) {
-	tm := time.FromJD(2461000.25, time.UTC)
+	tm := epoch.FromJD(2461000.25, epoch.UTC)
 
 	if _, err := SubsolarPoint(tm, nil); err != nil {
 		t.Errorf("SubsolarPoint(nil): unexpected error: %v", err)

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Every test here stands up an httptest server and hands its URL to the

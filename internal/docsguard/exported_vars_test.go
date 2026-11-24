@@ -26,7 +26,7 @@ var allowedVarFamilies = map[string]string{
 	"unit": "a Unit is a struct; units appear in composite literals and arithmetic throughout the module, " +
 		"where an accessor would read worse",
 	"unit/dim": "a Dimension is a struct; the same reason as unit",
-	"time":     "inventoried name by name in allowedTimeVars, by TestTimeExportsNoMutableFunctionValues",
+	"epoch":    "inventoried name by name in allowedEpochVars, by TestEpochExportsNoMutableFunctionValues",
 }
 
 // allowedExportedVars are exported vars outside allowedVarFamilies, keyed by
@@ -34,7 +34,7 @@ var allowedVarFamilies = map[string]string{
 // errors need no entry: see isSentinelError.
 var allowedExportedVars = map[string]string{}
 
-// TestNoUnlistedExportedVars extends TestTimeExportsNoMutableFunctionValues
+// TestNoUnlistedExportedVars extends TestEpochExportsNoMutableFunctionValues
 // to the whole module (#537).
 //
 // # What was wrong

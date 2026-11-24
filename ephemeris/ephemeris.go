@@ -12,7 +12,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -163,7 +163,7 @@ func WithKeplerBase(p Provider) KeplerOption {
 // first use inside NewFromElements/NewMovingBodyProvider) when the
 // elements are invalid — e.g. e >= 1, which a semi-major axis and mean
 // anomaly cannot describe; [ElementsFromPerihelion] takes those.
-func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float64,
+func NewElements(epoch epoch.Time, semiMajorAxis unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
 ) (Elements, error) {
 	el, err := kepler.NewElements(epoch, semiMajorAxis, eccentricity, inclination, ascendingNode, argPeriapsis, meanAnomaly)
@@ -179,7 +179,7 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 // perihelion distance and eccentricity — the form the Minor Planet Center
 // publishes comets in — for any e >= 0: ellipse, parabola or hyperbola. The
 // angles are referred to the J2000 ecliptic frame. See [kepler.FromPerihelion].
-func ElementsFromPerihelion(epoch, perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
+func ElementsFromPerihelion(epoch, perihelionTime epoch.Time, perihelionDistance unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis angle.Angle,
 ) (Elements, error) {
 	el, err := kepler.FromPerihelion(epoch, perihelionTime, perihelionDistance, eccentricity,
@@ -234,13 +234,13 @@ func NewFromElements(id ID, el Elements, opts ...KeplerOption) (Provider, error)
 type Option func(*config)
 
 type config struct {
-	Start        time.Time
-	End          time.Time
+	Start        epoch.Time
+	End          epoch.Time
 	ExtraKernels []string
 }
 
 // WithTimeInterval restricts the ephemeris coverage window (for small-body SPK).
-func WithTimeInterval(start, end time.Time) Option {
+func WithTimeInterval(start, end epoch.Time) Option {
 	return func(c *config) { c.Start = start; c.End = end }
 }
 

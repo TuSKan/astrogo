@@ -4,17 +4,18 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // sweptOppositions is what Oppositions did until #787, and what it is held
 // to: the apparent places of both bodies sampled at step, each crossing
 // rooted to a millisecond.
-func sweptOppositions(t *testing.T, step unit.Duration, target, sun Observable, start, end time.Time) []Event {
+func sweptOppositions(t *testing.T, step unit.Duration, target, sun Observable, start, end epoch.Time) []Event {
 	t.Helper()
 
 	events, err := NewEventSolver(step, unit.Seconds(0.001)).Find(EventSpec{
@@ -56,11 +57,11 @@ func TestOppositionsMatchADailyScan(t *testing.T) {
 	prov := eph.Default()
 	sun := NewSun(prov)
 
-	day := func(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.LocationUTC) }
+	day := func(y, m, d int) epoch.Time { return epoch.Date(y, time.Month(m), d, 0, 0, 0, 0, time.UTC) }
 
 	cases := []struct {
 		target     *Planet
-		start, end time.Time
+		start, end epoch.Time
 	}{
 		{NewMars(prov), day(2000, 1, 1), day(2012, 1, 1)},
 		{NewJupiter(prov), day(2000, 1, 1), day(2004, 1, 1)},
@@ -74,15 +75,15 @@ func TestOppositionsMatchADailyScan(t *testing.T) {
 		cases = append(cases,
 			struct {
 				target     *Planet
-				start, end time.Time
+				start, end epoch.Time
 			}{NewMars(prov), day(2026, 10, 1), day(2027, 4, 1)},
 			struct {
 				target     *Planet
-				start, end time.Time
+				start, end epoch.Time
 			}{NewSaturn(prov), day(2026, 8, 1), day(2026, 12, 1)},
 			struct {
 				target     *Planet
-				start, end time.Time
+				start, end epoch.Time
 			}{NewMoon(prov), day(2026, 1, 1), day(2026, 4, 1)},
 		)
 	}
@@ -110,14 +111,14 @@ func TestOppositionsMatchADailyScan(t *testing.T) {
 func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	years, sweep := 4, unit.Hours(6)
 	if testing.Short() {
 		years, sweep = 2, unit.Days(1)
 	}
 
-	end := epoch.AddDate(years, 0, 0)
+	end := at.AddDate(years, 0, 0)
 
 	for _, c := range []struct {
 		name          string
@@ -127,7 +128,7 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 		{"Apollo-type", 1.47, 0.56, 6.35, 35.6, 286.0},
 		{"comet-like", 11, 0.9, 50, 120, 40},
 	} {
-		el, err := eph.NewElements(epoch, unit.AU(c.a), c.e, angle.Deg(c.i), angle.Deg(c.node), angle.Deg(c.argp), angle.Deg(0))
+		el, err := eph.NewElements(at, unit.AU(c.a), c.e, angle.Deg(c.i), angle.Deg(c.node), angle.Deg(c.argp), angle.Deg(0))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,7 +140,7 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 
 		body, sun := NewGenericBody(c.name, eph.ID(2900001), prov), NewSun(prov)
 
-		got, err := Oppositions(body, sun, Window{Start: epoch, End: end})
+		got, err := Oppositions(body, sun, Window{Start: at, End: end})
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
@@ -148,13 +149,13 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 			t.Errorf("%s: no oppositions in %d years", c.name, years)
 		}
 
-		sameOppositions(t, c.name, got, sweptOppositions(t, sweep, body, sun, epoch, end))
+		sameOppositions(t, c.name, got, sweptOppositions(t, sweep, body, sun, at, end))
 	}
 
 	prov := eph.Default()
 	spica, sun := NewStar("Spica", angle.Deg(201.298), angle.Deg(-11.161)), NewSun(prov)
 
-	got, err := Oppositions(spica, sun, Window{Start: epoch, End: end})
+	got, err := Oppositions(spica, sun, Window{Start: at, End: end})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func TestOppositionsOfOrbitsThatKeepPaceWithTheEarth(t *testing.T) {
 		t.Errorf("Spica: %d oppositions in %d years", len(got), years)
 	}
 
-	sameOppositions(t, "Spica", got, sweptOppositions(t, unit.Days(1), spica, sun, epoch, end))
+	sameOppositions(t, "Spica", got, sweptOppositions(t, unit.Days(1), spica, sun, at, end))
 }
 
 // TestOppositionsOfAnInferiorPlanetAreNone: Mercury and Venus are never
@@ -173,7 +174,7 @@ func TestOppositionsOfAnInferiorPlanetAreNone(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, p := range []*Planet{NewMercury(prov), NewVenus(prov)} {
 		got, err := Oppositions(p, NewSun(prov), Window{Start: start, End: start.AddDate(2, 0, 0)})
@@ -191,7 +192,7 @@ func TestOppositionsTakeTheSunEitherWay(t *testing.T) {
 
 	prov := eph.Default()
 	sun, mars := NewSun(prov), NewMars(prov)
-	start := time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.AddDate(0, 3, 0)
 
 	one, err := Oppositions(mars, sun, Window{Start: start, End: end})
@@ -224,7 +225,7 @@ func TestOppositionsKeepToTheInterval(t *testing.T) {
 	prov := eph.Default()
 	sun, mars := NewSun(prov), NewMars(prov)
 
-	found, err := Oppositions(mars, sun, Window{Start: time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2027, 4, 1, 0, 0, 0, 0, time.LocationUTC)})
+	found, err := Oppositions(mars, sun, Window{Start: epoch.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC), End: epoch.Date(2027, 4, 1, 0, 0, 0, 0, time.UTC)})
 	if err != nil || len(found) != 1 {
 		t.Fatalf("Mars 2027: %v, err %v", found, err)
 	}
@@ -233,7 +234,7 @@ func TestOppositionsKeepToTheInterval(t *testing.T) {
 	edge := unit.Seconds(2)
 
 	for _, c := range []struct {
-		start, end time.Time
+		start, end epoch.Time
 		want       int
 	}{
 		{at.Add(-unit.Days(1)), at.Add(edge), 1},
@@ -263,8 +264,8 @@ func TestALongSweepReportsNoWrapAsAnOpposition(t *testing.T) {
 
 	prov := eph.Default()
 	sun, jupiter := NewSun(prov), NewJupiter(prov)
-	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2040, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	events, err := NewEventSolver(unit.Days(224), unit.Seconds(1)).Find(EventSpec{
 		Family: EventFamilyRelativeGeometry, Kind: EventOpposition, Target: jupiter, Other: sun,

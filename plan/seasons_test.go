@@ -3,9 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestSeasonsIncludeNutation compares the 2027 equinoxes and solstices with
@@ -22,11 +23,11 @@ func TestSeasonsIncludeNutation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	skyfield := []time.Time{
-		time.Date(2027, 3, 20, 20, 24, 41, 0, time.LocationUTC),
-		time.Date(2027, 6, 21, 14, 10, 50, 0, time.LocationUTC),
-		time.Date(2027, 9, 23, 6, 1, 43, 0, time.LocationUTC),
-		time.Date(2027, 12, 22, 2, 42, 10, 0, time.LocationUTC),
+	skyfield := []epoch.Time{
+		epoch.Date(2027, 3, 20, 20, 24, 41, 0, time.UTC),
+		epoch.Date(2027, 6, 21, 14, 10, 50, 0, time.UTC),
+		epoch.Date(2027, 9, 23, 6, 1, 43, 0, time.UTC),
+		epoch.Date(2027, 12, 22, 2, 42, 10, 0, time.UTC),
 	}
 
 	if len(events) != len(skyfield) {

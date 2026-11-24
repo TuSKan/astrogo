@@ -16,8 +16,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Sentinel errors for the raw OpenNGC CSV format.
@@ -118,7 +118,7 @@ func toTargets(records []targetRecord) []resolve.Target {
 			HasCoord: true,
 			Catalog:  "openngc",
 			Aliases:  rec.Aliases,
-			Epoch:    time.J2000(), // OpenNGC's RA/Dec are J2000 by catalog convention
+			Epoch:    epoch.J2000(), // OpenNGC's RA/Dec are J2000 by catalog convention
 		}
 
 		// A NaN or infinite magnitude is no magnitude (#1080).

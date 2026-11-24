@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -36,7 +37,7 @@ func TestWindowFindersSampleTheEnd(t *testing.T) {
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(10))}
 	// Midnight, so the star rises and sets once inside the reference day.
-	day := time.Date(2024, time.June, 15, 0, 0, 0, 0, time.LocationUTC)
+	day := epoch.Date(2024, time.June, 15, 0, 0, 0, 0, time.UTC)
 
 	whole, err := VisibleIntervals(obj, site, Window{Start: day, End: day.Add(unit.Days(1))}, unit.Minutes(5), angle.Zero())
 	if err != nil || len(whole) != 1 {
@@ -47,17 +48,17 @@ func TestWindowFindersSampleTheEnd(t *testing.T) {
 
 	finders := []struct {
 		name string
-		find func(start, end time.Time) ([]Window, error)
+		find func(start, end epoch.Time) ([]Window, error)
 	}{
-		{"VisibleIntervals", func(start, end time.Time) ([]Window, error) {
+		{"VisibleIntervals", func(start, end epoch.Time) ([]Window, error) {
 			iv, err := VisibleIntervals(obj, site, Window{Start: start, End: end}, unit.Minutes(5), angle.Zero())
 
 			return iv, err
 		}},
-		{"ObservableWindows", func(start, end time.Time) ([]Window, error) {
+		{"ObservableWindows", func(start, end epoch.Time) ([]Window, error) {
 			return ObservableWindows(obj, site, Window{Start: start, End: end}, unit.Minutes(5), Altitude{Threshold: angle.Zero()})
 		}},
-		{"Find", func(start, end time.Time) ([]Window, error) {
+		{"Find", func(start, end epoch.Time) ([]Window, error) {
 			iv, err := Find(obj, site, Window{Start: start, End: end}, unit.Minutes(5), Altitude{Threshold: angle.Zero()})
 
 			return iv, err

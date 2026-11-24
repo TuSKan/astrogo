@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -33,21 +33,21 @@ func pinEOP(b *testing.B, mode string) {
 
 	switch mode {
 	case "zero":
-		time.RegisterModel(time.ZeroModel{})
+		epoch.RegisterModel(epoch.ZeroModel{})
 	case "table":
-		table, err := time.ParseFinals2000A(strings.NewReader(testutil.FinalsText(benchEOPStart, benchEOPDays)))
+		table, err := epoch.ParseFinals2000A(strings.NewReader(testutil.FinalsText(benchEOPStart, benchEOPDays)))
 		if err != nil {
 			b.Fatal(err)
 		}
 
-		time.RegisterModel(table)
+		epoch.RegisterModel(table)
 	default:
 		b.Fatalf("unknown EOP mode %q", mode)
 	}
 
-	b.Cleanup(time.ResetEOP)
+	b.Cleanup(epoch.ResetEOP)
 
-	if got := time.EOPSource(); got != "explicit" {
+	if got := epoch.EOPSource(); got != "explicit" {
 		b.Fatalf("EOP source = %q after pinning %q, want explicit: the benchmark would time ambient data", got, mode)
 	}
 }

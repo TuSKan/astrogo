@@ -3,14 +3,15 @@ package plan
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,9 +22,9 @@ func TestDayEventsFindsSunRiseSetTransit(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	day := time.FromJD(2451545.0, time.UTC) // any instant on the day in question
+	day := epoch.FromJD(2451545.0, epoch.UTC) // any instant on the day in question
 
-	rise, set, transit, err := DayEvents(sun, site, day, time.LocationUTC)
+	rise, set, transit, err := DayEvents(sun, site, day, time.UTC)
 	testutil.AssertNoError(t, err)
 
 	if rise == nil || set == nil || transit == nil {
@@ -46,7 +47,7 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	// 2000-01-01 00:30 UTC is still 2000-01-01 in a UTC-based day, but is
 	// already 2000-01-01 19:30 the PREVIOUS day in a UTC-5 zone -- pick an
 	// instant where the local calendar date genuinely differs from UTC's.
-	utcMidnight30 := time.FromJD(2451544.5+0.5/24, time.UTC) // 2000-01-01 00:30 UTC
+	utcMidnight30 := epoch.FromJD(2451544.5+0.5/24, epoch.UTC) // 2000-01-01 00:30 UTC
 	utcMinus5 := time.FixedZone("UTC-5", -5*3600)
 
 	_, _, _, err := DayEvents(sun, site, utcMidnight30, utcMinus5)
@@ -57,7 +58,7 @@ func TestDayEventsUsesLocalCalendarDay(t *testing.T) {
 	// function itself relies on, so this test would fail loudly if that
 	// assumption were ever wrong.
 	localDate := utcMidnight30.GoTime().In(utcMinus5)
-	utcDate := utcMidnight30.GoTime().In(time.LocationUTC)
+	utcDate := utcMidnight30.GoTime().In(time.UTC)
 
 	if localDate.Day() == utcDate.Day() {
 		t.Fatal("test fixture assumption broken: local and UTC calendar days should differ at this instant")
@@ -69,12 +70,12 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	day := time.FromJD(2451545.0, time.UTC)
+	day := epoch.FromJD(2451545.0, epoch.UTC)
 
 	withNil, _, _, err := DayEvents(sun, site, day, nil)
 	testutil.AssertNoError(t, err)
 
-	withUTC, _, _, err := DayEvents(sun, site, day, time.LocationUTC)
+	withUTC, _, _, err := DayEvents(sun, site, day, time.UTC)
 	testutil.AssertNoError(t, err)
 
 	if withNil == nil || withUTC == nil {
@@ -82,7 +83,7 @@ func TestDayEventsNilLocDefaultsToUTC(t *testing.T) {
 	}
 
 	if !withNil.Time.Equal(withUTC.Time) {
-		t.Errorf("nil loc should behave exactly like time.LocationUTC; got %v vs %v", withNil.Time, withUTC.Time)
+		t.Errorf("nil loc should behave exactly like time.UTC; got %v vs %v", withNil.Time, withUTC.Time)
 	}
 }
 
@@ -93,9 +94,9 @@ func TestDayEventsPolarNight(t *testing.T) {
 	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	day := time.FromJD(2451727.5, time.UTC) // known midwinter date, per existing TestSunEvents_Polar
+	day := epoch.FromJD(2451727.5, epoch.UTC) // known midwinter date, per existing TestSunEvents_Polar
 
-	rise, set, _, err := DayEvents(sun, site, day, time.LocationUTC)
+	rise, set, _, err := DayEvents(sun, site, day, time.UTC)
 	testutil.AssertNoError(t, err)
 
 	if rise != nil || set != nil {
@@ -114,7 +115,7 @@ func TestEpisodeWithinWindowMatchesDirectSearch(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	from := time.FromJD(2451544.5, time.UTC) // local midday-ish, target below horizon
+	from := epoch.FromJD(2451544.5, epoch.UTC) // local midday-ish, target below horizon
 	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(sun, site, Window{Start: from, End: to})
@@ -172,7 +173,7 @@ func TestEpisodeExtendsBackwardWhenAlreadyUp(t *testing.T) {
 
 	// First locate a real sunrise, then start the Episode window 2 hours
 	// AFTER it -- guaranteeing "already up at from".
-	wideFrom := time.FromJD(2451544.5, time.UTC)
+	wideFrom := epoch.FromJD(2451544.5, epoch.UTC)
 	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.Add(unit.Days(1)))
 	testutil.AssertNoError(t, err)
 
@@ -226,7 +227,7 @@ func TestEpisodeExtendsForwardPastWindowEnd(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	wideFrom := time.FromJD(2451544.5, time.UTC)
+	wideFrom := epoch.FromJD(2451544.5, epoch.UTC)
 	wideEvents, err := visibilityEvents(sun, site, wideFrom, wideFrom.Add(unit.Days(1)))
 	testutil.AssertNoError(t, err)
 
@@ -283,7 +284,7 @@ func TestEpisodeCircumpolarReturnsNilNil(t *testing.T) {
 	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	star := NewStar("Circumpolar", angle.Deg(0), angle.Deg(85)) // dec=85, always up from 80N
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(star, site, Window{Start: from, End: to})
@@ -301,7 +302,7 @@ func TestEpisodeNeverRisesReturnsNilNil(t *testing.T) {
 	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	star := NewStar("NeverUp", angle.Deg(0), angle.Deg(-85)) // dec=-85, always down from 80N
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(1))
 
 	rise, set, err := Episode(star, site, Window{Start: from, End: to})
@@ -327,7 +328,7 @@ var errAlwaysFails = errors.New("day_episode_test: observable always fails")
 type errObservable struct{}
 
 func (errObservable) Name() string { return "ErrTarget" }
-func (errObservable) Position(time.Time) (coord.ICRS, error) {
+func (errObservable) Position(epoch.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errAlwaysFails
 }
 
@@ -349,7 +350,7 @@ type countingObservable struct {
 	failAfter int
 }
 
-func (o countingObservable) Position(t time.Time) (coord.ICRS, error) {
+func (o countingObservable) Position(t epoch.Time) (coord.ICRS, error) {
 	*o.calls++
 
 	if o.failAfter > 0 && *o.calls > o.failAfter {
@@ -368,9 +369,9 @@ func TestDayEventsPropagatesVisibilityError(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	day := time.FromJD(2451545.0, time.UTC)
+	day := epoch.FromJD(2451545.0, epoch.UTC)
 
-	_, _, _, err := DayEvents(errObservable{}, site, day, time.LocationUTC)
+	_, _, _, err := DayEvents(errObservable{}, site, day, time.UTC)
 	if !errors.Is(err, errAlwaysFails) {
 		t.Fatalf("expected errAlwaysFails, got %v", err)
 	}
@@ -380,7 +381,7 @@ func TestIsAboveHorizonPropagatesPositionError(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	_, err := isAboveHorizon(errObservable{}, site, time.FromJD(2451545.0, time.UTC))
+	_, err := isAboveHorizon(errObservable{}, site, epoch.FromJD(2451545.0, epoch.UTC))
 	if !errors.Is(err, errAlwaysFails) {
 		t.Fatalf("expected errAlwaysFails, got %v", err)
 	}
@@ -390,7 +391,7 @@ func TestSearchEventPropagatesVisibilityError(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 
 	_, err := searchEvent(errObservable{}, site, from, EventRise, true, 5)
 	if !errors.Is(err, errAlwaysFails) {
@@ -402,7 +403,7 @@ func TestEpisodePropagatesIsAboveHorizonError(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(40), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(1))
 
 	_, _, err := Episode(errObservable{}, site, Window{Start: from, End: to})
@@ -420,7 +421,7 @@ func TestEpisodeWidensSpanBeyondDefaultWindow(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(400)) // > episodeSearchWindow's 366 days
 
 	if span := to.Sub(from); span <= episodeSearchWindow {
@@ -448,7 +449,7 @@ func TestEpisodeRiseSearchErrorPropagates(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	to := from.Add(unit.Days(1))
 
 	calls := 0
@@ -473,7 +474,7 @@ func TestEpisodeSetSearchErrorPropagates(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	sun := NewSun(eph.Default())
 
-	from := time.FromJD(2451544.5, time.UTC)
+	from := epoch.FromJD(2451544.5, epoch.UTC)
 	maxSpanDays := episodeSearchWindow.Hours() / 24
 
 	calls := 0

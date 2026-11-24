@@ -5,13 +5,14 @@ package validation_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // metersInAU converts the tolerance below into the AU that State reports in.
@@ -56,7 +57,7 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 	// Fixed, and deliberately clear of a leap-second boundary: the point here
 	// is the provider's handling of the caller's label, not the leap-second
 	// table's behavior at a discontinuity.
-	utc := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	utc := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 
 	bodies := map[string]eph.ID{
 		"Moon": eph.Moon,
@@ -66,12 +67,12 @@ func TestJPLStateIsScaleInvariant(t *testing.T) {
 
 	scales := []struct {
 		label string
-		at    func(time.Time) time.Time
+		at    func(epoch.Time) epoch.Time
 	}{
-		{"UTC", func(t time.Time) time.Time { return t.UTC() }},
-		{"TAI", func(t time.Time) time.Time { return t.TAI() }},
-		{"TT", func(t time.Time) time.Time { return t.TT() }},
-		{"TDB", func(t time.Time) time.Time { return t.TDB() }},
+		{"UTC", func(t epoch.Time) epoch.Time { return t.UTC() }},
+		{"TAI", func(t epoch.Time) epoch.Time { return t.TAI() }},
+		{"TT", func(t epoch.Time) epoch.Time { return t.TT() }},
+		{"TDB", func(t epoch.Time) epoch.Time { return t.TDB() }},
 	}
 
 	for name, id := range bodies {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // recordingBrightSource answers nothing and keeps the request it was sent.

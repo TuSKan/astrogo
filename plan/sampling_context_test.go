@@ -3,21 +3,22 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // fullContexts is the Context source the sampling functions used before #480:
 // a full coord.NewContext at every instant. Each is held to its own algorithm
 // run on these.
-func fullContexts(tb testing.TB, site *Site) func(time.Time) *coord.Context {
+func fullContexts(tb testing.TB, site *Site) func(epoch.Time) *coord.Context {
 	tb.Helper()
 
-	return func(t time.Time) *coord.Context {
+	return func(t epoch.Time) *coord.Context {
 		return mustContext(tb, t, site.Location(), site.Refraction())
 	}
 }
@@ -27,7 +28,7 @@ func fullContexts(tb testing.TB, site *Site) func(time.Time) *coord.Context {
 // topocentric path rather than being read as a direction at infinity.
 type movingObject struct{ *Planet }
 
-func (o movingObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
+func (o movingObject) ICRS(t epoch.Time) (coord.ICRS, error) { return o.Position(t) }
 
 // samplingCase is one target at one site over a day: obj is the target as
 // the coord.Object functions take it, observable as the Observable ones do.
@@ -36,7 +37,7 @@ type samplingCase struct {
 	obj        coord.Object
 	observable Observable
 	site       *Site
-	start      time.Time
+	start      epoch.Time
 	window     unit.Duration
 }
 
@@ -47,7 +48,7 @@ func samplingCases(t *testing.T) []samplingCase {
 	t.Helper()
 
 	prov := eph.Default()
-	start := time.Date(2026, time.March, 3, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 3, 0, 0, 0, 0, time.UTC)
 	lats := []float64{-24.6, 60.2}
 	cases := make([]samplingCase, 0, 3*len(lats))
 

@@ -7,8 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // The chunk cache under concurrent readers (#811): a resident chunk is read

@@ -10,8 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // mirrorClient is a client whose SIMBAD endpoint is primary, with mirrors,

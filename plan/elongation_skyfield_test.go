@@ -5,10 +5,11 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -34,15 +35,15 @@ func TestGreatestElongationsAgreeWithSkyfield(t *testing.T) {
 
 	sun := plan.NewSun(prov)
 
-	at := func(y, mo, d, h, mi, s int, frac float64) time.Time {
-		return time.Date(y, time.Month(mo), d, h, mi, s, int(frac*1e9), time.LocationUTC)
+	at := func(y, mo, d, h, mi, s int, frac float64) epoch.Time {
+		return epoch.Date(y, time.Month(mo), d, h, mi, s, int(frac*1e9), time.UTC)
 	}
 
 	for _, c := range []struct {
 		name     string
 		body     eph.ID
 		east     bool
-		skyfield time.Time
+		skyfield epoch.Time
 		elongDeg float64
 	}{
 		{"Mercury E Feb", eph.Mercury, true, at(2026, 2, 19, 17, 41, 8, 0.58), 18.1227},

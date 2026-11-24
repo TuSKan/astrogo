@@ -2,16 +2,17 @@ package plan
 
 import (
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // t0 is an arbitrary fixed base instant every test below builds windows
 // relative to via hour offsets, so test cases read as plain integers
-// (h(0, 2) instead of two separately-constructed time.Time values).
-var t0 = time.FromJD(2451545.0, time.UTC)
+// (h(0, 2) instead of two separately-constructed epoch.Time values).
+var t0 = epoch.FromJD(2451545.0, epoch.UTC)
 
 // h builds a Window [t0+startH, t0+endH] hours from the fixture base.
 func h(startH, endH float64) Window {

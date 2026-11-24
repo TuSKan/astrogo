@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,7 +20,7 @@ func main() {
 	// to 13.5 arcsec, which shifts no block in a five-minute schedule. For
 	// full accuracy, blank-import remote/eop and consent to the IERS
 	// bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -67,7 +68,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	start := time.Date(2026, 4, 6, 19, 0, 0, 0, tz)
+	start := epoch.Date(2026, 4, 6, 19, 0, 0, 0, tz)
 	window := plan.Window{Start: start, End: start.Add(unit.Hours(6))}
 
 	schedule, err := scheduler.BuildSchedule(window, blocks)

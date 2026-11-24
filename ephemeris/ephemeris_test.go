@@ -5,12 +5,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -35,7 +36,7 @@ type stubProvider struct {
 	closed bool
 }
 
-func (s *stubProvider) Locate(id core.ID, _ time.Time) (State, error) {
+func (s *stubProvider) Locate(id core.ID, _ epoch.Time) (State, error) {
 	s.calls++
 
 	if id != s.id {
@@ -58,7 +59,7 @@ func (s *stubProvider) Close() error {
 func vec(a [3]float64) vector.Vec3 { return vector.Vec3{X: a[0], Y: a[1], Z: a[2]} }
 
 func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
-	epoch := time.J2000()
+	at := epoch.J2000()
 
 	cases := []struct {
 		name string
@@ -80,7 +81,7 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := NewElements(epoch, unit.AU(c.a), c.e,
+			_, err := NewElements(at, unit.AU(c.a), c.e,
 				angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(274))
 
 			if c.ok && err != nil {
@@ -100,7 +101,7 @@ func TestNewElementsRejectsWhatTwoBodyCannotRepresent(t *testing.T) {
 // rejection still names kepler's sentinel through the wrapping.
 func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
 	// 2I/Borisov's perihelion, 2019-12-08.
-	tp := time.FromJDParts(2458826.0528, 0, time.TDB)
+	tp := epoch.FromJDParts(2458826.0528, 0, epoch.TDB)
 
 	for _, e := range []float64{0.5, 1, 3.356476} {
 		el, err := ElementsFromPerihelion(tp, tp, unit.AU(2.006521), e,
@@ -142,7 +143,7 @@ func TestElementsFromPerihelionTakesEveryConic(t *testing.T) {
 }
 
 func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
-	el, err := NewElements(time.J2000(), unit.AU(2.7658), 0.07839,
+	el, err := NewElements(epoch.J2000(), unit.AU(2.7658), 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -157,7 +158,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	st, err := At(p, time.J2000()).Geometric(ceres, core.Earth)
+	st, err := At(p, epoch.J2000()).Geometric(ceres, core.Earth)
 	if err != nil {
 		t.Fatalf("State(registered body): %v", err)
 	}
@@ -172,7 +173,7 @@ func TestNewFromElementsAnswersTheRegisteredBody(t *testing.T) {
 	// A body it does not propagate must still be answerable, through the
 	// default SOFA base — that is what makes the returned Provider a drop-in
 	// for a kernel-backed one.
-	if _, err := At(p, time.J2000()).Geometric(core.Sun, core.Earth); err != nil {
+	if _, err := At(p, epoch.J2000()).Geometric(core.Sun, core.Earth); err != nil {
 		t.Errorf("State(Sun) through the default base: %v", err)
 	}
 }
@@ -192,7 +193,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 
 	p := NewMovingBodyProvider(WithKeplerBase(base))
 
-	st, err := At(p, time.J2000()).Geometric(core.Sun, core.Earth)
+	st, err := At(p, epoch.J2000()).Geometric(core.Sun, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Sun): %v", err)
 	}
@@ -217,7 +218,7 @@ func TestWithKeplerBaseIsUsed(t *testing.T) {
 func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	p := NewMovingBodyProvider()
 
-	st, err := At(p, time.J2000()).Geometric(core.PlutoBarycenter, core.Earth)
+	st, err := At(p, epoch.J2000()).Geometric(core.PlutoBarycenter, core.Earth)
 	if err != nil {
 		t.Fatalf("State(Pluto): %v", err)
 	}
@@ -230,7 +231,7 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 	}
 
 	// Every SOFA-covered body still works, which is the other half.
-	if _, err := At(p, time.J2000()).Geometric(core.MarsBarycenter, core.Earth); err != nil {
+	if _, err := At(p, epoch.J2000()).Geometric(core.MarsBarycenter, core.Earth); err != nil {
 		t.Errorf("State(Mars): %v", err)
 	}
 }
@@ -243,10 +244,10 @@ func TestFreshMovingBodyProviderAnswersPluto(t *testing.T) {
 func TestDefaultsPlutoIsStandishsAboutTheSun(t *testing.T) {
 	def, base := Default(), NewMovingBodyProvider()
 
-	for _, at := range []time.Time{
-		time.Date(1800, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.J2000(),
-		time.Date(2050, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	for _, at := range []epoch.Time{
+		epoch.Date(1800, time.January, 1, 0, 0, 0, 0, time.UTC),
+		epoch.J2000(),
+		epoch.Date(2050, time.January, 1, 0, 0, 0, 0, time.UTC),
 	} {
 		got, err := def.Locate(core.PlutoBarycenter, at)
 		if err != nil {
@@ -282,7 +283,7 @@ func TestDefaultAnswersEveryNamedBody(t *testing.T) {
 	}
 
 	for _, id := range named {
-		st, err := At(p, time.J2000()).Geometric(id, core.Earth)
+		st, err := At(p, epoch.J2000()).Geometric(id, core.Earth)
 		if err != nil {
 			t.Errorf("Default().State(%s) = %v; the doc comment says every named body is answerable", id, err)
 
@@ -339,7 +340,7 @@ func TestASatelliteIsAProviderOffline(t *testing.T) {
 
 	defer func() { _ = p.Close() }()
 
-	when := time.FromJD(2461281.5, time.UTC)
+	when := epoch.FromJD(2461281.5, epoch.UTC)
 
 	// State with the satellite's own NAIF code: a satellite provider tracks
 	// exactly one object and refuses any other id, so that a Sun lookup
@@ -368,8 +369,8 @@ func TestASatelliteIsAProviderOffline(t *testing.T) {
 // mistake these options are actually exposed to: an option that silently does
 // nothing, or writes the wrong field.
 func TestOptionsRecordWhatTheySay(t *testing.T) {
-	start := time.FromJD(2460310.5, time.TDB)
-	end := time.FromJD(2460350.5, time.TDB)
+	start := epoch.FromJD(2460310.5, epoch.TDB)
+	end := epoch.FromJD(2460350.5, epoch.TDB)
 
 	var cfg config
 

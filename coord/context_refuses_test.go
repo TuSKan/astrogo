@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -16,7 +17,7 @@ import (
 // the tests below is the bad argument's alone.
 var (
 	refusalSite  = coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635) // Paranal
-	refusalEpoch = time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	refusalEpoch = epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 )
 
 // TestNewContextRefusesWhatItCannotBuildFrom: a nil site is ErrNilGeodetic
@@ -36,7 +37,7 @@ func TestNewContextRefusesWhatItCannotBuildFrom(t *testing.T) {
 	}
 
 	for _, jd := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
-		at := time.FromJD(jd, time.UTC)
+		at := epoch.FromJD(jd, epoch.UTC)
 
 		if ctx, err := coord.NewContext(at, refusalSite, atmosphere.Refraction{}); ctx != nil || !errors.Is(err, coord.ErrNotFinite) {
 			t.Errorf("NewContext at FromJD(%v) = %v, %v, want ErrNotFinite", jd, ctx, err)
@@ -69,10 +70,10 @@ func TestTransformsRefuseWhatIsNotFinite(t *testing.T) {
 	}{
 		{"NaN right ascension", coord.NewICRS(angle.Rad(nan), dec)},
 		{"infinite declination", coord.NewICRS(ra, angle.Rad(inf))},
-		{"NaN proper motion in RA", coord.NewICRSWithKinematics(ra, dec, angle.Rad(nan), pm, plx, rv, time.J2000())},
-		{"infinite proper motion in Dec", coord.NewICRSWithKinematics(ra, dec, pm, angle.Rad(-inf), plx, rv, time.J2000())},
-		{"NaN parallax", coord.NewICRSWithKinematics(ra, dec, pm, pm, angle.Rad(nan), rv, time.J2000())},
-		{"NaN radial velocity", coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, unit.Velocity(nan), time.J2000())},
+		{"NaN proper motion in RA", coord.NewICRSWithKinematics(ra, dec, angle.Rad(nan), pm, plx, rv, epoch.J2000())},
+		{"infinite proper motion in Dec", coord.NewICRSWithKinematics(ra, dec, pm, angle.Rad(-inf), plx, rv, epoch.J2000())},
+		{"NaN parallax", coord.NewICRSWithKinematics(ra, dec, pm, pm, angle.Rad(nan), rv, epoch.J2000())},
+		{"NaN radial velocity", coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, unit.Velocity(nan), epoch.J2000())},
 	} {
 		if aa, err := ctx.ICRSToAltAz(c.icrs); !errors.Is(err, coord.ErrNotFinite) {
 			t.Errorf("ICRSToAltAz, %s: %v, %v, want ErrNotFinite", c.name, aa, err)
@@ -95,7 +96,7 @@ func TestTransformsRefuseWhatIsNotFinite(t *testing.T) {
 		}
 	}
 
-	star := coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, rv, time.J2000())
+	star := coord.NewICRSWithKinematics(ra, dec, pm, pm, plx, rv, epoch.J2000())
 
 	aa, err := ctx.ICRSToAltAz(star)
 	if err != nil || math.IsNaN(aa.Alt().Radians()) {

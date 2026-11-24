@@ -58,7 +58,7 @@ import "github.com/TuSKan/astrogo/plan"
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de442")
 defer prov.Close()
 
-t := time.Date(2025, time.February, 28, 19, 0, 0, 0, time.LocationUTC)
+t := epoch.Date(2025, time.February, 28, 19, 0, 0, 0, time.UTC)
 ctx, _ := coord.NewContext(t, loc, atmosphere.AtAltitude(760))
 
 planets := []plan.Observable{
@@ -122,7 +122,7 @@ defer prov.Close()
 
 site, _ := plan.NewSite("São Paulo", angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760), plan.WithTimeZone(brtz))
 
-day := time.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
+day := epoch.Date(2025, 2, 28, 0, 0, 0, 0, brtz)
 next := day.Add(unit.Days(1))
 
 _, sunset, _ := plan.SunriseSunset(site, plan.Window{Start: day, End: next}, prov)

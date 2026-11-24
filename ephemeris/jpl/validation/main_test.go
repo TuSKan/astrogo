@@ -28,7 +28,7 @@ import (
 // that looks like a physics regression and is a missing import.
 //
 // Beyond that no explicit fetch call is needed — the first Time.EOP()/UTC()/UT1() query
-// any test in this package makes now triggers time's automatic lazy load
+// any test in this package makes now triggers epoch's automatic lazy load
 // (disk cache, then this granted consent, then zero-EOP degradation),
 // exactly as if a real coord.Context construction had asked for it
 // directly. A lazy-load failure (offline, unreachable) only degrades to

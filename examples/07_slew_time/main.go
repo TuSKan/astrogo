@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -23,7 +24,7 @@ func main() {
 	// to 13.5 arcsec, which changes a slew time here by well under 0.1 s.
 	// For full accuracy, blank-import remote/eop and consent to the IERS
 	// bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -50,13 +51,13 @@ func main() {
 	}
 
 	// 4. When the telescope moves. A fixed instant keeps the output the same
-	// on every run; time.NowUTC() would estimate the move right now.
+	// on every run; epoch.Now() would estimate the move right now.
 	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
 	}
 
-	t := time.Date(2026, 4, 6, 21, 0, 0, 0, tz)
+	t := epoch.Date(2026, 4, 6, 21, 0, 0, 0, tz)
 
 	// 5. Where each target is in the sky, then what the model charges to
 	// move between them.

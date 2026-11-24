@@ -9,10 +9,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrNoData is returned when no GP records exist for a catalog number.
@@ -41,18 +42,18 @@ type GP struct {
 }
 
 // EpochTime parses the GP epoch string into an astrogo Time (UTC).
-func (gp GP) EpochTime() (time.Time, error) {
+func (gp GP) EpochTime() (epoch.Time, error) {
 	t, err := time.Parse("2006-01-02T15:04:05.999999", gp.Epoch)
 	if err != nil {
 		// Try without fractional seconds.
 		t, err = time.Parse("2006-01-02T15:04:05", gp.Epoch)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("norad: cannot parse epoch %q: %w", gp.Epoch, err)
+			return epoch.Time{}, fmt.Errorf("norad: cannot parse epoch %q: %w", gp.Epoch, err)
 		}
 	}
 
-	return time.Date(t.Year(), t.Month(), t.Day(),
-		t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.LocationUTC), nil
+	return epoch.Date(t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.UTC), nil
 }
 
 // ToTLE generates a TLE line pair from the GP data.
@@ -537,7 +538,7 @@ func (p *Provider) FetchByID(ctx context.Context, catNr int) (GP, error) {
 // gpToTarget converts a GP element set to a resolve.Target.
 func gpToTarget(gp GP) resolve.Target {
 	l1, l2 := gp.ToTLE()
-	epoch, _ := gp.EpochTime()
+	at, _ := gp.EpochTime()
 
 	return resolve.Target{
 		ID:          strconv.Itoa(gp.NoradCatID),
@@ -545,7 +546,7 @@ func gpToTarget(gp GP) resolve.Target {
 		Designation: gp.ObjectID,
 		Kind:        resolve.KindSatellite,
 		Catalog:     "norad",
-		Epoch:       epoch,
+		Epoch:       at,
 		TLELine1:    l1,
 		TLELine2:    l2,
 	}

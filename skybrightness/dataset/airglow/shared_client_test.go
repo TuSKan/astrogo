@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Fetch and AlmanacAt talk to SkyCalc through remote.Default(), the client the
@@ -102,7 +102,7 @@ func (n *neighbor) ask(t *testing.T) {
 func TestSkyCalcCallsLeaveTheSharedClientsOtherTransportsAlone(t *testing.T) {
 	// Not parallel: it points process-wide endpoints at its own servers and
 	// counts connections on the process-wide client.
-	when := time.GoDate(2024, time.March, 21, 3, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2024, time.March, 21, 3, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		name string

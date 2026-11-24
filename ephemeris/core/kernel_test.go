@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -33,7 +33,7 @@ var (
 // stubProvider is the smallest thing satisfying Provider.
 type stubProvider struct{}
 
-func (stubProvider) Locate(ID, time.Time) (State, error) {
+func (stubProvider) Locate(ID, epoch.Time) (State, error) {
 	return State{Pos: vector.Vec3{X: 1}}, nil
 }
 
@@ -77,8 +77,8 @@ func TestRequestCrossesTheBoundaryIntact(t *testing.T) {
 	want := KernelRequest{
 		Source:       SmallBody,
 		Kernel:       "433",
-		Start:        time.FromJD(2461000.5, time.TT),
-		End:          time.FromJD(2461100.5, time.TT),
+		Start:        epoch.FromJD(2461000.5, epoch.TT),
+		End:          epoch.FromJD(2461100.5, epoch.TT),
 		ExtraKernels: []string{"de441_part-2"},
 	}
 

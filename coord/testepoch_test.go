@@ -1,11 +1,15 @@
 package coord_test
 
-import "github.com/TuSKan/astrogo/time"
+import (
+	"time"
+
+	"github.com/TuSKan/astrogo/epoch"
+)
 
 // fixedEpoch is the instant tests use when they need *an* epoch rather than a
 // particular one.
 //
-// # Why not time.NowUTC
+// # Why not epoch.Now
 //
 // A test pinned to the wall clock drifts on its own schedule and fails on some
 // future Tuesday with no code change — the worst kind of failure, because the
@@ -27,6 +31,6 @@ import "github.com/TuSKan/astrogo/time"
 // is exercising ordinary conditions, and any boundary case is a deliberate
 // epoch chosen at its own call site rather than an accident of when the suite
 // happened to run.
-func fixedEpoch() time.Time {
-	return time.Date(2024, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
+func fixedEpoch() epoch.Time {
+	return epoch.Date(2024, time.June, 15, 12, 0, 0, 0, time.UTC)
 }

@@ -3,10 +3,11 @@ package coord
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -25,7 +26,7 @@ func TestTopocentricToObservedIsSOFAsCIRSToObserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	at := time.Date(2026, time.June, 21, 3, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 21, 3, 0, 0, 0, time.UTC)
 
 	for _, atm := range []atmosphere.Refraction{{}, {Pressure: 744, Temperature: 10, Humidity: 0.2, Wavelength: 0.55}} {
 		ctx, err := NewContext(at, site, atm)

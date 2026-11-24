@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // CandidatePairs returns, in order, the pairs (i, j) for which
@@ -99,7 +99,7 @@ type placed struct {
 	// anchor is the moving target at J2000.0, or the still one as given.
 	anchor coord.ICRS
 	// epoch is a still target's own epoch, J2000.0 when it gives none.
-	epoch time.Time
+	epoch epoch.Time
 	// errReach is √(11.83 · tr C) in radians at the most uncertain epoch the
 	// target is compared at, where hasErr says it publishes errors there.
 	errReach float64
@@ -116,7 +116,7 @@ func place(ts []resolve.Target) []placed {
 	for i, t := range ts {
 		p := placed{target: t, epoch: t.Epoch, ok: true}
 		if p.epoch.IsZero() {
-			p.epoch = time.J2000()
+			p.epoch = epoch.J2000()
 		}
 
 		c := Coord(t)
@@ -124,7 +124,7 @@ func place(ts []resolve.Target) []placed {
 		p.anchor = c
 
 		if p.moving {
-			at, err := coord.PropagateEpoch(c, time.J2000())
+			at, err := coord.PropagateEpoch(c, epoch.J2000())
 			p.anchor, p.ok = at, err == nil
 		}
 
@@ -136,7 +136,7 @@ func place(ts []resolve.Target) []placed {
 
 // stillEpochs returns the earliest and latest epoch of ps's still targets,
 // and false when there are none.
-func stillEpochs(ps []placed) (lo, hi time.Time, ok bool) {
+func stillEpochs(ps []placed) (lo, hi epoch.Time, ok bool) {
 	for _, p := range ps {
 		if !p.ok || p.moving {
 			continue
@@ -167,14 +167,14 @@ func stillEpochs(ps []placed) (lo, hi time.Time, ok bool) {
 // covariance only at the epoch its errors hold at, which is one of those
 // epochs when it lies between lo and hi. Its distance from its J2000.0 place
 // grows with the time from J2000.0, so it too is greatest at lo or hi.
-func (p *placed) reach(lo, hi time.Time, stillThere bool) {
+func (p *placed) reach(lo, hi epoch.Time, stillThere bool) {
 	if !p.ok {
 		return
 	}
 
-	epochs := []time.Time{p.epoch}
+	epochs := []epoch.Time{p.epoch}
 	if p.moving {
-		epochs = []time.Time{time.J2000()}
+		epochs = []epoch.Time{epoch.J2000()}
 		if stillThere {
 			epochs = append(epochs, lo, hi)
 
@@ -199,7 +199,7 @@ func (p *placed) reach(lo, hi time.Time, stillThere bool) {
 		return
 	}
 
-	for _, e := range []time.Time{lo, hi} {
+	for _, e := range []epoch.Time{lo, hi} {
 		at, err := coord.PropagateEpoch(Coord(p.target), e)
 		if err != nil {
 			// Compare cannot move it there either, but it may move it to an

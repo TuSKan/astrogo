@@ -5,10 +5,12 @@ package skyplan_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/plan"
@@ -16,7 +18,6 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/skybrightness/skyplan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -84,7 +85,7 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 		t.Fatalf("NewImaging: %v", err)
 	}
 
-	when := time.Date(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 5, 0, 0, 0, time.UTC)
 
 	zenith, err := depth.LimitingMagnitudeAt(when, angle.Deg(90), angle.Deg(0))
 	if err != nil {
@@ -163,7 +164,7 @@ func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	when := time.Date(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 5, 0, 0, 0, time.UTC)
 
 	// A bright star, which any such instrument reaches, and an absurdly faint
 	// one, which none does. Both are above the horizon at this instant.

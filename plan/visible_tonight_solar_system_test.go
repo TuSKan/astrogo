@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -18,7 +19,7 @@ import (
 // it was a candidate at no limit at all, because its magnitude returned an
 // error and the error was dropped.
 func TestSolarSystemCandidatesIncludePlutoByItsMagnitude(t *testing.T) {
-	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		magLimit float64
@@ -59,7 +60,7 @@ var errNoPluto = errors.New("plutolessProvider: no Pluto")
 // plutolessProvider answers for everything but Pluto.
 type plutolessProvider struct{ eph.Provider }
 
-func (p plutolessProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
+func (p plutolessProvider) Locate(id eph.ID, t epoch.Time) (core.State, error) {
 	if id == eph.PlutoBarycenter {
 		return core.State{}, errNoPluto
 	}
@@ -77,7 +78,7 @@ func (p plutolessProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
 // not left out as though it were too faint. The two are different answers to
 // a caller, and until #407 they looked the same.
 func TestSolarSystemCandidatesReportABodyTheyCannotEvaluate(t *testing.T) {
-	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)
 
 	var dropped skips
 
@@ -122,7 +123,7 @@ func TestMoonCandidatesReportAMoonTheyCannotEvaluate(t *testing.T) {
 
 	var dropped skips
 
-	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)
 	if got := moonCandidates(failingProvider{}, marsMoons, at, 30, &dropped); len(got) != 0 {
 		t.Errorf("%d candidates from a provider that answers nothing, want 0", len(got))
 	}
@@ -144,7 +145,7 @@ func TestMoonCandidatesReportAMoonTheyCannotEvaluate(t *testing.T) {
 // a distance from the observer and the phase angle between them.
 type twoPointProvider struct{}
 
-func (twoPointProvider) Locate(id eph.ID, _ time.Time) (core.State, error) {
+func (twoPointProvider) Locate(id eph.ID, _ epoch.Time) (core.State, error) {
 	if id == eph.Sun {
 		return geocentricMock(id, vector.Vec3{X: 1}, vector.Vec3{})
 	}
@@ -168,7 +169,7 @@ func TestMoonCandidatesKeepAMoonBrighterThanTheLimit(t *testing.T) {
 		}
 	}
 
-	at := time.Date(2026, 9, 23, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		magLimit float64

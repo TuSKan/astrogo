@@ -8,8 +8,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -46,14 +46,14 @@ const gaiaRows = "oid,main_id,ra,dec,otype,pmra,pmdec,plx_value,rvz_radvel," +
 
 var (
 	// gaiaEpoch is Gaia EDR3's and DR3's reference epoch, J2016.0.
-	gaiaEpoch = time.FromJD(2457389.0, time.TT)
+	gaiaEpoch = epoch.FromJD(2457389.0, epoch.TT)
 
 	// j2026 is J2026.0, a decade after Gaia's epoch.
-	j2026 = time.FromJD(2461041.5, time.TT)
+	j2026 = epoch.FromJD(2461041.5, epoch.TT)
 )
 
 // moved is where a star at epoch from, with the given motion, is at epoch to.
-func moved(t *testing.T, ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity, from, to time.Time) coord.ICRS {
+func moved(t *testing.T, ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Velocity, from, to epoch.Time) coord.ICRS {
 	t.Helper()
 
 	c, err := coord.PropagateEpoch(coord.NewICRSWithKinematics(ra, dec, pmRA, pmDec, parallax, rv, from), to)
@@ -64,20 +64,20 @@ func moved(t *testing.T, ra, dec, pmRA, pmDec, parallax angle.Angle, rv unit.Vel
 
 // targetAt is where a target is at epoch, moved from its own epoch with its
 // radial velocity.
-func targetAt(t *testing.T, tg resolve.Target, epoch time.Time) coord.ICRS {
+func targetAt(t *testing.T, tg resolve.Target, at epoch.Time) coord.ICRS {
 	t.Helper()
 
-	return moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, tg.RadialVelocity, tg.Epoch, epoch)
+	return moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, tg.RadialVelocity, tg.Epoch, at)
 }
 
 // gaiaAt is where a Gaia DR3 row puts its star at epoch.
-func gaiaAt(t *testing.T, row gaiaDR3Row, epoch time.Time) coord.ICRS {
+func gaiaAt(t *testing.T, row gaiaDR3Row, at epoch.Time) coord.ICRS {
 	t.Helper()
 
 	mas := func(v float64) angle.Angle { return angle.Arcsec(v / 1000) }
 
 	return moved(t, angle.Deg(row.ra), angle.Deg(row.dec), mas(row.pmRA), mas(row.pmDec), mas(row.parallax),
-		unit.KmPerSec(row.rv), gaiaEpoch, epoch)
+		unit.KmPerSec(row.rv), gaiaEpoch, at)
 }
 
 // masApart is the separation of two positions in mas.
@@ -165,7 +165,7 @@ func TestAPositionFromElsewhereStaysAtJ2000(t *testing.T) {
 			continue
 		}
 
-		if !tg.Epoch.Equal(time.J2000()) {
+		if !tg.Epoch.Equal(epoch.J2000()) {
 			t.Errorf("a Hipparcos position is reported at %v, want J2000.0", tg.Epoch)
 		}
 
@@ -196,7 +196,7 @@ func TestTheGaiaEpochPositionMovesBackOntoSIMBADs(t *testing.T) {
 
 	const edr3, dr2 = "2020yCat.1350....0G", "2018yCat.1345....0G"
 
-	dr2Epoch := time.FromJD(2457206.375, time.TT)
+	dr2Epoch := epoch.FromJD(2457206.375, epoch.TT)
 
 	for _, tc := range []struct {
 		name     string
@@ -204,7 +204,7 @@ func TestTheGaiaEpochPositionMovesBackOntoSIMBADs(t *testing.T) {
 		pm, pmD  string
 		parallax string
 		bibcode  string
-		epoch    time.Time
+		epoch    epoch.Time
 	}{
 		{"Barnard's star", 269.4520769586187, 4.693364966576667, "-801.551", "10362.394", "546.9759", edr3, gaiaEpoch},
 		{"11 arcseconds from the north pole", 123.4, 89.997, "3", "-4", "100", edr3, gaiaEpoch},
@@ -227,7 +227,7 @@ func TestTheGaiaEpochPositionMovesBackOntoSIMBADs(t *testing.T) {
 		}
 
 		simbad := coord.NewICRS(angle.Deg(tc.ra), angle.Deg(tc.dec))
-		back := moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, unit.KmPerSec(0), tg.Epoch, time.J2000())
+		back := moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, unit.KmPerSec(0), tg.Epoch, epoch.J2000())
 
 		if d := masApart(back, simbad); d > 1e-3 {
 			t.Errorf("%s: moved back to J2000.0 without the radial velocity, it lands %.6f mas from SIMBAD's position",
@@ -263,12 +263,12 @@ func TestAMotionTheSearchMayNotUndoLeavesSIMBADsPositionOrUndoesIt(t *testing.T)
 		tg, simbad := targets[0], coord.NewICRS(angle.Deg(tc.ra), angle.Deg(tc.dec))
 
 		switch {
-		case tg.Epoch.Equal(time.J2000()):
+		case tg.Epoch.Equal(epoch.J2000()):
 			if d := masApart(tg.Coord, simbad); d > unmovedMas {
 				t.Errorf("%s: left at J2000.0, it moved %g mas", tc.name, d)
 			}
 		case tg.Epoch.Equal(gaiaEpoch):
-			back := moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, unit.KmPerSec(0), tg.Epoch, time.J2000())
+			back := moved(t, tg.Coord.RA(), tg.Coord.Dec(), tg.PmRA, tg.PmDec, tg.Parallax, unit.KmPerSec(0), tg.Epoch, epoch.J2000())
 			if d := masApart(back, simbad); d > 1e-3 {
 				t.Errorf("%s: reported at Gaia's epoch, it moves back %.6f mas from SIMBAD's position", tc.name, d)
 			}

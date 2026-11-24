@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // RegisterLeapSeconds installs the kernel's DELTA_AT block as the process-wide
-// ΔAT table, via [time.RegisterLeapSeconds].
+// ΔAT table, via [epoch.RegisterLeapSeconds].
 //
 // # Why a kernel is a better source than a pinned dependency
 //
@@ -28,8 +28,8 @@ import (
 // provider is by then already committed to driving epochs from that kernel.
 //
 // Registration is superset-only: a kernel that contradicts the built-in record
-// below its last step is rejected with [time.ErrLeapSecondConflict] rather
-// than installed. See [time.RegisterLeapSeconds] for why that restriction is
+// below its last step is rejected with [epoch.ErrLeapSecondConflict] rather
+// than installed. See [epoch.RegisterLeapSeconds] for why that restriction is
 // what makes late registration safe.
 func RegisterLeapSeconds(r *Reader) error {
 	table, err := leapTable(r)
@@ -37,7 +37,7 @@ func RegisterLeapSeconds(r *Reader) error {
 		return err
 	}
 
-	if err := time.RegisterLeapSeconds(table, "kernel"); err != nil {
+	if err := epoch.RegisterLeapSeconds(table, "kernel"); err != nil {
 		return fmt.Errorf("lsk: %w", err)
 	}
 
@@ -47,15 +47,15 @@ func RegisterLeapSeconds(r *Reader) error {
 // leapTable converts the kernel's DELTA_AT entries to calendar form.
 //
 // The kernel records each step as a Julian Date at midnight UTC, because that
-// is the instant a leap second takes effect. time's table is in calendar form
+// is the instant a leap second takes effect. epoch's table is in calendar form
 // because that is the form IERS publishes and the form a reader can check by
 // eye against Bulletin C.
-func leapTable(r *Reader) ([]time.LeapSecond, error) {
+func leapTable(r *Reader) ([]epoch.LeapSecond, error) {
 	if len(r.DeltaAt) == 0 {
 		return nil, ErrNoLeapseconds
 	}
 
-	table := make([]time.LeapSecond, 0, len(r.DeltaAt))
+	table := make([]epoch.LeapSecond, 0, len(r.DeltaAt))
 
 	for _, d := range r.DeltaAt {
 		// Midnight, so the fraction is 0 and the day number is the .5 below
@@ -69,7 +69,7 @@ func leapTable(r *Reader) ([]time.LeapSecond, error) {
 				"representable calendar range", ErrInvalidDate, d.JD)
 		}
 
-		table = append(table, time.LeapSecond{Year: y, Month: m, Day: day, DeltaAT: unit.Seconds(d.N)})
+		table = append(table, epoch.LeapSecond{Year: y, Month: m, Day: day, DeltaAT: unit.Seconds(d.N)})
 	}
 
 	return table, nil

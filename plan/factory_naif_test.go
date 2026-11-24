@@ -3,10 +3,11 @@ package plan
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // jplTarget is a Target as catalog/horizons builds one from Horizons'
@@ -23,7 +24,7 @@ func jplTarget(name, naif string) resolve.Target {
 func TestFromCatalogTranslatesJPLMajorBodies(t *testing.T) {
 	t.Parallel()
 
-	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		name, naif string

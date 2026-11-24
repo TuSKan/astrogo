@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // errorRows are three of SIMBAD's basic rows, read 2026-11-18: Barnard's
@@ -53,7 +53,7 @@ func TestParseReadsTheErrorEllipses(t *testing.T) {
 		t.Errorf("an axis-aligned ellipse is uncorrelated: got %g, %g", barnard.RADec, barnard.PmRAPmDec)
 	}
 
-	if want := time.FromJD(2457389.0, time.TT); !barnard.Epoch.Equal(want) {
+	if want := epoch.FromJD(2457389.0, epoch.TT); !barnard.Epoch.Equal(want) {
 		t.Errorf("Barnard's errors hold at %v, want Gaia EDR3's J2016.0", barnard.Epoch)
 	}
 

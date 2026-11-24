@@ -44,7 +44,7 @@ var (
 // refusing them would be wrong. But the position is worse than inside the
 // span, by a factor SOFA states, and Locate's signature has no room to say so.
 // Until #1003 nothing did. A warning through logging is how astrogo already
-// reports an accuracy that silently degraded (time's EOP-unavailable warning),
+// reports an accuracy that silently degraded (epoch's EOP-unavailable warning),
 // and once is enough: a scan over a century would otherwise write one per
 // sample.
 func warnOutsideSpan(s sofaSpan, jd float64) {

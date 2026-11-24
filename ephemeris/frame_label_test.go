@@ -2,9 +2,10 @@ package ephemeris_test
 
 import (
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestProvidersNameTheirCenterAndAxes is the point of the Frame and Center
@@ -20,7 +21,7 @@ import (
 func TestProvidersNameTheirCenterAndAxes(t *testing.T) {
 	t.Parallel()
 
-	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	p := eph.Default()
 
 	for _, c := range []struct {

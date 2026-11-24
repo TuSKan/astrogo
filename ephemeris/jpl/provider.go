@@ -14,8 +14,8 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -112,8 +112,8 @@ type TargetCoverage struct {
 // goroutines are concurrently querying it — needs this to avoid a data race.
 type Provider struct {
 	mu               sync.RWMutex
-	startTime        time.Time
-	endTime          time.Time
+	startTime        epoch.Time
+	endTime          epoch.Time
 	LSK              *lsk.Reader
 	ByTarget         map[int32][]SegmentRef
 	ByTargetCoverage map[int32]TargetCoverage
@@ -127,7 +127,7 @@ type Provider struct {
 type Option func(*Provider)
 
 // WithTimeInterval sets the time interval for which the provider is valid.
-func WithTimeInterval(start, end time.Time) Option {
+func WithTimeInterval(start, end epoch.Time) Option {
 	return func(p *Provider) {
 		p.startTime = start
 		p.endTime = end
@@ -272,7 +272,7 @@ func (p *Provider) Close() error {
 // Earth-Moon barycenter, a planet's barycenter about the Solar System
 // barycenter, a moon of Neptune about Neptune's barycenter. ephemeris.At
 // composes those into a state about any center.
-func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
+func (p *Provider) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 

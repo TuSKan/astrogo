@@ -5,13 +5,13 @@ import (
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // siteContext is the Context a constraint's Check evaluates in: site's, at t.
 // A nil site is [ErrNilSite], and what [coord.NewContext] refuses is its
 // error.
-func siteContext(t time.Time, site *Site) (*coord.Context, error) {
+func siteContext(t epoch.Time, site *Site) (*coord.Context, error) {
 	if site == nil {
 		return nil, ErrNilSite
 	}
@@ -28,7 +28,7 @@ func siteContext(t time.Time, site *Site) (*coord.Context, error) {
 // search over [start, end] makes first: a non-finite or reversed interval is
 // the error checkInterval gives, as it always was, and a nil site is
 // [ErrNilSite].
-func siteContexts(start, end time.Time, site *Site) (func(time.Time) *coord.Context, error) {
+func siteContexts(start, end epoch.Time, site *Site) (func(epoch.Time) *coord.Context, error) {
 	if err := checkInterval(start, end); err != nil {
 		return nil, err
 	}
@@ -62,13 +62,13 @@ func siteContexts(start, end time.Time, site *Site) (func(time.Time) *coord.Cont
 // silently answer with the wrong atmosphere — which is why solveVisibility
 // keeps separate ones for its geometric rise/set search and its refracted
 // hour-angle search rather than sharing one.
-func movingContext(start time.Time, site *coord.Geodetic, atm atmosphere.Refraction) (func(time.Time) *coord.Context, error) {
+func movingContext(start epoch.Time, site *coord.Geodetic, atm atmosphere.Refraction) (func(epoch.Time) *coord.Context, error) {
 	ctx, err := coord.NewContext(start, site, atm)
 	if err != nil {
 		return nil, fmt.Errorf("plan: context: %w", err)
 	}
 
-	return func(t time.Time) *coord.Context {
+	return func(t epoch.Time) *coord.Context {
 		ctx.SetTime(t)
 
 		return ctx

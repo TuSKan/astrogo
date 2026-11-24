@@ -3,10 +3,11 @@ package satellite_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestSatelliteAnswersToItsNAIFCode: a satellite is its NAIF code, −100000
@@ -23,7 +24,7 @@ func TestSatelliteAnswersToItsNAIFCode(t *testing.T) {
 		t.Fatalf("ID() = %d, want -125544", int32(sat.ID()))
 	}
 
-	at := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	if _, err := sat.Locate(sat.ID(), at); err != nil {
 		t.Errorf("State(its own code): %v", err)

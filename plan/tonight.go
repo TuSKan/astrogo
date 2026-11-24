@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -15,7 +15,7 @@ import (
 type Tonight struct {
 	// Sunset and Sunrise bound the night, as SunEvents finds them: the Sun's
 	// center at the site's [Site.SunRiseSetThreshold].
-	Sunset, Sunrise time.Time
+	Sunset, Sunrise epoch.Time
 
 	// Civil, Nautical and Astronomical are the nights of each kind inside it,
 	// nil when the Sun does not go that deep tonight, as it does not reach 18°
@@ -25,7 +25,7 @@ type Tonight struct {
 	// Moonrise and Moonset are the Moon's rise and set between Sunset and
 	// Sunrise, as MoonEvents finds them, nil when it does not rise or set
 	// then.
-	Moonrise, Moonset *time.Time
+	Moonrise, Moonset *epoch.Time
 
 	// MoonUpAtSunset reports whether the Moon is above the horizon at Sunset.
 	// With Moonrise and Moonset it says when the Moon is up all night: up at
@@ -49,7 +49,7 @@ type Tonight struct {
 //
 // Where the Sun does not set and rise again within a day, as in a polar day
 // or night, it returns [ErrNoTwilight].
-func TonightAt(site *Site, t time.Time, prov eph.Provider) (Tonight, error) {
+func TonightAt(site *Site, t epoch.Time, prov eph.Provider) (Tonight, error) {
 	sunset, sunrise, err := nightAcross(t, site, prov, site.SunRiseSetThreshold().Degrees(), "sunset and sunrise")
 	if err != nil {
 		return Tonight{}, err

@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -31,7 +31,7 @@ func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 // immediately — there is no way to hold an Elements value whose fields
 // haven't already passed Validate.
 type Elements struct {
-	epoch                                                 time.Time
+	epoch                                                 epoch.Time
 	semiMajorAxis                                         unit.Length
 	eccentricity                                          float64
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle
@@ -46,7 +46,7 @@ type Elements struct {
 	// perihelionTime is when a set built by FromPerihelion passes
 	// perihelion, where its propagation starts. epoch is then the osculation
 	// epoch the elements were published for.
-	perihelionTime time.Time
+	perihelionTime epoch.Time
 
 	// central is the body the elements are referred to. The zero value
 	// means the Sun, so an Elements built by NewElements and never given a
@@ -299,7 +299,7 @@ func CentralBodyFor(id core.ID) (CentralBody, bool) {
 // propagator.
 // Orbital elements are published with the semi-major axis in astronomical
 // units, so it is almost always [unit.AU](a) here.
-func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float64,
+func NewElements(epoch epoch.Time, semiMajorAxis unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis, meanAnomaly angle.Angle,
 ) (Elements, error) {
 	el := Elements{
@@ -340,7 +340,7 @@ func NewElements(epoch time.Time, semiMajorAxis unit.Length, eccentricity float6
 //
 // Orbital elements are published with the perihelion distance in
 // astronomical units, so it is almost always [unit.AU](q) here.
-func FromPerihelion(epoch, perihelionTime time.Time, perihelionDistance unit.Length, eccentricity float64,
+func FromPerihelion(epoch, perihelionTime epoch.Time, perihelionDistance unit.Length, eccentricity float64,
 	inclination, ascendingNode, argPeriapsis angle.Angle,
 ) (Elements, error) {
 	if !finite(perihelionDistance.AU()) || perihelionDistance <= 0 {
@@ -458,7 +458,7 @@ func (el Elements) WithCentralBody(body CentralBody) Elements {
 
 // Epoch is the osculation epoch MeanAnomaly is given at, for every form: for a
 // set built by [FromState], the state's.
-func (el Elements) Epoch() time.Time { return el.epoch }
+func (el Elements) Epoch() epoch.Time { return el.epoch }
 
 // SemiMajorAxis is the orbit's semi-major axis: positive for an ellipse,
 // negative for a hyperbola by the usual convention, and +Inf for a parabola.
@@ -645,7 +645,7 @@ const elementsEclipticObliquity = 84381.448 * math.Pi / 648000
 // within months, for a typical main-belt asteroid. For higher-accuracy
 // positions over longer spans, use a real SPK-kernel-backed provider
 // instead (ephemeris.NewProvider with eph.SmallBody).
-func (el Elements) StateAt(t time.Time) (pos, vel vector.Vec3, err error) {
+func (el Elements) StateAt(t epoch.Time) (pos, vel vector.Vec3, err error) {
 	if !el.prep.ok {
 		// A set the constructors did not build, or one a With method made
 		// invalid: say why, or prepare it here.

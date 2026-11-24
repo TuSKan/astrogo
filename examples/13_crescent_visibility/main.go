@@ -14,12 +14,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -29,7 +30,7 @@ func main() {
 	// altitudes by up to 13.5 arcsec, far below the tenths of a degree the
 	// criteria work in. For full accuracy, blank-import remote/eop and
 	// consent to the IERS bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -41,14 +42,14 @@ func main() {
 
 	// ── Find the first New Moon of December 2026 ────────────────────────
 	// A fixed start keeps the output the same on every run; start from
-	// time.NowUTC() to look for the next one from today. Times print in
+	// epoch.Now() to look for the next one from today. Times print in
 	// the zone of the start, here the site's.
 	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
 	}
 
-	from := time.Date(2026, 12, 1, 0, 0, 0, 0, tz)
+	from := epoch.Date(2026, 12, 1, 0, 0, 0, 0, tz)
 
 	newMoon, err := plan.NextNewMoon(from, prov)
 	if err != nil {

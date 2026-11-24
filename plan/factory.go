@@ -10,7 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // starAtJ2000 returns c's position at J2000, carrying c's own proper
@@ -25,7 +25,7 @@ import (
 func starAtJ2000(c catalog.Target) (coord.ICRS, error) {
 	pos := coord.NewICRSWithKinematics(c.Coord.RA(), c.Coord.Dec(), c.PmRA, c.PmDec, c.Parallax, c.RadialVelocity, c.Epoch)
 
-	moved, err := coord.PropagateEpoch(pos, time.J2000())
+	moved, err := coord.PropagateEpoch(pos, epoch.J2000())
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("position at J2000: %w", err)
 	}
@@ -290,15 +290,15 @@ func elementsFromTarget(c catalog.Target) (eph.Elements, error) {
 		el, err = eph.NewElements(c.Epoch, c.SemiMajorAxis, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis, c.MeanAnomaly)
 	} else {
-		// The osculation epoch, where the source published one: the MPC's
+		// The osculation at, where the source published one: the MPC's
 		// comet file carries it, falling back itself to the perihelion time
 		// for an unperturbed orbit, and that is the fallback here too.
-		epoch := c.Epoch
-		if epoch.IsZero() {
-			epoch = c.PerihelionTime
+		at := c.Epoch
+		if at.IsZero() {
+			at = c.PerihelionTime
 		}
 
-		el, err = eph.ElementsFromPerihelion(epoch, c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
+		el, err = eph.ElementsFromPerihelion(at, c.PerihelionTime, c.PerihelionDistance, c.Eccentricity,
 			c.Inclination, c.AscendingNode, c.ArgPeriapsis)
 	}
 

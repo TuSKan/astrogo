@@ -10,11 +10,11 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/horizonsfault"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // horizonsAbsoluteMagnitudeRe reads "V(1,0)= -1.28" from Horizons' physical

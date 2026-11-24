@@ -5,10 +5,11 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestConjunctionsAgreeWithSkyfield holds Conjunctions to Skyfield 1.55's
@@ -33,22 +34,22 @@ func TestConjunctionsAgreeWithSkyfield(t *testing.T) {
 	// its smallest.
 	const tolSeconds = 2.0
 
-	day := func(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.LocationUTC) }
+	day := func(y, m, d int) epoch.Time { return epoch.Date(y, time.Month(m), d, 0, 0, 0, 0, time.UTC) }
 
 	for _, c := range []struct {
 		name       string
 		a, b       eph.ID
-		start, end time.Time
-		skyfield   time.Time
+		start, end epoch.Time
+		skyfield   epoch.Time
 	}{
 		{"Venus-Jupiter", eph.Venus, eph.JupiterBarycenter, day(2023, 2, 25), day(2023, 3, 8),
-			time.Date(2023, 3, 2, 10, 40, 47, 60_000_000, time.LocationUTC)},
+			epoch.Date(2023, 3, 2, 10, 40, 47, 60_000_000, time.UTC)},
 		{"Jupiter-Saturn", eph.JupiterBarycenter, eph.SaturnBarycenter, day(2020, 12, 15), day(2020, 12, 28),
-			time.Date(2020, 12, 21, 13, 32, 4, 470_000_000, time.LocationUTC)},
+			epoch.Date(2020, 12, 21, 13, 32, 4, 470_000_000, time.UTC)},
 		{"Moon-Venus", eph.Moon, eph.Venus, day(2026, 1, 10), day(2026, 1, 25),
-			time.Date(2026, 1, 19, 1, 1, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 1, 19, 1, 1, 0, 0, time.UTC)},
 		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
-			time.Date(2026, 4, 20, 17, 36, 7, 520_000_000, time.LocationUTC)},
+			epoch.Date(2026, 4, 20, 17, 36, 7, 520_000_000, time.UTC)},
 	} {
 		events, err := plan.Conjunctions(plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov), plan.Window{Start: c.start, End: c.end})
 		if err != nil {
@@ -84,23 +85,23 @@ func TestAppulsesAgreeWithSkyfield(t *testing.T) {
 
 	t.Cleanup(func() { _ = prov.Close() })
 
-	day := func(y, m, d int) time.Time { return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.LocationUTC) }
+	day := func(y, m, d int) epoch.Time { return epoch.Date(y, time.Month(m), d, 0, 0, 0, 0, time.UTC) }
 
 	for _, c := range []struct {
 		name       string
 		a, b       eph.ID
-		start, end time.Time
-		skyfield   time.Time
+		start, end epoch.Time
+		skyfield   epoch.Time
 		sepDeg     float64
 	}{
 		{"Venus-Jupiter", eph.Venus, eph.JupiterBarycenter, day(2023, 2, 25), day(2023, 3, 8),
-			time.Date(2023, 3, 2, 5, 5, 18, 370_000_000, time.LocationUTC), 0.489177},
+			epoch.Date(2023, 3, 2, 5, 5, 18, 370_000_000, time.UTC), 0.489177},
 		{"Jupiter-Saturn", eph.JupiterBarycenter, eph.SaturnBarycenter, day(2020, 12, 15), day(2020, 12, 28),
-			time.Date(2020, 12, 21, 18, 21, 0, 40_000_000, time.LocationUTC), 0.101773},
+			epoch.Date(2020, 12, 21, 18, 21, 0, 40_000_000, time.UTC), 0.101773},
 		{"Moon-Venus", eph.Moon, eph.Venus, day(2026, 1, 10), day(2026, 1, 25),
-			time.Date(2026, 1, 19, 2, 23, 50, 760_000_000, time.LocationUTC), 2.042813},
+			epoch.Date(2026, 1, 19, 2, 23, 50, 760_000_000, time.UTC), 2.042813},
 		{"Mars-Saturn", eph.MarsBarycenter, eph.SaturnBarycenter, day(2026, 4, 1), day(2026, 5, 15),
-			time.Date(2026, 4, 19, 22, 14, 27, 20_000_000, time.LocationUTC), 1.194358},
+			epoch.Date(2026, 4, 19, 22, 14, 27, 20_000_000, time.UTC), 1.194358},
 	} {
 		events, err := plan.Appulses(plan.NewPlanet(c.name, c.a, prov), plan.NewPlanet(c.name, c.b, prov), plan.Window{Start: c.start, End: c.end})
 		if err != nil {

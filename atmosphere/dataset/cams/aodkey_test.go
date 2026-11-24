@@ -3,9 +3,9 @@ package cams_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/atmosphere/dataset/cams"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // An instant resolves to the most recent CAMS cycle at or before it, and to
@@ -29,33 +29,33 @@ func TestAODKeySelectsTheCycleAtOrBeforeTheInstant(t *testing.T) {
 
 	for _, c := range []struct {
 		name  string
-		when  time.GoTime
+		when  time.Time
 		cycle string
 		step  string
 	}{
 		{
 			"morning, 00Z cycle",
-			time.GoDate(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC),
+			time.Date(2026, time.March, 20, 5, 0, 0, 0, time.UTC),
 			"20260320000000", "005",
 		},
 		{
 			"last hour before the switch",
-			time.GoDate(2026, time.March, 20, 11, 59, 0, 0, time.LocationUTC),
+			time.Date(2026, time.March, 20, 11, 59, 0, 0, time.UTC),
 			"20260320000000", "011",
 		},
 		{
 			"exactly the switch",
-			time.GoDate(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC),
+			time.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC),
 			"20260320120000", "000",
 		},
 		{
 			"evening, 12Z cycle, part-hour truncates down",
-			time.GoDate(2026, time.March, 20, 18, 30, 0, 0, time.LocationUTC),
+			time.Date(2026, time.March, 20, 18, 30, 0, 0, time.UTC),
 			"20260320120000", "006",
 		},
 		{
 			"last hour of the day",
-			time.GoDate(2026, time.March, 20, 23, 0, 0, 0, time.LocationUTC),
+			time.Date(2026, time.March, 20, 23, 0, 0, 0, time.UTC),
 			"20260320120000", "011",
 		},
 	} {
@@ -87,14 +87,14 @@ func TestAODKeyConvertsToUTC(t *testing.T) {
 	east := time.FixedZone("UTC+2", 2*60*60)
 
 	// 05:00+02:00 is 03:00 UTC, so step 3 of the 00Z cycle.
-	got := cams.AODKey(time.GoDate(2026, time.March, 20, 5, 0, 0, 0, east))
+	got := cams.AODKey(time.Date(2026, time.March, 20, 5, 0, 0, 0, east))
 
 	if !strings.Contains(got, "_prod_fc_sfc_003_") {
 		t.Errorf("AODKey for 05:00+02:00 is %q; 03:00 UTC is step 3 of the 00Z cycle", got)
 	}
 
 	// And the same instant expressed in UTC gives byte-identical output.
-	if utc := cams.AODKey(time.GoDate(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)); utc != got {
+	if utc := cams.AODKey(time.Date(2026, time.March, 20, 3, 0, 0, 0, time.UTC)); utc != got {
 		t.Errorf("the same instant in two zones gave different keys:\n%q\n%q", got, utc)
 	}
 }
@@ -109,7 +109,7 @@ func TestAODKeyConvertsToUTC(t *testing.T) {
 func TestAODKeyShapeMatchesTheStoreLayout(t *testing.T) {
 	t.Parallel()
 
-	key := cams.AODKey(time.GoDate(2026, time.January, 2, 7, 0, 0, 0, time.LocationUTC))
+	key := cams.AODKey(time.Date(2026, time.January, 2, 7, 0, 0, 0, time.UTC))
 
 	if !strings.HasPrefix(key, "CAMS/GLOBAL/2026/01/02/") {
 		t.Errorf("key %q does not start with the zero-padded date prefix", key)

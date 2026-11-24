@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // PlutoCharonMagnitudes are Johnson V apparent magnitudes of Pluto, of Charon,
@@ -47,7 +47,7 @@ type PlutoCharonMagnitudes struct {
 // It does not model mutual events, which dim the pair by up to 0.5 mag during
 // an eclipse season, or anything outside the phase angles Earth sees
 // (at most about 1.9°).
-func PlutoCharonApparent(p eph.Provider, t time.Time) (PlutoCharonMagnitudes, error) {
+func PlutoCharonApparent(p eph.Provider, t epoch.Time) (PlutoCharonMagnitudes, error) {
 	r, delta, phAng, lon, err := plutoCharonGeometry(p, t)
 	if err != nil {
 		return PlutoCharonMagnitudes{}, err
@@ -59,7 +59,7 @@ func PlutoCharonApparent(p eph.Provider, t time.Time) (PlutoCharonMagnitudes, er
 // plutoCharonGeometry returns what the model is evaluated at: Pluto's
 // heliocentric and geocentric distances (AU), its phase angle (degrees), and
 // its sub-Earth east longitude in the paper's system (degrees).
-func plutoCharonGeometry(p eph.Provider, t time.Time) (r, delta, phAng, lon float64, err error) {
+func plutoCharonGeometry(p eph.Provider, t epoch.Time) (r, delta, phAng, lon float64, err error) {
 	// The Pluto–Charon barycenter, which every planetary kernel and
 	// eph.Default have; Pluto's own center needs NAIF's plu kernel, and
 	// is 2,100 km from it, nothing at 40 AU for a distance or a phase.

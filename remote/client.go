@@ -3,9 +3,9 @@ package remote
 import (
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Client is one component's I/O policy: which endpoints it may reach, where

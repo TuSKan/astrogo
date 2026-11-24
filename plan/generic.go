@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -37,7 +37,7 @@ func (g *GenericBody) EphID() eph.ID { return g.id }
 
 // Position returns the apparent ICRS coordinates at the given time — see
 // [apparentVec].
-func (g *GenericBody) Position(t time.Time) (coord.ICRS, error) {
+func (g *GenericBody) Position(t epoch.Time) (coord.ICRS, error) {
 	icrs, err := apparentICRS(g.provider, g.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("generic body %s: %w", g.name, err)
@@ -48,7 +48,7 @@ func (g *GenericBody) Position(t time.Time) (coord.ICRS, error) {
 
 // GeocentricVec returns the apparent geocentric position vector — see
 // [apparentVec].
-func (g *GenericBody) GeocentricVec(t time.Time) (vector.Vec3, error) {
+func (g *GenericBody) GeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	v, err := apparentVec(g.provider, g.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("generic body %s: %w", g.name, err)

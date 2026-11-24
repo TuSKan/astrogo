@@ -5,8 +5,8 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -21,7 +21,7 @@ import (
 // it is cheap enough to build that sharing one is never the point.
 type Instant struct {
 	p    Provider
-	t    time.Time
+	t    epoch.Time
 	n    int
 	memo [instantMemo]located
 }
@@ -44,10 +44,10 @@ type located struct {
 const chainDepth = 8
 
 // At returns the Instant of p at t.
-func At(p Provider, t time.Time) *Instant { return &Instant{p: p, t: t} }
+func At(p Provider, t epoch.Time) *Instant { return &Instant{p: p, t: t} }
 
 // Time returns the epoch of the Instant.
-func (in *Instant) Time() time.Time { return in.t }
+func (in *Instant) Time() epoch.Time { return in.t }
 
 // Geometric returns the state of target about center at the Instant's epoch:
 // r_target(t) − r_center(t), both at TDB t, with no light time.

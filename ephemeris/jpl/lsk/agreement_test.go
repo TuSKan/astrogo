@@ -4,14 +4,15 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // firstLeapSecondYear is when UTC began accumulating whole leap seconds.
@@ -144,13 +145,13 @@ func TestLeapSecondSourcesAgree(t *testing.T) {
 	// second announced after gofa v1.19.1 was pinned appears in the kernel and
 	// nowhere in that walk's failures — it would simply be an entry gofa
 	// answers with the previous value. Sweeping independently finds it.
-	last := time.Date(2035, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	last := epoch.Date(2035, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	var swept int
 
 	for y := firstLeapSecondYear; y <= last.Year(); y++ {
 		for _, m := range []time.Month{time.January, time.July} {
-			jd := time.Date(y, m, 1, 12, 0, 0, 0, time.LocationUTC).JD()
+			jd := epoch.Date(y, m, 1, 12, 0, 0, 0, time.UTC).JD()
 
 			fromGofa, status := gofaext.Dat(y, int(m), 1, 0.5)
 			if status < 0 {

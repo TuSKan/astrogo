@@ -3,12 +3,13 @@ package ephemeris_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -39,7 +40,7 @@ func TestSiteApparentIsSOFAsTopocentricPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, body := range []eph.ID{eph.Moon, eph.MarsBarycenter} {
 		var (
@@ -138,7 +139,7 @@ func TestSiteIsTheContextsObserver(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	at := time.Date(2026, time.June, 10, 3, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 10, 3, 0, 0, 0, time.UTC)
 
 	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
 	if err != nil {

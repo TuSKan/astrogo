@@ -3,10 +3,11 @@ package kepler_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -40,9 +41,9 @@ func BenchmarkSolveKepler(b *testing.B) {
 // BenchmarkStateAt is one heliocentric state of a Ceres-like orbit, through
 // NewElements and the eccentric anomaly.
 func BenchmarkStateAt(b *testing.B) {
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	el, err := kepler.NewElements(epoch, unit.AU(2.77), 0.0785, angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(60))
+	el, err := kepler.NewElements(at, unit.AU(2.77), 0.0785, angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(60))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -51,7 +52,7 @@ func BenchmarkStateAt(b *testing.B) {
 
 	i := 0
 	for b.Loop() {
-		pos, _, err := el.StateAt(epoch.Add(unit.Days(float64(i % 400))))
+		pos, _, err := el.StateAt(at.Add(unit.Days(float64(i % 400))))
 		if err != nil {
 			b.Fatal(err)
 		}

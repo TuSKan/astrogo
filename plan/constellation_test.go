@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -30,7 +30,7 @@ func TestNewConstellation_NameAndAbbreviationResolveIdentically(t *testing.T) {
 		t.Errorf("NewConstellation(Orion): Name()=%q Abbreviation()=%q, want Orion/Ori", byName.Name(), byName.Abbreviation())
 	}
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	posA, err := byName.Position(tm)
 	if err != nil {
@@ -121,7 +121,7 @@ func TestNewConstellation_GetDetailsAndWindows(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	if _, err := ObservableWindows(c, site, Window{Start: start, End: end}, unit.Minutes(10)); err != nil {

@@ -3,12 +3,13 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -36,7 +37,7 @@ func TestLookAngleTakesASatelliteFromTheContext(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	base := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 
 	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
 		at := base.Add(dt)
@@ -97,7 +98,7 @@ func TestLookAngleUsesTheContextItIsGiven(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	base := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 
 	for _, dt := range []unit.Duration{unit.Minutes(20), unit.Minutes(40), unit.Hours(1)} {
 		at := base.Add(dt)
@@ -173,7 +174,7 @@ func TestLookAngleMatchesTheReducerItReplaced(t *testing.T) {
 	const kmPerAU = 149597870.7
 
 	for _, hour := range []int{0, 3, 9, 15, 21} {
-		at := time.Date(2026, time.April, 20, hour, 0, 0, 0, time.LocationUTC)
+		at := epoch.Date(2026, time.April, 20, hour, 0, 0, 0, time.UTC)
 
 		ctx := mustContext(t, at, site, defaultAtm)
 

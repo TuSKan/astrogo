@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -115,8 +116,8 @@ type Schedule struct {
 type Transition struct {
 	FromBlock *Block // nil if ToBlock is the first block
 	ToBlock   *Block
-	FromTime  time.Time // when the previous observation ended
-	ToTime    time.Time // when the next observation begins (approximate, often FromTime)
+	FromTime  epoch.Time // when the previous observation ended
+	ToTime    epoch.Time // when the next observation begins (approximate, often FromTime)
 	Site      *Site
 
 	// FromAltAz is FromBlock's target observed from Site at FromTime, where
@@ -151,7 +152,7 @@ func NewTransition(from, to *Block, site *Site, w Window) (Transition, error) {
 // by ctxAt. ctxAt moves one Context, so each position is taken before the
 // next instant is asked for.
 func newTransition(
-	from, to *Block, fromTime, toTime time.Time, site *Site, ctxAt func(time.Time) *coord.Context,
+	from, to *Block, fromTime, toTime epoch.Time, site *Site, ctxAt func(epoch.Time) *coord.Context,
 ) (Transition, error) {
 	tr := Transition{FromBlock: from, ToBlock: to, FromTime: fromTime, ToTime: toTime, Site: site}
 
@@ -175,7 +176,7 @@ func newTransition(
 }
 
 // observedTargetAt is target's observed alt/az at t, through ctxAt's Context.
-func observedTargetAt(target Observable, t time.Time, ctxAt func(time.Time) *coord.Context) (coord.AltAz, error) {
+func observedTargetAt(target Observable, t epoch.Time, ctxAt func(epoch.Time) *coord.Context) (coord.AltAz, error) {
 	pos, err := target.Position(t)
 	if err != nil {
 		return coord.AltAz{}, fmt.Errorf("position: %w", err)
@@ -390,10 +391,10 @@ func overheadError(from, to *Block, err error) error {
 // should hear about it rather than receive a quietly shorter plan.
 func checkConstraintsInterval(
 	target Observable,
-	start, end time.Time,
+	start, end epoch.Time,
 	step unit.Duration,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 	constraints ...Constraint,
 ) (bool, error) {
@@ -407,14 +408,14 @@ func checkConstraintsInterval(
 // does, with its Result, or -1 when all pass throughout.
 func firstFailure(
 	target Observable,
-	start, end time.Time,
+	start, end epoch.Time,
 	step unit.Duration,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 	constraints ...Constraint,
 ) (int, Result, error) {
-	check := func(t time.Time) (int, Result, error) {
+	check := func(t epoch.Time) (int, Result, error) {
 		ctx := ctxAt(t)
 
 		for i, c := range constraints {
@@ -474,7 +475,7 @@ func (s *GreedyStrategy) schedule(
 	window Window,
 	blocks []*Block,
 	transition TransitionModel,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	sky *runSky,
 ) (*Schedule, error) {
 	if err := checkInterval(window.Start, window.End); err != nil {
@@ -504,7 +505,7 @@ func (s *GreedyStrategy) schedule(
 	var lastBlock *Block
 
 	type activeItem struct {
-		available time.Time
+		available epoch.Time
 		b         *Block
 		// constraints are the planner's and the block's, as checked.
 		constraints []Constraint

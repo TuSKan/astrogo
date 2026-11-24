@@ -6,11 +6,12 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/logging"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -20,7 +21,7 @@ var errConstraintUnavailable = errors.New("predicate_errors_test: constraint cou
 // failed or a provider that could not be reached.
 type failingConstraint struct{}
 
-func (failingConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
+func (failingConstraint) Check(_ Observable, _ *Site, _ epoch.Time) (Result, error) {
 	return Result{}, errConstraintUnavailable
 }
 
@@ -36,7 +37,7 @@ type unreachableTarget struct{}
 
 func (unreachableTarget) Name() string { return "Unreachable" }
 
-func (unreachableTarget) Position(_ time.Time) (coord.ICRS, error) {
+func (unreachableTarget) Position(_ epoch.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errPositionUnavailable
 }
 
@@ -302,8 +303,8 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 		return ScheduledBlock{
 			Block: b,
 			Window: Window{
-				Start: start.Add(time.FromGoDuration(offset)),
-				End:   start.Add(time.FromGoDuration(offset) + unit.Minutes(10)),
+				Start: start.Add(epoch.FromGoDuration(offset)),
+				End:   start.Add(epoch.FromGoDuration(offset) + unit.Minutes(10)),
 			},
 		}
 	}
@@ -343,9 +344,9 @@ func TestSwapOptimizedScheduleForwardsAPassFailure(t *testing.T) {
 
 // endOnlyFailingConstraint fails at one exact instant and passes everywhere
 // else.
-type endOnlyFailingConstraint struct{ at time.Time }
+type endOnlyFailingConstraint struct{ at epoch.Time }
 
-func (c endOnlyFailingConstraint) Check(_ Observable, _ *Site, t time.Time) (Result, error) {
+func (c endOnlyFailingConstraint) Check(_ Observable, _ *Site, t epoch.Time) (Result, error) {
 	if t.Equal(c.at) {
 		return Result{}, errConstraintUnavailable
 	}

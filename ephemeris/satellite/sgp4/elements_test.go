@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // good returns an element set that passes, so each case below can change
@@ -15,7 +16,7 @@ import (
 func good() sgp4.Elements {
 	return sgp4.Elements{
 		NORAD:        25544,
-		Epoch:        time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		Epoch:        epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		Inclination:  angle.Deg(51.6416),
 		RAAN:         angle.Deg(247.4627),
 		ArgPerigee:   angle.Deg(130.5360),
@@ -86,7 +87,7 @@ func TestValidateRefusesTheImpossible(t *testing.T) {
 			wantErr: false,
 		},
 
-		{"zero epoch", func(e *sgp4.Elements) { e.Epoch = time.Time{} }, true},
+		{"zero epoch", func(e *sgp4.Elements) { e.Epoch = epoch.Time{} }, true},
 	} {
 		el := good()
 		tc.mutate(&el)

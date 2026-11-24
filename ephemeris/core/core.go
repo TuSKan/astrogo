@@ -16,7 +16,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -135,7 +135,7 @@ type Provider interface {
 	// about any center, the Earth among them. The method replaced a geocentric
 	// State rather than redefining it, so that a caller still expecting a
 	// geocentric answer fails to compile instead of being an AU wrong.
-	Locate(id ID, t time.Time) (State, error)
+	Locate(id ID, t epoch.Time) (State, error)
 
 	// Close releases any resources held by the provider (files, caches).
 	// Providers with no resources may return nil.

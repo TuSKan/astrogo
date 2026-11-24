@@ -3,11 +3,12 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -28,14 +29,14 @@ func refractionScene(t *testing.T) (withAtm, noAtm *coord.Context) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	epoch := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 
 	atm := atmosphere.AtAltitude(800)
 
 	dry := atm
 	dry.Pressure = 0
 
-	return mustContext(t, epoch, site, atm), mustContext(t, epoch, site, dry)
+	return mustContext(t, at, site, atm), mustContext(t, at, site, dry)
 }
 
 // farVector is a geocentric position vector pointing at an ICRS direction, far

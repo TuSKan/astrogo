@@ -4,13 +4,14 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -29,7 +30,7 @@ type fixedEarthBase struct {
 
 var errNotHere = errors.New("not in this base")
 
-func (b *fixedEarthBase) Locate(id core.ID, _ time.Time) (core.State, error) {
+func (b *fixedEarthBase) Locate(id core.ID, _ epoch.Time) (core.State, error) {
 	if id != core.Earth {
 		return core.State{}, errNotHere
 	}
@@ -47,7 +48,7 @@ const smallBody = core.ID(core.SmallBodyBase + 4179)
 func asteroid(t *testing.T) kepler.Elements {
 	t.Helper()
 
-	el, err := kepler.NewElements(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	el, err := kepler.NewElements(epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		unit.AU(2.53), 0.11, angle.Deg(0.45), angle.Deg(124.3), angle.Deg(277.6), angle.Deg(18.2))
 	if err != nil {
 		t.Fatalf("elements: %v", err)

@@ -2,11 +2,12 @@ package coord_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // leapStepEOP is Earth orientation across the leap second that ended 2016:
@@ -16,13 +17,13 @@ import (
 // is here regardless of whether the runner has the bulletin.
 type leapStepEOP struct{}
 
-func (leapStepEOP) EOP(mjd float64) (time.EOP, error) {
+func (leapStepEOP) EOP(mjd float64) (epoch.EOP, error) {
 	dut1 := -0.408
 	if mjd >= 57754 {
 		dut1 = 0.592 // one second more: UT1 − UTC after UTC stepped back
 	}
 
-	return time.EOP{DUT1: dut1, XP: angle.Arcsec(0.077).Radians(), YP: angle.Arcsec(0.264).Radians()}, nil
+	return epoch.EOP{DUT1: dut1, XP: angle.Arcsec(0.077).Radians(), YP: angle.Arcsec(0.264).Radians()}, nil
 }
 
 // TestSetTimeAcrossALeapSecond is #489. AtTime, which SetTime replaces,
@@ -33,8 +34,8 @@ func (leapStepEOP) EOP(mjd float64) (time.EOP, error) {
 // comment at 0.007″.
 func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
-	time.RegisterModel(leapStepEOP{})
+	t.Cleanup(epoch.ResetEOP)
+	epoch.RegisterModel(leapStepEOP{})
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	if err != nil {
@@ -44,12 +45,12 @@ func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	star := coord.NewICRS(angle.Hour(5.5), angle.Deg(-30))
 
-	before := time.Date(2016, time.December, 31, 23, 30, 0, 0, time.LocationUTC)
-	after := time.Date(2017, time.January, 1, 0, 15, 0, 0, time.LocationUTC)
+	before := epoch.Date(2016, time.December, 31, 23, 30, 0, 0, time.UTC)
+	after := epoch.Date(2017, time.January, 1, 0, 15, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		name     string
-		base, at time.Time
+		base, at epoch.Time
 	}{
 		{"forward across the leap", before, after},
 		{"backward across the leap", after, before},

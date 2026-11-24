@@ -4,19 +4,20 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // teteEpoch is fixed so the equation of the origins is a fixed number: it
 // grows at about 46 arcseconds a year, so a test run against "now" would be
 // comparing against a moving target.
-var teteEpoch = time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+var teteEpoch = epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC)
 
 func teteContext(t *testing.T) *coord.Context {
 	t.Helper()
@@ -35,7 +36,7 @@ func teteContext(t *testing.T) *coord.Context {
 // The equation of the origins is defined as ERA − GST: the difference between
 // the Earth rotation angle, measured from the Celestial Intermediate Origin,
 // and apparent sidereal time, measured from the true equinox. astrogo can
-// produce both sides independently — [time.Time.GAST] for one and SOFA's Era00
+// produce both sides independently — [epoch.Time.GAST] for one and SOFA's Era00
 // for the other — so the shift this conversion applies can be checked against
 // the definition instead of against the implementation.
 func TestEquationOfOriginsIsEraMinusGST(t *testing.T) {

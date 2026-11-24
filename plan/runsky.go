@@ -4,7 +4,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // runSky is what one scheduling run has worked out about the sky at each
@@ -35,18 +35,18 @@ type runSky struct {
 	// cache, since it scores each placement once (#959).
 	moon moonPlaces
 
-	sunAlt    map[time.Time]angle.Angle
-	moonTopo  map[time.Time]coord.ICRS
-	moonIllum map[time.Time]float64
+	sunAlt    map[epoch.Time]angle.Angle
+	moonTopo  map[epoch.Time]coord.ICRS
+	moonIllum map[epoch.Time]float64
 }
 
 // newRunSky starts a run's record. With moon, it keeps the score's Moon as
 // well as the constraints' sky.
 func newRunSky(moon bool) *runSky {
 	s := &runSky{
-		sunAlt:    map[time.Time]angle.Angle{},
-		moonTopo:  map[time.Time]coord.ICRS{},
-		moonIllum: map[time.Time]float64{},
+		sunAlt:    map[epoch.Time]angle.Angle{},
+		moonTopo:  map[epoch.Time]coord.ICRS{},
+		moonIllum: map[epoch.Time]float64{},
 	}
 
 	if moon {
@@ -61,13 +61,13 @@ func newRunSky(moon bool) *runSky {
 // built-in Sun, MoonSep and MoonIllum. Their CheckCtx is checkSky with no
 // record.
 type skyConstraint interface {
-	checkSky(obj Observable, t time.Time, ctx *coord.Context, sky *runSky) (Result, error)
+	checkSky(obj Observable, t epoch.Time, ctx *coord.Context, sky *runSky) (Result, error)
 }
 
 // checkConstraint evaluates c for obj at t. It takes c's sky term from the
 // run's record when c has one, gives c the Context when c takes one, and
 // otherwise lets c build what it needs.
-func checkConstraint(c Constraint, obj Observable, t time.Time, site *Site, ctx *coord.Context, sky *runSky) (Result, error) {
+func checkConstraint(c Constraint, obj Observable, t epoch.Time, site *Site, ctx *coord.Context, sky *runSky) (Result, error) {
 	switch c := c.(type) {
 	case skyConstraint:
 		return c.checkSky(obj, t, ctx, sky)
@@ -79,7 +79,7 @@ func checkConstraint(c Constraint, obj Observable, t time.Time, site *Site, ctx 
 }
 
 // sunAltitude is the Sun's observed altitude at t, as ctx places it.
-func (s *runSky) sunAltitude(t time.Time, ctx *coord.Context) (angle.Angle, error) {
+func (s *runSky) sunAltitude(t epoch.Time, ctx *coord.Context) (angle.Angle, error) {
 	if s != nil {
 		if alt, ok := s.sunAlt[t]; ok {
 			return alt, nil
@@ -101,7 +101,7 @@ func (s *runSky) sunAltitude(t time.Time, ctx *coord.Context) (angle.Angle, erro
 }
 
 // moonTopocentric is the Moon at t as the site ctx describes sees it.
-func (s *runSky) moonTopocentric(t time.Time, ctx *coord.Context) (coord.ICRS, error) {
+func (s *runSky) moonTopocentric(t epoch.Time, ctx *coord.Context) (coord.ICRS, error) {
 	if s != nil {
 		if pos, ok := s.moonTopo[t]; ok {
 			return pos, nil
@@ -122,7 +122,7 @@ func (s *runSky) moonTopocentric(t time.Time, ctx *coord.Context) (coord.ICRS, e
 
 // moonIllumination is the Moon's illuminated fraction at t, from the default
 // ephemeris.
-func (s *runSky) moonIllumination(t time.Time) (float64, error) {
+func (s *runSky) moonIllumination(t epoch.Time) (float64, error) {
 	if s != nil {
 		if frac, ok := s.moonIllum[t]; ok {
 			return frac, nil

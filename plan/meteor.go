@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -315,7 +315,7 @@ func wrap360Deg(d float64) float64 {
 // IsActive reports whether m is active at time t, from the Sun's longitude
 // referred to the equinox J2000.0, as IMO tabulates its activity windows —
 // not a calendar-date range.
-func (m MeteorShower) IsActive(t time.Time, prov eph.Provider) (bool, error) {
+func (m MeteorShower) IsActive(t epoch.Time, prov eph.Provider) (bool, error) {
 	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
 		return false, fmt.Errorf("meteor: active: %w", err)
@@ -329,7 +329,7 @@ func (m MeteorShower) IsActive(t time.Time, prov eph.Provider) (bool, error) {
 // m.PeakSolarLongitude, converted to an elapsed-day count via
 // meanSolarLongitudeDegPerDay, and applied as linear RA/Dec drift from the
 // peak position.
-func (m MeteorShower) RadiantAt(t time.Time, prov eph.Provider) (ra, dec angle.Angle, err error) {
+func (m MeteorShower) RadiantAt(t epoch.Time, prov eph.Provider) (ra, dec angle.Angle, err error) {
 	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
 		return angle.Zero(), angle.Zero(), fmt.Errorf("meteor: radiant: %w", err)
@@ -346,7 +346,7 @@ func (m MeteorShower) RadiantAt(t time.Time, prov eph.Provider) (ra, dec angle.A
 // Radiant returns m's radiant at time t as a *Star — a radiant is just a
 // fixed sky point at a given moment, and Star already implements exactly
 // that; no bespoke Observable type is needed for a meteor shower itself.
-func (m MeteorShower) Radiant(t time.Time, prov eph.Provider) (*Star, error) {
+func (m MeteorShower) Radiant(t epoch.Time, prov eph.Provider) (*Star, error) {
 	ra, dec, err := m.RadiantAt(t, prov)
 	if err != nil {
 		return nil, err
@@ -358,7 +358,7 @@ func (m MeteorShower) Radiant(t time.Time, prov eph.Provider) (*Star, error) {
 // ZHRAt returns m's zenithal hourly rate at time t: m.ZHR, the rate at the
 // maximum, times m.Activity at the Sun's J2000 longitude, and zero outside
 // [m.ActiveStartSolarLon, m.ActiveEndSolarLon].
-func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
+func (m MeteorShower) ZHRAt(t epoch.Time, prov eph.Provider) (float64, error) {
 	lambda, err := sunLongitudeJ2000(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: ZHR: %w", err)
@@ -385,7 +385,7 @@ func (m MeteorShower) ZHRAt(t time.Time, prov eph.Provider) (float64, error) {
 // computed here: it depends on moonlight, zodiacal light and light
 // pollution through a sky-brightness model, which is a separate concern
 // from meteor rate arithmetic.
-func (m MeteorShower) ObservedRate(site *Site, t time.Time, prov eph.Provider, limitingMag float64) (float64, error) {
+func (m MeteorShower) ObservedRate(site *Site, t epoch.Time, prov eph.Provider, limitingMag float64) (float64, error) {
 	zhr, err := m.ZHRAt(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: observed rate: %w", err)
@@ -441,7 +441,7 @@ func (m MeteorShower) zhrAtSolarLongitude(lambda float64) float64 {
 // J2000 equator, 0.02″, is far below anything a shower's timing resolves.
 // Against Skyfield's ecliptic_J2000_frame (DE421) it agrees to a thousandth
 // of a degree, about a minute of time.
-func sunLongitudeJ2000(t time.Time, prov eph.Provider) (float64, error) {
+func sunLongitudeJ2000(t epoch.Time, prov eph.Provider) (float64, error) {
 	sun, err := geocentric(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("meteor: sun position: %w", err)

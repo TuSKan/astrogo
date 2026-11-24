@@ -3,12 +3,13 @@ package plan
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -20,7 +21,7 @@ type errMovingBody struct{}
 
 func (errMovingBody) Name() string { return "ErrMovingBody" }
 
-func (errMovingBody) Position(time.Time) (coord.ICRS, error) {
+func (errMovingBody) Position(epoch.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, nil
 }
 
@@ -28,7 +29,7 @@ func (errMovingBody) GetDetails(*coord.Context, DetailOverrides) (*TargetDetails
 	return nil, errMovingBodyFails
 }
 
-func (errMovingBody) GeocentricVec(time.Time) (vector.Vec3, error) {
+func (errMovingBody) GeocentricVec(epoch.Time) (vector.Vec3, error) {
 	return vector.Vec3{}, errMovingBodyFails
 }
 
@@ -64,7 +65,7 @@ func TestAltitudesAtReportsFailureRatherThanAGuess(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	when := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 	geomAtm := atmosphere.Refraction{Pressure: 0}
 
 	for _, tc := range []struct {
@@ -115,7 +116,7 @@ func TestAltitudesAtSeparatesTheTwoAtmospheres(t *testing.T) {
 	// A star near the horizon, where refraction is largest and the two
 	// atmospheres disagree most.
 	star := NewStar("low", angle.Deg(0), angle.Deg(44))
-	when := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 
 	spec := EventSpec{Target: star, Observer: site}
 

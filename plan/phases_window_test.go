@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -20,14 +21,14 @@ import (
 // (NASA's canon, 11:34:52 TD).
 func TestMoonPhasesSeeTheLastPartialStep(t *testing.T) {
 	prov := eph.Default()
-	fullMoon := time.Date(2026, 9, 26, 16, 49, 2, 0, time.LocationUTC)
+	fullMoon := epoch.Date(2026, 9, 26, 16, 49, 2, 0, time.UTC)
 
 	for _, w := range []struct {
 		name       string
-		start, end time.Time
+		start, end epoch.Time
 	}{
-		{"last partial step", time.Date(2026, 9, 26, 8, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 26, 17, 0, 0, 0, time.LocationUTC)},
-		{"window shorter than a step", time.Date(2026, 9, 26, 16, 0, 0, 0, time.LocationUTC), time.Date(2026, 9, 26, 17, 0, 0, 0, time.LocationUTC)},
+		{"last partial step", epoch.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC), epoch.Date(2026, 9, 26, 17, 0, 0, 0, time.UTC)},
+		{"window shorter than a step", epoch.Date(2026, 9, 26, 16, 0, 0, 0, time.UTC), epoch.Date(2026, 9, 26, 17, 0, 0, 0, time.UTC)},
 	} {
 		phases, err := MoonPhases(Window{Start: w.start, End: w.end}, prov)
 		if err != nil {
@@ -45,12 +46,12 @@ func TestMoonPhasesSeeTheLastPartialStep(t *testing.T) {
 		}
 	}
 
-	eclipses, err := LunarEclipses(Window{Start: time.Date(2026, 3, 2, 21, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 3, 3, 14, 0, 0, 0, time.LocationUTC)}, prov)
+	eclipses, err := LunarEclipses(Window{Start: epoch.Date(2026, 3, 2, 21, 0, 0, 0, time.UTC), End: epoch.Date(2026, 3, 3, 14, 0, 0, 0, time.UTC)}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	greatest := time.Date(2026, 3, 3, 11, 33, 37, 0, time.LocationUTC)
+	greatest := epoch.Date(2026, 3, 3, 11, 33, 37, 0, time.UTC)
 	if len(eclipses) != 1 || math.Abs(eclipses[0].Time.Sub(greatest).Minutes()) > 2 {
 		t.Errorf("LunarEclipses over [2026-03-02 21:00, 2026-03-03 14:00]: %v, want the total eclipse at %v", eclipses, greatest)
 	}
@@ -61,7 +62,7 @@ func TestMoonPhasesSeeTheLastPartialStep(t *testing.T) {
 // cut inside nearly every six-hour step, which is where #419 lost phases.
 func TestMoonPhasesDoNotDependOnWhereTheWindowIsCut(t *testing.T) {
 	prov := eph.Default()
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(60))
 
 	whole, err := MoonPhases(Window{Start: start, End: end}, prov)
@@ -103,8 +104,8 @@ func TestMoonPhasesDoNotDependOnWhereTheWindowIsCut(t *testing.T) {
 // missing with a nil error; a provider that failed on every later call too
 // would hide that, since the next sample would report it anyway.
 func TestMoonPhasesReturnEveryProviderFailure(t *testing.T) {
-	start := time.Date(2026, 9, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 9, 30, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)
 
 	counting := &failingOnceProvider{Provider: eph.Default(), on: -1}
 
@@ -132,7 +133,7 @@ type failingOnceProvider struct {
 	calls, on int
 }
 
-func (p *failingOnceProvider) Locate(id eph.ID, t time.Time) (core.State, error) {
+func (p *failingOnceProvider) Locate(id eph.ID, t epoch.Time) (core.State, error) {
 	call := p.calls
 	p.calls++
 

@@ -31,7 +31,7 @@ import (
 //
 // `var Table = map[...]...{...}` is the shortest way to publish a table and
 // reads as harmless, so the next one would arrive the same way. Unlike
-// [TestTimeExportsNoMutableFunctionValues] this has no allow list: a table
+// [TestEpochExportsNoMutableFunctionValues] this has no allow list: a table
 // has no case Go forces on us, because a function that looks a value up in
 // an unexported table, or returns a copy of it, is always available.
 func TestNoExportedPackageLevelTables(t *testing.T) {

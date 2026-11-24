@@ -1,9 +1,9 @@
-// Package eop supplies IERS Earth Orientation Parameters to astrogo/time.
+// Package eop supplies IERS Earth Orientation Parameters to astrogo/epoch.
 // Blank-import it from a program whose accuracy depends on them:
 //
 //	import _ "github.com/TuSKan/astrogo/remote/eop"
 //
-// Without it, time.Time.EOP, .UTC and .UT1 report zero DUT1 and polar
+// Without it, epoch.Time.EOP, .UTC and .UT1 report zero DUT1 and polar
 // motion and log one warning saying so — costing roughly an arcsecond of
 // topocentric position and up to 0.9 s of UT1.
 //
@@ -33,7 +33,7 @@
 // air-gapped deployment needs.
 //
 // The lazy load cannot say it failed. A program that needs to know calls
-// time.LoadEOP(ctx) after granting consent: the same two steps, fetch then
+// epoch.LoadEOP(ctx) after granting consent: the same two steps, fetch then
 // cache, under its context, with an error when neither gives a bulletin.
 package eop
 
@@ -43,11 +43,11 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
-// eopLoader is the time.EOPLoader this package registers. See the package
+// eopLoader is the epoch.EOPLoader this package registers. See the package
 // doc comment for why it lives here rather than in remote.
 type eopLoader struct{}
 
@@ -57,36 +57,36 @@ type eopLoader struct{}
 // which a hand-pre-seeded file never has. Reading the cache object
 // directly is what finds a file copied in by hand for an offline or
 // air-gapped deployment.
-func (eopLoader) Cached(ctx context.Context) (time.EOPData, error) {
+func (eopLoader) Cached(ctx context.Context) (epoch.EOPData, error) {
 	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
-		return time.EOPData{}, time.ErrNoEOPData
+		return epoch.EOPData{}, epoch.ErrNoEOPData
 	}
 
 	key := prefix + eopCacheName
 
 	info, err := fs.Stat(fsys, key)
 	if err != nil {
-		return time.EOPData{}, time.ErrNoEOPData
+		return epoch.EOPData{}, epoch.ErrNoEOPData
 	}
 
 	raw, err := fs.ReadFile(fsys, key)
 	if err != nil {
-		return time.EOPData{}, time.ErrNoEOPData
+		return epoch.EOPData{}, epoch.ErrNoEOPData
 	}
 
-	return time.EOPData{Raw: raw, ModTime: info.ModTime()}, nil
+	return epoch.EOPData{Raw: raw, ModTime: info.ModTime()}, nil
 }
 
 // Fetch downloads finals2000A.all, subject to download consent.
-func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
+func (eopLoader) Fetch(ctx context.Context) (epoch.EOPData, error) {
 	// The network step, and consent gates it before anything else does.
 	// Without consent remote.GetFile serves a cached bulletin as offline mode
 	// does (#964), which is the one Cached has just read and found wanting,
 	// and the lazy load would record it as fetched from the network.
 	ep, _ := remote.Lookup(remote.IERSFinals2000A)
 	if err := remote.CheckDownload(remote.IERSFinals2000A, "finals2000A.all", ep.ApproxSize); err != nil {
-		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
+		return epoch.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
 	}
 
 	// remote.GetFile reuses the cache untouched when the source's current ETag
@@ -108,7 +108,7 @@ func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 			return fmt.Errorf("remote: read EOP data: %w", err)
 		}
 
-		if _, perr := time.ParseFinals2000A(bytes.NewReader(b)); perr != nil {
+		if _, perr := epoch.ParseFinals2000A(bytes.NewReader(b)); perr != nil {
 			return fmt.Errorf("remote: EOP data does not parse: %w", perr)
 		}
 
@@ -119,14 +119,14 @@ func (eopLoader) Fetch(ctx context.Context) (time.EOPData, error) {
 
 	if _, _, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
 		remote.WithCacheName(eopCacheName), remote.WithRead(read)); err != nil {
-		return time.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
+		return epoch.EOPData{}, fmt.Errorf("remote: fetch EOP data: %w", err)
 	}
 
-	return time.EOPData{Raw: raw}, nil
+	return epoch.EOPData{Raw: raw}, nil
 }
 
 // eopCacheName is the name finals2000A.all is cached under.
 const eopCacheName = "finals2000A.data"
 
 //nolint:gochecknoinits // the registration this package exists to provide
-func init() { time.RegisterEOPLoader(eopLoader{}) }
+func init() { epoch.RegisterEOPLoader(eopLoader{}) }

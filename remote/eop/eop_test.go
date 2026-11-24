@@ -8,11 +8,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // sampleFinals2000A mimics finals2000A.all format for two consecutive
@@ -20,7 +21,7 @@ import (
 const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
 73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
 
-// These tests moved here from time/internal/iers when the EOP dependency
+// These tests moved here from epoch/internal/iers when the EOP dependency
 // was inverted. They were always testing this package's behavior —
 // consent, ETag revalidation, cache layout — through a package that had
 // no business knowing about any of it. They now sit next to the code they
@@ -59,7 +60,7 @@ func scratchCache(t *testing.T) {
 	t.Cleanup(func() {
 		remote.SetDataDir("")
 		remote.Reset()
-		time.ResetEOP()
+		epoch.ResetEOP()
 	})
 }
 
@@ -73,7 +74,7 @@ func TestEOPLoaderFetchesAndParses(t *testing.T) {
 		t.Fatalf("Fetch: %v", err)
 	}
 
-	if _, err := time.ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
+	if _, err := epoch.ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
 		t.Fatalf("fetched bytes do not parse as finals2000A: %v", err)
 	}
 }
@@ -170,8 +171,8 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 				t.Error("a corrupt download must not be cached")
 			}
 
-			if _, ok := time.GetModel().(time.ZeroModel); !ok {
-				t.Errorf("model must be unchanged after a rejected download, got %T", time.GetModel())
+			if _, ok := epoch.GetModel().(epoch.ZeroModel); !ok {
+				t.Errorf("model must be unchanged after a rejected download, got %T", epoch.GetModel())
 			}
 		})
 	}
@@ -297,7 +298,7 @@ func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 	scratchCache(t)
 
 	_, err := eopLoader{}.Cached(context.Background())
-	if !errors.Is(err, time.ErrNoEOPData) {
+	if !errors.Is(err, epoch.ErrNoEOPData) {
 		t.Fatalf("Cached with an empty cache = %v, want ErrNoEOPData", err)
 	}
 }
@@ -333,7 +334,7 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 }
 
 // TestInitRegistersTheLoader is the whole point of the inversion: merely
-// importing this package must wire astrogo/time up, because that is what
+// importing this package must wire astrogo/epoch up, because that is what
 // keeps the change invisible to every existing caller.
 func TestInitRegistersTheLoader(t *testing.T) {
 	scratchCache(t)
@@ -352,9 +353,9 @@ func TestInitRegistersTheLoader(t *testing.T) {
 	// Nothing here registers a loader: if init did not, this reports
 	// ErrNoEOPLoader instead of finding the file above.
 	// MJD 41684 as a JD, on the UTC scale.
-	time.FromJD(41684+2400000.5, time.UTC).EOP()
+	epoch.FromJD(41684+2400000.5, epoch.UTC).EOP()
 
-	if got := time.EOPSource(); got != "cache" {
+	if got := epoch.EOPSource(); got != "cache" {
 		t.Errorf("EOPSource = %q, want %q", got, "cache")
 	}
 }
@@ -364,7 +365,7 @@ func TestInitRegistersTheLoader(t *testing.T) {
 //
 // Every failure here answers ErrNoEOPData rather than the underlying error, on
 // purpose: Time.EOP has no error return, so a caller cannot be told anything
-// richer than "no data", and time's own one-time warning is the notice that
+// richer than "no data", and epoch's own one-time warning is the notice that
 // accuracy degraded. Returning a different error would only push a value that
 // nothing can read further up.
 func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
@@ -374,7 +375,7 @@ func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
 	// A scheme no driver registers, so opening the cache fsys fails.
 	remote.SetDataDir("no-such-scheme://example.invalid/cache")
 
-	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, time.ErrNoEOPData) {
+	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, epoch.ErrNoEOPData) {
 		t.Errorf("Cached with an unopenable cache = %v, want ErrNoEOPData", err)
 	}
 }

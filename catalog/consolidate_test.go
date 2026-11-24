@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +21,7 @@ func icrs(raDeg, decDeg float64) coord.ICRS {
 func simbadAlnilam() catalog.Record {
 	return catalog.Record{Provider: "simbad", Target: catalog.Target{
 		ID: "* eps Ori", Name: "Alnilam", Catalog: "SIMBAD",
-		Coord: icrs(84.05338894, -1.20191914), HasCoord: true, Epoch: time.J2000(),
+		Coord: icrs(84.05338894, -1.20191914), HasCoord: true, Epoch: epoch.J2000(),
 		PmRA: angle.Arcsec(0.00144), PmDec: angle.Arcsec(-0.00078), Parallax: angle.Arcsec(0.00165),
 		VMag: 1.69, HasVMag: true, RadialVelocity: unit.KmPerSec(25.9), HasRadialVelocity: true,
 		Aliases: []string{"* eps Ori", "HD  37128", "HIP 26311", "BD-01   969", "NAME Alnilam", "V* eps Ori"},

@@ -7,8 +7,8 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -129,7 +129,7 @@ type oppositionScan struct {
 // newOppositionScan picks the target's natural frame from its place at start:
 // about the Earth if it is inside the Earth's Hill sphere, where the Earth's
 // pull on it outweighs the Sun's tide, and about the Sun otherwise.
-func newOppositionScan(target Observable, sun MovingBody, start time.Time) (*oppositionScan, error) {
+func newOppositionScan(target Observable, sun MovingBody, start epoch.Time) (*oppositionScan, error) {
 	o := &oppositionScan{target: target, sun: sun}
 
 	body, ok := target.(MovingBody)
@@ -178,7 +178,7 @@ type oppositionSample struct {
 // of the two, whatever a and b are, so the alignment this scans for is the
 // apparent opposition to first order. rate and curv are the geometric
 // orbits', which the light time moves by parts in ten thousand.
-func (o *oppositionScan) sample(t time.Time) (oppositionSample, error) {
+func (o *oppositionScan) sample(t epoch.Time) (oppositionSample, error) {
 	tt1, tt2 := t.TT().JDParts()
 	rm := gofaext.Ecm06(tt1, tt2)
 	ecliptic := func(v vector.Vec3) vector.Vec3 {
@@ -240,14 +240,14 @@ func (o *oppositionScan) sample(t time.Time) (oppositionSample, error) {
 
 // find scans [start, end] for alignments and returns those that are
 // oppositions, refined on the apparent places.
-func (o *oppositionScan) find(start, end time.Time, solver Solver) ([]Event, error) {
+func (o *oppositionScan) find(start, end epoch.Time, solver Solver) ([]Event, error) {
 	const turn = 2 * math.Pi
 
 	tol := solver.Tolerance.Days()
 
 	var events []Event
 
-	keep := func(tr time.Time, s oppositionSample) error {
+	keep := func(tr epoch.Time, s oppositionSample) error {
 		if !s.beyond {
 			return nil
 		}
@@ -359,14 +359,14 @@ func (o *oppositionScan) find(start, end time.Time, solver Solver) ([]Event, err
 // crossed roots the alignment a step from t1 to t2 crossed, u running from u1
 // to u2 across a multiple of a turn, and returns it with the sample last taken
 // there.
-func (o *oppositionScan) crossed(t1, t2 time.Time, u1, u2, rate float64, solver Solver) (time.Time, oppositionSample, error) {
+func (o *oppositionScan) crossed(t1, t2 epoch.Time, u1, u2, rate float64, solver Solver) (epoch.Time, oppositionSample, error) {
 	const turn = 2 * math.Pi
 
 	zero := turn * math.Floor(math.Max(u1, u2)/turn)
 
 	var last oppositionSample
 
-	g := func(t time.Time) (float64, error) {
+	g := func(t epoch.Time) (float64, error) {
 		s, err := o.sample(t)
 		if err != nil {
 			return 0, err
@@ -388,8 +388,8 @@ func (o *oppositionScan) crossed(t1, t2 time.Time, u1, u2, rate float64, solver 
 // second order and the Sun's deflection of the light, a fraction of a second
 // of time, so a bracket of the solver's tolerance about tr seldom needs to
 // grow; when it does, it widens on both sides.
-func (o *oppositionScan) refine(tr time.Time, solver Solver) (Event, error) {
-	exact := func(t time.Time) (float64, error) {
+func (o *oppositionScan) refine(tr epoch.Time, solver Solver) (Event, error) {
+	exact := func(t epoch.Time) (float64, error) {
 		pos1, err := o.target.Position(t)
 		if err != nil {
 			return 0, fmt.Errorf("events: target position: %w", err)
@@ -502,7 +502,7 @@ func longitudeCurvatureBound(r, v vector.Vec3, mu float64) float64 {
 // on the ecliptic of date, in degrees within (−180, 180]: zero at a
 // conjunction in longitude. For an opposition it is measured from 180°
 // instead, so that it is zero there.
-func eclipticDifference(kind EventKind, pos1, pos2 coord.ICRS, t time.Time) float64 {
+func eclipticDifference(kind EventKind, pos1, pos2 coord.ICRS, t epoch.Time) float64 {
 	diff := wrap180(coord.ICRSToEcliptic(pos1, t).Lon().Degrees() - coord.ICRSToEcliptic(pos2, t).Lon().Degrees())
 
 	if kind == EventOpposition {

@@ -7,8 +7,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -41,7 +41,7 @@ import (
 // whatever Geometric has, the documented pipeline has too.
 func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	const (
 		dut1Seconds = 0.1237
@@ -54,7 +54,7 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 		tolerance = 0.01
 	)
 
-	time.RegisterModel(fixedEOP{
+	epoch.RegisterModel(fixedEOP{
 		dut1: dut1Seconds,
 		xp:   angle.Arcsec(xpArcsec).Radians(),
 		yp:   angle.Arcsec(ypArcsec).Radians(),
@@ -63,8 +63,8 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}
 
-	epoch := diurnalEpoch
-	tt1, tt2 := epoch.TT().JDParts()
+	at := diurnalEpoch
+	tt1, tt2 := at.TT().JDParts()
 	rc2i := gofaext.C2i06a(tt1, tt2)
 
 	// The observer's rotation velocity is due east, so this is the direction
@@ -77,12 +77,12 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		ctx, err := coord.NewContext(epoch, site, atm)
+		ctx, err := coord.NewContext(at, site, atm)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		reducer := mustReducer(t, site, epoch, atm)
+		reducer := mustReducer(t, site, at, atm)
 		diurabArcsec := expectedDiurnalArcsec(site.Lat().Radians(), site.Height().Meters())
 
 		var worst float64
@@ -157,9 +157,9 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 // property of light rather than of where the body is.
 func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
-	time.RegisterModel(fixedEOP{
+	epoch.RegisterModel(fixedEOP{
 		dut1: 0.1237,
 		xp:   angle.Arcsec(0.1834).Radians(),
 		yp:   angle.Arcsec(0.4021).Radians(),
@@ -173,14 +173,14 @@ func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	epoch := diurnalEpoch
+	at := diurnalEpoch
 
-	ctx, err := coord.NewContext(epoch, site, atm)
+	ctx, err := coord.NewContext(at, site, atm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	red := mustReducer(t, site, epoch, atm).Reduce(vector.V3(0.5, 0.3, 0.1))
+	red := mustReducer(t, site, at, atm).Reduce(vector.V3(0.5, 0.3, 0.1))
 
 	want := vector.V3(0.5, 0.3, 0.1).Sub(ctx.ObsVec())
 

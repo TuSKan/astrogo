@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // yallopObservation is one evening row of Table 4 of Yallop (1997), NAO
@@ -61,7 +61,7 @@ func TestCrescentVisibilityReproducesYallopTable4(t *testing.T) {
 		// Three hours before Yallop's best time: after the day's previous
 		// sunset, before this one.
 		best := 2400000 + o.jdNew + o.age/24
-		evening := time.FromJD(best-3.0/24, time.UTC)
+		evening := epoch.FromJD(best-3.0/24, epoch.UTC)
 
 		r, err := CrescentVisibility(site, evening, eph.Default())
 		if err != nil {

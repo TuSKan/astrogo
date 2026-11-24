@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // Attempt describes one HTTP attempt a [RetryPolicy] is asked to judge.

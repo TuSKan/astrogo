@@ -5,14 +5,15 @@ package validation_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
-// EOP needs no explicit load here: the time package pulls finals2000A lazily
+// EOP needs no explicit load here: the epoch package pulls finals2000A lazily
 // the first time an epoch conversion asks for it, so these tests are already
 // online by the time they convert anything. This file used to carry an empty
 // init saying so, which was a comment pretending to be code.
@@ -36,7 +37,7 @@ func TestPhase1ObserverPipelineAgainstHorizons(t *testing.T) {
 	tStrStop := "2024-11-01 12:01"
 
 	// Create the AstroGo native time
-	obsTime := time.Date(2024, 11, 1, 12, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2024, 11, 1, 12, 0, 0, 0, time.UTC)
 
 	// Fetch Topocentric Observer Table for Mars (NAIF ID: 499)
 	marsHorizons, err := fetchObserverTable("499", "Mars", site.Lon().Degrees(), site.Lat().Degrees(), site.Height().Meters(), tStrStart, tStrStop)

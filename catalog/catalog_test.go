@@ -9,8 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -179,7 +179,7 @@ func TestResolver_ProviderPriority(t *testing.T) {
 		"target": {
 			ID: "gaia-1", Aliases: []string{"shared"},
 			Coord: coord.NewICRS(angle.Deg(101.287155), angle.Deg(-16.716116)), HasCoord: true,
-			Epoch: time.J2000(),
+			Epoch: epoch.J2000(),
 			PmRA:  angle.Arcsec(-0.379), PmDec: angle.Arcsec(-1.303), Parallax: angle.Arcsec(0.379),
 		},
 	}}
@@ -245,7 +245,7 @@ func TestResolver_ProviderPriority(t *testing.T) {
 // since pairing these elements with a foreign epoch would be physically
 // wrong.
 func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
-	elementsEpoch := time.FromJDParts(2461200.5, 0, time.TDB)
+	elementsEpoch := epoch.FromJDParts(2461200.5, 0, epoch.TDB)
 
 	p1 := &mockProvider{name: "sbdb", targets: map[string]Target{
 		"target": {
@@ -259,12 +259,12 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 			MeanAnomaly:   angle.Deg(274),
 
 			PerihelionDistance: unit.AU(2.55),
-			PerihelionTime:     time.FromJDParts(2461599.841, 0, time.TDB),
+			PerihelionTime:     epoch.FromJDParts(2461599.841, 0, epoch.TDB),
 		},
 	}}
 	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
 		"target": {
-			ID: "simbad-1", Aliases: []string{"shared"}, Epoch: time.J2000(), // a different, unrelated epoch — must not win
+			ID: "simbad-1", Aliases: []string{"shared"}, Epoch: epoch.J2000(), // a different, unrelated epoch — must not win
 		},
 	}}
 
@@ -460,14 +460,14 @@ func TestMergeGroup_VMagPrecedence(t *testing.T) {
 // own, ranking VizieR above OpenNGC where Coord ranks it below, which paired
 // OpenNGC's J2000 position with a 2MASS row's 1997 observation date (#628).
 func TestMergeGroup_EpochFollowsCoord(t *testing.T) {
-	observed := time.FromJD(2450745.8589, time.UTC)
+	observed := epoch.FromJD(2450745.8589, epoch.UTC)
 
 	got := mergeGroup(group{candidates: []candidate{
 		{provider: "vizier", target: Target{
 			Coord: coord.NewICRS(angle.Deg(10.684737), angle.Deg(41.269035)), HasCoord: true, Epoch: observed,
 		}},
 		{provider: "openngc", target: Target{
-			Coord: coord.NewICRS(angle.Deg(10.684792), angle.Deg(41.269067)), HasCoord: true, Epoch: time.J2000(),
+			Coord: coord.NewICRS(angle.Deg(10.684792), angle.Deg(41.269067)), HasCoord: true, Epoch: epoch.J2000(),
 		}},
 	}})
 
@@ -475,7 +475,7 @@ func TestMergeGroup_EpochFollowsCoord(t *testing.T) {
 		t.Fatalf("Coord from %q, want openngc", got.Provenance["Coord"])
 	}
 
-	if got.Provenance["Epoch"] != "openngc" || !got.Epoch.Equal(time.J2000()) {
+	if got.Provenance["Epoch"] != "openngc" || !got.Epoch.Equal(epoch.J2000()) {
 		t.Errorf("Epoch = %v from %q, want OpenNGC's J2000 with OpenNGC's position", got.Epoch, got.Provenance["Epoch"])
 	}
 }
@@ -627,7 +627,7 @@ func TestResolver_CrossMatchByAlias(t *testing.T) {
 	p1 := &mockProvider{name: "gaia", targets: map[string]Target{
 		"sirius": {
 			ID: "gaia-1", Coord: coord.NewICRS(angle.Deg(101.28), angle.Deg(-16.71)),
-			HasCoord: true, Epoch: time.J2000(),
+			HasCoord: true, Epoch: epoch.J2000(),
 		},
 	}}
 	p2 := &mockProvider{name: "simbad", targets: map[string]Target{
@@ -703,10 +703,10 @@ func TestResolver_CrossMatchIDAgainstAlias(t *testing.T) {
 // the same epoch, merge via the positional fallback.
 func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.822), angle.Deg(-5.391)), HasCoord: true, Epoch: time.J2000()},
+		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.822), angle.Deg(-5.391)), HasCoord: true, Epoch: epoch.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
-		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), HasCoord: true, Epoch: time.J2000()},
+		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8221), angle.Deg(-5.3911)), HasCoord: true, Epoch: epoch.J2000()},
 	}}
 
 	r := &Resolver{
@@ -733,10 +733,10 @@ func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 // Targets, not be forced together.
 func TestResolver_CrossMatchByPosition_TooFarDoesNotMerge(t *testing.T) {
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
+		"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: epoch.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
-		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.82), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
+		"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.82), angle.Deg(-5.39)), HasCoord: true, Epoch: epoch.J2000()},
 	}}
 
 	r := &Resolver{
@@ -768,9 +768,9 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 	pmRA, pmDec := angle.Arcsec(1.0), angle.Arcsec(0)
 	parallax := angle.Arcsec(0.01)
 
-	laterEpoch := time.J2000().Add(unit.JulianYears(50))
+	laterEpoch := epoch.J2000().Add(unit.JulianYears(50))
 
-	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0, time.J2000())
+	base := coord.NewICRSWithKinematics(baseRA, baseDec, pmRA, pmDec, parallax, 0, epoch.J2000())
 
 	laterCoord, err := coord.PropagateEpoch(base, laterEpoch)
 	if err != nil {
@@ -782,7 +782,7 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 	}
 
 	p1 := &mockProvider{name: "p1", targets: map[string]Target{
-		"a": {ID: "P1", Name: "TestStar", Coord: base, HasCoord: true, Epoch: time.J2000()},
+		"a": {ID: "P1", Name: "TestStar", Coord: base, HasCoord: true, Epoch: epoch.J2000()},
 	}}
 	p2 := &mockProvider{name: "p2", targets: map[string]Target{
 		"b": {
@@ -815,11 +815,11 @@ func TestResolver_ConeSearchBridge_FoldsInAstrometry(t *testing.T) {
 	coneCoord := coord.NewICRS(angle.Deg(50.0001), angle.Deg(10.0001)) // ~0.5" from anchor
 
 	p1 := &mockProvider{name: "simbad", targets: map[string]Target{
-		"star": {ID: "S1", Name: "Star", Coord: anchor, HasCoord: true, Epoch: time.J2000()},
+		"star": {ID: "S1", Name: "Star", Coord: anchor, HasCoord: true, Epoch: epoch.J2000()},
 	}}
 
 	cs := &mockConeSearcher{targets: []Target{
-		{ID: "GAIA123", Coord: coneCoord, HasCoord: true, Epoch: time.J2000(), Parallax: angle.Arcsec(5)},
+		{ID: "GAIA123", Coord: coneCoord, HasCoord: true, Epoch: epoch.J2000(), Parallax: angle.Arcsec(5)},
 	}}
 
 	r := &Resolver{
@@ -909,10 +909,10 @@ func TestResolver_Search_RespectsCap(t *testing.T) {
 func TestResolver_Resolution_Configurable(t *testing.T) {
 	newResolver := func(threshold angle.Angle) *Resolver {
 		p1 := &mockProvider{name: "p1", targets: map[string]Target{
-			"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
+			"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: epoch.J2000()},
 		}}
 		p2 := &mockProvider{name: "p2", targets: map[string]Target{
-			"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8003), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
+			"b": {ID: "B2", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.8003), angle.Deg(-5.39)), HasCoord: true, Epoch: epoch.J2000()},
 		}}
 
 		return &Resolver{

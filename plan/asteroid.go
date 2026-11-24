@@ -7,8 +7,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	mag "github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -141,7 +141,7 @@ func (a *Asteroid) PhysicalRadius() (unit.Length, bool) {
 
 // Position returns the apparent ICRS sky position at time t — see
 // [apparentVec].
-func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
+func (a *Asteroid) Position(t epoch.Time) (coord.ICRS, error) {
 	icrs, err := apparentICRS(a.provider, a.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("asteroid %s: %w", a.name, err)
@@ -152,7 +152,7 @@ func (a *Asteroid) Position(t time.Time) (coord.ICRS, error) {
 
 // GeocentricVec returns the apparent geocentric position vector at time t —
 // see [apparentVec].
-func (a *Asteroid) GeocentricVec(t time.Time) (vector.Vec3, error) {
+func (a *Asteroid) GeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	v, err := apparentVec(a.provider, a.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("asteroid %s: %w", a.name, err)
@@ -168,7 +168,7 @@ func (a *Asteroid) GetDetails(ctx *coord.Context, over DetailOverrides) (*Target
 
 // ApparentMagnitude computes the apparent magnitude using the best available
 // model: sHG1G2 → HG1G2 → HG.
-func (a *Asteroid) ApparentMagnitude(t time.Time) (float64, error) {
+func (a *Asteroid) ApparentMagnitude(t epoch.Time) (float64, error) {
 	r, delta, alpha, st, err := a.helioGeometry(t)
 	if err != nil {
 		return 0, err
@@ -189,13 +189,13 @@ func (a *Asteroid) ApparentMagnitude(t time.Time) (float64, error) {
 }
 
 // ApparentMagnitudeCtx computes apparent magnitude (context variant).
-func (a *Asteroid) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, error) {
+func (a *Asteroid) ApparentMagnitudeCtx(t epoch.Time, _ *coord.Context) (float64, error) {
 	return a.ApparentMagnitude(t)
 }
 
 // helioGeometry computes heliocentric distance r, geocentric distance Δ,
 // and phase angle α.
-func (a *Asteroid) helioGeometry(t time.Time) (r, delta float64, alpha angle.Angle, st eph.State, err error) {
+func (a *Asteroid) helioGeometry(t epoch.Time) (r, delta float64, alpha angle.Angle, st eph.State, err error) {
 	in := eph.At(a.provider, t)
 
 	st, err = in.Geometric(a.id, eph.Earth)

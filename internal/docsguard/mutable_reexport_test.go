@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// allowedTimeVars is the complete inventory of exported package-level vars the
-// `time` package may hold, each with the reason Go leaves no alternative.
+// allowedEpochVars is the complete inventory of exported package-level vars the
+// `epoch` package may hold, each with the reason Go leaves no alternative.
 //
 // A var is reassignable by any importer, process-wide. In the package every
 // epoch calculation in the library passes through, that is worth spending a
 // line of justification on rather than letting one appear by habit.
-var allowedTimeVars = map[string]string{
-	// Sentinel errors re-exported from the unexported time/internal/iers, so
+var allowedEpochVars = map[string]string{
+	// Sentinel errors re-exported from the unexported epoch/internal/iers, so
 	// callers can errors.Is against them. An error value cannot be const, and
 	// the sentinel-plus-%w idiom is what CLAUDE.md asks for.
 	"ErrOutOfRange":  "sentinel error; error values cannot be const",
@@ -30,24 +30,22 @@ var allowedTimeVars = map[string]string{
 	"ErrLeapSecondConflict": "sentinel error; error values cannot be const",
 	"ErrLeapSecondOrder":    "sentinel error; error values cannot be const",
 
-	// The standard library declares `var UTC *Location = &utcLoc`, so a
-	// function would hand back the same reassignable pointer and remove
-	// nothing, at the cost of churning every call site.
-	//
-	// The last var on this list that is not a sentinel error, and the only one
-	// astrogo could not have avoided. J2000 was the other, and #113 turned it
-	// into a function: a struct value cannot be const, but a function that
-	// returns a copy of an unexported one cannot be reassigned either.
-	"LocationUTC": "wraps the standard library's own mutable time.UTC",
+	// Nothing on this list is anything but a sentinel error. LocationUTC was
+	// the last, wrapping the standard library's own mutable time.UTC, and went
+	// with every other re-export of the standard library. J2000 was another,
+	// and #113 turned it into a function: a struct value cannot be const, but
+	// a function that returns a copy of an unexported one cannot be
+	// reassigned either.
 }
 
-// TestTimeExportsNoMutableFunctionValues keeps the package that underpins
+// TestEpochExportsNoMutableFunctionValues keeps the package that underpins
 // every epoch in the library from re-exporting the standard library through
 // reassignable variables.
 //
 // # What was wrong
 //
-// Fifteen of `time`'s re-exports were declared `var Parse = time.Parse`,
+// Fifteen of this package's re-exports, when it was named `time`, were
+// declared `var Parse = time.Parse`,
 // `var Sleep = time.Sleep`, `var Now = time.Now` and so on, and the six layout
 // strings were a `var` block where the standard library has untyped constants.
 // Any package anywhere in the import graph could assign to any of them and
@@ -67,14 +65,14 @@ var allowedTimeVars = map[string]string{
 // The allow list is an inventory rather than an exclusion list: every entry
 // carries why Go offers no alternative, so adding one is a sentence somebody
 // has to write and a reviewer gets to disagree with.
-func TestTimeExportsNoMutableFunctionValues(t *testing.T) {
+func TestEpochExportsNoMutableFunctionValues(t *testing.T) {
 	t.Parallel()
 
-	dir := filepath.Join(repoRoot(t), "time")
+	dir := filepath.Join(repoRoot(t), "epoch")
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("read time/: %v", err)
+		t.Fatalf("read epoch/: %v", err)
 	}
 
 	fset := token.NewFileSet()
@@ -103,7 +101,7 @@ func TestTimeExportsNoMutableFunctionValues(t *testing.T) {
 		for _, name := range exportedVarNames(file) {
 			seen[name.Name] = true
 
-			if _, allowed := allowedTimeVars[name.Name]; allowed {
+			if _, allowed := allowedEpochVars[name.Name]; allowed {
 				continue
 			}
 
@@ -111,7 +109,7 @@ func TestTimeExportsNoMutableFunctionValues(t *testing.T) {
 				"  Any importer can reassign this, process-wide, in the package every epoch in "+
 				"the library goes through. Re-export a function AS a function — identical at "+
 				"every call site — and a constant value as a const. If it can be neither, add "+
-				"it to allowedTimeVars with the reason it cannot.",
+				"it to allowedEpochVars with the reason it cannot.",
 				fileName, fset.Position(name.Pos()).Line, name.Name)
 		}
 	}
@@ -120,13 +118,13 @@ func TestTimeExportsNoMutableFunctionValues(t *testing.T) {
 	// close that: the files were read, and every allowed name was actually
 	// found rather than the list guarding an empty set.
 	if parsed == 0 {
-		t.Fatal("scanned no files in time/; the guard is guarding nothing")
+		t.Fatal("scanned no files in epoch/; the guard is guarding nothing")
 	}
 
-	for name, why := range allowedTimeVars {
+	for name, why := range allowedEpochVars {
 		if !seen[name] {
-			t.Errorf("allowedTimeVars lists %s (%s) but the scan did not find it.\n"+
-				"  Either it was removed — shorten the list — or the scan is not reaching time/.",
+			t.Errorf("allowedEpochVars lists %s (%s) but the scan did not find it.\n"+
+				"  Either it was removed — shorten the list — or the scan is not reaching epoch/.",
 				name, why)
 		}
 	}

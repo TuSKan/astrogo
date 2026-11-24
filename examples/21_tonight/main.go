@@ -6,12 +6,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +22,7 @@ func main() {
 	// second, below the minute these times are read to. For full accuracy,
 	// blank-import remote/eop and consent to the IERS bulletin, as
 	// 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Two sites on two nights. Quinta Calixto in Brazil, in August, has every
 	// kind of night. Greenwich at midsummer has none darker than nautical:
@@ -52,7 +53,7 @@ func main() {
 
 		// Local noon names that date's evening: TonightAt gives the night
 		// under way at an instant, or the coming one in daylight.
-		noon := time.Date(n.year, n.month, n.day, 12, 0, 0, 0, zone)
+		noon := epoch.Date(n.year, n.month, n.day, 12, 0, 0, 0, zone)
 
 		tonight, err := plan.TonightAt(site, noon, eph.Default())
 		if err != nil {
@@ -64,8 +65,8 @@ func main() {
 }
 
 // printTonight shows one night, in the site's local time.
-func printTonight(site string, date time.Time, t plan.Tonight, zone *time.Location) {
-	clock := func(at time.Time) string { return at.In(zone).Format("15:04") }
+func printTonight(site string, date epoch.Time, t plan.Tonight, zone *time.Location) {
+	clock := func(at epoch.Time) string { return at.In(zone).Format("15:04") }
 
 	show.Title("Tonight at "+site, "the night of "+date.Format("2006-01-02"))
 
@@ -105,7 +106,7 @@ func printTonight(site string, date time.Time, t plan.Tonight, zone *time.Locati
 
 // eventClock is a Moon event's local time, or why there is none: the Moon
 // may not rise or set between sunset and sunrise.
-func eventClock(at *time.Time, clock func(time.Time) string) string {
+func eventClock(at *epoch.Time, clock func(epoch.Time) string) string {
 	if at == nil {
 		return "not tonight"
 	}

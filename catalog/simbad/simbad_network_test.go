@@ -5,6 +5,7 @@ package simbad
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // requireSimbad skips the test when the SIMBAD TAP endpoint is unreachable

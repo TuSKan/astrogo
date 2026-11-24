@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -14,12 +15,12 @@ import (
 // set at t, from skyfieldISSShadow's transitions, and how far t is from the
 // nearest of them. The ISS is sunlit before the first, which it enters
 // shadow at.
-func skyfieldSunlitAt(t time.Time) (sunlit bool, margin unit.Duration) {
+func skyfieldSunlitAt(t epoch.Time) (sunlit bool, margin unit.Duration) {
 	sunlit, margin = true, unit.Days(1)
 
 	for _, tr := range skyfieldISSShadow {
-		at := time.Date(2026, time.April, tr.day, tr.hour, tr.minute, tr.second,
-			int(tr.millisecond*1e6), time.LocationUTC)
+		at := epoch.Date(2026, time.April, tr.day, tr.hour, tr.minute, tr.second,
+			int(tr.millisecond*1e6), time.UTC)
 
 		margin = min(margin, t.Sub(at).Abs())
 
@@ -43,7 +44,7 @@ func TestSatellitePassEventsSayWhetherTheSatelliteIsSunlit(t *testing.T) {
 
 	sat, site := testISS(t)
 
-	start := time.Date(2026, time.April, 19, 12, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 19, 12, 0, 0, 0, time.UTC)
 
 	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, site), Window{Start: start, End: start.Add(unit.Days(1))}, WithMinElevation(angle.Deg(10)))
 	if err != nil {

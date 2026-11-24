@@ -3,10 +3,11 @@ package plan
 import (
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // detailValue returns the value on the line of s that starts with label,
@@ -30,7 +31,7 @@ func detailValue(s, label string) string {
 func TestStringAlignsItsValues(t *testing.T) {
 	t.Parallel()
 
-	rise := time.Date(2026, time.April, 25, 9, 20, 0, 0, time.LocationUTC)
+	rise := epoch.Date(2026, time.April, 25, 9, 20, 0, 0, time.UTC)
 	d := TargetDetails{
 		Name:           "Sun",
 		Description:    "Our local star",

@@ -9,8 +9,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // A caller without download consent can be given only what is already cached,

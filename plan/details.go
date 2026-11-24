@@ -10,7 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -26,9 +26,9 @@ type TargetDetails struct {
 	// that neither rises nor sets has no RiseTime or SetTime, and its
 	// TransitTime is its next culmination. RiseAzimuth, SetAzimuth and
 	// MaxElevation go with them.
-	SetTime        *time.Time
-	TransitTime    *time.Time
-	RiseTime       *time.Time
+	SetTime        *epoch.Time
+	TransitTime    *epoch.Time
+	RiseTime       *epoch.Time
 	AngularSize    string
 	Description    string
 	Source         string
@@ -67,7 +67,7 @@ type TargetDetails struct {
 }
 
 // detailsTimeLayout is how [TargetDetails.String] prints an event time: in
-// the time's own display zone (the Context's, through [time.Time.In]), with
+// the time's own display zone (the Context's, through [epoch.Time.In]), with
 // its date and that zone's name, for example "2026-04-25 06:20 -03".
 const detailsTimeLayout = "2006-01-02 15:04 MST"
 
@@ -265,7 +265,7 @@ func computeDetails(obs Observable, ctx *coord.Context, over DetailOverrides) (*
 
 // fillMovingBody computes topocentric AltAz, RA/Dec, distance, and elongation
 // for a target with an ephemeris provider, all from ctx's site.
-func fillMovingBody(d *TargetDetails, mb MovingBody, t time.Time, ctx *coord.Context) {
+func fillMovingBody(d *TargetDetails, mb MovingBody, t epoch.Time, ctx *coord.Context) {
 	in := eph.At(mb.Provider(), t)
 
 	topoVec, err := astrometricFromSite(in, mb, ctx)
@@ -567,7 +567,7 @@ func fillRiseSetTransit(d *TargetDetails, obs Observable, ctx *coord.Context) {
 // one after says which: a set means a pass in progress whose rise is out of
 // reach. With none at all, the target neither rises nor sets, and the pass
 // is its next culmination. Any of the three may be nil.
-func passAt(events []Event, t time.Time) (rise, transit, set *Event) {
+func passAt(events []Event, t epoch.Time) (rise, transit, set *Event) {
 	var last *Event
 
 	for i := range events {

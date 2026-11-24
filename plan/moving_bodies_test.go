@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -41,7 +42,7 @@ func newOppositionProvider(targetID eph.ID) *testEphProvider {
 
 var errUnknownTestBody = errors.New("testEphProvider: unknown body id")
 
-func (p *testEphProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+func (p *testEphProvider) Locate(id eph.ID, _ epoch.Time) (eph.State, error) {
 	switch id { //nolint:exhaustive // a stub serving the Earth, the Sun and one target; the default rejects the rest
 	case eph.Earth:
 		return geocentricMock(id, vector.Vec3{}, vector.Vec3{})
@@ -69,7 +70,7 @@ func testContext(t *testing.T) *coord.Context {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	return mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+	return mustContext(t, epoch.FromJD(2451545.0, epoch.UTC), loc, site.Refraction())
 }
 
 func TestAsteroid_HG_OppositionMagnitude(t *testing.T) {
@@ -78,7 +79,7 @@ func TestAsteroid_HG_OppositionMagnitude(t *testing.T) {
 	prov := newOppositionProvider(asteroidID)
 	a := NewAsteroid("Ceres", asteroidID, prov, WithHG(3.34, 0.12))
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	mag, err := a.ApparentMagnitude(tm)
 	if err != nil {
@@ -178,7 +179,7 @@ func TestAsteroid_HG1G2AndSHG1G2(t *testing.T) {
 	const asteroidID eph.ID = 2000002
 
 	prov := newOppositionProvider(asteroidID)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	hg1g2 := NewAsteroid("Test HG1G2", asteroidID, prov, WithHG1G2(10.0, 0.3, 0.2))
 
@@ -212,7 +213,7 @@ func TestAsteroid_PositionAndGetDetails(t *testing.T) {
 	prov := newOppositionProvider(asteroidID)
 	a := NewAsteroid("Test Asteroid", asteroidID, prov, WithHG(15.0, 0.15))
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	icrs, err := a.Position(tm)
 	if err != nil {
@@ -252,12 +253,12 @@ func TestAsteroid_PositionAndGetDetails(t *testing.T) {
 // any other provider (there is no separate "from elements" constructor
 // — see plan.FromCatalog for the automatic version of this same wiring).
 func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	// Illustrative main-belt-asteroid-like elements (roughly Ceres'
 	// real values) — precision doesn't matter here, only that the
 	// plumbing produces a real, non-degenerate result.
-	el, err := eph.NewElements(epoch, unit.AU(2.77), 0.076,
+	el, err := eph.NewElements(at, unit.AU(2.77), 0.076,
 		angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(0))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -278,11 +279,11 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 		t.Errorf("EphID = %v, want keplerSyntheticID (%v)", a.EphID(), keplerSyntheticID)
 	}
 
-	if _, err := a.Position(epoch); err != nil {
+	if _, err := a.Position(at); err != nil {
 		t.Fatalf("Position: %v", err)
 	}
 
-	vec, err := a.GeocentricVec(epoch)
+	vec, err := a.GeocentricVec(at)
 	if err != nil {
 		t.Fatalf("GeocentricVec: %v", err)
 	}
@@ -310,7 +311,7 @@ func TestNewAsteroid_KeplerBackedProvider(t *testing.T) {
 }
 
 func TestNewElements_RejectsHyperbolicEccentricity(t *testing.T) {
-	_, err := eph.NewElements(time.FromJD(2451545.0, time.UTC), 2.77, 1.2, // hyperbolic — a semi-major axis and mean anomaly describe an ellipse only
+	_, err := eph.NewElements(epoch.FromJD(2451545.0, epoch.UTC), 2.77, 1.2, // hyperbolic — a semi-major axis and mean anomaly describe an ellipse only
 		angle.Zero(), angle.Zero(), angle.Zero(), angle.Zero())
 	if err == nil {
 		t.Fatal("NewElements: expected error for hyperbolic eccentricity, got nil")
@@ -323,7 +324,7 @@ func TestComet_ApparentMagnitudeAndDetails(t *testing.T) {
 	prov := newOppositionProvider(cometID)
 	c := NewComet("Test Comet", cometID, prov, 6.0, 10.0, WithNuclearMagnitude(11.0, 5.0, 0.03))
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	m, err := c.ApparentMagnitude(tm)
 	if err != nil {
@@ -399,7 +400,7 @@ func TestGenericBody_PositionAndDetails(t *testing.T) {
 		t.Error("Provider() did not return the constructor-supplied provider")
 	}
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	icrs, err := g.Position(tm)
 	if err != nil {
@@ -441,7 +442,7 @@ func TestGenericBody_PositionError(t *testing.T) {
 	prov := newOppositionProvider(9999999) // provider only knows a different ID
 	g := NewGenericBody("Broken Body", bodyID, prov)
 
-	if _, err := g.Position(time.FromJD(2451545.0, time.UTC)); err == nil {
+	if _, err := g.Position(epoch.FromJD(2451545.0, epoch.UTC)); err == nil {
 		t.Error("expected an error when the provider doesn't recognize the body's ID")
 	}
 }

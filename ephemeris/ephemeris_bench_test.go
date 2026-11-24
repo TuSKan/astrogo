@@ -2,16 +2,17 @@ package ephemeris_test
 
 import (
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
-// benchEpoch is fixed, not time.NowUTC: a benchmark whose result depends on the
+// benchEpoch is fixed, not epoch.Now: a benchmark whose result depends on the
 // day it is run cannot be compared with the one before it.
-func benchEpoch() time.Time {
-	return time.Date(2026, time.March, 20, 22, 0, 0, 0, time.LocationUTC)
+func benchEpoch() epoch.Time {
+	return epoch.Date(2026, time.March, 20, 22, 0, 0, 0, time.UTC)
 }
 
 func BenchmarkStateSun(b *testing.B) {

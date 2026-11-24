@@ -2,7 +2,7 @@ package vizier
 
 import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // tableSchema describes a VizieR table's ADQL column names for the fields
@@ -24,7 +24,7 @@ type tableSchema struct {
 	// Gaia DR3 J2016.0), so this cannot be a single package-wide constant.
 	// A cone's center is moved to it before the query, and every row is
 	// stamped with it unless EpochCol names the row's own.
-	Epoch time.Time
+	Epoch epoch.Time
 	// EpochCol, when set, is a column holding each row's own epoch as a
 	// Julian date, for a table whose positions were never moved to one
 	// epoch: 2MASS's are where each source was when it was observed,
@@ -44,9 +44,9 @@ var (
 	// The "raj2000"/"dej2000" column names state the J2000 equinox and frame,
 	// not an epoch, and every row used to be stamped J2000 on their strength
 	// (#628).
-	epoch2MASS     = time.J2000()
-	epochHipparcos = time.FromJD(2448349.0625, time.TT) // J1991.25, the Hipparcos catalog's own reference epoch
-	epochGaiaDR3   = time.FromJD(2457389.0, time.TT)    // J2016.0 = 2451545.0 + 16 x 365.25, Gaia DR3's reference epoch (#611)
+	epoch2MASS     = epoch.J2000()
+	epochHipparcos = epoch.FromJD(2448349.0625, epoch.TT) // J1991.25, the Hipparcos catalog's own reference epoch
+	epochGaiaDR3   = epoch.FromJD(2457389.0, epoch.TT)    // J2016.0 = 2451545.0 + 16 x 365.25, Gaia DR3's reference epoch (#611)
 )
 
 // tableSchemas is the registry of VizieR tables ConeSearch knows how to

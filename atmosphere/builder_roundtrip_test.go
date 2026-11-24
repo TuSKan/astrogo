@@ -3,10 +3,10 @@ package atmosphere_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +33,7 @@ func (h flatHorizon) AltitudeAt(_ angle.Angle) angle.Angle { return angle.Angle(
 func TestBuilderRoundTripsEveryField(t *testing.T) {
 	t.Parallel()
 
-	issued := time.GoDate(2026, time.March, 20, 3, 30, 0, 0, time.LocationUTC)
+	issued := time.Date(2026, time.March, 20, 3, 30, 0, 0, time.UTC)
 	horizon := flatHorizon(angle.Deg(7.5))
 
 	cloud := atmosphere.CloudLayer{

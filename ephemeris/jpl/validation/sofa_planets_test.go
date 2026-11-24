@@ -8,13 +8,14 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // planetSeries is one row of SOFA's own published error table for Plan94,
@@ -141,11 +142,6 @@ func (p planetSeries) contract() metrology.Contract {
 		"gofa ephem.go, Plan94 note 5, maximum absolute differences against DE200")
 }
 
-// isoDate is the layout for a sample label. Spelled out rather than taken
-// from the standard library, which this module does not import outside its
-// own time package.
-const isoDate = "2006-01-02"
-
 // planetEpochs samples the interval SOFA's table is quoted over.
 //
 // Quarterly rather than at three named instants, because a maximum over three
@@ -193,7 +189,7 @@ const isoDate = "2006-01-02"
 // The window still ends at 2100, the table's own limit: sampling past it would
 // measure against a bound that was never claimed there. 1800 is that same
 // limit at the other end.
-func planetEpochs() []time.Time {
+func planetEpochs() []epoch.Time {
 	const (
 		firstYear = 1800
 		lastYear  = 2100
@@ -201,11 +197,11 @@ func planetEpochs() []time.Time {
 
 	quarters := []time.Month{time.January, time.April, time.July, time.October}
 
-	out := make([]time.Time, 0, (lastYear-firstYear+1)*len(quarters))
+	out := make([]epoch.Time, 0, (lastYear-firstYear+1)*len(quarters))
 
 	for y := firstYear; y <= lastYear; y++ {
 		for _, mo := range quarters {
-			out = append(out, time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC))
+			out = append(out, epoch.Date(y, mo, 1, 0, 0, 0, 0, time.UTC))
 		}
 	}
 
@@ -258,12 +254,12 @@ func TestSOFAPlanetsAgainstDE440(t *testing.T) {
 			for _, at := range planetEpochs() {
 				want, werr := eph.At(p, at).Geometric(body.id, core.Earth)
 				if werr != nil {
-					t.Fatalf("DE440 State(%s) at %s: %v", body.id, at.Format(isoDate), werr)
+					t.Fatalf("DE440 State(%s) at %s: %v", body.id, at.Format(time.DateOnly), werr)
 				}
 
 				got, gerr := eph.At(sofa, at).Geometric(body.id, core.Earth)
 				if gerr != nil {
-					t.Fatalf("SOFA State(%s) at %s: %v", body.id, at.Format(isoDate), gerr)
+					t.Fatalf("SOFA State(%s) at %s: %v", body.id, at.Format(time.DateOnly), gerr)
 				}
 
 				diff := got.Pos.Sub(want.Pos).Norm()
@@ -272,7 +268,7 @@ func TestSOFAPlanetsAgainstDE440(t *testing.T) {
 					Error: diff,
 					Label: body.id.String(),
 					Context: fmt.Sprintf("%s, |DE440 - SOFA| = %.0f km",
-						at.Format(isoDate), diff*kmPerAU),
+						at.Format(time.DateOnly), diff*kmPerAU),
 				})
 			}
 
@@ -333,7 +329,7 @@ func TestNoTimekeepingStepAtTheLeapSecondBoundary(t *testing.T) {
 		var worst float64
 
 		for mo := 1; mo <= 12; mo++ {
-			at := time.Date(year, time.Month(mo), 1, 0, 0, 0, 0, time.LocationUTC)
+			at := epoch.Date(year, time.Month(mo), 1, 0, 0, 0, 0, time.UTC)
 
 			want, werr := eph.At(p, at).Geometric(core.Sun, core.Earth)
 			if werr != nil {
@@ -380,7 +376,7 @@ func TestNoTimekeepingStepAtTheLeapSecondBoundary(t *testing.T) {
 	if before > 3*after {
 		t.Errorf("residual jumps from %.1f km in %d to %.1f km in %d, a factor of %.1f.\n"+
 			"  That is a timekeeping term returning, not a series error — check that "+
-			"epochs before the DELTA_AT table still delegate to time's historical "+
+			"epochs before the DELTA_AT table still delegate to epoch's historical "+
 			"delta-T rather than being given no offset at all.",
 			after, firstLeapSecondYear, before, firstLeapSecondYear-1, before/after)
 	}

@@ -2,13 +2,13 @@ package skybrightness_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // sceneWithPressure builds two scenes that differ only in surface conditions.
@@ -29,7 +29,7 @@ func sceneWithPressure(t *testing.T, loc *coord.Geodetic, hPa, kelvin float64) *
 
 	return &skybrightness.Scene{
 		Observer:   loc,
-		Time:       time.GoDate(2026, 3, 20, 5, 0, 0, 0, time.LocationUTC),
+		Time:       time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}

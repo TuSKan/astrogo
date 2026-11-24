@@ -6,7 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -20,12 +20,12 @@ import (
 // motion in the Target's own fields. That is the whole point of the test —
 // a propagation that reads the motion from Coord moves nothing.
 
-var gaiaDR3Epoch = time.FromJD(2457389.0, time.TT)
+var gaiaDR3Epoch = epoch.FromJD(2457389.0, epoch.TT)
 
 func simbadRow(id string, ra, dec, pmRAmas, pmDecmas, plxmas, rvkms float64) resolve.Target {
 	return resolve.Target{
 		ID: id, Name: id, Catalog: "SIMBAD", Kind: resolve.KindStar,
-		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)), HasCoord: true, Epoch: time.J2000(),
+		Coord: coord.NewICRS(angle.Deg(ra), angle.Deg(dec)), HasCoord: true, Epoch: epoch.J2000(),
 		PmRA: angle.Arcsec(pmRAmas / 1000), PmDec: angle.Arcsec(pmDecmas / 1000),
 		Parallax: angle.Arcsec(plxmas / 1000), RadialVelocity: unit.KmPerSec(rvkms), HasRadialVelocity: true,
 	}
@@ -57,7 +57,7 @@ func TestMatchAppliesTheTargetsOwnProperMotion(t *testing.T) {
 	twoMASSBarnard := resolve.Target{
 		ID: "2MASS J17574849+0441405", Name: "2MASS J17574849+0441405", Catalog: "2MASS", Kind: resolve.KindStar,
 		Coord:    coord.NewICRS(angle.Deg(269.452044), angle.Deg(4.694597)),
-		HasCoord: true, Epoch: time.FromJD(2451692.9284, time.TT),
+		HasCoord: true, Epoch: epoch.FromJD(2451692.9284, epoch.TT),
 	}
 
 	for _, c := range []struct {

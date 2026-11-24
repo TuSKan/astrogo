@@ -3,12 +3,13 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -25,7 +26,7 @@ import (
 // each one by more than 0.1″, so it cannot pass on inputs that were zeroed.
 func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	const (
 		dut1Seconds = 0.1237
@@ -38,7 +39,7 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 		kinematicFloorArcsec = 0.1
 	)
 
-	time.RegisterModel(fixedEOP{
+	epoch.RegisterModel(fixedEOP{
 		dut1: dut1Seconds,
 		xp:   angle.Arcsec(xpArcsec).Radians(),
 		yp:   angle.Arcsec(ypArcsec).Radians(),
@@ -69,9 +70,9 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 		{"Mauna Kea", -155.4681, 19.8207, 4205},
 	}
 
-	epochs := []time.Time{
-		time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.August, 21, 2, 17, 43, 250000000, time.LocationUTC),
+	epochs := []epoch.Time{
+		epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.August, 21, 2, 17, 43, 250000000, time.UTC),
 	}
 
 	for _, s := range sites {
@@ -80,20 +81,20 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		for _, epoch := range epochs {
-			ctx, err := coord.NewContext(epoch, site, atm)
+		for _, at := range epochs {
+			ctx, err := coord.NewContext(at, site, atm)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			utc1, utc2 := epoch.UTC().JDParts()
+			utc1, utc2 := at.UTC().JDParts()
 
 			for _, st := range stars {
 				ra, dec := angle.Deg(st.raDeg), angle.Deg(st.decDeg)
 				pmRA, pmDec := angle.Arcsec(st.pmRAmas/1000), angle.Arcsec(st.pmDecmas/1000)
 				px := angle.Arcsec(st.pxmas / 1000)
 
-				got, err := ctx.ICRSToAltAz(coord.NewICRSWithKinematics(ra, dec, pmRA, pmDec, px, unit.KmPerSec(st.rvKmS), time.J2000()))
+				got, err := ctx.ICRSToAltAz(coord.NewICRSWithKinematics(ra, dec, pmRA, pmDec, px, unit.KmPerSec(st.rvKmS), epoch.J2000()))
 				if err != nil {
 					t.Fatalf("%s: ICRSToAltAz: %v", st.name, err)
 				}
@@ -118,7 +119,7 @@ func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 				want := atco(pmRA.Radians()/math.Cos(dec.Radians()), pmDec.Radians(), px.Arcseconds(), st.rvKmS)
 				static := atco(0, 0, 0, 0)
 
-				label := st.name + " @ " + s.name + " " + epoch.Format("2006-01-02")
+				label := st.name + " @ " + s.name + " " + at.Format("2006-01-02")
 
 				if moved := horizonSeparationArcsec(want, static); moved < kinematicFloorArcsec {
 					t.Fatalf("%s: the kinematics move the star %.3f″ in SOFA, under %.1f″; the test would not see them",

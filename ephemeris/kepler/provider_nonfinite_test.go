@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Locate refuses a NaN or infinite time before choosing between registered
@@ -24,12 +24,12 @@ func TestLocateRefusesANonFiniteTime(t *testing.T) {
 	// The Sun and the Moon come from the SOFA base, Pluto's barycenter from
 	// the registered elements.
 	for _, id := range []core.ID{core.Sun, core.Moon, core.PlutoBarycenter} {
-		if _, err := p.Locate(id, time.FromJD(2451545.0, time.TT)); err != nil {
+		if _, err := p.Locate(id, epoch.FromJD(2451545.0, epoch.TT)); err != nil {
 			t.Fatalf("%v at J2000: %v, want an answer", id, err)
 		}
 
 		for name, jd := range map[string]float64{"NaN": math.NaN(), "+Inf": math.Inf(1), "-Inf": math.Inf(-1)} {
-			st, err := p.Locate(id, time.FromJD(jd, time.TT))
+			st, err := p.Locate(id, epoch.FromJD(jd, epoch.TT))
 			if !errors.Is(err, kepler.ErrNonFiniteTime) {
 				t.Errorf("%v at JD %s: position %v, err %v, want ErrNonFiniteTime", id, name, st.Pos, err)
 			}

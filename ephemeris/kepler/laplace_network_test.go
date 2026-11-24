@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -152,7 +152,7 @@ func TestGalileanAgainstHorizons(t *testing.T) {
 		}
 
 		for jd, refPos := range want {
-			pos, _, err := el.StateAt(time.FromJD(jd, time.TDB))
+			pos, _, err := el.StateAt(epoch.FromJD(jd, epoch.TDB))
 			if err != nil {
 				t.Errorf("%s: StateAt: %v", s.name, err)
 

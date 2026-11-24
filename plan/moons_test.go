@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestPlanetaryMoonsTableIntegrity guards moonSpecs against copy-paste
@@ -72,7 +72,7 @@ func TestPlanetaryMoon_ParentAndEmbedding(t *testing.T) {
 	const moonID eph.ID = 501 // Io's real NAIF ID
 
 	prov := newOppositionProvider(moonID)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	moon, err := NewPlanetaryMoon("Io", prov)
 	if err != nil {

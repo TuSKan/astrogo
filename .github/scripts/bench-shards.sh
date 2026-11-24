@@ -18,12 +18,12 @@
 # # How they are balanced
 #
 # By that run's seconds per package: coord 191, plan 189, skybrightness 161,
-# time 86, angle 54, vector 43, ephemeris/kepler 14, and 250 for everything
-# else.
+# epoch 86 (then named time), angle 54, vector 43, ephemeris/kepler 14, and
+# 250 for everything else.
 #
 #	coord-angle   coord, angle                    245 s
 #	plan          plan, vector, ephemeris/kepler   246 s
-#	sky-time      skybrightness, time              247 s
+#	sky-epoch     skybrightness, epoch             247 s
 #	rest          everything else                  250 s
 #
 # rest is every package the named shards leave out, read from go list, so a new
@@ -39,14 +39,14 @@ set -euo pipefail
 readonly module="github.com/TuSKan/astrogo"
 
 # The named shards, in matrix order. rest is appended after them.
-readonly named_shards=(coord-angle plan sky-time)
+readonly named_shards=(coord-angle plan sky-epoch)
 
 # shard_members prints a named shard's packages, relative to the module.
 shard_members() {
 	case "$1" in
 	coord-angle) echo coord angle ;;
 	plan) echo plan vector ephemeris/kepler ;;
-	sky-time) echo skybrightness time ;;
+	sky-epoch) echo skybrightness epoch ;;
 	*) return 1 ;;
 	esac
 }

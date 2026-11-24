@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // Write encodes f as a FITS stream.

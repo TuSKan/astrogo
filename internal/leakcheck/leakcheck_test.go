@@ -4,9 +4,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/leakcheck"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // settle is how long these tests will wait for a goroutine to park.

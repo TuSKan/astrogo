@@ -3,13 +3,14 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -94,7 +95,7 @@ func TestConstraintAndDetailsAgreeOnAltitude(t *testing.T) {
 			// A full day, so the comparison spans rising, transit and setting
 			// rather than one lucky geometry.
 			for hour := range 24 {
-				when := time.Date(2026, time.March, 20, hour, 0, 0, 0, time.LocationUTC)
+				when := epoch.Date(2026, time.March, 20, hour, 0, 0, 0, time.UTC)
 
 				ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
 				if err != nil {
@@ -147,7 +148,7 @@ func TestMoonParallaxIsActuallyApplied(t *testing.T) {
 	var maxSeen float64
 
 	for hour := range 24 {
-		when := time.Date(2026, time.March, 20, hour, 0, 0, 0, time.LocationUTC)
+		when := epoch.Date(2026, time.March, 20, hour, 0, 0, 0, time.UTC)
 
 		// No atmosphere, so refraction cancels exactly and the difference is
 		// parallax alone.

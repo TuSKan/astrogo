@@ -8,9 +8,9 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrAsyncJob reports that an asynchronous TAP job did not produce a result.

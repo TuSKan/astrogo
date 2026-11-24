@@ -370,7 +370,7 @@ func TestEnsureLoadedRejectsWhatIsNotTheTable(t *testing.T) {
 // transient outage or a consent gate granted a moment later disables this
 // provider permanently. catalog/openngc had the same shape and #191 called it
 // worse than a per-query failure, precisely because it is invisible and cannot
-// recover; time/internal/iers takes the middle path with a retry cooldown.
+// recover; epoch/internal/iers takes the middle path with a retry cooldown.
 //
 // The trade-off here is not the same, since SSOFT is a bulk download rather
 // than two CSVs, so this is filed as #215 rather than changed under a coverage

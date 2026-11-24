@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -27,7 +27,7 @@ func ExamplePlanner_Observable() {
 	obj := NewStar("Arp 220", angle.Deg(233.738), angle.Deg(23.503))
 
 	// Fixed time: Equinox 2000 midnight (T=0.5).
-	t := time.FromJD(2451545.5, time.UTC)
+	t := epoch.FromJD(2451545.5, epoch.UTC)
 
 	visible, _ := planner.Observable(obj, t)
 	if visible {
@@ -44,7 +44,7 @@ func ExampleObservableWindows() {
 	// Target at Zenith initially (J2000 Noon LST ~18.69h)
 	obj := NewStar("ZenithTarget", angle.Hour(18.69), angle.Zero())
 
-	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
+	start := epoch.FromJD(2451545.0, epoch.UTC) // J2000 Noon
 	end := start.Add(unit.Hours(6))
 	step := unit.Minutes(10) // ≤ 15min
 
@@ -63,7 +63,7 @@ func ExampleObservableWindows() {
 
 func ExampleRankObservables() {
 	site, _ := NewSite("Test", angle.LatDeg(0), angle.LonDeg(0), unit.Meters(0))
-	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000 Noon
 
 	obj1 := NewStar("NearZenith", angle.Hour(18.69), angle.Deg(0))
 	obj2 := NewStar("Lower", angle.Hour(18.69), angle.Deg(45))

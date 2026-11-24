@@ -7,6 +7,7 @@ import (
 	"math"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -14,7 +15,7 @@ import (
 	"github.com/TuSKan/astrogo/internal/parallel"
 	"github.com/TuSKan/astrogo/vector"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +34,7 @@ func NewPlanner(site *Site, constraints []Constraint) (*Planner, error) {
 }
 
 // Observable returns true if all constraints are satisfied for obj at time t.
-func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
+func (p *Planner) Observable(obj Observable, t epoch.Time) (bool, error) {
 	eval, err := IsObservable(obj, p.Site, t, p.Constraints...)
 	if err != nil {
 		return false, err
@@ -44,7 +45,7 @@ func (p *Planner) Observable(obj Observable, t time.Time) (bool, error) {
 
 // FilterObservable returns the subset of objects that satisfy all constraints
 // at the given time. Objects are evaluated concurrently.
-func (p *Planner) FilterObservable(objects []Observable, t time.Time) ([]Observable, error) {
+func (p *Planner) FilterObservable(objects []Observable, t epoch.Time) ([]Observable, error) {
 	results, err := parallel.Map(objects, 0, func(_ int, obj Observable) (bool, error) {
 		return p.Observable(obj, t)
 	})
@@ -163,7 +164,7 @@ type Evaluation struct {
 func IsObservable(
 	obj Observable,
 	site *Site,
-	t time.Time,
+	t epoch.Time,
 	constraints ...Constraint,
 ) (Evaluation, error) {
 	eval, err := isObservableCtx(obj, t, site, nil, nil, constraints...)
@@ -177,7 +178,7 @@ func IsObservable(
 // If ctx is non-nil it is reused; otherwise a new Context is created.
 func isObservableCtx(
 	obj Observable,
-	t time.Time,
+	t epoch.Time,
 	site *Site,
 	ctx *coord.Context,
 	sky *runSky,
@@ -310,7 +311,7 @@ const moonPosCacheSize = 32
 // moonPosEntry is the cached Moon position for one epoch: its apparent
 // geocentric vector, which each site turns into its own direction.
 type moonPosEntry struct {
-	t   time.Time
+	t   epoch.Time
 	vec vector.Vec3
 }
 
@@ -319,17 +320,17 @@ type moonPosEntry struct {
 // time.
 var moonSepCache = struct {
 	mu      sync.Mutex
-	entries map[time.Time]*list.Element // time.Time is a comparable value type
-	order   *list.List                  // front = most recently used
+	entries map[epoch.Time]*list.Element // epoch.Time is a comparable value type
+	order   *list.List                   // front = most recently used
 }{
-	entries: make(map[time.Time]*list.Element, moonPosCacheSize),
+	entries: make(map[epoch.Time]*list.Element, moonPosCacheSize),
 	order:   list.New(),
 }
 
 // getMoonGeocentricVec returns the Moon's apparent geocentric vector,
 // caching per-epoch. It is a vector rather than a direction because the
 // direction depends on the site (see topocentricPosition).
-func getMoonGeocentricVec(t time.Time) (vector.Vec3, error) {
+func getMoonGeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	moonSepCache.mu.Lock()
 
 	if el, ok := moonSepCache.entries[t]; ok {
@@ -397,7 +398,7 @@ var urgencyProbes = [...]unit.Duration{
 // leave ctx where the caller has it. They were five full Contexts per score
 // (#481); SetTime holds every probe to ≲0.007″ of a full Context, against an
 // interpolation whose own error is degrees.
-func estimateHoursUntilSet(obj Observable, t time.Time, ctx *coord.Context, currentAlt float64) float64 {
+func estimateHoursUntilSet(obj Observable, t epoch.Time, ctx *coord.Context, currentAlt float64) float64 {
 	// If already below horizon, urgency is maximum.
 	if currentAlt <= 0 {
 		return 0
@@ -482,10 +483,10 @@ type Scorer struct {
 // return was a miss: a 100-block schedule needed the Moon at 100 instants and
 // computed it 2,100 times (#959). The run knows its own instants, so it keeps
 // them; a failure is returned and never kept.
-type moonPlaces map[time.Time]vector.Vec3
+type moonPlaces map[epoch.Time]vector.Vec3
 
 // at is the Moon's vector at t, computed once per run.
-func (m moonPlaces) at(t time.Time) (vector.Vec3, error) {
+func (m moonPlaces) at(t epoch.Time) (vector.Vec3, error) {
 	if v, ok := m[t]; ok {
 		return v, nil
 	}
@@ -513,7 +514,7 @@ func (m moonPlaces) at(t time.Time) (vector.Vec3, error) {
 // The weighted composite is multiplied by the target's priority if it
 // implements the Prioritized interface. A target failing any constraint scores
 // zero.
-func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
+func (s Scorer) Score(obj Observable, t epoch.Time) (float64, error) {
 	ctx := s.Context
 	if ctx == nil {
 		var err error
@@ -591,7 +592,7 @@ func (s Scorer) Score(obj Observable, t time.Time) (float64, error) {
 
 // moonAt is the Moon's vector at t: from the scheduling run's own record when
 // the Scorer carries one, from the process-wide cache otherwise.
-func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
+func (s Scorer) moonAt(t epoch.Time) (vector.Vec3, error) {
 	if s.sky != nil && s.sky.moon != nil {
 		return s.sky.moon.at(t)
 	}
@@ -610,7 +611,7 @@ func (s Scorer) moonAt(t time.Time) (vector.Vec3, error) {
 func RankObservables(
 	objs []Observable,
 	site *Site,
-	t time.Time,
+	t epoch.Time,
 	constraints ...Constraint,
 ) ([]ScoredTarget, error) {
 	// Nothing to score needs no Context, and no site.
@@ -703,10 +704,10 @@ func ObservableWindows(
 // supplied by ctxAt, for the reason visibleIntervals gives.
 func observableWindows(
 	obj Observable,
-	start, end time.Time,
+	start, end epoch.Time,
 	step unit.Duration,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	constraints ...Constraint,
 ) ([]Window, error) {
 	// For the reason visibleIntervals checks it (#996).
@@ -732,7 +733,7 @@ func observableWindows(
 	// that failed mid-bisection did not drop the window, it moved the refined
 	// boundary, and the caller got a rise or set time that was quietly wrong
 	// rather than absent.
-	checkObs := func(t time.Time) (bool, error) {
+	checkObs := func(t epoch.Time) (bool, error) {
 		eval, err := isObservableCtx(obj, t, site, ctxAt(t), nil, constraints...)
 		if err != nil {
 			return false, fmt.Errorf("plan: observability at %s: %w",
@@ -747,8 +748,8 @@ func observableWindows(
 	inWindow := false
 
 	var (
-		windowStart time.Time
-		prevT       time.Time
+		windowStart epoch.Time
+		prevT       epoch.Time
 	)
 
 	hasPrev := false

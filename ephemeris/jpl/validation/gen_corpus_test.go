@@ -14,9 +14,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // updateCorpus gates every write to the checked-in corpus.

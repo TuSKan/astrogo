@@ -2,10 +2,11 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -23,7 +24,7 @@ func TestSwapOptimizedStrategy(t *testing.T) {
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
-	start := time.ZeroTime()
+	start := epoch.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 1.0}
@@ -92,7 +93,7 @@ func TestSwapOptimizedGapInsertion(t *testing.T) {
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
-	start := time.ZeroTime()
+	start := epoch.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	// B1 always fails constraints → will be unscheduled by greedy
@@ -198,7 +199,7 @@ func TestSwapOptimizedWithNilBase(t *testing.T) {
 
 	tm := &BasicTransitionModel{BaseSetup: 0}
 
-	start := time.ZeroTime()
+	start := epoch.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T1", angle.Zero(), angle.Zero()), Duration: unit.Minutes(20), Priority: 1.0}
@@ -228,7 +229,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 		Priority: 2.0,
 	}
 
-	start := time.ZeroTime()
+	start := epoch.ZeroTime()
 	score := scoreBlockPlacement(b, start, start.Add(unit.Minutes(20)), planner, plannerContexts(t, planner, start), nil)
 	t.Logf("Score for mock block: %.2f", score)
 
@@ -240,7 +241,7 @@ func TestScoreBlockPlacement(t *testing.T) {
 
 // scheduleBase is an arbitrary but *real* epoch for schedule arithmetic tests.
 //
-// These used to start from time.ZeroTime(), which is FromJD(0, UTC) — a
+// These used to start from epoch.ZeroTime(), which is FromJD(0, UTC) — a
 // zero-value sentinel, not a valid UTC epoch. It is Julian Date 0, in the year
 // −4712, where the Espenak & Meeus ΔT polynomial reads 135,943 s and drifts
 // 0.144 s per hour. Since Time.Sub measures physical elapsed time rather than
@@ -251,8 +252,8 @@ func TestScoreBlockPlacement(t *testing.T) {
 // Any ordinary epoch avoids it: ΔAT is piecewise constant, so within a window
 // that crosses no leap second, label arithmetic and physical arithmetic agree
 // exactly.
-func scheduleBase() time.Time {
-	return time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+func scheduleBase() epoch.Time {
+	return epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 }
 
 // TestTabuTenureResolvesEachCase holds TabuTenure to its doc (#733): the zero

@@ -18,9 +18,9 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestAstrometricAgreesWithHorizonsGeocentric compares astrogo's astrometric
@@ -158,9 +158,9 @@ func TestAstrometricAgreesWithHorizonsGeocentric(t *testing.T) {
 		var bodySeparations []float64
 
 		for _, row := range rows {
-			epoch := time.FromJD(row.jdUT, time.UTC)
+			at := epoch.FromJD(row.jdUT, epoch.UTC)
 
-			state, err := eph.At(provider, epoch).Astrometric(body.id, eph.Geocenter())
+			state, err := eph.At(provider, at).Astrometric(body.id, eph.Geocenter())
 			if err != nil {
 				t.Fatalf("%s: Astrometric: %v", body.name, err)
 			}

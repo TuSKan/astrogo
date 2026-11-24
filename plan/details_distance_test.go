@@ -3,12 +3,13 @@ package plan
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +22,7 @@ func TestStringOmitsAnUnknownDistance(t *testing.T) {
 	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760))
 	testutil.AssertNoError(t, err)
 
-	tm := time.Date(2026, time.April, 25, 20, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.April, 25, 20, 0, 0, 0, time.UTC)
 
 	ctx, err := coord.NewContext(tm, loc, atmosphere.Refraction{})
 	if err != nil {

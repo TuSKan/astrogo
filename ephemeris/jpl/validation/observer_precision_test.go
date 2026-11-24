@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -22,8 +23,8 @@ import (
 	// ephemeris/ imports plan, so the layering rule ("lower layers never
 	// import higher ones") is about production imports, not test fixtures,
 	// and isn't actually violated here.
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -280,9 +281,9 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 		numEpochs = 9
 	)
 
-	epochStart := time.Date(2026, time.January, 5, 0, 0, 0, 0, time.LocationUTC)
+	epochStart := epoch.Date(2026, time.January, 5, 0, 0, 0, 0, time.UTC)
 
-	epochs := make([]time.Time, numEpochs)
+	epochs := make([]epoch.Time, numEpochs)
 	for i := range numEpochs {
 		epochs[i] = epochStart.Add(unit.Days(float64(i) * 45))
 	}
@@ -529,7 +530,7 @@ func TestObserverPrecisionMatrix(t *testing.T) {
 // each remaining item is its own future follow-up plan, not built here.
 // Items 3 and (indirectly) 1 have already been checked live, see the
 // doc comment above:
-//  1. DUT1 interpolation in time/internal/iers (currently nearest/linear
+//  1. DUT1 interpolation in epoch/internal/iers (currently nearest/linear
 //     from the finals2000A table). A related lead — EOP prediction
 //     divergence between astrogo and Horizons for future dates — was
 //     tested directly (a controlled daily scan across Horizons' own

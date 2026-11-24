@@ -7,6 +7,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -19,7 +20,6 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -96,8 +96,8 @@ func gambonsDust(t *testing.T) *dust.SFD {
 }
 
 // gambonsEpoch is 21 August 2026 01:16 GMT+2, which is what the run recorded.
-func gambonsEpoch() time.GoTime {
-	return time.GoDate(2026, 8, 20, 23, 16, 0, 0, time.LocationUTC)
+func gambonsEpoch() time.Time {
+	return time.Date(2026, 8, 20, 23, 16, 0, 0, time.UTC)
 }
 
 // johnsonVTophat approximates the Johnson V response.

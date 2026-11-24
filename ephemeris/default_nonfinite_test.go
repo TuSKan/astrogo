@@ -7,7 +7,7 @@ import (
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Default answered the Sun and the Moon at a NaN or infinite time with a NaN
@@ -30,12 +30,12 @@ func TestDefaultRefusesANonFiniteTime(t *testing.T) {
 	}
 
 	for _, id := range answered {
-		if _, err := eph.At(eph.Default(), time.FromJD(2451545.0, time.TT)).Geometric(id, center(id)); err != nil {
+		if _, err := eph.At(eph.Default(), epoch.FromJD(2451545.0, epoch.TT)).Geometric(id, center(id)); err != nil {
 			t.Fatalf("%v at J2000: %v, want an answer", id, err)
 		}
 
 		for name, jd := range map[string]float64{"NaN": math.NaN(), "+Inf": math.Inf(1), "-Inf": math.Inf(-1)} {
-			st, err := eph.At(eph.Default(), time.FromJD(jd, time.TT)).Geometric(id, center(id))
+			st, err := eph.At(eph.Default(), epoch.FromJD(jd, epoch.TT)).Geometric(id, center(id))
 			if !errors.Is(err, kepler.ErrNonFiniteTime) {
 				t.Errorf("%v at JD %s: position %v, err %v, want kepler.ErrNonFiniteTime", id, name, st.Pos, err)
 			}

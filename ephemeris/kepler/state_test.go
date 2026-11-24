@@ -4,12 +4,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -29,16 +30,16 @@ func angleDiff(got, want angle.Angle) float64 {
 func TestFromStateStartsAtItsState(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 	pos := vector.V3(-1.8133, 1.9071, 0.4415)
 	vel := vector.V3(-0.007212, -0.006058, -0.000894)
 
-	el, err := kepler.FromState(epoch, pos, vel, sunGM)
+	el, err := kepler.FromState(at, pos, vel, sunGM)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	gotPos, gotVel, err := el.StateAt(epoch)
+	gotPos, gotVel, err := el.StateAt(at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,15 +61,15 @@ func TestFromStateReportsTheOrbit(t *testing.T) {
 		relTol   = 1e-12
 	)
 
-	epoch := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 
-	ellipse, err := kepler.NewElements(epoch, unit.AU(2.7), 0.08,
+	ellipse, err := kepler.NewElements(at, unit.AU(2.7), 0.08,
 		angle.Deg(10), angle.Deg(80), angle.Deg(73), angle.Deg(40))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	hyperbola, err := kepler.FromPerihelion(epoch, epoch, unit.AU(1.5), 1.2,
+	hyperbola, err := kepler.FromPerihelion(at, at, unit.AU(1.5), 1.2,
 		angle.Deg(25), angle.Deg(130), angle.Deg(-40))
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func TestFromStateReportsTheOrbit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			at := epoch.Add(unit.Days(tc.at))
+			at := at.Add(unit.Days(tc.at))
 
 			pos, vel, err := tc.orbit.StateAt(at)
 			if err != nil {
@@ -162,7 +163,7 @@ func TestFromStateReportsTheOrbit(t *testing.T) {
 func TestFromStateRefusesWhatNoConicDescribes(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 	pos, vel := vector.V3(1, 0, 0), vector.V3(0, 0.017, 0)
 
 	for _, tc := range []struct {
@@ -178,7 +179,7 @@ func TestFromStateRefusesWhatNoConicDescribes(t *testing.T) {
 		{"no mass", pos, vel, kepler.CentralBody{ID: core.Sun}, kepler.ErrInvalidElements},
 		{"a negative mass", pos, vel, kepler.CentralBody{ID: core.Sun, GM: -1}, kepler.ErrInvalidElements},
 	} {
-		if _, err := kepler.FromState(epoch, tc.pos, tc.vel, tc.central); !errors.Is(err, tc.want) {
+		if _, err := kepler.FromState(at, tc.pos, tc.vel, tc.central); !errors.Is(err, tc.want) {
 			t.Errorf("%s: FromState = %v, want %v", tc.name, err, tc.want)
 		}
 	}
@@ -191,10 +192,10 @@ func TestFromStateRefusesWhatNoConicDescribes(t *testing.T) {
 func TestFromStateTakesNoSatelliteModifiers(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 	pos, vel := vector.V3(1.2, 0.3, -0.1), vector.V3(-0.003, 0.015, 0.002)
 
-	el, err := kepler.FromState(epoch, pos, vel, sunGM)
+	el, err := kepler.FromState(at, pos, vel, sunGM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +205,7 @@ func TestFromStateTakesNoSatelliteModifiers(t *testing.T) {
 		"secular precession": el.WithSecularPrecession(kepler.SecularPrecession{ApsisPeriod: 100}),
 		"period":             el.WithPeriod(400),
 	} {
-		if _, _, err := modified.StateAt(epoch); !errors.Is(err, kepler.ErrInvalidElements) {
+		if _, _, err := modified.StateAt(at); !errors.Is(err, kepler.ErrInvalidElements) {
 			t.Errorf("%s: StateAt = %v, want ErrInvalidElements", name, err)
 		}
 	}
@@ -222,7 +223,7 @@ func TestFromStateTakesNoSatelliteModifiers(t *testing.T) {
 		t.Errorf("SemiMajorAxis under twice the mass = %v AU, want %v", got, wantA)
 	}
 
-	if gotPos, gotVel, err := moved.StateAt(epoch); err != nil || gotPos != pos || gotVel != vel {
+	if gotPos, gotVel, err := moved.StateAt(at); err != nil || gotPos != pos || gotVel != vel {
 		t.Errorf("StateAt(epoch) under twice the mass = %v, %v, %v; want the same state", gotPos, gotVel, err)
 	}
 }
@@ -234,10 +235,10 @@ func TestFromStateRegisters(t *testing.T) {
 
 	const id core.ID = 1_000_001
 
-	epoch := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 	pos, vel := vector.V3(1.2, 0.3, -0.1), vector.V3(-0.003, 0.015, 0.002)
 
-	el, err := kepler.FromState(epoch, pos, vel, sunGM)
+	el, err := kepler.FromState(at, pos, vel, sunGM)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +248,7 @@ func TestFromStateRegisters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st, err := p.Locate(id, epoch)
+	st, err := p.Locate(id, at)
 	if err != nil {
 		t.Fatal(err)
 	}

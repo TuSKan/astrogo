@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestSatelliteDetailsDistanceIsTheRange is #495: GetDetails reported every
@@ -18,9 +19,9 @@ func TestSatelliteDetailsDistanceIsTheRange(t *testing.T) {
 	prov, site := testISS(t)
 	sat := NewSatellite("ISS", prov.ID(), prov)
 
-	for _, at := range []time.Time{
-		time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.April, 17, 6, 0, 0, 0, time.LocationUTC),
+	for _, at := range []epoch.Time{
+		epoch.Date(2026, time.April, 17, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.April, 17, 6, 0, 0, 0, time.UTC),
 	} {
 		ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
 		if err != nil {

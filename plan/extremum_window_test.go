@@ -2,17 +2,18 @@ package plan_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // separationAt is the geocentric angular separation of a and b at t, in
 // degrees: the quantity GreatestElongations maximizes and Appulses minimizes.
-func separationAt(t *testing.T, a, b plan.Observable, at time.Time) float64 {
+func separationAt(t *testing.T, a, b plan.Observable, at epoch.Time) float64 {
 	t.Helper()
 
 	pa, err := a.Position(at)
@@ -31,11 +32,11 @@ func separationAt(t *testing.T, a, b plan.Observable, at time.Time) float64 {
 // windowEndStarts are the window starts that put a sweep's last regular
 // sample nanoseconds before the end of a 365-day window, so that the end is
 // sampled a second time and the two samples match by rounding (#1140).
-func windowEndStarts() []time.Time {
-	return []time.Time{
-		time.Date(2026, 11, 13, 11, 18, 0, 0, time.LocationUTC),
-		time.Date(2026, 11, 13, 11, 18, 28, 0, time.LocationUTC),
-		time.Date(2026, 11, 13, 11, 18, 48, 0, time.LocationUTC),
+func windowEndStarts() []epoch.Time {
+	return []epoch.Time{
+		epoch.Date(2026, 11, 13, 11, 18, 0, 0, time.UTC),
+		epoch.Date(2026, 11, 13, 11, 18, 28, 0, time.UTC),
+		epoch.Date(2026, 11, 13, 11, 18, 48, 0, time.UTC),
 	}
 }
 

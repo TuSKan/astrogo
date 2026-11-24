@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/leakcheck"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestMain pins Earth orientation to zero for every test in this package.
@@ -26,7 +26,7 @@ import (
 // orders of magnitude past the lock and nowhere near a rounding artifact.
 // Locally every table passed; in CI all four failed on every platform.
 //
-// [time.RegisterModel] with [time.ZeroModel] is the documented way to ask for
+// [epoch.RegisterModel] with [epoch.ZeroModel] is the documented way to ask for
 // deterministic zero EOP, and it also marks the choice authoritative so the
 // lazy load cannot silently replace it later. The tables below are generated
 // under it, which makes them a property of this code rather than of whatever
@@ -47,7 +47,7 @@ import (
 // true: a worker started and not waited for fails the package rather than
 // growing a caller's process (#1099).
 func TestMain(m *testing.M) {
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	os.Exit(leakcheck.RunWithLeakCheck(m))
 }

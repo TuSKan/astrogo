@@ -13,8 +13,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -171,7 +171,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 		}
 
 		if hasElements {
-			t.Epoch = time.FromJD(epochJD, time.TDB)
+			t.Epoch = epoch.FromJD(epochJD, epoch.TDB)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)
@@ -470,7 +470,7 @@ func (p *Provider) SearchBright(ctx context.Context, req resolve.BrightRequest) 
 	}
 
 	return func(yield func(resolve.Target, error) bool) {
-		asteroids, asteroidRows, err := p.queryBright(ctx, "a", "H", req.MaxVMag, time.Time{}, ask)
+		asteroids, asteroidRows, err := p.queryBright(ctx, "a", "H", req.MaxVMag, epoch.Time{}, ask)
 		if err != nil {
 			yield(resolve.Target{}, err)
 			return
@@ -632,7 +632,7 @@ func (p *Provider) lookup(ctx context.Context, key, value string) (lookupPayload
 //
 // A nonzero at bounds each comet by where its orbit has it around that date
 // rather than by its perihelion alone; see sunDistanceAround.
-func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVMag float64, at time.Time, limit int) ([]resolve.Target, int, error) {
+func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, maxVMag float64, at epoch.Time, limit int) ([]resolve.Target, int, error) {
 	fields := "full_name,spkid,H,G,class" + elementFields
 	if magField == "M1" {
 		fields = "full_name,spkid,M1,K1,class" + elementFields
@@ -763,7 +763,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		}
 
 		if hasElements {
-			t.Epoch = time.FromJD(epochJD, time.TDB)
+			t.Epoch = epoch.FromJD(epochJD, epoch.TDB)
 			t.Eccentricity = eccentricity
 			t.Inclination = angle.Deg(incl)
 			t.AscendingNode = angle.Deg(node)
@@ -792,7 +792,7 @@ func (p *Provider) queryBright(ctx context.Context, sbKind, magField string, max
 		if hasQ {
 			closest := q
 			if sbKind == "c" && !at.IsZero() && hasE && hasTP {
-				closest = sunDistanceAround(q, eccentricity, time.FromJD(tp, time.TDB), at)
+				closest = sunDistanceAround(q, eccentricity, epoch.FromJD(tp, epoch.TDB), at)
 			}
 
 			if !couldReach(t, closest, maxVMag) {
@@ -862,7 +862,7 @@ var datedWindow = unit.Days(30)
 // Away from perihelion the distance changes monotonically, so the nearest is
 // at an end of the window. A comet falling toward the Sun at the start and
 // receding at the end passed perihelion inside it, and gets q.
-func sunDistanceAround(q, e float64, tp, at time.Time) float64 {
+func sunDistanceAround(q, e float64, tp, at epoch.Time) float64 {
 	// Only the distance from the Sun is read, which no epoch or angle
 	// changes: the orbit is taken as osculating at its perihelion.
 	el, err := kepler.FromPerihelion(tp, tp, unit.AU(q), e, angle.Zero(), angle.Zero(), angle.Zero())
@@ -945,7 +945,7 @@ func setElementForms(t *resolve.Target, hasAsteroidForm bool, a, ma float64, has
 
 	if hasCometForm {
 		t.PerihelionDistance = unit.AU(q)
-		t.PerihelionTime = time.FromJD(tp, time.TDB)
+		t.PerihelionTime = epoch.FromJD(tp, epoch.TDB)
 	}
 }
 

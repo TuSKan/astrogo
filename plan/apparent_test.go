@@ -5,13 +5,14 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -53,7 +54,7 @@ func TestApparentSunIsDisplacedByTheConstantOfAberration(t *testing.T) {
 	// A full year, so the ±1.7% from Earth's eccentricity is exercised at both
 	// ends rather than sampled at one phase of the orbit.
 	for d := range 365 {
-		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
+		tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(d)))
 
 		apparent, err := sun.Position(tm)
 		testutil.AssertNoError(t, err)
@@ -114,7 +115,7 @@ func TestApparentPositionReachesTheAltAzPath(t *testing.T) {
 	)
 
 	for step := range 365 * 4 {
-		tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(step) * 0.25))
+		tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(step) * 0.25))
 
 		ctx, err := coord.NewContext(tm, loc, site.Refraction())
 		if err != nil {
@@ -185,7 +186,7 @@ func TestPositionAndGeocentricVecAgree(t *testing.T) {
 			}
 
 			for d := 0; d < 365; d += 11 {
-				tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
+				tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(d)))
 
 				pos, err := tc.obj.Position(tm)
 				testutil.AssertNoError(t, err)
@@ -230,7 +231,7 @@ func TestSatellitePositionsAreNotRetarded(t *testing.T) {
 
 	sat := NewSatellite("ISS", prov.ID(), prov)
 
-	tm := time.Date(2026, time.January, 1, 12, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 12, 0, 0, 0, time.UTC)
 
 	got, err := sat.GeocentricVec(tm)
 	testutil.AssertNoError(t, err)
@@ -265,12 +266,12 @@ func altAzSeparationArcsec(a, b coord.AltAz) float64 {
 // three target types the default provider cannot: Asteroid, Comet and
 // GenericBody have no SOFA body to stand in for them.
 type linearProvider struct {
-	epoch time.Time
+	epoch epoch.Time
 	pos0  vector.Vec3 // AU at epoch
 	vel   vector.Vec3 // AU/day
 }
 
-func (p linearProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (p linearProvider) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	// The Sun is answered separately, and where it is matters. The apparent
 	// place asks for it to apply light deflection, and a mock that returned
 	// the moving target for every id would place the Sun on top of the target:
@@ -302,12 +303,12 @@ func (linearProvider) Close() error { return nil }
 func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	// Two astronomical units out along x, crossing the line of sight at
 	// 0.01 AU/day (~17 km/s, a plausible relative speed for a minor body).
 	prov := linearProvider{
-		epoch: epoch,
+		epoch: at,
 		pos0:  vector.V3(2, 0, 0),
 		vel:   vector.V3(0, 0.01, 0),
 	}
@@ -340,7 +341,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 				t.Fatalf("%s is not a MovingBody", tc.name)
 			}
 
-			got, err := mb.GeocentricVec(epoch)
+			got, err := mb.GeocentricVec(at)
 			testutil.AssertNoError(t, err)
 
 			// The geometric answer at the epoch is pos0 exactly, so the whole
@@ -354,7 +355,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 			}
 
 			// And Position must be the same place seen as a direction.
-			pos, err := tc.obj.Position(epoch)
+			pos, err := tc.obj.Position(at)
 			testutil.AssertNoError(t, err)
 
 			fromVec, err := eph.ToICRS(got)
@@ -374,7 +375,7 @@ func TestEveryEphemerisBackedTargetIsApparent(t *testing.T) {
 // Pisces with complete confidence.
 type zeroProvider struct{}
 
-func (zeroProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+func (zeroProvider) Locate(id eph.ID, _ epoch.Time) (eph.State, error) {
 	return geocentricMock(id, vector.Vec3{}, vector.Vec3{})
 }
 
@@ -394,7 +395,7 @@ func TestApparentFailuresNameTheTargetThatFailed(t *testing.T) {
 	t.Parallel()
 
 	prov := failingProvider{}
-	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, tc := range []struct {
 		name string
@@ -452,7 +453,7 @@ func TestApparentDirectionRefusesTheGeocenter(t *testing.T) {
 	t.Parallel()
 
 	body := NewPlanet("AtTheCenter", eph.MarsBarycenter, zeroProvider{})
-	when := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	_, vecErr := body.GeocentricVec(when)
 	_, posErr := body.Position(when)

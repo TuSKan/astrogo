@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -90,10 +91,10 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 	t.Parallel()
 
 	sirius := NewStar("Sirius", angle.Deg(101.2872), angle.Deg(-16.7161))
-	start := time.Date(2026, 3, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 3, 21, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)
 
-	events := func(opts ...SiteOption) (site *Site, rise, set time.Time) {
+	events := func(opts ...SiteOption) (site *Site, rise, set epoch.Time) {
 		t.Helper()
 
 		site, err := NewSite("sea level", angle.LatDeg(45), angle.LonDeg(0), unit.Meters(0), opts...)
@@ -123,7 +124,7 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 		return site, rise, set
 	}
 
-	geometric := func(site *Site, at time.Time) float64 {
+	geometric := func(site *Site, at epoch.Time) float64 {
 		t.Helper()
 
 		pos, err := sirius.Position(at)
@@ -154,7 +155,7 @@ func TestHorizonRefractionMovesRiseAndSet(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		site *Site
-		at   time.Time
+		at   epoch.Time
 	}{
 		{"dense air, rise", dense, denseRise},
 		{"dense air, set", dense, denseSet},
@@ -212,7 +213,7 @@ func TestHorizonRefractionIsPartOfTheSite(t *testing.T) {
 
 	for name, s := range map[string]*Site{
 		"WithHorizon":  withHorizon,
-		"WithTimeZone": cold.WithTimeZone(time.LocationUTC),
+		"WithTimeZone": cold.WithTimeZone(time.UTC),
 	} {
 		if got, want := s.horizonRefraction(), cold.horizonRefraction(); got != want {
 			t.Errorf("%s dropped the horizon air: %.6f°, want %.6f°", name, got, want)

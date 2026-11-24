@@ -3,11 +3,12 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -35,7 +36,7 @@ func TestTheSunOrbitsTheBarycenterByAboutASolarRadius(t *testing.T) {
 	// A Jupiter period, sampled finely enough to catch the extremes.
 	for year := 2020; year <= 2032; year++ {
 		for month := 1; month <= 12; month += 3 {
-			ep := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.LocationUTC)
+			ep := epoch.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 
 			v, err := coord.SunBarycentric(ep)
 			if err != nil {
@@ -89,7 +90,7 @@ func TestTheSunsBarycentricPositionAndVelocityAgree(t *testing.T) {
 		hDays = 0.5
 	)
 
-	mid := time.Date(epochYear, 6, 1, 12, 0, 0, 0, time.LocationUTC)
+	mid := epoch.Date(epochYear, 6, 1, 12, 0, 0, 0, time.UTC)
 
 	before, err := coord.SunBarycentric(mid.Add(unit.Days(-hDays)))
 	if err != nil {
@@ -144,7 +145,7 @@ func TestTheSunsBarycentricPositionAndVelocityAgree(t *testing.T) {
 func TestTheTranslationGoesTheRightWay(t *testing.T) {
 	t.Parallel()
 
-	ep := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	ep := epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC)
 
 	sun, err := coord.SunBarycentric(ep)
 	if err != nil {
@@ -190,7 +191,7 @@ func TestTheTranslationGoesTheRightWay(t *testing.T) {
 func TestTheOffsetMattersForAPlanetAndNotForAStar(t *testing.T) {
 	t.Parallel()
 
-	ep := time.Date(2023, 1, 1, 0, 0, 0, 0, time.LocationUTC) // near the Sun's furthest excursion
+	ep := epoch.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC) // near the Sun's furthest excursion
 
 	sun, err := coord.SunBarycentric(ep)
 	if err != nil {
@@ -223,7 +224,7 @@ func TestTheOffsetMattersForAPlanetAndNotForAStar(t *testing.T) {
 }
 
 func BenchmarkSunBarycentric(b *testing.B) {
-	ep := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	ep := epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC)
 
 	b.ReportAllocs()
 

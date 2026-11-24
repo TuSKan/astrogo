@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"time"
 
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/api"
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // This file is the whole of astrogo's I/O surface.

@@ -6,11 +6,12 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -142,12 +143,12 @@ func parseCometRow(row string) (resolve.Target, error) {
 	t.Epoch = tp
 
 	if text := strings.TrimSpace(row[cometEpochStart:cometEpochEnd]); text != "" {
-		epoch, err := cometEpoch(text)
+		at, err := cometEpoch(text)
 		if err != nil {
 			return resolve.Target{}, fmt.Errorf("%w: %s: epoch %q: %w", ErrMalformedRow, t.ID, text, err)
 		}
 
-		t.Epoch = epoch
+		t.Epoch = at
 	}
 
 	t.HasElements = true
@@ -189,47 +190,47 @@ var errPerihelionDate = errors.New("perihelion date out of range")
 // four decimals, in TT. The midnight's Julian Date is formed through the UTC
 // calendar and labeled TT, as ParseEpoch does, and the day's fraction is
 // carried as a second part so it keeps its precision.
-func cometPerihelionTime(row string) (time.Time, error) {
+func cometPerihelionTime(row string) (epoch.Time, error) {
 	year, err := strconv.Atoi(row[cometTYearStart:cometTYearEnd])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("perihelion year: %w", err)
+		return epoch.Time{}, fmt.Errorf("perihelion year: %w", err)
 	}
 
 	month, err := strconv.Atoi(strings.TrimSpace(row[cometTMonthStart:cometTMonthEnd]))
 	if err != nil || month < 1 || month > 12 {
-		return time.Time{}, fmt.Errorf("%w: month %q", errPerihelionDate, row[cometTMonthStart:cometTMonthEnd])
+		return epoch.Time{}, fmt.Errorf("%w: month %q", errPerihelionDate, row[cometTMonthStart:cometTMonthEnd])
 	}
 
 	// A NaN day passed both comparisons below and reached int(math.Floor),
 	// so it is refused as the text it is (#1080).
 	day, ok := finite.Parse(strings.TrimSpace(row[cometTDayStart:cometTDayEnd]))
 	if !ok || day < 1 || day >= 32 {
-		return time.Time{}, fmt.Errorf("%w: day %q", errPerihelionDate, row[cometTDayStart:cometTDayEnd])
+		return epoch.Time{}, fmt.Errorf("%w: day %q", errPerihelionDate, row[cometTDayStart:cometTDayEnd])
 	}
 
 	whole := math.Floor(day)
-	midnight := time.Date(year, time.Month(month), int(whole), 0, 0, 0, 0, time.LocationUTC)
+	midnight := epoch.Date(year, time.Month(month), int(whole), 0, 0, 0, 0, time.UTC)
 
-	return time.FromJDParts(midnight.JD(), day-whole, time.TT), nil
+	return epoch.FromJDParts(midnight.JD(), day-whole, epoch.TT), nil
 }
 
 // cometEpoch reads an epoch written YYYYMMDD, at 0h TT.
-func cometEpoch(text string) (time.Time, error) {
+func cometEpoch(text string) (epoch.Time, error) {
 	if len(text) != 8 {
-		return time.Time{}, fmt.Errorf("%w: want YYYYMMDD", ErrMalformedEpoch)
+		return epoch.Time{}, fmt.Errorf("%w: want YYYYMMDD", ErrMalformedEpoch)
 	}
 
 	ymd, err := strconv.Atoi(text)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %w", ErrMalformedEpoch, err)
+		return epoch.Time{}, fmt.Errorf("%w: %w", ErrMalformedEpoch, err)
 	}
 
 	year, month, day := ymd/10000, ymd/100%100, ymd%100
 	if month < 1 || month > 12 || day < 1 || day > 31 {
-		return time.Time{}, fmt.Errorf("%w: month %d day %d", ErrMalformedEpoch, month, day)
+		return epoch.Time{}, fmt.Errorf("%w: month %d day %d", ErrMalformedEpoch, month, day)
 	}
 
-	midnight := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.LocationUTC)
+	midnight := epoch.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 
-	return time.FromJD(midnight.JD(), time.TT), nil
+	return epoch.FromJD(midnight.JD(), epoch.TT), nil
 }

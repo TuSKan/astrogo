@@ -11,7 +11,7 @@ const twoPi = 2.0 * math.Pi
 //
 // # Why this is not time.Time.GAST, and must not become it
 //
-// astrogo has a proper sidereal time: [github.com/TuSKan/astrogo/time]'s GAST
+// astrogo has a proper sidereal time: [github.com/TuSKan/astrogo/epoch]'s GAST
 // is IAU 2006/2000A with real Earth orientation parameters, and it is a
 // materially better answer to the question "what is the sidereal time". Using
 // it here would make this package *worse*.

@@ -121,7 +121,7 @@ precession-nutation rather than a fresh evaluation of it (#812).
 
 The ephemeris argument is TDB; an SPK's is TDB seconds past J2000, computed
 straight from the input time and never through a summed Julian Date (#150). A
-caller's `time.Time` may be in any scale; UTC goes through the leap-second
+caller's `epoch.Time` may be in any scale; UTC goes through the leap-second
 table the kernel's own LSK registered. Light time is solved in TDB. UT1 and
 polar motion enter only at the observer (§3.6), through EOP.
 
@@ -438,7 +438,7 @@ Three, with the signatures each would ship.
 ```go
 // ephemeris/core — unchanged
 type Provider interface {
-	State(id ID, t time.Time) (State, error) // geocentric, ICRF, AU, AU/day
+	State(id ID, t epoch.Time) (State, error) // geocentric, ICRF, AU, AU/day
 	Close() error
 }
 ```
@@ -471,14 +471,14 @@ type State struct {
 // kernel about the segment's center, SOFA planets about the Sun, the Moon
 // and satellites about the Earth, a Kepler orbit about its fitted center.
 type Provider interface {
-	Locate(id ID, t time.Time) (State, error)
+	Locate(id ID, t epoch.Time) (State, error)
 	Close() error
 }
 
 // ephemeris
 type Instant struct{ /* epoch, provider, memo of barycentric states */ }
 
-func At(p Provider, t time.Time) *Instant
+func At(p Provider, t epoch.Time) *Instant
 
 func (in *Instant) Geometric(target, center ID) (State, error)
 func (in *Instant) Astrometric(target ID, obs Observer) (State, error)
@@ -514,7 +514,7 @@ type Place uint8 // Geometric, Astrometric, Apparent
 type Query struct {
 	Targets []ID
 	Center  ID
-	Times   []time.Time
+	Times   []epoch.Time
 	Place   Place
 }
 

@@ -3,12 +3,13 @@ package plan
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,12 +19,12 @@ type benchMock struct {
 	c coord.ICRS
 }
 
-func (m benchMock) ICRS(_ time.Time) (coord.ICRS, error) {
+func (m benchMock) ICRS(_ epoch.Time) (coord.ICRS, error) {
 	return m.c, nil
 }
 
-func (m benchMock) Name() string                             { return "mock" }
-func (m benchMock) Position(_ time.Time) (coord.ICRS, error) { return m.c, nil }
+func (m benchMock) Name() string                              { return "mock" }
+func (m benchMock) Position(_ epoch.Time) (coord.ICRS, error) { return m.c, nil }
 func (m benchMock) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
@@ -32,7 +33,7 @@ func BenchmarkVisibleIntervals(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
@@ -46,7 +47,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := benchMock{c: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(1.0))
 
 	for b.Loop() {
@@ -64,7 +65,7 @@ func BenchmarkVisibleIntervals_1MinStep(b *testing.B) {
 func BenchmarkOppositions(b *testing.B) {
 	prov := eph.Default()
 	mars, sun := NewMars(prov), NewSun(prov)
-	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(365))
 
 	for b.Loop() {
@@ -78,7 +79,7 @@ func BenchmarkEventSolver_Visibility(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(1))
 	spec := EventSpec{
@@ -102,7 +103,7 @@ func BenchmarkObservableWindows(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(12))
 	constraints := []Constraint{Altitude{Threshold: angle.Deg(30)}}
 
@@ -140,17 +141,17 @@ func benchScheduler(b *testing.B, n int, strategy Strategy) {
 	blocks := makeBlocks(n)
 
 	// A real epoch, inside the EOP bulletin's coverage, rather than
-	// time.ZeroTime.
+	// epoch.ZeroTime.
 	//
 	// ZeroTime is FromJD(0) — 4713 BC — where no Earth Orientation
 	// Parameters exist, and every constraint evaluation therefore took the
 	// out-of-coverage path. A heap profile put 99.88% of this benchmark's
-	// allocated bytes in time.Time.EOP rather than anywhere in scheduling,
+	// allocated bytes in epoch.Time.EOP rather than anywhere in scheduling,
 	// so what it reported was the cost of missing EOP data (#246).
 	//
-	// Fixed epoch, not time.NowUTC: a benchmark whose result depends on the
+	// Fixed epoch, not epoch.Now: a benchmark whose result depends on the
 	// day it is run cannot be compared with the one before it.
-	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 	window := Window{Start: start, End: start.Add(unit.Minutes(float64(n) * 15))}
 
 	for b.Loop() {
@@ -211,7 +212,7 @@ func BenchmarkTransitEstimate(b *testing.B) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := benchMock{c: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(0.5))
 
 	for b.Loop() {
@@ -247,7 +248,7 @@ func BenchmarkFortnightEvents(b *testing.B) {
 	}
 
 	provider := eph.Default()
-	start := time.Date(2026, 7, 20, 0, 0, 0, 0, tz)
+	start := epoch.Date(2026, 7, 20, 0, 0, 0, 0, tz)
 
 	for b.Loop() {
 		for d := range 14 {

@@ -2,12 +2,13 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -29,10 +30,10 @@ func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
 		zone *time.Location
 		name string // the zone's name as the layout's MST prints it
 	}{
-		{time.LocationUTC, "UTC"},
+		{time.UTC, "UTC"},
 		{saoPaulo, "-03"},
 	} {
-		tm := time.Date(2026, time.April, 25, 20, 0, 0, 0, time.LocationUTC).In(c.zone)
+		tm := epoch.Date(2026, time.April, 25, 20, 0, 0, 0, time.UTC).In(c.zone)
 
 		ctx, err := coord.NewContext(tm, loc, atmosphere.Refraction{})
 		if err != nil {
@@ -48,7 +49,7 @@ func TestStringPrintsTimesWithDateAndZone(t *testing.T) {
 
 		s := d.String()
 
-		for label, at := range map[string]*time.Time{
+		for label, at := range map[string]*epoch.Time{
 			"Rise time:":                 d.RiseTime,
 			"Time of maximum elevation:": d.TransitTime,
 			"Set time:":                  d.SetTime,

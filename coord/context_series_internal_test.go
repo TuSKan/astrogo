@@ -2,11 +2,12 @@ package coord
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestNewContextKeepsItsMatrix holds the reuse in NewContext to the matrix it
@@ -30,12 +31,12 @@ func TestNewContextKeepsItsMatrix(t *testing.T) {
 
 	atm := atmosphere.AtAltitude(2635)
 
-	var epochs []time.Time
+	var epochs []epoch.Time
 
 	// 1900 to 2100 in steps of 37.3 days, so every phase of the year and of
 	// the day is visited.
 	for jd := 2415020.5; jd < 2488069.5; jd += 37.3 {
-		epochs = append(epochs, time.FromJD(jd, time.UTC))
+		epochs = append(epochs, epoch.FromJD(jd, epoch.UTC))
 	}
 
 	for _, ym := range [][2]int{
@@ -50,20 +51,20 @@ func TestNewContextKeepsItsMatrix(t *testing.T) {
 		}
 
 		for _, hour := range []int{12, 23} {
-			epochs = append(epochs, time.Date(ym[0], time.Month(ym[1]), day, hour, 30, 0, 0, time.LocationUTC))
+			epochs = append(epochs, epoch.Date(ym[0], time.Month(ym[1]), day, hour, 30, 0, 0, time.UTC))
 		}
 	}
 
-	for _, epoch := range epochs {
-		ctx, err := NewContext(epoch, loc, atm)
+	for _, at := range epochs {
+		ctx, err := NewContext(at, loc, atm)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		tt1, tt2 := epoch.UTC().TT().JDParts()
+		tt1, tt2 := at.UTC().TT().JDParts()
 		if want := gofaext.C2i06a(tt1, tt2); ctx.rc2i != want {
 			t.Fatalf("%v: NewContext's celestial-to-intermediate matrix is not C2i06a at t.TT():\n"+
-				"  got  %v\n  want %v", epoch, ctx.rc2i, want)
+				"  got  %v\n  want %v", at, ctx.rc2i, want)
 		}
 	}
 }

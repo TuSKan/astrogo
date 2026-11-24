@@ -3,14 +3,15 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -50,7 +51,7 @@ func TestSatelliteAltitudePipelinesAgree(t *testing.T) {
 	// Two orbits at ten-minute steps, so the comparison spans a full sweep of
 	// geometry rather than one point on one pass.
 	for minute := 0; minute < 180; minute += 10 {
-		when := time.Date(2026, time.April, 19, 12, minute, 0, 0, time.LocationUTC)
+		when := epoch.Date(2026, time.April, 19, 12, minute, 0, 0, time.UTC)
 
 		ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
 		if err != nil {
@@ -127,8 +128,8 @@ func TestEventAltitudesAreWhatTheyAreNamed(t *testing.T) {
 	prov := eph.Default()
 	moon := plan.NewMoon(prov)
 
-	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, time.March, 21, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, time.March, 21, 0, 0, 0, 0, time.UTC)
 
 	events, err := plan.MoonEvents(site, plan.Window{Start: start, End: end}, prov)
 	if err != nil {

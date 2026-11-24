@@ -3,7 +3,7 @@ package plan
 import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -72,7 +72,7 @@ func (d *DeepSkyObject) MeasuredRadialVelocity() (unit.Velocity, bool) {
 func (d *DeepSkyObject) Name() string { return d.name }
 
 // Position returns the fixed ICRS position (time-independent).
-func (d *DeepSkyObject) Position(_ time.Time) (coord.ICRS, error) {
+func (d *DeepSkyObject) Position(_ epoch.Time) (coord.ICRS, error) {
 	return d.coord, nil
 }
 

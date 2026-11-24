@@ -22,10 +22,11 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -150,18 +151,18 @@ func parseAstroPixelsPage(html string) []apPhaseEvent {
 
 			// AstroPixels prints Universal Time, UT1, from the ΔT it states for
 			// each century. The label is therefore read as UT1 and converted by
-			// time's one ΔT (#696). It used to be read as UTC, which from 1972
+			// epoch's one ΔT (#696). It used to be read as UTC, which from 1972
 			// adds TT − UTC rather than ΔT: the same number while leap seconds
 			// keep UT1 near UTC, but not a statement of the same thing.
-			var label time.Time
+			var label epoch.Time
 			if isJulian {
-				label = time.DateJulianCal(currentYear, month, day, hour, minute, 0)
+				label = epoch.DateJulianCal(currentYear, month, day, hour, minute, 0)
 			} else {
-				label = time.Date(currentYear, time.Month(month), day, hour, minute, 0, 0, time.LocationUTC)
+				label = epoch.Date(currentYear, time.Month(month), day, hour, minute, 0, 0, time.UTC)
 			}
 
 			j1, j2 := label.JDParts()
-			tUT := time.FromJDParts(j1, j2, time.UT1)
+			tUT := epoch.FromJDParts(j1, j2, epoch.UT1)
 
 			events = append(events, apPhaseEvent{
 				Year: currentYear, Month: month, Day: day,
@@ -250,7 +251,7 @@ const astroPixelsBound = 1.0
 //
 // Both use the same ΔT before 1960, Espenak & Meeus (2006) with the
 // −25.858″/cy² correction: each century page states the range it used, and
-// time.DeltaT matches it to the page's printed resolution. AstroPixels prints
+// epoch.DeltaT matches it to the page's printed resolution. AstroPixels prints
 // UT1, so the parser reads its labels as UT1 and lets time convert them.
 //
 // They do not share a lunar theory. AstroPixels is "based on procedures
@@ -307,7 +308,7 @@ func TestAstroPixels_MoonPhases(t *testing.T) {
 			for _, ref := range refEvents {
 				// Use TDB scale for TD reference time (TDB ≈ TT to ~1.7ms)
 				// This avoids the LSK adding 32.184s on top of the already-corrected TD JD
-				refTime := time.FromJD(ref.JDtd, time.TDB)
+				refTime := epoch.FromJD(ref.JDtd, epoch.TDB)
 
 				// DE441 covers every date on these pages, so an error from the
 				// search is astrogo's, and a miss rather than a skip.

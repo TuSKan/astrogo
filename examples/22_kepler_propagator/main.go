@@ -31,9 +31,9 @@ import (
 	"log"
 
 	"github.com/TuSKan/astrogo/catalog"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -47,7 +47,7 @@ func main() {
 	// move a rise or set by up to about a second, below the minute printed.
 	// For full accuracy, blank-import remote/eop and consent to the IERS
 	// bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Resolve 1 Ceres's real, current osculating elements live from JPL
 	// SBDB — catalog/sbdb decodes orbit.elements (e, a, i, om, w, ma) and
@@ -95,14 +95,14 @@ func main() {
 		log.Fatalf("FromCatalog did not build a Kepler-propagated *plan.Asteroid for %q (got %T)", target.Name, obs)
 	}
 
-	epoch := target.Epoch
+	at := target.Epoch
 
 	// ── Part 1: position/magnitude drift across the year ────────────────────
 	year := show.NewTable(show.Left("Date"), show.Left("RA"), show.Left("Dec"),
 		show.Right("Distance"), show.Right("Magnitude"))
 
 	for m := range 12 {
-		t := epoch.Add(unit.Days(float64(m) * 30))
+		t := at.Add(unit.Days(float64(m) * 30))
 
 		pos, err := asteroid.Position(t)
 		if err != nil {
@@ -140,7 +140,7 @@ func main() {
 		log.Fatalf("site: %v", err)
 	}
 
-	events, err := plan.VisibilityEvents(asteroid, site, plan.Window{Start: epoch, End: epoch.Add(unit.Days(1))})
+	events, err := plan.VisibilityEvents(asteroid, site, plan.Window{Start: at, End: at.Add(unit.Days(1))})
 	if err != nil {
 		log.Fatalf("visibility events: %v", err)
 	}

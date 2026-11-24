@@ -3,12 +3,13 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestGeocentricToObservedCarriesTheTopocentricDistance is #495:
@@ -23,7 +24,7 @@ func TestGeocentricToObservedCarriesTheTopocentricDistance(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	at := time.Date(2026, time.March, 20, 15, 45, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 20, 15, 45, 0, 0, time.UTC)
 
 	moon, err := geoPos(eph.At(eph.Default(), at).Geometric(eph.Moon, eph.Earth))
 	if err != nil {

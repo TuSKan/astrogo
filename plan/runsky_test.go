@@ -4,11 +4,12 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -38,8 +39,8 @@ func runSkySite(t *testing.T) *Site {
 // runSkyStart is the evening of 27 March 2026 at runSkySite, with the Moon
 // past first quarter and up through the evening, so MoonSep has a Moon in the
 // sky to keep targets away from.
-func runSkyStart() time.Time {
-	return time.Date(2026, time.March, 27, 17, 0, 0, 0, time.LocationUTC)
+func runSkyStart() epoch.Time {
+	return epoch.Date(2026, time.March, 27, 17, 0, 0, 0, time.UTC)
 }
 
 func sameAngleBits(a, b angle.Angle) bool {
@@ -76,7 +77,7 @@ func TestRunSkyAnswersAsTheConstraintsDo(t *testing.T) {
 		frac float64
 	}
 
-	firsts := map[time.Time]first{}
+	firsts := map[epoch.Time]first{}
 
 	for pass := range 2 {
 		for i := range 40 {

@@ -14,8 +14,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // goBlock matches a fenced Go code block and captures its body.
@@ -548,8 +547,8 @@ func itoa(i int) string {
 // open, a virus scanner reading the .go file just written, stays listed as
 // delete-pending until that handle closes. The next test process to walk the
 // repository then finds the fragments: a gate runs ./... untagged and then
-// tagged, back to back, and TestNoStandardLibraryTimeOutsideTimePackage
-// failed on a leftover frag11.go that way. So this retries, about thirty
+// tagged, back to back, and the guard on time imports (now
+// TestTimePackagesKeepTheirNames) failed on a leftover frag11.go that way. So this retries, about thirty
 // seconds at most and without reading the clock, and says so if the
 // directory outlives that rather than discarding the error.
 func removeAndWait(t *testing.T, dir string) {

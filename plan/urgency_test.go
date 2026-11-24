@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -37,7 +38,7 @@ func TestHoursUntilSetInterpolatesBetweenProbes(t *testing.T) {
 	// rising for the first half of them, which is the case the old
 	// interpolation got wrong.
 	star := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(-30))}
-	day := time.Date(2024, time.June, 15, 0, 0, 0, 0, time.LocationUTC)
+	day := epoch.Date(2024, time.June, 15, 0, 0, 0, 0, time.UTC)
 
 	windows, err := VisibleIntervals(star, site, Window{Start: day, End: day.Add(unit.Days(1))}, unit.Minutes(5), angle.Zero())
 	if err != nil || len(windows) != 1 {

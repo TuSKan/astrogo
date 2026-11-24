@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -23,8 +24,8 @@ func sameVecBits(a, b vector.Vec3) bool {
 		math.Float64bits(a.Z) == math.Float64bits(b.Z)
 }
 
-func moonPlacesEpoch() time.Time {
-	return time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+func moonPlacesEpoch() epoch.Time {
+	return epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 }
 
 // TestMoonPlacesAnswerAsTheProcessCache: over forty instants asked for twice,

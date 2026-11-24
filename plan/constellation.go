@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Constellation is a fixed target at one of the 88 IAU constellations'
@@ -57,7 +57,7 @@ func (c *Constellation) Abbreviation() string { return c.abbr }
 
 // Position returns the fixed boundary-centroid ICRS position
 // (time-independent).
-func (c *Constellation) Position(_ time.Time) (coord.ICRS, error) {
+func (c *Constellation) Position(_ epoch.Time) (coord.ICRS, error) {
 	return c.pos, nil
 }
 

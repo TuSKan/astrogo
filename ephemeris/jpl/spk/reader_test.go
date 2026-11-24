@@ -8,13 +8,13 @@ import (
 	"io"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // fakeReaderAt adapts a *bytes.Reader (which already implements io.ReaderAt)

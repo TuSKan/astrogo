@@ -3,10 +3,11 @@ package plan
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -14,11 +15,11 @@ import (
 // whose verdict depends only on the clock, so a test of the scheduler's
 // account of it does not depend on the sky.
 type failsBefore struct {
-	until time.Time
+	until epoch.Time
 	why   string
 }
 
-func (c failsBefore) Check(_ Observable, _ *Site, t time.Time) (Result, error) {
+func (c failsBefore) Check(_ Observable, _ *Site, t epoch.Time) (Result, error) {
 	if t.Before(c.until) {
 		return Result{Reason: c.why}, nil
 	}
@@ -89,7 +90,7 @@ func TestAnUnscheduledBlockNamesTheConstraintThatKeptItOut(t *testing.T) {
 		{10 * time.Minute, "never", 1},
 	} {
 		constraints := []Constraint{
-			failsBefore{until: window.Start.Add(time.FromGoDuration(c.until)), why: "too early"},
+			failsBefore{until: window.Start.Add(epoch.FromGoDuration(c.until)), why: "too early"},
 			failsBefore{until: window.End.Add(unit.Hours(1)), why: "never"},
 		}
 		block := &Block{ID: "B", Target: star, Duration: unit.Minutes(10), Constraints: constraints}

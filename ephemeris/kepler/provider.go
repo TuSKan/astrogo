@@ -6,8 +6,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -107,7 +107,7 @@ func (p *Provider) Register(id core.ID, el Elements) error {
 // Located about its own center, the orbit meets the Earth, the Sun and any
 // parent planet only where ephemeris.At composes it with the base's chains,
 // so one ephemeris places them all.
-func (p *Provider) Locate(id core.ID, t time.Time) (core.State, error) {
+func (p *Provider) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	// SOFA's theories compute a NaN position from a NaN date, and Moon98 has
 	// no status to say so, so ephemeris.Default answered the Sun and the Moon
 	// at a NaN or infinite time with NaN and no error (#1002). Checked before
@@ -162,7 +162,7 @@ func PlutoElements() Elements { return plutoElements }
 
 // plutoElements is the value PlutoElements returns, built once.
 var plutoElements = func() Elements {
-	el, err := NewElements(time.J2000(), unit.AU(39.48211675), 0.24882730,
+	el, err := NewElements(epoch.J2000(), unit.AU(39.48211675), 0.24882730,
 		angle.Deg(17.14001206), angle.Deg(110.30393684),
 		angle.Deg(113.76497945), angle.Deg(14.86012204))
 	if err != nil {
@@ -209,7 +209,7 @@ type epv00At struct {
 	pvh, pvb [2][3]float64
 }
 
-func (s *sofaBase) Locate(id core.ID, t time.Time) (core.State, error) {
+func (s *sofaBase) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	tdb := t.TDB()
 	d1, d2 := tdb.JDParts()
 

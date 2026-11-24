@@ -3,12 +3,13 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -35,7 +36,7 @@ func TestGalacticRoundTrip(t *testing.T) {
 }
 
 func TestEclipticRoundTrip(t *testing.T) {
-	tm := time.FromJD(2451545.0, time.UTC) // J2000
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000
 	icrs := coord.NewICRS(angle.Deg(45), angle.Deg(30))
 
 	ecl := coord.ICRSToEcliptic(icrs, tm)
@@ -47,7 +48,7 @@ func TestEclipticRoundTrip(t *testing.T) {
 
 func TestAltAzRoundTrip(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(10), 500)
-	tm := time.FromJD(2460000.5, time.UTC)
+	tm := epoch.FromJD(2460000.5, epoch.UTC)
 	icrs := coord.NewICRS(angle.Deg(100), angle.Deg(20))
 
 	ctx, err := coord.NewContext(tm, site, atmosphere.StandardRefraction())
@@ -78,7 +79,7 @@ func TestGalacticPole(t *testing.T) {
 
 func TestAltAzEdgeCases(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	// Zenith test
 	icrsAtZenith := coord.NewICRS(angle.Deg(280.4606), angle.Deg(0)) // Simplified
@@ -136,7 +137,7 @@ func TestGalacticExtremes(t *testing.T) {
 func TestEclipticExtremes(t *testing.T) {
 	const tol = 2e-5
 
-	tm := time.FromJD(2451545.0, time.UTC) // J2000
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000
 
 	tests := []struct {
 		name string
@@ -170,7 +171,7 @@ func TestEclipticExtremes(t *testing.T) {
 
 func TestICRSToHourAngle(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 	icrs := coord.NewICRS(angle.Deg(0), angle.Deg(0))
 
 	ctx, err := coord.NewContext(tm, site, atmosphere.StandardRefraction())
@@ -189,7 +190,7 @@ func TestICRSToHourAngle(t *testing.T) {
 func TestRefractionModes(t *testing.T) {
 	site, _ := coord.NewGeodetic(angle.LatDeg(45.0), angle.LonDeg(45.0), 100.0)
 
-	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2023, 5, 1, 6, 0, 0, 0, time.UTC)
 
 	// A star likely to be somewhat low on the horizon
 	astro := coord.NewAstrometric(angle.Deg(270.0), angle.Deg(10.0))
@@ -263,7 +264,7 @@ func TestAstrometricToCIRS(t *testing.T) {
 	astro.SetRV(unit.KmPerSec(50.0)) // km/s
 
 	// Calculate apparent position 10 years later (2010.0)
-	obsTime := time.Date(2010, 1, 1, 12, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2010, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	site, _ := coord.NewGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0)
 
@@ -299,7 +300,7 @@ func TestCIRSToObserved(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2023, 5, 1, 6, 0, 0, 0, time.UTC)
 
 	apparent := coord.NewCIRS(angle.Deg(10.0), angle.Deg(45.0))
 
@@ -329,7 +330,7 @@ func TestLegacyEquatorialHorizontalConsistency(t *testing.T) {
 		t.Fatalf("Failed to create geodetic site: %v", err)
 	}
 
-	obsTime := time.Date(2023, 5, 1, 6, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2023, 5, 1, 6, 0, 0, 0, time.UTC)
 
 	geom := coord.NewICRS(angle.Deg(150), angle.Deg(30))
 
@@ -453,7 +454,7 @@ func TestNegativeLongitude(t *testing.T) {
 func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	tm := time.FromJD(2460000.5, time.UTC)
+	tm := epoch.FromJD(2460000.5, epoch.UTC)
 
 	ctx, err := coord.NewContext(tm, loc, atm)
 	if err != nil {
@@ -489,7 +490,7 @@ func TestICRSBatchToAltAzParallel_Correctness(t *testing.T) {
 func TestReduceBatchParallel_Correctness(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
 	atm := atmosphere.AtAltitude(2635)
-	tm := time.FromJD(2460000.5, time.UTC)
+	tm := epoch.FromJD(2460000.5, epoch.UTC)
 
 	ctx, err := coord.NewContext(tm, loc, atm)
 	if err != nil {

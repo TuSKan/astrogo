@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // FuzzSearchBright serves SBDB's bulk query answer from fuzzed bytes and asks
@@ -53,7 +53,7 @@ func FuzzSearchBright(f *testing.F) {
 	f.Fuzz(func(t *testing.T, body string) {
 		answer.Store(&body)
 
-		for _, at := range []time.Time{{}, time.FromJD(2460600.5, time.TT)} {
+		for _, at := range []epoch.Time{{}, epoch.FromJD(2460600.5, epoch.TT)} {
 			New().SearchBright(context.Background(), resolve.BrightRequest{MaxVMag: 12, Limit: 50, At: at})(
 				func(tgt resolve.Target, err error) bool {
 					if err == nil && tgt.SPKID == "" {

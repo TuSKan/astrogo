@@ -9,8 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // TestTheTimeoutBoundsTheWholeCall: a host that accepts connections and

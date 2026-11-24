@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -16,11 +16,11 @@ import (
 func TestAStarThatCannotBeMovedIsLeftWhereItIs(t *testing.T) {
 	t.Parallel()
 
-	j2016 := time.FromJD(2457389.0, time.TT)
+	j2016 := epoch.FromJD(2457389.0, epoch.TT)
 	star := NewICRSWithKinematics(angle.Deg(150), angle.Deg(20),
 		angle.Arcsec(0.1), angle.Arcsec(0.1), angle.Arcsec(1e300), unit.KmPerSec(0), j2016)
 
-	if _, err := PropagateEpoch(star, time.J2000()); !errors.Is(err, ErrPropagationFailed) {
+	if _, err := PropagateEpoch(star, epoch.J2000()); !errors.Is(err, ErrPropagationFailed) {
 		t.Fatalf("test setup: PropagateEpoch error %v, want ErrPropagationFailed", err)
 	}
 

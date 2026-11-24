@@ -14,10 +14,10 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -165,14 +165,14 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 		var bodySeparations []float64
 
 		for _, row := range rows {
-			epoch := time.FromJD(row.jdUT, time.UTC)
+			at := epoch.FromJD(row.jdUT, epoch.UTC)
 
-			state, err := eph.At(provider, epoch).Apparent(body.id, eph.Geocenter())
+			state, err := eph.At(provider, at).Apparent(body.id, eph.Geocenter())
 			if err != nil {
 				t.Fatalf("%s: Apparent: %v", body.name, err)
 			}
 
-			gotRA, gotDec := apparentEquinoxOfDate(state.Pos, epoch)
+			gotRA, gotDec := apparentEquinoxOfDate(state.Pos, at)
 
 			dRA := wrapDegrees(gotRA-row.raDeg) * math.Cos(gotDec*math.Pi/180)
 			dD := gotDec - row.decDeg
@@ -311,8 +311,8 @@ func TestApparentAgreesWithHorizonsGeocentric(t *testing.T) {
 //
 // eo comes from Atci13 evaluated at the origin because it is a function of the
 // date alone; the direction handed in does not affect it.
-func apparentEquinoxOfDate(pos vector.Vec3, epoch time.Time) (raDeg, decDeg float64) {
-	tt1, tt2 := epoch.TT().JDParts()
+func apparentEquinoxOfDate(pos vector.Vec3, at epoch.Time) (raDeg, decDeg float64) {
+	tt1, tt2 := at.TT().JDParts()
 	rc2i := gofaext.C2i06a(tt1, tt2)
 
 	u := pos.Unit()

@@ -5,15 +5,16 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 
 	// The kernel-backed sources register their backend rather than being
@@ -44,7 +45,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	t := time.Date(2026, 4, 25, 17, 0, 0, 0, tz) // 20:00 UTC
+	t := epoch.Date(2026, 4, 25, 17, 0, 0, 0, tz) // 20:00 UTC
 
 	ctx, err := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 	if err != nil {

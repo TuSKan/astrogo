@@ -13,11 +13,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -27,7 +28,7 @@ func main() {
 	// to 13.5 arcsec, which changes no score at the precision printed. For
 	// full accuracy, blank-import remote/eop and consent to the IERS
 	// bulletin, as 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// ── Observatory: Quinta Calixto (-22.528478°, -46.473002°, 835.05m) ──
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -41,7 +42,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	tm := time.Date(2026, 4, 16, 0, 0, 0, 0, tz)
+	tm := epoch.Date(2026, 4, 16, 0, 0, 0, 0, tz)
 
 	// ── Targets, at their J2000 positions from SIMBAD ───────────────────
 	// 05_resolve_name shows how to look a name up in a catalog instead.

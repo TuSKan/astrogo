@@ -16,13 +16,14 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -86,7 +87,7 @@ func main() {
 			continue
 		}
 
-		var equinox time.Time
+		var equinox epoch.Time
 
 		for _, s := range seasons {
 			if s.Season == plan.SeasonVernalEquinox {
@@ -127,9 +128,9 @@ func main() {
 			conjYear, conjMonth, conjDay, _ := nm.Time.Calendar()
 			// Check this and next 2 days for first visible crescent
 			for dayOff := range 3 {
-				noon := time.Date(
+				noon := epoch.Date(
 					conjYear, time.Month(conjMonth), conjDay+dayOff,
-					9, 39, 0, 0, time.LocationUTC)
+					9, 39, 0, 0, time.UTC)
 
 				result, err := plan.CrescentVisibility(site, noon, prov)
 				if err != nil {
@@ -165,7 +166,7 @@ func main() {
 					weekday := nisan14.Weekday()
 
 					marker := ""
-					if weekday == time.Friday {
+					if weekday == epoch.Friday {
 						marker = "★ FRIDAY"
 
 						fridays = append(fridays, fridayCandidate{

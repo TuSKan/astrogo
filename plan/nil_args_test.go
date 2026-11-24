@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -43,7 +44,7 @@ func TestConstraintsRefuseANilSiteOrTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	at := time.Date(2026, time.June, 15, 4, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 15, 4, 0, 0, 0, time.UTC)
 	ctx := mustContext(t, at, site.Location(), site.Refraction())
 
 	for _, c := range []struct {
@@ -99,7 +100,7 @@ func TestSearchesRefuseANilSiteOrTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.Date(2026, time.June, 15, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Hours(6))
 	star := plan.NewStar("Vega", angle.Deg(279.23), angle.Deg(38.78))
 	vega := fixedObject{coord.NewICRS(angle.Deg(279.23), angle.Deg(38.78))}

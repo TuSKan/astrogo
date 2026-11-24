@@ -5,9 +5,10 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/oracle"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -73,14 +74,14 @@ func stateContractStart(t *testing.T, mu, e, tau float64) (r, v [3]float64) {
 func TestFromStateContract(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	decades, places := 2, []int{0, 1, 2, 3}
 	if testing.Short() {
 		decades, places = 4, []int{3}
 	}
 
-	probe, err := FromState(epoch, vector.V3(1, 0, 0), vector.V3(0, 0.017, 0), sunCenter)
+	probe, err := FromState(at, vector.V3(1, 0, 0), vector.V3(0, 0.017, 0), sunCenter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +110,7 @@ func TestFromStateContract(t *testing.T) {
 				tau := taus[i]
 				r0, v0 := stateContractStart(t, mu, e, tau)
 
-				el, err := FromState(epoch, vector.V3(r0[0], r0[1], r0[2]), vector.V3(v0[0], v0[1], v0[2]), sunCenter)
+				el, err := FromState(at, vector.V3(r0[0], r0[1], r0[2]), vector.V3(v0[0], v0[1], v0[2]), sunCenter)
 				if err != nil {
 					t.Fatalf("τ %g: %v", tau, err)
 				}

@@ -7,20 +7,21 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // sofaEpoch is one fixed instant in the comparison, named so a failing
 // sample identifies itself.
 //
 // Fixed, because a validation result whose epoch is "now" cannot be
-// reproduced: this test previously used time.NowUTC() for one of its three
+// reproduced: this test previously used epoch.Now() for one of its three
 // points, so every run compared a different instant and any failure would
 // have been unreproducible by the person reading the log. It also meant the
 // contract below was re-rolled against a fresh epoch on every run — see
@@ -32,7 +33,7 @@ import (
 // [sofaLastYear] and [firstLeapSecondYear].
 type sofaEpoch struct {
 	name string
-	t    time.Time
+	t    epoch.Time
 }
 
 // sofaLastYear ends the window at both reference routines' own upper limit.
@@ -53,7 +54,7 @@ const sofaLastYear = 2100
 // sofaEpochs samples the window quarterly.
 //
 // It used to be three named instants, which is not enough to say anything
-// about a maximum — and one of the three used to be time.NowUTC(), so the
+// about a maximum — and one of the three used to be epoch.Now(), so the
 // contract's margin was re-rolled on every run and a failure could not be
 // reproduced by the person reading the log. Fixing the wall clock removed the
 // irreproducibility; this removes the sample size, and brings these two rows
@@ -69,8 +70,8 @@ func sofaEpochs() []sofaEpoch {
 
 	for y := first; y <= last; y++ {
 		for _, mo := range quarters {
-			at := time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC)
-			out = append(out, sofaEpoch{name: at.Format(isoDate), t: at})
+			at := epoch.Date(y, mo, 1, 0, 0, 0, 0, time.UTC)
+			out = append(out, sofaEpoch{name: at.Format(time.DateOnly), t: at})
 		}
 	}
 
@@ -98,7 +99,7 @@ func sofaEpochs() []sofaEpoch {
 // published worst case of 31.7 km, so the Moon bound demanded the two agree
 // twice as closely as SOFA documents its own routine to be accurate. It
 // passed only because the sampled epochs happened to land in a favorable
-// part of the lunar residual, and one of those epochs was time.NowUTC(), so
+// part of the lunar residual, and one of those epochs was epoch.Now(), so
 // that luck was re-rolled on every single run.
 //
 // The bounds below are the published worst cases doubled. The factor is not

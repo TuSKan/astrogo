@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -53,7 +53,7 @@ func TestSubPointIsOverhead(t *testing.T) {
 		2461318.0, // 2026
 		2469807.5, // 2050
 	} {
-		tm := time.FromJD(jd, time.UTC)
+		tm := epoch.FromJD(jd, epoch.UTC)
 
 		for _, dir := range directions {
 			geo, err := coord.SubPoint(dir, tm)
@@ -104,7 +104,7 @@ func TestSubPointPutsANearBodyAtTheZenith(t *testing.T) {
 		issAU     = (6378.137 + 420) / 149597870.7
 	)
 
-	tm := time.FromJD(2461318.0, time.UTC)
+	tm := epoch.FromJD(2461318.0, epoch.UTC)
 
 	for _, c := range []struct {
 		name     string
@@ -144,7 +144,7 @@ func TestSubPointPutsANearBodyAtTheZenith(t *testing.T) {
 // TestSubPoint_ZeroVector confirms the degenerate zero-length input is
 // rejected rather than silently returning (0,0).
 func TestSubPoint_ZeroVector(t *testing.T) {
-	_, err := coord.SubPoint(vector.Vec3{}, time.FromJD(2451545.0, time.UTC))
+	_, err := coord.SubPoint(vector.Vec3{}, epoch.FromJD(2451545.0, epoch.UTC))
 	if !errors.Is(err, coord.ErrZeroVector) {
 		t.Fatalf("SubPoint(zero vector) error = %v, want ErrZeroVector", err)
 	}
@@ -161,7 +161,7 @@ func TestSubPoint_ZeroVector(t *testing.T) {
 // precession moves it 20 arcsec a year from there. That test passed because
 // SubPoint ignored both.
 func TestSubPoint_PoleIsLongitudeIndependent(t *testing.T) {
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	site, err := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	if err != nil {

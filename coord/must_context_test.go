@@ -5,12 +5,12 @@ import (
 
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // mustContext is coord.NewContext for a test, failing it on the error
 // coord.NewContext returns.
-func mustContext(tb testing.TB, at time.Time, site *coord.Geodetic, atm atmosphere.Refraction) *coord.Context {
+func mustContext(tb testing.TB, at epoch.Time, site *coord.Geodetic, atm atmosphere.Refraction) *coord.Context {
 	tb.Helper()
 
 	ctx, err := coord.NewContext(at, site, atm)
@@ -23,7 +23,7 @@ func mustContext(tb testing.TB, at time.Time, site *coord.Geodetic, atm atmosphe
 
 // mustReducer is coord.NewReducer for a test, failing it on the error
 // coord.NewReducer returns.
-func mustReducer(tb testing.TB, site *coord.Geodetic, at time.Time, atm atmosphere.Refraction) *coord.Reducer {
+func mustReducer(tb testing.TB, site *coord.Geodetic, at epoch.Time, atm atmosphere.Refraction) *coord.Reducer {
 	tb.Helper()
 
 	r, err := coord.NewReducer(site, at, atm)

@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -77,8 +78,8 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 		{"Moon", 12, 21, "rise", 8, 16, 56, 174},
 		{"Moon", 12, 21, "set", 23, 9, 54, 914},
 	} {
-		start := time.Date(2026, time.Month(c.month), c.day, 0, 0, 0, 0, time.LocationUTC)
-		end := time.Date(2026, time.Month(c.month), c.day+1, 0, 0, 0, 0, time.LocationUTC)
+		start := epoch.Date(2026, time.Month(c.month), c.day, 0, 0, 0, 0, time.UTC)
+		end := epoch.Date(2026, time.Month(c.month), c.day+1, 0, 0, 0, 0, time.UTC)
 
 		events := SunEvents
 		if c.body == "Moon" {
@@ -95,9 +96,9 @@ func TestRiseAndSetAtAltitudeAgreeWithSkyfield(t *testing.T) {
 			kind = EventSet
 		}
 
-		want := time.Date(2026, time.Month(c.month), c.day, c.hour, c.minute, c.second, int(math.Round(c.millisecond*1e6)), time.LocationUTC)
+		want := epoch.Date(2026, time.Month(c.month), c.day, c.hour, c.minute, c.second, int(math.Round(c.millisecond*1e6)), time.UTC)
 
-		var found []time.Time
+		var found []epoch.Time
 
 		for _, e := range got {
 			if e.Kind == kind {

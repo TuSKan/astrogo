@@ -2,14 +2,15 @@ package coord
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
-func bracketFixture(t *testing.T) (*Geodetic, atmosphere.Refraction, time.Time) {
+func bracketFixture(t *testing.T) (*Geodetic, atmosphere.Refraction, epoch.Time) {
 	t.Helper()
 
 	site, err := NewGeodetic(angle.LatDeg(50), angle.LonDeg(15), 0)
@@ -17,7 +18,7 @@ func bracketFixture(t *testing.T) (*Geodetic, atmosphere.Refraction, time.Time) 
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	return site, atmosphere.StandardRefraction(), time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
+	return site, atmosphere.StandardRefraction(), epoch.Date(2026, time.June, 15, 12, 0, 0, 0, time.UTC)
 }
 
 // TestSetTimeEvaluatesTheSeriesOnceADay is #790's cost in the terms that
@@ -33,7 +34,7 @@ func TestSetTimeEvaluatesTheSeriesOnceADay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var at []time.Time
+	var at []epoch.Time
 
 	note := func(n *node) {
 		for _, a := range at {

@@ -12,9 +12,9 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -201,7 +201,7 @@ func TestJPLStateAgainstHorizons(t *testing.T) {
 			continue
 		}
 
-		tm := time.FromJD(2451545.0+sv.ET/86400.0, time.TDB)
+		tm := epoch.FromJD(2451545.0+sv.ET/86400.0, epoch.TDB)
 
 		state, err := eph.At(p, tm).Geometric(hc.id, core.Earth)
 		if err != nil {

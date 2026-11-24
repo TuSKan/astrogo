@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // defaultLimMagRamp is the soft-ramp half-width, in magnitudes, that
@@ -40,7 +40,7 @@ type SkyDepth interface {
 	// The magnitude is the one above the atmosphere, which is what a catalog
 	// and an ephemeris quote and what the constraint compares it against, so
 	// an implementation dims the source by the air toward (alt, az) itself.
-	LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error)
+	LimitingMagnitudeAt(t epoch.Time, alt, az angle.Angle) (float64, error)
 }
 
 // LimitingMagnitudeConstraint scores or gates targets by comparing how deep
@@ -93,7 +93,7 @@ type LimitingMagnitudeConstraint struct {
 var _ ConstraintCtx = LimitingMagnitudeConstraint{}
 
 // Check evaluates the constraint, building a coord.Context for (t, site).
-func (c LimitingMagnitudeConstraint) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c LimitingMagnitudeConstraint) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -104,7 +104,7 @@ func (c LimitingMagnitudeConstraint) Check(obj Observable, site *Site, t time.Ti
 
 // CheckCtx evaluates the constraint using a pre-built coord.Context.
 func (c LimitingMagnitudeConstraint) CheckCtx(
-	obj Observable, _ *Site, _ time.Time, ctx *coord.Context,
+	obj Observable, _ *Site, _ epoch.Time, ctx *coord.Context,
 ) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget

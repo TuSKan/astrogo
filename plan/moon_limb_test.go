@@ -3,13 +3,14 @@ package plan_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -56,7 +57,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 			t.Fatalf("NewSite: %v", err)
 		}
 
-		start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+		start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 		events, err := plan.MoonEvents(site, plan.Window{Start: start, End: start.Add(span)}, prov)
 		if err != nil {
@@ -68,7 +69,7 @@ func TestMoonEventsPutTheUpperLimbOnTheHorizon(t *testing.T) {
 		// limbAbove is the upper limb's height above the horizon at t, in
 		// degrees, and the semi-diameter, in arcminutes, from a fresh
 		// geometric Context.
-		limbAbove := func(at time.Time) (float64, float64) {
+		limbAbove := func(at epoch.Time) (float64, float64) {
 			ctx, err := coord.NewContext(at, loc, atmosphere.Refraction{})
 			if err != nil {
 				t.Fatal(err)

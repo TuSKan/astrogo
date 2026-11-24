@@ -8,10 +8,10 @@ import (
 	"net"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // requireArchive skips the test when the archive id names is unreachable, and

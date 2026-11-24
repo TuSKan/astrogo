@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -17,12 +17,12 @@ type mockObject struct {
 	pos coord.ICRS
 }
 
-func (m mockObject) ICRS(_ time.Time) (coord.ICRS, error) {
+func (m mockObject) ICRS(_ epoch.Time) (coord.ICRS, error) {
 	return m.pos, nil
 }
 
-func (m mockObject) Name() string                             { return "mock" }
-func (m mockObject) Position(_ time.Time) (coord.ICRS, error) { return m.pos, nil }
+func (m mockObject) Name() string                              { return "mock" }
+func (m mockObject) Position(_ epoch.Time) (coord.ICRS, error) { return m.pos, nil }
 func (m mockObject) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }
@@ -58,7 +58,7 @@ func TestVisibleIntervals(t *testing.T) {
 
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	start := time.FromJD(2460000.5, time.UTC)
+	start := epoch.FromJD(2460000.5, epoch.UTC)
 	end := start.Add(unit.Days(1))
 
 	// Circumpolar-like object (very high dec)
@@ -76,7 +76,7 @@ func TestVisibleIntervals_StepTooLarge(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	start := time.FromJD(2460000.5, time.UTC)
+	start := epoch.FromJD(2460000.5, epoch.UTC)
 	end := start.Add(unit.Days(1))
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(0), angle.Deg(45))}
@@ -93,7 +93,7 @@ func TestNeverVisible(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	start := time.FromJD(2460000.5, time.UTC)
+	start := epoch.FromJD(2460000.5, epoch.UTC)
 	end := start.Add(unit.Days(1))
 
 	// Object far below horizon (antipode)
@@ -111,7 +111,7 @@ func TestTransitEstimate(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(0.5))
 
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
@@ -162,7 +162,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 	// one-second time tolerance alone is worth tens of milliarcseconds.
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(-30))}
 
-	altAt := func(tm time.Time) float64 {
+	altAt := func(tm epoch.Time) float64 {
 		aa, err := observedAltAz(obj, tm, mustContext(t, tm, site.Location(), site.Refraction()), obj.pos)
 		if err != nil {
 			t.Fatalf("altitude at %v: %v", tm, err)
@@ -171,7 +171,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 		return aa.Alt().Degrees()
 	}
 
-	day := time.FromJD(2461000.5, time.UTC)
+	day := epoch.FromJD(2461000.5, epoch.UTC)
 
 	transit, _, err := TransitEstimate(obj, site, Window{Start: day, End: day.Add(unit.Days(1))})
 	testutil.AssertNoError(t, err)
@@ -242,7 +242,7 @@ func TestTransitEstimateFindsThePeakAtTheWindowEdge(t *testing.T) {
 func TestFind(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(45), angle.LonDeg(0), 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(1))
 	obj := mockObject{pos: coord.NewICRS(angle.Deg(100), angle.Deg(20))}
 
@@ -260,7 +260,7 @@ func TestFind(t *testing.T) {
 }
 
 func TestDuration(t *testing.T) {
-	start := time.FromJD(2460000.0, time.UTC)
+	start := epoch.FromJD(2460000.0, epoch.UTC)
 	end := start.Add(unit.Days(1))
 	win := Window{Start: start, End: end}
 

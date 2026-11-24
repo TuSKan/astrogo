@@ -2,18 +2,19 @@ package coord_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Two systems both called "apparent", twenty arcminutes apart. The pipeline
 // produces the CIRS one; an almanac prints the other.
 func ExampleContext_CIRSToTETE() {
 	ctx, err := coord.NewContext(
-		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC),
 		coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		atmosphere.Refraction{},
 	)

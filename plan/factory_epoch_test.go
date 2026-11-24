@@ -2,11 +2,12 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ import (
 func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 	t.Parallel()
 
-	gaiaEpoch := time.FromJD(2457389.0, time.TT)
+	gaiaEpoch := epoch.FromJD(2457389.0, epoch.TT)
 
 	for _, c := range []struct {
 		name         string
@@ -28,7 +29,7 @@ func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 		{
 			name: "Barnard's star",
 			simbad: resolve.Target{
-				Name: "Barnard's star", Kind: resolve.KindStar, HasCoord: true, Epoch: time.J2000(),
+				Name: "Barnard's star", Kind: resolve.KindStar, HasCoord: true, Epoch: epoch.J2000(),
 				Coord: coord.NewICRS(angle.Deg(269.4520769586), angle.Deg(4.6933649666)),
 				PmRA:  angle.Arcsec(-0.8015510), PmDec: angle.Arcsec(10.3623940), Parallax: angle.Arcsec(0.5469759),
 				RadialVelocity: unit.KmPerSec(-110.11), HasRadialVelocity: true,
@@ -48,7 +49,7 @@ func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 		{
 			name: "HD 209458",
 			simbad: resolve.Target{
-				Name: "HD 209458", Kind: resolve.KindStar, HasCoord: true, Epoch: time.J2000(),
+				Name: "HD 209458", Kind: resolve.KindStar, HasCoord: true, Epoch: epoch.J2000(),
 				Coord: coord.NewICRS(angle.Deg(330.7948864439), angle.Deg(18.8843192759)),
 				PmRA:  angle.Arcsec(0.0297660), PmDec: angle.Arcsec(-0.0179760), Parallax: angle.Arcsec(0.0207694),
 				RadialVelocity: unit.KmPerSec(-14.743), HasRadialVelocity: true,
@@ -61,7 +62,7 @@ func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 			maxArcsec: 0.01,
 		},
 	} {
-		at := time.Date(2026, 10, 1, 4, 0, 0, 0, time.LocationUTC)
+		at := epoch.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 
 		var now [2]coord.ICRS
 
@@ -96,9 +97,9 @@ func TestFromCatalogPlacesAStarFromItsOwnEpoch(t *testing.T) {
 func TestFromCatalogLeavesAJ2000StarAsGiven(t *testing.T) {
 	t.Parallel()
 
-	for _, epoch := range []time.Time{time.J2000(), {}} {
+	for _, at := range []epoch.Time{epoch.J2000(), {}} {
 		tg := resolve.Target{
-			Name: "Vega", Kind: resolve.KindStar, HasCoord: true, Epoch: epoch,
+			Name: "Vega", Kind: resolve.KindStar, HasCoord: true, Epoch: at,
 			Coord: coord.NewICRS(angle.Deg(279.23473479), angle.Deg(38.78368896)),
 			PmRA:  angle.Arcsec(0.20094), PmDec: angle.Arcsec(0.28623), Parallax: angle.Arcsec(0.13023),
 		}
@@ -108,13 +109,13 @@ func TestFromCatalogLeavesAJ2000StarAsGiven(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		pos, err := obj.Position(time.J2000())
+		pos, err := obj.Position(epoch.J2000())
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if pos.RA() != tg.Coord.RA() || pos.Dec() != tg.Coord.Dec() {
-			t.Errorf("epoch %v: Vega moved to (%v, %v)", epoch, pos.RA(), pos.Dec())
+			t.Errorf("epoch %v: Vega moved to (%v, %v)", at, pos.RA(), pos.Dec())
 		}
 	}
 }

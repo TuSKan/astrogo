@@ -5,7 +5,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -42,7 +42,7 @@ func readKinematics(t *resolve.Target, row []string, colIdx map[string]int) {
 		return finite.Parse(row[i])
 	}
 
-	t.Epoch = time.J2000()
+	t.Epoch = epoch.J2000()
 
 	if v, ok := value("pmra"); ok {
 		t.PmRA = angle.Arcsec(v / 1000)
@@ -64,8 +64,8 @@ func readKinematics(t *resolve.Target, row []string, colIdx map[string]int) {
 	t.AstrometricError = astrometricError(row, colIdx)
 
 	if i, ok := colIdx["coo_bibcode"]; ok && i < len(row) {
-		if epoch, ok := gaiaCoordinateEpochs[row[i]]; ok {
-			atGaiaEpoch(t, epoch)
+		if at, ok := gaiaCoordinateEpochs[row[i]]; ok {
+			atGaiaEpoch(t, at)
 		}
 	}
 }
@@ -89,7 +89,7 @@ func readKinematics(t *resolve.Target, row []string, colIdx map[string]int) {
 // guess moves there. A star whose motion between the epochs carries it near
 // a pole is not reached, and like any target the search fails for, it stays
 // at J2000.0, as SIMBAD gives it.
-func atGaiaEpoch(t *resolve.Target, epoch time.Time) {
+func atGaiaEpoch(t *resolve.Target, at epoch.Time) {
 	want := vector.FromSpherical(t.Coord.RA().Radians(), t.Coord.Dec().Radians())
 	guess := want
 
@@ -97,9 +97,9 @@ func atGaiaEpoch(t *resolve.Target, epoch time.Time) {
 		lon, lat := guess.ToSpherical()
 
 		atEpoch := coord.NewICRSWithKinematics(angle.Rad(lon), angle.Rad(lat),
-			t.PmRA, t.PmDec, t.Parallax, unit.KmPerSec(0), epoch)
+			t.PmRA, t.PmDec, t.Parallax, unit.KmPerSec(0), at)
 
-		moved, err := coord.PropagateEpoch(atEpoch, time.J2000())
+		moved, err := coord.PropagateEpoch(atEpoch, epoch.J2000())
 		if err != nil {
 			return
 		}
@@ -107,7 +107,7 @@ func atGaiaEpoch(t *resolve.Target, epoch time.Time) {
 		residual := want.Sub(vector.FromSpherical(moved.RA().Radians(), moved.Dec().Radians()))
 		if residual.Norm() < gaiaEpochTolerance {
 			t.Coord = coord.NewICRS(angle.Rad(lon), angle.Rad(lat))
-			t.Epoch = epoch
+			t.Epoch = at
 
 			return
 		}

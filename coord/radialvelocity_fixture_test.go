@@ -7,12 +7,13 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -219,7 +220,7 @@ func TestRVCorrectionAgainstAstropy(t *testing.T) {
 			t.Fatalf("%s: parsing %q: %v", tc.Name, tc.EpochUTC, err)
 		}
 
-		ctx, err := coord.NewContext(time.FromGo(parsed), site, atm)
+		ctx, err := coord.NewContext(epoch.FromGo(parsed), site, atm)
 		if err != nil {
 			t.Fatal(err)
 		}

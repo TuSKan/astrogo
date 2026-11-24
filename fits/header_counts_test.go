@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/fits"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // tableFile is an empty primary HDU followed by a one-row table extension of

@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/oracle"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -47,7 +48,7 @@ func TestTwoPiIsThreeExactParts(t *testing.T) {
 // -short: E within contractAnomalyULPs of the exact root, E(±0) = ±0 and
 // E(−M) = −E(M) bit for bit, and the perifocal state within its bounds.
 func TestSolveKeplerContract(t *testing.T) {
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, e := range oracle.Eccentricities() {
 		for _, z := range []float64{0, math.Copysign(0, -1)} {
@@ -82,7 +83,7 @@ func TestSolveKeplerContract(t *testing.T) {
 				continue
 			}
 
-			el, err := NewElements(epoch, unit.AU(2.77), e, angle.Zero(), angle.Zero(), angle.Zero(), angle.Rad(m))
+			el, err := NewElements(at, unit.AU(2.77), e, angle.Zero(), angle.Zero(), angle.Zero(), angle.Rad(m))
 			if err != nil {
 				t.Fatalf("e = %v, M = %v: %v", e, m, err)
 			}

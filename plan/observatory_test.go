@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -16,7 +17,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/unit"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 func TestNewSite(t *testing.T) {
@@ -373,7 +374,7 @@ func TestLocalSiderealTime(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.LatDeg(51.5), angle.LonDeg(0), 0) // Greenwich
 	site, _ := NewSite("Greenwich", loc.Lat(), loc.Lon(), loc.Height())
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	lst, err := site.LocalSiderealTime(tm)
 	if err != nil {
@@ -562,6 +563,66 @@ func TestNewKnownSiteReturnsSharedInstanceWithoutOpts(t *testing.T) {
 
 	if s1 != s2 {
 		t.Errorf("NewKnownSite with no opts should return the shared registry *Site, got distinct pointers")
+	}
+}
+
+// TestKnownSitesLoadNoTimeZoneAtInit pins where a known site's time zone is
+// loaded: on the first NewKnownSite, which can return the error, and not
+// while the package initializes. The table used to load all ten there, and a
+// host without a zone database (Windows without Go installed, a minimal
+// container) panicked every program importing plan before main ran.
+func TestKnownSitesLoadNoTimeZoneAtInit(t *testing.T) {
+	t.Parallel()
+
+	for key, k := range knownSites {
+		if k.timeZone != nil {
+			t.Errorf("%s: the table holds a loaded time zone, %v; NewKnownSite loads it", key, k.timeZone)
+		}
+	}
+}
+
+// TestNewKnownSiteCarriesItsTimeZone: the zone loaded on first use is the one
+// the table names.
+func TestNewKnownSiteCarriesItsTimeZone(t *testing.T) {
+	t.Parallel()
+
+	for name, want := range map[string]string{
+		"Greenwich": "Europe/London",
+		"Mauna Kea": "Pacific/Honolulu",
+		"Paranal":   "America/Santiago",
+	} {
+		s, err := NewKnownSite(name)
+		if err != nil {
+			t.Fatalf("NewKnownSite(%q): %v", name, err)
+		}
+
+		if got := s.TimeZone().String(); got != want {
+			t.Errorf("NewKnownSite(%q).TimeZone() = %s, want %s", name, got, want)
+		}
+	}
+}
+
+// TestAKnownSiteWhoseZoneDoesNotLoadIsAnError: a zone the host cannot load is
+// an error naming the site and the zone, on every call, and leaves the
+// table's entry as it was.
+func TestAKnownSiteWhoseZoneDoesNotLoadIsAnError(t *testing.T) {
+	t.Parallel()
+
+	k := known(Site{name: "Nowhere"}, "Nowhere/Not_A_Zone")
+
+	for call := range 2 {
+		s, err := k.site()
+		if err == nil {
+			t.Fatalf("call %d: site() = %v, nil; want the zone's load error", call, s)
+		}
+
+		if msg := err.Error(); !strings.Contains(msg, `"Nowhere"`) || !strings.Contains(msg, "Nowhere/Not_A_Zone") {
+			t.Errorf("call %d: error %q does not name both the site and the zone", call, msg)
+		}
+	}
+
+	if k.timeZone != nil {
+		t.Errorf("a failed load set the entry's time zone to %v", k.timeZone)
 	}
 }
 

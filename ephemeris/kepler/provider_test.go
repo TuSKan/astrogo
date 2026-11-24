@@ -3,13 +3,14 @@ package kepler_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -23,7 +24,7 @@ func testElementsForProvider(t *testing.T) kepler.Elements {
 	t.Helper()
 
 	el, err := kepler.NewElements(
-		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		unit.AU(2.5), 0.1, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0),
 	)
 	testutil.AssertNoError(t, err)
@@ -47,7 +48,7 @@ func TestRegister_RejectsInvalidElements(t *testing.T) {
 	// same guard NewElements already enforces from a second angle:
 	// Register never trusts an Elements value blindly).
 	_, err := kepler.NewElements(
-		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		unit.AU(2.5), 1.5, angle.Deg(5), angle.Deg(30), angle.Deg(60), angle.Deg(0), // e=1.5, hyperbolic
 	)
 	testutil.AssertErrorIs(t, err, kepler.ErrUnsupportedOrbit)
@@ -80,7 +81,7 @@ func TestProvider_Locate_DefaultBase_SunMoonPlanets(t *testing.T) {
 	p := kepler.New()
 	testutil.AssertNoError(t, p.Register(propagatedID, testElementsForProvider(t)))
 
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	bodies := []struct {
 		name string
@@ -120,7 +121,7 @@ func TestProvider_Locate_DefaultBase_UnsupportedBody(t *testing.T) {
 	p := kepler.New()
 	testutil.AssertNoError(t, p.Register(propagatedID, testElementsForProvider(t)))
 
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	// Pluto used to be the example here, because SOFA has no analytical
 	// source for it. The default base now propagates its Standish elements
@@ -145,7 +146,7 @@ type mockBaseProvider struct {
 
 var errMockBase = errors.New("mockBaseProvider: intentional test failure")
 
-func (m *mockBaseProvider) Locate(core.ID, time.Time) (core.State, error) {
+func (m *mockBaseProvider) Locate(core.ID, epoch.Time) (core.State, error) {
 	m.called = true
 	if m.wantErr != nil {
 		return core.State{}, m.wantErr
@@ -164,7 +165,7 @@ func TestProvider_Locate_WithBase_Override(t *testing.T) {
 	p := kepler.New(kepler.WithBase(mock))
 	testutil.AssertNoError(t, p.Register(propagatedID, testElementsForProvider(t)))
 
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	if _, err := eph.At(p, tm).Geometric(core.Sun, core.Earth); err != nil {
 		t.Fatalf("Geometric(Sun): %v", err)
@@ -183,7 +184,7 @@ func TestProvider_Locate_WithBase_WrapsError(t *testing.T) {
 	p := kepler.New(kepler.WithBase(mock))
 	testutil.AssertNoError(t, p.Register(propagatedID, testElementsForProvider(t)))
 
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	_, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	testutil.AssertErrorIs(t, err, errMockBase)
@@ -205,7 +206,7 @@ func TestProvider_MultiBody(t *testing.T) {
 	el1 := testElementsForProvider(t)
 
 	el2, err := kepler.NewElements(
-		time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		4.0, 0.2, angle.Deg(10), angle.Deg(50), angle.Deg(90), angle.Deg(180),
 	)
 	testutil.AssertNoError(t, err)

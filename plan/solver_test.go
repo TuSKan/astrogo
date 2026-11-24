@@ -3,29 +3,30 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // epoch is a fixed reference time for test evaluators.
-var epoch = time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+var refEpoch = epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // timeFunc wraps a pure mathematical function f(seconds) into an Evaluator
 // where seconds is measured from epoch.
 func timeFunc(f func(float64) float64) plan.Evaluator {
-	return func(t time.Time) (float64, error) {
-		sec := t.Sub(epoch).Seconds()
+	return func(t epoch.Time) (float64, error) {
+		sec := t.Sub(refEpoch).Seconds()
 		return f(sec), nil
 	}
 }
 
 // after returns epoch + d seconds.
-func after(seconds float64) time.Time {
-	return epoch.Add(unit.Seconds(seconds))
+func after(seconds float64) epoch.Time {
+	return refEpoch.Add(unit.Seconds(seconds))
 }
 
 // tightSolver returns a solver with microsecond tolerance for analytical tests.
@@ -49,7 +50,7 @@ func TestFindRoot_LinearFunction(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
 	if math.Abs(rootSec-5) > 1e-6 {
@@ -68,7 +69,7 @@ func TestFindRoot_QuadraticFunction(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
 	if math.Abs(rootSec-2) > 1e-6 {
@@ -85,7 +86,7 @@ func TestFindRoot_SineFunction(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.12f s  f(root)=%e  (π=%.12f)", rootSec, fval, math.Pi)
 
 	if math.Abs(rootSec-math.Pi) > 1e-6 {
@@ -106,7 +107,7 @@ func TestFindRoot_FlatFunction(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e (flat triple root)", rootSec, fval)
 
 	if math.Abs(rootSec-3) > 1e-3 {
@@ -126,7 +127,7 @@ func TestFindRoot_ExponentialDecay(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e  (expected=%.9f)", rootSec, fval, expected)
 
 	if math.Abs(rootSec-expected) > 1e-6 {
@@ -148,7 +149,7 @@ func TestFindRoot_AstronomicalScale(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	expected := period / 6 // = 14400
 	t.Logf("root=%.3f s  f(root)=%e  (expected=%.1f s)", rootSec, fval, expected)
 
@@ -182,7 +183,7 @@ func TestFindRoot_ExactRootAtEndpoint(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.9f s  f(root)=%e", rootSec, fval)
 
 	// The solver should converge very close to 0
@@ -207,7 +208,7 @@ func TestFindExtremum_QuadraticMinimum(t *testing.T) {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
 
-	minSec := minT.Sub(epoch).Seconds()
+	minSec := minT.Sub(refEpoch).Seconds()
 	t.Logf("min=%.9f s  f(min)=%e", minSec, minVal)
 
 	if math.Abs(minSec-7) > 1e-3 {
@@ -233,7 +234,7 @@ func TestFindExtremum_QuadraticMaximum(t *testing.T) {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
 
-	maxSec := maxT.Sub(epoch).Seconds()
+	maxSec := maxT.Sub(refEpoch).Seconds()
 	t.Logf("max=%.9f s  f(max)=%.6f", maxSec, maxVal)
 
 	if math.Abs(maxSec-5) > 1e-3 {
@@ -254,7 +255,7 @@ func TestFindExtremum_CosineMinimum(t *testing.T) {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
 
-	minSec := minT.Sub(epoch).Seconds()
+	minSec := minT.Sub(refEpoch).Seconds()
 	t.Logf("min=%.12f s  f(min)=%.12f  (π=%.12f)", minSec, minVal, math.Pi)
 
 	if math.Abs(minSec-math.Pi) > 1e-3 {
@@ -281,7 +282,7 @@ func TestFindExtremum_TransitSimulation(t *testing.T) {
 		t.Fatalf("FindExtremum failed: %v", err)
 	}
 
-	maxSec := maxT.Sub(epoch).Seconds()
+	maxSec := maxT.Sub(refEpoch).Seconds()
 	expected := period / 2.0 // 21600 s
 	t.Logf("transit=%.3f s (%.1f h)  expected=%.1f s (%.1f h)", maxSec, maxSec/3600, expected, expected/3600)
 
@@ -357,8 +358,8 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 	count := 0
 	s := plan.Solver{Tolerance: unit.Seconds(1e-6), MaxIter: 100} // 1 µs
 
-	root, _, err := s.FindRoot(func(t time.Time) (float64, error) {
-		x := t.Sub(epoch).Seconds()
+	root, _, err := s.FindRoot(func(t epoch.Time) (float64, error) {
+		x := t.Sub(refEpoch).Seconds()
 		count++
 
 		return x*x - 2, nil
@@ -367,7 +368,7 @@ func TestFindRoot_ConvergenceCount(t *testing.T) {
 		t.Fatalf("FindRoot failed: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	t.Logf("root=%.12f (√2=%.12f)  evaluations=%d", rootSec, math.Sqrt(2), count)
 
 	if count > 30 {

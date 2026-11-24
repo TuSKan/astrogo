@@ -16,10 +16,10 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // horizonsContext bounds one request to Horizons by what astrogo's own client allows
@@ -142,7 +142,7 @@ func TestMovingBodyRadialVelocityAgainstHorizons(t *testing.T) {
 	// A fixed instant, so a failure is reproducible.
 	const tlistJD = "2461114.5"
 
-	at := time.FromJD(2461114.5, time.UTC)
+	at := epoch.FromJD(2461114.5, epoch.UTC)
 
 	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{Pressure: 0})
 	if err != nil {

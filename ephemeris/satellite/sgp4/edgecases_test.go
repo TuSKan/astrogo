@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -26,7 +27,7 @@ import (
 func leo() sgp4.Elements {
 	return sgp4.Elements{
 		NORAD:        1,
-		Epoch:        time.Date(2024, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		Epoch:        epoch.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 		Inclination:  angle.Deg(51.6),
 		RAAN:         angle.Deg(247.0),
 		ArgPerigee:   angle.Deg(130.0),
@@ -424,7 +425,7 @@ func TestNewRefusesAnUnknownOption(t *testing.T) {
 //
 // The conversion is the part worth testing rather than the arithmetic: SGP4 is
 // defined against UTC, and a TT instant taken at face value lands 69.184 s late
-// — 530 km for a low Earth orbit. time.Time is scale-aware precisely so that
+// — 530 km for a low Earth orbit. epoch.Time is scale-aware precisely so that
 // cannot be left to the caller, and AtTime is where astrogo makes that good.
 func TestAtTimeAgreesWithAt(t *testing.T) {
 	t.Parallel()
@@ -548,7 +549,7 @@ func TestAtTimeCountsLabelsOnALeapSecondDay(t *testing.T) {
 	t.Parallel()
 
 	el := leo()
-	el.Epoch = time.Date(2016, time.December, 31, 0, 0, 0, 0, time.LocationUTC)
+	el.Epoch = epoch.Date(2016, time.December, 31, 0, 0, 0, 0, time.UTC)
 
 	p, err := sgp4.New(el)
 	if err != nil {
@@ -560,7 +561,7 @@ func TestAtTimeCountsLabelsOnALeapSecondDay(t *testing.T) {
 		t.Fatalf("At(720): %v", err)
 	}
 
-	got, _, err := p.AtTime(time.Date(2016, time.December, 31, 12, 0, 0, 0, time.LocationUTC))
+	got, _, err := p.AtTime(epoch.Date(2016, time.December, 31, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("AtTime(noon): %v", err)
 	}

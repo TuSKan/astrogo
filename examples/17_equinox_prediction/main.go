@@ -18,15 +18,16 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -104,8 +105,8 @@ func main() {
 	}
 
 	durations := []struct {
-		start time.Time
-		end   time.Time
+		start epoch.Time
+		end   epoch.Time
 		name  string
 	}{
 		{events26[0].Time, events26[1].Time, "Mar-Jun  (southern autumn, northern spring)"},
@@ -153,8 +154,8 @@ func main() {
 	fmt.Println("── Moon Phases: January–March 2026 ────────────────────────────────")
 	fmt.Println()
 
-	phStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	phEnd := time.Date(2026, time.April, 1, 0, 0, 0, 0, time.LocationUTC)
+	phStart := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	phEnd := epoch.Date(2026, time.April, 1, 0, 0, 0, 0, time.UTC)
 
 	phases, err := plan.MoonPhases(plan.Window{Start: phStart, End: phEnd}, prov)
 	if err != nil {
@@ -183,8 +184,8 @@ func main() {
 	fmt.Println("── Eclipses of 2026 ───────────────────────────────────────────────")
 	fmt.Println()
 
-	eclStart := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	eclEnd := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	eclStart := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	eclEnd := epoch.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	lunarEcl, err := plan.LunarEclipses(plan.Window{Start: eclStart, End: eclEnd}, prov)
 	if err != nil {
@@ -243,7 +244,7 @@ func main() {
 	fmt.Printf("  Moon illumination: %.1f%% (phase angle: %.1f°)\n", frac*100, phaseAngle.Degrees())
 
 	// Moon rise/set on equinox day
-	eqDay := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	eqDay := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 	eqNext := eqDay.Add(unit.Hours(24))
 
 	moonrise, moonset, err := plan.MoonriseMoonset(site, plan.Window{Start: eqDay, End: eqNext}, prov)

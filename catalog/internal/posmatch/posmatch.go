@@ -15,8 +15,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Coord returns t's position carrying t's own proper motion, parallax and
@@ -45,7 +45,7 @@ func Coord(t resolve.Target) coord.ICRS {
 // given. A moving position is moved from its own [coord.ICRS.Epoch], as
 // [Coord] sets it, so aEpoch and bEpoch matter only for one that does not
 // move.
-func Separation(a coord.ICRS, aEpoch time.Time, b coord.ICRS, bEpoch time.Time) (angle.Angle, error) {
+func Separation(a coord.ICRS, aEpoch epoch.Time, b coord.ICRS, bEpoch epoch.Time) (angle.Angle, error) {
 	a, _, b, _, err := atCommonEpoch(a, aEpoch, b, bEpoch)
 	if err != nil {
 		return 0, err
@@ -57,20 +57,20 @@ func Separation(a coord.ICRS, aEpoch time.Time, b coord.ICRS, bEpoch time.Time) 
 // atCommonEpoch moves a and b to the epoch [Separation] compares them at, and
 // returns the epoch each was compared at: one epoch for both, unless neither
 // moves and each is compared where it was given.
-func atCommonEpoch(a coord.ICRS, aEpoch time.Time, b coord.ICRS, bEpoch time.Time) (
-	coord.ICRS, time.Time, coord.ICRS, time.Time, error,
+func atCommonEpoch(a coord.ICRS, aEpoch epoch.Time, b coord.ICRS, bEpoch epoch.Time) (
+	coord.ICRS, epoch.Time, coord.ICRS, epoch.Time, error,
 ) {
 	if aEpoch.IsZero() {
-		aEpoch = time.J2000()
+		aEpoch = epoch.J2000()
 	}
 
 	if bEpoch.IsZero() {
-		bEpoch = time.J2000()
+		bEpoch = epoch.J2000()
 	}
 
 	switch {
 	case moving(a) && moving(b):
-		aEpoch, bEpoch = time.J2000(), time.J2000()
+		aEpoch, bEpoch = epoch.J2000(), epoch.J2000()
 	case moving(a):
 		aEpoch = bEpoch
 	case moving(b):
@@ -165,7 +165,7 @@ type covariance struct{ xx, xy, yy float64 }
 //
 // The errors move as the linear position p(t) = p₀ + μ·Δt does:
 // C(t) = Cpp + Δt·(Cpμ + Cμp) + Δt²·Cμμ.
-func covarianceAt(t resolve.Target, tc time.Time) (covariance, bool) {
+func covarianceAt(t resolve.Target, tc epoch.Time) (covariance, bool) {
 	e := t.AstrometricError
 	if e.RA <= 0 || e.Dec <= 0 {
 		return covariance{}, false
@@ -194,14 +194,14 @@ func covarianceAt(t resolve.Target, tc time.Time) (covariance, bool) {
 
 // errorEpoch is the epoch t's errors hold at: their own, else t's, else
 // J2000.0.
-func errorEpoch(t resolve.Target) time.Time {
+func errorEpoch(t resolve.Target) epoch.Time {
 	switch {
 	case !t.AstrometricError.Epoch.IsZero():
 		return t.AstrometricError.Epoch
 	case !t.Epoch.IsZero():
 		return t.Epoch
 	default:
-		return time.J2000()
+		return epoch.J2000()
 	}
 }
 

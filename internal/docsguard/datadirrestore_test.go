@@ -33,7 +33,7 @@ import (
 //
 // A test function that calls remote.SetDataDir with anything but "" must put
 // the directory back: by capturing it first, remote.Capture(...).Restore, or by
-// restoring the default with remote.SetDataDir(""), as time's EOP tests do. A
+// restoring the default with remote.SetDataDir(""), as epoch's EOP tests do. A
 // helper in the same package that does either counts for every function that
 // calls it, so serveProfile-style fixtures need no second capture in each test.
 //

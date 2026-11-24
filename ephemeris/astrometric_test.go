@@ -3,8 +3,9 @@ package ephemeris
 import (
 	"math"
 	"testing"
+	"time"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -71,9 +72,9 @@ func TestAstrometricDiffersFromApparentByAberration(t *testing.T) {
 		n := 0
 
 		for day := range 73 {
-			epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(day * 5)))
+			at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(day * 5)))
 
-			sep := separationOfPlaces(t, p, Sun, epoch)
+			sep := separationOfPlaces(t, p, Sun, at)
 
 			// The whole year stays within eccentricity's swing of κ.
 			if math.Abs(sep-constantOfAberration) > 0.5 {
@@ -100,9 +101,9 @@ func TestAstrometricDiffersFromApparentByAberration(t *testing.T) {
 			var maxSep float64
 
 			for day := range 73 {
-				epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(day * 5)))
+				at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(day * 5)))
 
-				sep := separationOfPlaces(t, p, id, epoch)
+				sep := separationOfPlaces(t, p, id, at)
 
 				// A displacement larger than κ would mean the Earth moving
 				// faster than it does.
@@ -137,9 +138,9 @@ func TestAstrometricIsNotApparent(t *testing.T) {
 	t.Parallel()
 
 	p := Default()
-	epoch := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
-	sep := separationOfPlaces(t, p, Sun, epoch)
+	sep := separationOfPlaces(t, p, Sun, at)
 	if sep < 1 {
 		t.Fatalf("astrometric and apparent Sun differ by %.4f arcsec; they should "+
 			"differ by the annual aberration, near %.5f", sep, constantOfAberration)
@@ -148,10 +149,10 @@ func TestAstrometricIsNotApparent(t *testing.T) {
 
 // separationOfPlaces is the angle between a target's astrometric and apparent
 // directions.
-func separationOfPlaces(tb testing.TB, p Provider, id ID, epoch time.Time) float64 {
+func separationOfPlaces(tb testing.TB, p Provider, id ID, at epoch.Time) float64 {
 	tb.Helper()
 
-	in := At(p, epoch)
+	in := At(p, at)
 
 	astrometric, err := in.Astrometric(id, Geocenter())
 	if err != nil {

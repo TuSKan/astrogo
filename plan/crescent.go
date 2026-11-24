@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -500,11 +500,11 @@ type CrescentResult struct {
 	// Sunset and Moonset are the evening's sunset and the moonset its lag
 	// runs to; GeometricSunset is when the Sun's center reached altitude 0,
 	// the "sunset" of the azimuth–altitude criteria.
-	Sunset, Moonset, GeometricSunset time.Time
+	Sunset, Moonset, GeometricSunset epoch.Time
 
 	// BestTime is Yallop's best time, Ts + (4/9)·Lag, at which Bruin, Yallop
 	// and Odeh are read; QureshiBestTime is Qureshi's, Ts + (4.3/9.3)·Lag.
-	BestTime, QureshiBestTime time.Time
+	BestTime, QureshiBestTime epoch.Time
 
 	Yallop  CrescentZone
 	Odeh    CrescentZone

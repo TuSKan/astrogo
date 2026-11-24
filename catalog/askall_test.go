@@ -7,9 +7,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // barrier holds every provider in Resolve/Search until all of them have

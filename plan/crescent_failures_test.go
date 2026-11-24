@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -21,10 +22,10 @@ var errFailingWhen = errors.New("failingWhenProvider: this lookup fails")
 type failingWhenProvider struct {
 	eph.Provider
 
-	fails func(id eph.ID, t time.Time) bool
+	fails func(id eph.ID, t epoch.Time) bool
 }
 
-func (p failingWhenProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (p failingWhenProvider) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	if p.fails(id, t) {
 		return eph.State{}, errFailingWhen
 	}
@@ -44,7 +45,7 @@ type countingProvider struct {
 	calls int
 }
 
-func (p *countingProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (p *countingProvider) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	p.calls++
 
 	st, err := p.Provider.Locate(id, t)
@@ -65,7 +66,7 @@ func TestCrescentVisibilityReportsAFailedLookup(t *testing.T) {
 	site, evening := portOfSpainEvening(t)
 
 	for _, body := range []eph.ID{eph.Sun, eph.Moon} {
-		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ time.Time) bool { return id == body }}
+		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ epoch.Time) bool { return id == body }}
 
 		if _, err := CrescentVisibility(site, evening, prov); !errors.Is(err, errFailingWhen) {
 			t.Errorf("body %v failing: err = %v, want the lookup's error", body, err)
@@ -81,7 +82,7 @@ func TestCrescentVisibilityReportsAFailedLookup(t *testing.T) {
 
 	// The new-moon search looks only hours back; the sunset and moonset
 	// searches only forward.
-	phases := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, at time.Time) bool {
+	phases := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, at epoch.Time) bool {
 		return id == eph.Moon && at.Before(r.Sunset.Add(unit.Hours(-1)))
 	}}
 
@@ -104,7 +105,7 @@ func TestMoonsetSearchBackReportsAFailedLookup(t *testing.T) {
 	t.Parallel()
 
 	site := crescentSite(t, 10.65, -61.52)
-	evening := time.Date(2025, 3, 28, 16, 0, 0, 0, time.LocationUTC)
+	evening := epoch.Date(2025, 3, 28, 16, 0, 0, 0, time.UTC)
 
 	r, err := CrescentVisibility(site, evening, eph.Default())
 	if err != nil {
@@ -118,7 +119,7 @@ func TestMoonsetSearchBackReportsAFailedLookup(t *testing.T) {
 	// A minute back: the Moon's apparent place at sunset is looked up a
 	// light-time, 1.3 s, earlier, and that lookup belongs to the search
 	// forward.
-	before := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, at time.Time) bool {
+	before := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, at epoch.Time) bool {
 		return id == eph.Moon && at.Before(r.Sunset.Add(unit.Minutes(-1)))
 	}}
 
@@ -130,15 +131,15 @@ func TestMoonsetSearchBackReportsAFailedLookup(t *testing.T) {
 func TestMoonAgeHoursReportsFailures(t *testing.T) {
 	t.Parallel()
 
-	at := time.Date(2025, 3, 29, 22, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2025, 3, 29, 22, 0, 0, 0, time.UTC)
 
 	// The elongation at the instant itself, and the phase search behind it.
 	for _, c := range []struct {
 		name  string
-		fails func(eph.ID, time.Time) bool
+		fails func(eph.ID, epoch.Time) bool
 	}{
-		{"elongation", func(id eph.ID, _ time.Time) bool { return id == eph.Moon }},
-		{"phase search", func(id eph.ID, t time.Time) bool { return id == eph.Moon && t.Before(at.Add(unit.Hours(-1))) }},
+		{"elongation", func(id eph.ID, _ epoch.Time) bool { return id == eph.Moon }},
+		{"phase search", func(id eph.ID, t epoch.Time) bool { return id == eph.Moon && t.Before(at.Add(unit.Hours(-1))) }},
 	} {
 		prov := failingWhenProvider{Provider: eph.Default(), fails: c.fails}
 
@@ -168,7 +169,7 @@ func TestMoonAgeHoursReportsFailures(t *testing.T) {
 func TestMoonAgeHoursJustAfterANewMoon(t *testing.T) {
 	t.Parallel()
 
-	at := time.Date(2025, 3, 29, 13, 58, 0, 0, time.LocationUTC)
+	at := epoch.Date(2025, 3, 29, 13, 58, 0, 0, time.UTC)
 
 	age, err := moonAgeHours(at, eph.Default())
 	if err != nil {
@@ -189,7 +190,7 @@ type twoBodyProvider struct {
 	sun, moon vector.Vec3
 }
 
-func (p twoBodyProvider) Locate(id eph.ID, _ time.Time) (eph.State, error) {
+func (p twoBodyProvider) Locate(id eph.ID, _ epoch.Time) (eph.State, error) {
 	if id == eph.Moon {
 		return geocentricMock(id, p.moon, vector.Vec3{})
 	}
@@ -204,17 +205,17 @@ func (twoBodyProvider) Close() error { return nil }
 func TestEventSearchesEndInAShortChunk(t *testing.T) {
 	t.Parallel()
 
-	start := time.Date(2025, 3, 29, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2025, 3, 29, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(0.3)) // 7.2 h: one whole chunk and a short one
 
-	var windows [][2]time.Time
+	var windows [][2]epoch.Time
 
 	// The event sits in the short chunk: 6.6 h after start, 0.6 h after end − 7.2 h.
-	searchAt := func(event time.Time) eventsFunc {
+	searchAt := func(event epoch.Time) eventsFunc {
 		return func(_ *Site, w Window, _ eph.Provider) ([]Event, error) {
 			from, to := w.Start, w.End
 
-			windows = append(windows, [2]time.Time{from, to})
+			windows = append(windows, [2]epoch.Time{from, to})
 			if !event.Before(from) && !event.After(to) {
 				return []Event{{Kind: EventSet, Time: event}}, nil
 			}
@@ -272,7 +273,7 @@ func TestCrescentGeometryReportsAFailedLookup(t *testing.T) {
 	}
 
 	for _, body := range []eph.ID{eph.Sun, eph.Moon} {
-		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ time.Time) bool { return id == body }}
+		prov := failingWhenProvider{Provider: eph.Default(), fails: func(id eph.ID, _ epoch.Time) bool { return id == body }}
 
 		if _, err := crescentGeometryAt(ctx, prov); !errors.Is(err, errFailingWhen) {
 			t.Errorf("body %v failing: err = %v", body, err)

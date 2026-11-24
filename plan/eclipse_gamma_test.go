@@ -3,9 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -62,7 +63,7 @@ func TestEclipseGammaIsTheCanons(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		day := time.Date(c.y, time.Month(c.m), c.d, 0, 0, 0, 0, time.LocationUTC)
+		day := epoch.Date(c.y, time.Month(c.m), c.d, 0, 0, 0, 0, time.UTC)
 
 		events, err := c.find(Window{Start: day.Add(unit.Days(-1)), End: day.Add(unit.Days(2))}, prov)
 		if err != nil || len(events) != 1 {

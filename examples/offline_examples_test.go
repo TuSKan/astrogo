@@ -11,8 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // offlineRow matches a row of the README's examples table whose Network

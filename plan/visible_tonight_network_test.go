@@ -6,15 +6,16 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/sbdb"
 	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -247,7 +248,7 @@ func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	night := time.Date(2026, 8, 1, 12, 0, 0, 0, time.LocationUTC)
+	night := epoch.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 
 	results, err := plan.VisibleTonight(context.Background(), site, night, []resolve.BrightObjectSearcher{simbad.New()}, ephemeris.Default(), 4.5)
 

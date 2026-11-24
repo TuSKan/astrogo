@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // horizonsCIFault is the explanation JPL Horizons returned for both 433 Eros
@@ -73,8 +73,8 @@ func TestCacheAPIReportsAServerFaultAsBothRefusalAndFault(t *testing.T) {
 
 	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	_, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
 	if err == nil {
@@ -120,8 +120,8 @@ func TestCacheAPIKeepsARealRefusalFatal(t *testing.T) {
 
 	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	_, err := CacheAPI(context.Background(), bucket, "", "433", start, end)
 	if err == nil {

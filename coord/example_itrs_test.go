@@ -2,11 +2,12 @@ package coord_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ func ExampleContext_ICRSToITRS() {
 	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635) // Paranal
 
 	ctx, err := coord.NewContext(
-		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC),
 		site,
 		atmosphere.Refraction{},
 	)
@@ -52,7 +53,7 @@ func ExampleContext_ICRSToITRS() {
 // Earth-fixed longitude as the planet turns beneath it.
 func ExampleContext_ICRSToITRS_earthRotation() {
 	ctx, err := coord.NewContext(
-		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC),
 		coord.MustGeodetic(angle.LatDeg(0), angle.LonDeg(0), 0),
 		atmosphere.Refraction{},
 	)

@@ -7,13 +7,13 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere/dataset/cams"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // These tests need the s3:// scheme, which went with gocloud.dev and has no
@@ -37,7 +37,7 @@ func requireS3(tb testing.TB) {
 
 // A date the archive is known to hold, used by every test here so they share
 // one cached file rather than fetching one each.
-var aodEpoch = time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC)
+var aodEpoch = time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC)
 
 func siteAt(tb testing.TB, lonDeg, latDeg float64) *coord.Geodetic {
 	tb.Helper()
@@ -181,27 +181,27 @@ func TestAODKeyPicksTheCoveringCycle(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		when time.GoTime
+		when time.Time
 		want string
 	}{{
 		// Exactly on the morning cycle: step zero of that cycle.
-		when: time.GoDate(2023, 1, 1, 0, 0, 0, 0, time.LocationUTC),
+		when: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101000000_prod_fc_sfc_000_aod550/" +
 			"z_cams_c_ecmf_20230101000000_prod_fc_sfc_000_aod550.nc",
 	}, {
 		// Three hours later: same cycle, step three.
-		when: time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC),
+		when: time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101000000_prod_fc_sfc_003_aod550/" +
 			"z_cams_c_ecmf_20230101000000_prod_fc_sfc_003_aod550.nc",
 	}, {
 		// Past midday: the afternoon cycle takes over, not the morning one
 		// extended.
-		when: time.GoDate(2023, 1, 1, 13, 30, 0, 0, time.LocationUTC),
+		when: time.Date(2023, 1, 1, 13, 30, 0, 0, time.UTC),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550/" +
 			"z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550.nc",
 	}, {
 		// A non-UTC instant resolves by its UTC time, not its wall clock.
-		when: time.GoDate(2023, 1, 1, 20, 0, 0, 0, time.FixedZone("UTC+7", 7*3600)),
+		when: time.Date(2023, 1, 1, 20, 0, 0, 0, time.FixedZone("UTC+7", 7*3600)),
 		want: "CAMS/GLOBAL/2023/01/01/z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550/" +
 			"z_cams_c_ecmf_20230101120000_prod_fc_sfc_001_aod550.nc",
 	}}
