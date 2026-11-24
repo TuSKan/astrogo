@@ -24,6 +24,33 @@ func barnardDR3(at epoch.Time) coord.ICRS {
 // j2016 is the Gaia DR3 reference epoch, J2016.0 TDB.
 func j2016() epoch.Time { return epoch.FromJD(2457389.0, epoch.TDB) }
 
+// TestPropagateEpochToAZeroEpochIsToJ2000 holds PropagateEpoch to its doc: a
+// zero target epoch is J2000.0. The star moves 166″ getting there, so the
+// comparison is between two places that both moved.
+func TestPropagateEpochToAZeroEpochIsToJ2000(t *testing.T) {
+	t.Parallel()
+
+	star := barnardDR3(j2016())
+
+	zero, err := coord.PropagateEpoch(star, epoch.Time{})
+	if err != nil {
+		t.Fatalf("PropagateEpoch to a zero epoch: %v", err)
+	}
+
+	j2000, err := coord.PropagateEpoch(star, epoch.J2000())
+	if err != nil {
+		t.Fatalf("PropagateEpoch to J2000: %v", err)
+	}
+
+	if moved := coord.Separation(zero, star).Arcseconds(); moved < 100 {
+		t.Fatalf("propagating to a zero epoch moved the star %.3f″, want the 166″ to J2000", moved)
+	}
+
+	if off := coord.Separation(zero, j2000).Arcseconds(); off > 1e-9 {
+		t.Errorf("a zero epoch lands %.3g″ from J2000.0, want J2000.0", off)
+	}
+}
+
 // TestAStarIsPlacedFromItsOwnEpoch: a star given at J2016.0, as Gaia DR3
 // gives it, is observed where the same star moved to J2000.0 first is, and
 // converts to FK5 as it does; the same row read as J2000.0 is placed 16

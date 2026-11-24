@@ -602,3 +602,15 @@ func TestAstrometricHasConverged(t *testing.T) {
 		}
 	}
 }
+
+// TestInstantTimeIsTheInstantAsked: At keeps the instant it is given, on its
+// own scale, and Time returns it.
+func TestInstantTimeIsTheInstantAsked(t *testing.T) {
+	t.Parallel()
+
+	at := epoch.FromJD(2460000.5, epoch.TDB)
+
+	if got := eph.At(eph.Default(), at).Time(); !got.Equal(at) || got.Scale() != epoch.TDB {
+		t.Errorf("At(p, %v).Time() = %v on %v, want the instant given, on TDB", at, got, got.Scale())
+	}
+}
