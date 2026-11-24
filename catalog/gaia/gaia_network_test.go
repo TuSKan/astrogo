@@ -163,7 +163,7 @@ func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
 // neighbor, carrying both identifiers: 61 Cyg A by HIP 104214, Barnard's
 // star by TYC 425-2502-1. alf Cen A, too bright for Gaia, has no counterpart.
 func TestGaiaResolvesHipparcosAndTychoIdentifiers(t *testing.T) {
-	requireGaia(t)
+	control := requireArchive(t, DefaultEndpoint)
 
 	prov, err := New("")
 	if err != nil {
@@ -179,7 +179,7 @@ func TestGaiaResolvesHipparcosAndTychoIdentifiers(t *testing.T) {
 
 	rows, err := resolve.Drain(prov.ResolveIdentifiers(ctx, ids), 0)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, control)
 		t.Fatalf("ResolveIdentifiers: %v", err)
 	}
 
