@@ -4,16 +4,12 @@ package gaia
 
 import (
 	"context"
-	"errors"
-	"net"
-	"net/url"
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/internal/votable"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -32,8 +28,11 @@ import (
 // This is what ESA is for in this package now: not the path a caller takes,
 // but the independent answer the default is checked against.
 func TestArchivesAgree(t *testing.T) {
-	requireArchive(t, remote.GaiaAIP)
-	requireArchive(t, remote.GaiaTAP)
+	// One control for each archive, asked only about that archive's error.
+	controls := map[remote.EndpointID]func() error{
+		remote.GaiaAIP: requireArchive(t, remote.GaiaAIP),
+		remote.GaiaTAP: requireArchive(t, remote.GaiaTAP),
+	}
 
 	// The north galactic pole, and a field sized against the cap rather than
 	// picked round. The provider's query is TOP N with no ORDER BY, so a
@@ -85,15 +84,16 @@ func TestArchivesAgree(t *testing.T) {
 			// replied to every query with a 408 and "Job timeout/aborted"
 			// (#595). The shared classifier knows both, and every other
 			// outage this repository has met.
-			testutil.SkipOnUpstreamFailure(t, iterErr)
-
-			// And an archive that answers with its own error page is the same
+			//
+			// An archive that answers with its own error page is the same
 			// condition wearing different clothes: a 200 carrying HTML, which
 			// used to surface here as "XML syntax error ... unexpected end
 			// element </div>" and fail the build over somebody else's outage.
-			if errors.Is(iterErr, votable.ErrNotVOTable) {
-				t.Skipf("%s answered with a web page rather than a VOTable: %v", id, iterErr)
-			}
+			// So is one refusing every request with a 4xx, as Gaia@AIP
+			// answered every query with a 405 on 2026-11-23 (#1252). The
+			// classifier takes both for a fault of ours, and the control,
+			// a query that cannot be wrong, tells them apart from one.
+			testutil.SkipOnDegradedService(t, iterErr, controls[id])
 
 			t.Fatalf("%s: cone search: %v", id, iterErr)
 		}
@@ -158,39 +158,4 @@ func TestArchivesAgree(t *testing.T) {
 	}
 
 	t.Logf("%d sources in both, worst positional difference %.4f mas", len(aip), worst)
-}
-
-// requireArchive skips when one archive is unreachable.
-//
-// Either being down is downtime, not wrong data, and the policy here is that
-// only wrong data from a responsive endpoint fails. ESA in particular has been
-// unreachable for a whole working day.
-func requireArchive(t *testing.T, id remote.EndpointID) {
-	t.Helper()
-
-	raw, err := remote.URL(id)
-	if err != nil {
-		// Offline mode and a disabled endpoint are choices the caller made, so
-		// there is nothing here to verify and nothing wrong. Anything else —
-		// an id missing from the registry above all — is this repository's own
-		// mistake, and skipping past it would hide a broken endpoint table
-		// behind a message about the archive.
-		if errors.Is(err, remote.ErrOffline) || errors.Is(err, remote.ErrEndpointDisabled) {
-			t.Skipf("%s is not resolvable: %v", id, err)
-		}
-
-		t.Fatalf("resolving %s: %v", id, err)
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil {
-		t.Fatalf("%s resolves to %q, which does not parse: %v", id, raw, err)
-	}
-
-	port := u.Port()
-	if port == "" {
-		port = "443"
-	}
-
-	testutil.RequireReachable(t, net.JoinHostPort(u.Hostname(), port))
 }

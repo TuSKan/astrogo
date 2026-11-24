@@ -4,14 +4,10 @@ package gaia
 
 import (
 	"context"
-	"errors"
-	"net"
-	"net/url"
 	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
@@ -19,44 +15,8 @@ import (
 	"github.com/TuSKan/astrogo/time"
 )
 
-// requireGaia skips the test when the default archive is unreachable - per
-// this project's network test policy, a reachability failure must never fail
-// CI outright.
-//
-// The host is derived from the endpoint rather than written down, so it
-// follows [DefaultEndpoint] instead of having to be remembered alongside it.
-func requireGaia(t *testing.T) {
-	t.Helper()
-
-	raw, err := remote.URL(DefaultEndpoint)
-	if err != nil {
-		// Offline mode and a disabled endpoint are choices the caller made, so
-		// there is nothing here to verify and nothing wrong. Anything else —
-		// an id missing from the registry above all — is this repository's own
-		// mistake, and skipping past it would hide a broken endpoint table
-		// behind a message about the archive.
-		if errors.Is(err, remote.ErrOffline) || errors.Is(err, remote.ErrEndpointDisabled) {
-			t.Skipf("%s is not resolvable: %v", DefaultEndpoint, err)
-		}
-
-		t.Fatalf("resolving %s: %v", DefaultEndpoint, err)
-	}
-
-	u, err := url.Parse(raw)
-	if err != nil {
-		t.Fatalf("%s resolves to %q, which does not parse: %v", DefaultEndpoint, raw, err)
-	}
-
-	port := u.Port()
-	if port == "" {
-		port = "443"
-	}
-
-	testutil.RequireReachable(t, net.JoinHostPort(u.Hostname(), port))
-}
-
 func TestGaiaNetworkConeSearch(t *testing.T) {
-	requireGaia(t)
+	control := requireArchive(t, DefaultEndpoint)
 
 	prov, err := New("")
 	if err != nil {
@@ -79,7 +39,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 
 	iter(func(tar resolve.Target, err error) bool {
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, control)
 			t.Fatalf("Live network failed: %v", err)
 		}
 
@@ -104,7 +64,7 @@ func TestGaiaNetworkConeSearch(t *testing.T) {
 // one of the densest patches of the Orion Nebula, so the five nearest of a
 // 0.2° cone lie close to its center, far inside the edge.
 func TestGaiaConeSearchReturnsTheNearestSources(t *testing.T) {
-	requireGaia(t)
+	control := requireArchive(t, DefaultEndpoint)
 
 	prov, err := New("")
 	if err != nil {
@@ -121,7 +81,7 @@ func TestGaiaConeSearchReturnsTheNearestSources(t *testing.T) {
 
 	prov.ConeSearch(ctx, resolve.ConeRequest{Center: center, Radius: radius, Limit: 5})(func(tar resolve.Target, err error) bool {
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, control)
 			t.Fatalf("ConeSearch: %v", err)
 		}
 
@@ -162,7 +122,7 @@ func assertNearestFirst(t *testing.T, seps []float64, want int, radiusDeg float6
 // lists for Barnard's star and 61 Cyg A bring back exactly those two rows,
 // each with its designation and its published errors.
 func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
-	requireGaia(t)
+	control := requireArchive(t, DefaultEndpoint)
 
 	prov, err := New("")
 	if err != nil {
@@ -177,7 +137,7 @@ func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
 
 	rows, err := resolve.Drain(prov.ResolveIdentifiers(ctx, ids), 0)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, control)
 		t.Fatalf("ResolveIdentifiers: %v", err)
 	}
 
@@ -203,7 +163,7 @@ func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
 // neighbor, carrying both identifiers: 61 Cyg A by HIP 104214, Barnard's
 // star by TYC 425-2502-1. alf Cen A, too bright for Gaia, has no counterpart.
 func TestGaiaResolvesHipparcosAndTychoIdentifiers(t *testing.T) {
-	requireGaia(t)
+	control := requireArchive(t, DefaultEndpoint)
 
 	prov, err := New("")
 	if err != nil {
@@ -219,7 +179,7 @@ func TestGaiaResolvesHipparcosAndTychoIdentifiers(t *testing.T) {
 
 	rows, err := resolve.Drain(prov.ResolveIdentifiers(ctx, ids), 0)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, control)
 		t.Fatalf("ResolveIdentifiers: %v", err)
 	}
 

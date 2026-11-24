@@ -28,7 +28,7 @@ import (
 func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	t.Parallel()
 
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -53,7 +53,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 	t.Logf("query: %s", adql)
 
 	m, counts, err := starlight.RunChunk(ctx, build, 100000, 100003)
-	testutil.SkipOnUpstreamFailure(t, err)
+	testutil.SkipOnDegradedService(t, err, control)
 
 	if err != nil {
 		t.Fatalf("the archive rejected the generated query: %v", err)
@@ -85,7 +85,7 @@ func TestGaiaQueryIsAcceptedByTheArchive(t *testing.T) {
 // will parse and answer in a reasonable time, which is the whole premise of
 // fetching narrowly instead of building a sky.
 func TestFetchAnswersATargetList(t *testing.T) {
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
@@ -114,6 +114,7 @@ func TestFetchAnswersATargetList(t *testing.T) {
 			t.Skipf("Gaia archive is not answering: %v", err)
 		}
 
+		testutil.SkipOnDegradedService(t, err, control)
 		t.Fatalf("Fetch: %v", err)
 	}
 
@@ -212,7 +213,7 @@ func archiveCongested(err error) bool {
 func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
 	t.Parallel()
 
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -234,7 +235,7 @@ func TestSourceIDTilingAgreesAcrossOrders(t *testing.T) {
 
 		_, counts, err := starlight.RunChunk(ctx, build, first, last)
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, control)
 			t.Fatalf("RunChunk for the order-%d chunk: %v", order, err)
 		}
 
@@ -315,7 +316,10 @@ func brightStarServicesControl(t *testing.T) func() error {
 func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 	t.Parallel()
 
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	// The one test here that asks ESA: FetchBrightStars reads its VOTables,
+	// whose overflow flag the bright-star paging needs. brightStarServicesControl
+	// is its control.
+	requireArchive(t, remote.GaiaTAP)
 	testutil.RequireReachable(t, "tapvizier.u-strasbg.fr:80")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
@@ -397,7 +401,7 @@ func TestFetchBrightStarsFindsTheSaturatedStars(t *testing.T) {
 func TestFourBandQueryIsOnePass(t *testing.T) {
 	t.Parallel()
 
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
@@ -436,7 +440,7 @@ func TestFourBandQueryIsOnePass(t *testing.T) {
 	t.Logf("query (%d characters): %s", len(adql), adql)
 
 	m, counts, err := starlight.RunChunk(ctx, build, 100000, 100003)
-	testutil.SkipOnUpstreamFailure(t, err)
+	testutil.SkipOnDegradedService(t, err, control)
 
 	if err != nil {
 		t.Fatalf("the archive rejected the four-band query: %v", err)

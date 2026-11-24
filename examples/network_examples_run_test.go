@@ -113,8 +113,12 @@ func degraded(t *testing.T, name string) error {
 			t.Fatalf("endpoint %q: %v", id, err)
 		}
 
+		// The mirrors remote asks while the endpoint's own host is not
+		// serving, so the control asks the host that answered the example.
+		ep, _ := remote.Lookup(id)
+
 		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-		err = testutil.TAPControl(ctx, syncURL, control.from, control.column)()
+		err = testutil.TAPControl(ctx, syncURL, control.from, control.column, ep.Mirrors...)()
 
 		cancel()
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
 	"github.com/TuSKan/astrogo/time"
 )
@@ -42,7 +43,7 @@ import (
 // a total the map is a known subset of, is what makes the assertion mean
 // something.
 func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -60,7 +61,7 @@ func TestGaiaMapMatchesThePublishedSurfaceBrightness(t *testing.T) {
 	// than the bound below, not fainter, so the test would say so.
 	m, counts, err := starlight.RunChunk(ctx, build, 0, 63)
 	if err != nil {
-		testutil.SkipOnUpstreamFailure(t, err)
+		testutil.SkipOnDegradedService(t, err, control)
 		t.Fatalf("RunChunk: %v", err)
 	}
 
@@ -159,7 +160,7 @@ func runOf(t *testing.T, grid coord.HEALPix, n int, want func(b angle.Angle) boo
 // sixteen pixels of each rather than 786,432, so the bound is loose, but a
 // washed-out contrast is unmissable.
 func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
-	testutil.RequireReachable(t, "gea.esac.esa.int:443")
+	control := requireArchive(t, remote.GaiaAIP)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -183,7 +184,7 @@ func TestGaiaMapPutsTheMilkyWayInThePlane(t *testing.T) {
 	sample := func(first int64) float64 {
 		m, _, err := starlight.RunChunk(ctx, build, first, first+run-1)
 		if err != nil {
-			testutil.SkipOnUpstreamFailure(t, err)
+			testutil.SkipOnDegradedService(t, err, control)
 			t.Fatalf("RunChunk(%d): %v", first, err)
 		}
 
