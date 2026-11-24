@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -14,8 +15,11 @@ import (
 // errControlRejected is a TAP service refusing a control query.
 var errControlRejected = errors.New("the service rejected the control query")
 
+// votableField captures the name of each FIELD a VOTable declares.
+var votableField = regexp.MustCompile(`(?i)<FIELD\b[^>]*\bname\s*=\s*"([^"]*)"`)
+
 // SkipOnDegradedService is [SkipOnUpstreamFailure] for a service whose bad
-// day can look like our bad request.
+// day can look like our mistake.
 //
 // A 4xx means astrogo built a request the service rejected, and stays a
 // failure everywhere else. VizieR breaks that rule when degraded: for hours on
@@ -26,13 +30,21 @@ var errControlRejected = errors.New("the service rejected the control query")
 //
 // The same message is also what a genuinely renamed column produces, so the
 // message alone cannot decide. control can: it sends a request that cannot be
-// wrong, and if the service rejects that too, the 4xx was the service's. If
-// the control succeeds, the service is answering correctly and the 4xx is
+// wrong, and if the service fails that too, the error was the service's. If
+// the control succeeds, the service is answering correctly and the error is
 // ours, so this returns and the caller fails as before.
 //
-// control is consulted only for a 4xx, after the ordinary upstream
-// classification has had its say. Build it so it cannot share a defect with
-// the request under test; [TAPControl] does that by not using astrogo's client.
+// # Why every error, and not only a 4xx
+//
+// An archive can also answer with its own web page and a 200. catalog/gaia's
+// cone search met one: the page failed to parse, which carries no status to
+// classify, and a parse failure was taken as ours. [TAPControl] fails on such
+// a page as well, since it names no column, so the control decides that error
+// as it decides a 4xx.
+//
+// control is consulted for whatever the ordinary upstream classification
+// leaves undecided. Build it so it cannot share a defect with the request
+// under test; [TAPControl] does that by not using astrogo's client.
 func SkipOnDegradedService(tb testing.TB, err error, control func() error) {
 	tb.Helper()
 
@@ -40,20 +52,18 @@ func SkipOnDegradedService(tb testing.TB, err error, control func() error) {
 		return
 	}
 
-	SkipOnUpstreamFailure(tb, err)
+	// Returning rather than relying on Skipf to end the test: a testing.TB
+	// need not stop there, and the control must not be asked about an error
+	// already decided.
+	if _, ok := UpstreamFailure(err); ok {
+		SkipOnUpstreamFailure(tb, err)
 
-	var status interface{ HTTPStatus() int }
-	if !errors.As(err, &status) {
-		return
-	}
-
-	if code := status.HTTPStatus(); code < 400 || code >= 500 {
 		return
 	}
 
 	if cerr := control(); cerr != nil {
-		tb.Skipf("service degraded, not verified: it rejected a control request that cannot be wrong (%v), "+
-			"so its rejection of this one is not evidence against astrogo: %v", cerr, err)
+		tb.Skipf("service degraded, not verified: it failed a control request that cannot be wrong (%v), "+
+			"so its failure on this one is not evidence against astrogo: %v", cerr, err)
 	}
 }
 
@@ -63,6 +73,17 @@ func SkipOnDegradedService(tb testing.TB, err error, control func() error) {
 // table has carried for as long as anyone has queried it — HIP in
 // I/239/hip_main, source_id in gaiadr3.gaia_source — so the control cannot be
 // wrong.
+//
+// The service passes only by answering: a 200 that reports no query error and
+// whose CSV header or VOTable FIELD names column, which is what every TAP
+// service's answer to this query has in common. A web page served with a 200
+// names no column, so it fails.
+//
+// mirrors are the endpoint's mirrors, asked as remote asks them: while a host
+// is not serving the API (no answer, a 404 or a 5xx) the next is asked, and
+// the first that serves decides. A control asking only the primary would fail
+// while a mirror answered the request under test, and so skip a defect in that
+// answer.
 //
 // # Why it names a column
 //
@@ -78,42 +99,93 @@ func SkipOnDegradedService(tb testing.TB, err error, control func() error) {
 // client, on purpose. A control sharing the request-building path would fail
 // alongside the request under test when that path is what broke, and the
 // helper would then skip the very defect the test exists to catch.
-func TAPControl(ctx context.Context, syncURL, from, column string) func() error {
+func TAPControl(ctx context.Context, syncURL, from, column string, mirrors ...string) func() error {
+	query := "SELECT TOP 1 " + column + " FROM " + from
+
 	return func() error {
-		form := url.Values{
-			"REQUEST": {"doQuery"},
-			"LANG":    {"ADQL"},
-			"FORMAT":  {"csv"},
-			"QUERY":   {"SELECT TOP 1 " + column + " FROM " + from},
+		failures := make([]error, 0, 1+len(mirrors))
+
+		for _, base := range append([]string{syncURL}, mirrors...) {
+			serving, err := tapControlAt(ctx, base, query, column)
+			if serving {
+				return err
+			}
+
+			failures = append(failures, err)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, syncURL, strings.NewReader(form.Encode()))
-		if err != nil {
-			return fmt.Errorf("control query: %w", err)
-		}
-
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("control query: %w", err)
-		}
-
-		defer func() { _ = resp.Body.Close() }()
-
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-		if err != nil {
-			return fmt.Errorf("control query: reading the response: %w", err)
-		}
-
-		// Some TAP services report a failed query in a 200 VOTable rather
-		// than a status, so both are checked.
-		if resp.StatusCode != http.StatusOK || strings.Contains(string(body), `QUERY_STATUS" value="ERROR"`) {
-			return fmt.Errorf("%w: %q: HTTP %d: %s", errControlRejected, form.Get("QUERY"), resp.StatusCode, firstLine(body))
-		}
-
-		return nil
+		return errors.Join(failures...)
 	}
+}
+
+// tapControlAt sends the control query to one host. It reports whether the
+// host is serving the API, as remote judges it, and if it is, what its answer
+// decides.
+func tapControlAt(ctx context.Context, syncURL, query, column string) (bool, error) {
+	form := url.Values{
+		"REQUEST": {"doQuery"},
+		"LANG":    {"ADQL"},
+		"FORMAT":  {"csv"},
+		"QUERY":   {query},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, syncURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return true, fmt.Errorf("control query: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("control query to %s: %w", syncURL, err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if err != nil {
+		return false, fmt.Errorf("control query to %s: reading the response: %w", syncURL, err)
+	}
+
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode >= http.StatusInternalServerError {
+		return false, fmt.Errorf("%w: %q: %s: HTTP %d: %s", errControlRejected, query, syncURL, resp.StatusCode, firstLine(body))
+	}
+
+	// Some TAP services report a failed query in a 200 VOTable rather
+	// than a status, so both are checked.
+	if resp.StatusCode != http.StatusOK || strings.Contains(string(body), `QUERY_STATUS" value="ERROR"`) {
+		return true, fmt.Errorf("%w: %q: HTTP %d: %s", errControlRejected, query, resp.StatusCode, firstLine(body))
+	}
+
+	if !namesColumn(body, column) {
+		return true, fmt.Errorf("%w: %q: HTTP 200 without the column %s: %s", errControlRejected, query, column, firstLine(body))
+	}
+
+	return true, nil
+}
+
+// namesColumn reports whether body is a TAP answer naming column: a VOTable
+// declaring a FIELD of that name, or a CSV whose header holds it. Names are
+// compared without case or quotes, as ADQL resolves an undelimited one.
+func namesColumn(body []byte, column string) bool {
+	want := strings.ToLower(strings.Trim(column, `"`))
+
+	for _, m := range votableField.FindAllSubmatch(body, -1) {
+		if strings.ToLower(string(m[1])) == want {
+			return true
+		}
+	}
+
+	header, _, _ := strings.Cut(strings.TrimSpace(string(body)), "\n")
+
+	for name := range strings.SplitSeq(header, ",") {
+		if strings.ToLower(strings.Trim(strings.TrimSpace(name), `"`)) == want {
+			return true
+		}
+	}
+
+	return false
 }
 
 // firstLine is the start of a response body, for an error message.

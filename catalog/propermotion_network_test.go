@@ -29,6 +29,7 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 
 	type service struct {
 		syncURL, from, column string
+		mirrors               []string
 	}
 
 	services := make([]service, 0, 2)
@@ -45,7 +46,11 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 			t.Fatalf("%s endpoint: %v", svc.id, err)
 		}
 
-		services = append(services, service{syncURL, svc.from, svc.column})
+		// The mirrors remote asks while the endpoint's own host is not
+		// serving, so the control asks the host that answered.
+		ep, _ := remote.Lookup(svc.id)
+
+		services = append(services, service{syncURL, svc.from, svc.column, ep.Mirrors})
 	}
 
 	return func() error {
@@ -54,7 +59,7 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 
 		errs := make([]error, 0, len(services))
 		for _, svc := range services {
-			errs = append(errs, testutil.TAPControl(ctx, svc.syncURL, svc.from, svc.column)())
+			errs = append(errs, testutil.TAPControl(ctx, svc.syncURL, svc.from, svc.column, svc.mirrors...)())
 		}
 
 		return errors.Join(errs...)

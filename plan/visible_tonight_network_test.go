@@ -44,11 +44,15 @@ func simbadControl(t *testing.T) func() error {
 		t.Fatalf("SIMBAD endpoint: %v", err)
 	}
 
+	// The mirrors remote asks while SIMBAD's own host is not serving, so the
+	// control asks the host that answered the request under test.
+	ep, _ := remote.Lookup(remote.SIMBAD)
+
 	return func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		return testutil.TAPControl(ctx, syncURL, "basic", "main_id")()
+		return testutil.TAPControl(ctx, syncURL, "basic", "main_id", ep.Mirrors...)()
 	}
 }
 
