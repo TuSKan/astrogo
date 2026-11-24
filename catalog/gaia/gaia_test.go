@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -130,8 +131,12 @@ func TestProviderInterface(t *testing.T) {
 	testutil.AssertEqual(t, "Name", p.Name(), "gaia")
 
 	caps := p.Capabilities()
-	if len(caps) != 1 || caps[0] != resolve.CapConeSearch {
-		t.Errorf("expected CapConeSearch, got %v", caps)
+	if !slices.Equal(caps, []resolve.Capability{resolve.CapConeSearch, resolve.CapIdentifierResolution}) {
+		t.Errorf("expected CapConeSearch and CapIdentifierResolution, got %v", caps)
+	}
+
+	if _, ok := any(p).(resolve.IdentifierResolver); !ok {
+		t.Error("the provider claims CapIdentifierResolution and is no resolve.IdentifierResolver")
 	}
 
 	_, err := p.Resolve(context.Background(), "foo")

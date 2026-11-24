@@ -9,7 +9,9 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
@@ -73,7 +75,7 @@ func (p *Provider) Name() string { return "gaia" }
 
 // Capabilities returns the set of supported resolution operations.
 func (p *Provider) Capabilities() []resolve.Capability {
-	return []resolve.Capability{resolve.CapConeSearch}
+	return []resolve.Capability{resolve.CapConeSearch, resolve.CapIdentifierResolution}
 }
 
 // Resolve reports [resolve.ErrUnsupported]: Gaia is a cone-search provider and
@@ -130,16 +132,59 @@ func (p *Provider) ConeSearch(ctx context.Context, req resolve.ConeRequest) reso
 	dec := strconv.FormatFloat(center.Dec().Degrees(), 'f', -1, 64)
 	radius := strconv.FormatFloat(rad, 'f', -1, 64)
 
-	// Query gaia source for ra, dec, pmra, pmdec, parallax, the errors of
-	// the position and proper motion and their correlations.
 	// Ordered by an alias rather than by the DISTANCE expression itself, which
 	// ADQL 2.0 does not allow in ORDER BY.
-	adql := fmt.Sprintf(`SELECT TOP %d source_id, ra, dec, pmra, pmdec, parallax, ra_error, dec_error, pmra_error, pmdec_error, ra_dec_corr, ra_pmra_corr, ra_pmdec_corr, dec_pmra_corr, dec_pmdec_corr, pmra_pmdec_corr, phot_g_mean_mag, bp_rp, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, ra, dec, ra, dec, radius)
+	adql := fmt.Sprintf(`SELECT TOP %d %s, DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', %s, %s)) AS dist FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', %s, %s, %s)) ORDER BY dist ASC`, limit, columns, ra, dec, ra, dec, radius)
 
 	// The archive is part of the key. Two providers over one cache would
 	// otherwise serve each other's answers, and the whole point of holding
 	// both is to be able to tell them apart.
-	cacheKey := fmt.Sprintf("gaia:cone:%s:%s:%s:%s:%d", p.endpoint, ra, dec, radius, limit)
+	return p.query(ctx, adql, fmt.Sprintf("gaia:cone:%s:%s:%s:%s:%d", p.endpoint, ra, dec, radius, limit), limit)
+}
+
+// ResolveIdentifiers returns the Gaia DR3 sources ids name, as other
+// catalogs cross-identify them: SIMBAD lists Barnard's star as "Gaia DR3
+// 4472832130942575872". An identifier in another naming scheme or release
+// names none of them and costs no query.
+func (p *Provider) ResolveIdentifiers(ctx context.Context, ids []resolve.Identifier) resolve.SeqIterator[resolve.Target] {
+	var sourceIDs []string
+
+	for _, id := range ids {
+		if id.Namespace != "gaia" || id.Release != "DR3" || slices.Contains(sourceIDs, id.Value) {
+			continue
+		}
+
+		// A source ID is a number, and only a number goes into the query.
+		if _, err := strconv.ParseUint(id.Value, 10, 64); err != nil {
+			continue
+		}
+
+		sourceIDs = append(sourceIDs, id.Value)
+	}
+
+	if len(sourceIDs) == 0 {
+		return resolve.SliceSeq[resolve.Target](nil)
+	}
+
+	slices.Sort(sourceIDs)
+	list := strings.Join(sourceIDs, ", ")
+	adql := fmt.Sprintf(`SELECT TOP %d %s FROM gaiadr3.gaia_source WHERE source_id IN (%s)`, len(sourceIDs), columns, list)
+
+	return p.query(ctx, adql, fmt.Sprintf("gaia:ids:%s:%s", p.endpoint, list), len(sourceIDs))
+}
+
+// columns are what every query of this provider selects: the source ID, the
+// position, proper motion and parallax, their errors and correlations, and
+// the photometry V is derived from.
+const columns = "source_id, ra, dec, pmra, pmdec, parallax, " +
+	"ra_error, dec_error, pmra_error, pmdec_error, " +
+	"ra_dec_corr, ra_pmra_corr, ra_pmdec_corr, dec_pmra_corr, dec_pmdec_corr, pmra_pmdec_corr, " +
+	"phot_g_mean_mag, bp_rp"
+
+// query runs adql against the archive and yields its sources, keeping the
+// answer under cacheKey unless the archive cut it. A cut answer, short of
+// the limit rows asked for, ends with resolve.ErrTruncated.
+func (p *Provider) query(ctx context.Context, adql, cacheKey string, limit int) resolve.SeqIterator[resolve.Target] {
 	if seq, ok := p.cache.Get(cacheKey); ok {
 		return seq
 	}

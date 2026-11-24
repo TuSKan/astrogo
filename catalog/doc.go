@@ -7,7 +7,7 @@
 // celestial targets by name. Supported sources are selected via [Source]
 // constants at construction time:
 //
-//   - [OpenNGC]  — embedded NGC/IC catalog (zero I/O, via go:embed)
+//   - [OpenNGC]  — the OpenNGC NGC/IC catalog, fetched on its first query
 //   - [SIMBAD]   — CDS SIMBAD (ADQL/TAP)
 //   - [MAST]     — STScI Mikulski Archive (CAOM REST)
 //   - [JPL]      — NASA JPL Horizons

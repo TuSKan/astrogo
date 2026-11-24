@@ -121,8 +121,10 @@ type Evidence struct {
 // D² = Δᵀ(C₁+C₂)⁻¹Δ: Δ is b's offset from a on the plane tangent at a, and C₁
 // and C₂ are the two positions' covariances at that epoch. They may be one
 // object when D² is at most the 99.73% point of a χ² with two degrees of
-// freedom. Otherwise they may be one object when they are no more than
-// threshold apart.
+// freedom. Otherwise they may be one object when they are closer together
+// than resolution, which they never are when resolution is zero or below:
+// without stated errors, only a caller's resolution says how close is one
+// object.
 //
 // D² weighs the offset by the errors the catalogs state and by nothing else.
 // Two catalogs that move a star between epochs by different models disagree
@@ -130,7 +132,7 @@ type Evidence struct {
 // a radial velocity, and 61 Cyg A's Gaia row moved there with its own lands
 // 26 mas away, against errors under 1 mas. Such a pair is incompatible by
 // position and is one star by an identifier.
-func Compare(a, b resolve.Target, threshold angle.Angle) (Evidence, bool, error) {
+func Compare(a, b resolve.Target, resolution angle.Angle) (Evidence, bool, error) {
 	pa, ta, pb, tb, err := atCommonEpoch(Coord(a), a.Epoch, Coord(b), b.Epoch)
 	if err != nil {
 		return Evidence{}, false, err
@@ -149,7 +151,7 @@ func Compare(a, b resolve.Target, threshold angle.Angle) (Evidence, bool, error)
 		}
 	}
 
-	return ev, ev.Separation <= threshold, nil
+	return ev, resolution > 0 && ev.Separation < resolution, nil
 }
 
 // covariance is a position's covariance over (α*, δ), in square radians.

@@ -32,3 +32,27 @@ func TestMatchWeighsPublishedErrors(t *testing.T) {
 		t.Fatalf("pairs %+v, want A with B2", pairs)
 	}
 }
+
+// TestMatchWithNoResolutionPairsByIdentifiersAlone: by default no resolution
+// is set, so two Targets that publish no position error and share no
+// identifier are not paired however close they are, while two sharing an
+// identifier are paired however far apart.
+func TestMatchWithNoResolutionPairsByIdentifiersAlone(t *testing.T) {
+	t.Parallel()
+
+	near := withErrors("A1", 0, 0)
+	nearby := withErrors("B1", 0.5, 0)
+	named := withErrors("A2", 0, 0)
+	named.Aliases = []string{"HD 37128"}
+	far := withErrors("B2", 3600, 0)
+	far.Aliases = []string{"HD 37128"}
+
+	pairs := Match([]resolve.Target{near, named}, []resolve.Target{nearby, far})
+	if len(pairs) != 1 || pairs[0].A.ID != "A2" || pairs[0].B.ID != "B2" {
+		t.Fatalf("pairs %+v, want only A2 with B2, by their shared identifier", pairs)
+	}
+
+	if pairs := Match([]resolve.Target{near}, []resolve.Target{nearby}, WithResolution(angle.Arcsec(1))); len(pairs) != 1 {
+		t.Errorf("with a 1″ resolution: %d pairs, want A1 with B1", len(pairs))
+	}
+}

@@ -117,7 +117,7 @@ func TestResolverMatchesAMovingStarsGaiaRow(t *testing.T) {
 		r := &Resolver{
 			providers:     []Provider{&mockProvider{name: "simbad", targets: map[string]Target{resolve.Normalize(c.simbad.ID): c.simbad}}},
 			coneSearchers: []coneProvider{{name: "gaia", cs: &mockConeSearcher{targets: []Target{c.gaia}}}},
-			cfg:           resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+			cfg:           resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 		}
 
 		got, err := r.Resolve(context.Background(), c.simbad.ID)
@@ -160,7 +160,7 @@ func TestResolverMatchesAStarsTwoMASSRowAtItsOwnDate(t *testing.T) {
 				resolve.Normalize(simbadBarnard.ID): simbadBarnard,
 			}}},
 			coneSearchers: []coneProvider{{name: "vizier", cs: &mockConeSearcher{targets: []Target{row(c.epoch)}}}},
-			cfg:           resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+			cfg:           resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 		}
 
 		got, err := r.Resolve(context.Background(), simbadBarnard.ID)

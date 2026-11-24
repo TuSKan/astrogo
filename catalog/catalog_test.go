@@ -197,7 +197,7 @@ func TestResolver_ProviderPriority(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2, p3},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "target")
@@ -270,7 +270,7 @@ func TestResolver_MergePreservesOrbitalElements(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "target")
@@ -636,7 +636,7 @@ func TestResolver_CrossMatchByAlias(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "sirius")
@@ -672,7 +672,7 @@ func TestResolver_CrossMatchIDAgainstAlias(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{mast, simbad},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Search(context.Background(), "M31")
@@ -711,7 +711,7 @@ func TestResolver_CrossMatchByPosition_SameEpochMerges(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Search(context.Background(), "TestObj")
@@ -741,7 +741,7 @@ func TestResolver_CrossMatchByPosition_TooFarDoesNotMerge(t *testing.T) {
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Search(context.Background(), "TestObj")
@@ -777,7 +777,7 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 		t.Fatalf("test setup: PropagateEpoch: %v", err)
 	}
 
-	if sep := coord.Separation(base, laterCoord); sep.Arcseconds() < defaultPositionMatchThreshold.Arcseconds() {
+	if sep := coord.Separation(base, laterCoord); sep.Arcseconds() < 2 {
 		t.Fatalf("test setup invalid: raw separation %.3f\" already within threshold", sep.Arcseconds())
 	}
 
@@ -793,7 +793,7 @@ func TestResolver_CrossMatchByPosition_EpochMismatchAppliesPropagation(t *testin
 
 	r := &Resolver{
 		providers: []resolve.Provider{p1, p2},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Search(context.Background(), "TestStar")
@@ -825,7 +825,7 @@ func TestResolver_ConeSearchBridge_FoldsInAstrometry(t *testing.T) {
 	r := &Resolver{
 		providers:     []resolve.Provider{p1},
 		coneSearchers: []coneProvider{{name: "gaia", cs: cs}},
-		cfg:           resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: defaultCap},
+		cfg:           resolverConfig{resolution: angle.Arcsec(2), cap: defaultCap},
 	}
 
 	got, err := r.Resolve(context.Background(), "star")
@@ -862,14 +862,18 @@ func TestResolver_Limit(t *testing.T) {
 	}
 }
 
-func TestResolver_PositionMatchThreshold(t *testing.T) {
-	r := &Resolver{cfg: resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold}}
+func TestResolver_Resolution(t *testing.T) {
+	r := NewResolver()
 
-	if got := r.PositionMatchThreshold(angle.Arcsec(10)); got != r {
-		t.Error("PositionMatchThreshold should return r for chaining")
+	if r.cfg.resolution != 0 {
+		t.Errorf("a new Resolver has resolution %v, want none", r.cfg.resolution)
 	}
 
-	testutil.AssertNear(t, "positionMatchThreshold", r.cfg.positionMatchThreshold.Arcseconds(), 10, 1e-9)
+	if got := r.Resolution(angle.Arcsec(10)); got != r {
+		t.Error("Resolution should return r for chaining")
+	}
+
+	testutil.AssertNear(t, "resolution", r.cfg.resolution.Arcseconds(), 10, 1e-9)
 }
 
 // TestResolver_Search_RespectsCap confirms Search actually caps its result
@@ -885,7 +889,7 @@ func TestResolver_Search_RespectsCap(t *testing.T) {
 	// own group; Search's rank-then-cap step is what limits the count.
 	r := &Resolver{
 		providers: []resolve.Provider{p},
-		cfg:       resolverConfig{positionMatchThreshold: defaultPositionMatchThreshold, cap: 2},
+		cfg:       resolverConfig{resolution: angle.Arcsec(2), cap: 2},
 	}
 
 	got, err := r.Search(context.Background(), "TestObj")
@@ -898,11 +902,11 @@ func TestResolver_Search_RespectsCap(t *testing.T) {
 	}
 }
 
-// TestResolver_PositionMatchThreshold_Configurable demonstrates that
-// widening PositionMatchThreshold changes cross-match behavior: the same
-// two candidates fail to merge under a tight threshold but do merge under
-// a looser one.
-func TestResolver_PositionMatchThreshold_Configurable(t *testing.T) {
+// TestResolver_Resolution_Configurable demonstrates that a coarser
+// Resolution changes cross-match behavior: the same two candidates, which
+// publish no position error, fail to merge under no resolution or a fine
+// one but do merge under a coarser one.
+func TestResolver_Resolution_Configurable(t *testing.T) {
 	newResolver := func(threshold angle.Angle) *Resolver {
 		p1 := &mockProvider{name: "p1", targets: map[string]Target{
 			"a": {ID: "A1", Name: "TestObj", Coord: coord.NewICRS(angle.Deg(83.80), angle.Deg(-5.39)), HasCoord: true, Epoch: time.J2000()},
@@ -913,11 +917,17 @@ func TestResolver_PositionMatchThreshold_Configurable(t *testing.T) {
 
 		return &Resolver{
 			providers: []resolve.Provider{p1, p2},
-			cfg:       resolverConfig{positionMatchThreshold: threshold, cap: defaultCap},
+			cfg:       resolverConfig{resolution: threshold, cap: defaultCap},
 		}
 	}
 
 	// ~1.08" apart (0.0003 deg * 3600 * cos(-5.39deg)).
+	none := newResolver(0)
+
+	if got, err := none.Search(context.Background(), "TestObj"); err != nil || len(got) != 2 {
+		t.Fatalf("no resolution: %d results, %v; want the two candidates apart", len(got), err)
+	}
+
 	tight := newResolver(angle.Arcsec(0.5))
 
 	got, err := tight.Search(context.Background(), "TestObj")

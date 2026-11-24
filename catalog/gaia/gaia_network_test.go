@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"slices"
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -155,4 +156,44 @@ func assertNearestFirst(t *testing.T, seps []float64, want int, radiusDeg float6
 	}
 
 	t.Logf("distances from the center: %.5f°", seps)
+}
+
+// TestGaiaResolvesTheSourcesSIMBADNames: the Gaia DR3 designations SIMBAD
+// lists for Barnard's star and 61 Cyg A bring back exactly those two rows,
+// each with its designation and its published errors.
+func TestGaiaResolvesTheSourcesSIMBADNames(t *testing.T) {
+	requireGaia(t)
+
+	prov, err := New("")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	want := []string{"Gaia DR3 1872046609345556480", "Gaia DR3 4472832130942575872"}
+	ids := []resolve.Identifier{resolve.ParseIdentifier(want[0]), resolve.ParseIdentifier(want[1])}
+
+	rows, err := resolve.Drain(prov.ResolveIdentifiers(ctx, ids), 0)
+	if err != nil {
+		testutil.SkipOnUpstreamFailure(t, err)
+		t.Fatalf("ResolveIdentifiers: %v", err)
+	}
+
+	got := make([]string, 0, len(rows))
+
+	for _, r := range rows {
+		got = append(got, r.Designation)
+
+		if r.AstrometricError.RA <= 0 || r.AstrometricError.PmDec <= 0 {
+			t.Errorf("%s carries no errors: %+v", r.Designation, r.AstrometricError)
+		}
+	}
+
+	slices.Sort(got)
+
+	if !slices.Equal(got, want) {
+		t.Errorf("rows %v, want %v", got, want)
+	}
 }

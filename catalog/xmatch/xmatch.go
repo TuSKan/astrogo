@@ -37,29 +37,24 @@ type Pair struct {
 }
 
 type config struct {
-	positionMatchThreshold angle.Angle
+	resolution angle.Angle
 }
 
 // Option configures Match.
 type Option func(*config)
 
-// defaultPositionMatchThresholdArcsec mirrors catalog.Resolver's own
-// default (catalog/catalog.go's defaultPositionMatchThreshold) — generous
-// against typical SIMBAD/OpenNGC/MAST-relayed position precision, tight
-// against typical inter-object separation in dense fields.
-const defaultPositionMatchThresholdArcsec = 2.0
-
-// WithPositionMatchThreshold sets the maximum angular separation, at a
-// common epoch, at which two Targets sharing no alias or ID are still
-// considered the same object, where either publishes no position error. See
-// Match for which epoch that is, and for how two Targets that both publish
-// one are compared. Default: 2 arcsec.
-func WithPositionMatchThreshold(threshold angle.Angle) Option {
-	return func(c *config) { c.positionMatchThreshold = threshold }
+// WithResolution sets how far apart two Targets sharing no alias or ID must
+// be, compared at a common epoch, for them to be two objects, where either
+// publishes no position error: closer together than sep, they are a
+// candidate pair. See Match for which epoch that is, and for how two Targets
+// that both publish one are compared. The default is none: zero, or
+// anything below it, pairs such Targets by their identifiers alone.
+func WithResolution(sep angle.Angle) Option {
+	return func(c *config) { c.resolution = sep }
 }
 
 func newConfig(opts ...Option) config {
-	c := config{positionMatchThreshold: angle.Arcsec(defaultPositionMatchThresholdArcsec)}
+	var c config
 	for _, opt := range opts {
 		opt(&c)
 	}
@@ -94,8 +89,8 @@ type item struct {
 //     are a candidate pair when D² = Δᵀ(C₁+C₂)⁻¹Δ is at most 11.83, the
 //     99.73% point of a χ² with two degrees of freedom: Δ is their offset on
 //     the plane tangent at the first, and C₁ and C₂ their covariances at
-//     that epoch. Two others are a candidate pair within
-//     WithPositionMatchThreshold. Candidate pairs are accepted closest
+//     that epoch. Two others are a candidate pair closer together than
+//     WithResolution, if one is set. Candidate pairs are accepted closest
 //     first, each group pairing at most once, so the result does not depend
 //     on the order of either slice.
 //
@@ -117,7 +112,7 @@ func Match(a, b []resolve.Target, opts ...Option) []Pair {
 
 	uf := newUnionFind(len(items))
 	unionByAlias(items, uf)
-	unionByPosition(items, uf, cfg.positionMatchThreshold)
+	unionByPosition(items, uf, cfg.resolution)
 
 	return pairsFromGroups(items, uf)
 }
@@ -200,7 +195,7 @@ func unpairedIndices(items []item, uf *unionFind) []int {
 // package targets (two candidate lists from a handful of catalogs, not a
 // bulk all-sky cross-match), the same reasoning catalog.go's own
 // unionByPosition documents.
-func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
+func unionByPosition(items []item, uf *unionFind, resolution angle.Angle) {
 	var side [2][]int
 
 	for _, i := range unpairedIndices(items, uf) {
@@ -218,7 +213,7 @@ func unionByPosition(items []item, uf *unionFind, threshold angle.Angle) {
 
 	for _, ia := range side[0] {
 		for _, ib := range side[1] {
-			ev, ok, err := posmatch.Compare(items[ia].target, items[ib].target, threshold)
+			ev, ok, err := posmatch.Compare(items[ia].target, items[ib].target, resolution)
 			if err != nil || !ok {
 				continue
 			}

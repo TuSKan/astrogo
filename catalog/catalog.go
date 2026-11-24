@@ -80,26 +80,12 @@ type (
 	SeqIterator[T any] = resolve.SeqIterator[T]
 )
 
-// defaultPositionMatchThreshold is the maximum angular separation (after
-// epoch normalization) at which two Targets from different providers,
-// sharing no alias or ID, are still considered the same physical object,
-// where either publishes no position error. 2 arcsec is generous against typical SIMBAD/OpenNGC/MAST-relayed position
-// precision, and tight against typical inter-object separation in dense
-// fields — see Resolver.PositionMatchThreshold to override it.
-var defaultPositionMatchThreshold = angle.Arcsec(2)
-
 // defaultCap is Search's default result-count ceiling — see Resolver.Limit.
 const defaultCap = 10
 
-// coneSearchRadiusFactor widens a ConeSearch bridge query beyond the
-// acceptance threshold (bounding candidate retrieval, not match
-// acceptance — retrieved candidates are still filtered against the exact
-// threshold before being accepted into a group).
-const coneSearchRadiusFactor = 2.5
-
 type resolverConfig struct {
-	positionMatchThreshold angle.Angle
-	cap                    int
+	resolution angle.Angle
+	cap        int
 }
 
 // coneProvider pairs a resolve.ConeSearcher with the provider name
@@ -111,6 +97,13 @@ type coneProvider struct {
 	cs   resolve.ConeSearcher
 }
 
+// idProvider pairs a resolve.IdentifierResolver with the name of the
+// provider that is one, as coneProvider does a ConeSearcher.
+type idProvider struct {
+	name string
+	ir   resolve.IdentifierResolver
+}
+
 // Resolver orchestrates multiple providers to find astronomical targets.
 //
 // Resolve and Search cross-match every provider's results for the same
@@ -118,12 +111,18 @@ type coneProvider struct {
 // (after epoch-normalizing via proper motion) when alias sets don't
 // overlap — and merge each group of matching Targets field-by-field from a
 // provider-precedence table, rather than returning one provider's whole,
-// possibly-incomplete record. Registered ConeSearcher providers (Gaia,
-// VizieR) are bridged in around each group's anchor position, so their
-// astrometry can participate even though neither does name-based lookup.
+// possibly-incomplete record.
+//
+// Providers that resolve no names are bridged in after the cross-match, so
+// their astrometry can participate. One that resolves identifiers, as Gaia
+// does, is asked for the records each group's identifiers name: a SIMBAD
+// star's "Gaia DR3 …" brings in its Gaia row. One that searches cones, as
+// Gaia and VizieR do, is searched within [Resolver.Resolution] of each
+// group's position, when one is set.
 type Resolver struct {
 	providers     []Provider
 	coneSearchers []coneProvider
+	idResolvers   []idProvider
 	cfg           resolverConfig
 }
 
@@ -173,13 +172,10 @@ func NewProvider(source Source) (Provider, error) {
 }
 
 // NewResolver instantiates remote and local catalog implementations
-// securely for the given sources. Use Limit/PositionMatchThreshold on the
-// returned Resolver to override their defaults (10 results, 2 arcsec).
+// securely for the given sources. Use Limit and Resolution on the returned
+// Resolver to override their defaults: 10 results, and no resolution.
 func NewResolver(sources ...Source) *Resolver {
-	cfg := resolverConfig{
-		positionMatchThreshold: defaultPositionMatchThreshold,
-		cap:                    defaultCap,
-	}
+	cfg := resolverConfig{cap: defaultCap}
 
 	var providers []Provider
 
@@ -189,15 +185,22 @@ func NewResolver(sources ...Source) *Resolver {
 		}
 	}
 
-	var coneSearchers []coneProvider
+	var (
+		coneSearchers []coneProvider
+		idResolvers   []idProvider
+	)
 
 	for _, p := range providers {
 		if cs, ok := p.(resolve.ConeSearcher); ok {
 			coneSearchers = append(coneSearchers, coneProvider{name: p.Name(), cs: cs})
 		}
+
+		if ir, ok := p.(resolve.IdentifierResolver); ok {
+			idResolvers = append(idResolvers, idProvider{name: p.Name(), ir: ir})
+		}
 	}
 
-	return &Resolver{providers: providers, coneSearchers: coneSearchers, cfg: cfg}
+	return &Resolver{providers: providers, coneSearchers: coneSearchers, idResolvers: idResolvers, cfg: cfg}
 }
 
 // Limit sets the maximum number of results Search returns (default 10) and
@@ -207,15 +210,20 @@ func (r *Resolver) Limit(n int) *Resolver {
 	return r
 }
 
-// PositionMatchThreshold sets the maximum angular separation (after epoch
-// normalization) at which two Targets sharing no identifier are considered
-// the same object, where either publishes no position error (default 2
-// arcsec), and returns r for chaining. Two Targets that both publish one
-// are compared by D² against their errors instead, as
-// [resolve.Association]'s D2 describes; a Target that matches two records
-// of one provider either way is matched with neither.
-func (r *Resolver) PositionMatchThreshold(threshold angle.Angle) *Resolver {
-	r.cfg.positionMatchThreshold = threshold
+// Resolution sets how far apart two records must be, compared at a common
+// epoch, for them to be two objects, where either publishes no position
+// error, and returns r for chaining. Two records sharing no identifier and
+// closer together than sep are one object. It also bounds the cone searches
+// the Resolver bridges providers in with.
+//
+// The default is none: zero, or anything below it, matches a record that
+// publishes no position error by its identifiers alone, and makes no cone
+// search. Two records that both publish one are compared by D² against
+// their errors whatever the resolution, as [resolve.Association]'s D2
+// describes. A record that matches two records of one provider, either way,
+// is matched with neither.
+func (r *Resolver) Resolution(sep angle.Angle) *Resolver {
+	r.cfg.resolution = sep
 	return r
 }
 
@@ -437,14 +445,14 @@ func incompleteSearch(query string, failed, asked int, failures []error) error {
 func (r *Resolver) reconcile(ctx context.Context, candidates []candidate) []Target {
 	uf := newUnionFind(len(candidates))
 	links := unionByAlias(candidates, uf)
-	joined, ambiguous := unionByPosition(candidates, uf, r.cfg.positionMatchThreshold)
+	joined, ambiguous := unionByPosition(candidates, uf, r.cfg.resolution)
 	links = append(links, joined...)
 
 	groups := groupCandidates(candidates, uf)
 	attachAssociations(groups, candidates, uf, links, ambiguous)
 
-	if len(r.coneSearchers) > 0 {
-		groups = r.bridgeConeSearch(ctx, groups)
+	if len(r.coneSearchers) > 0 || len(r.idResolvers) > 0 {
+		groups = r.bridge(ctx, groups)
 	}
 
 	merged := make([]Target, len(groups))
@@ -618,8 +626,9 @@ func singletonIndices(candidates []candidate, uf *unionFind) []int {
 
 // unionByPosition joins still-singleton, trustworthy-coord candidates from
 // different providers whose positions may be one object, as posmatch.Compare
-// decides it: by D² where both publish their position errors, and within
-// threshold where either publishes none. O(M²) over the remaining singletons
+// decides it: by D² where both publish their position errors, and closer
+// together than resolution where either publishes none, which a zero
+// resolution never is. O(M²) over the remaining singletons
 // M, which is bounded by what the providers answered one query with, not by
 // catalog size, so a spatial index would buy nothing here.
 //
@@ -631,7 +640,7 @@ func singletonIndices(candidates []candidate, uf *unionFind) []int {
 //
 // It returns one link for each join it makes, and one for each pair it left
 // ambiguous, with the evidence of each.
-func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angle) (joined, ambiguous []link) {
+func unionByPosition(candidates []candidate, uf *unionFind, resolution angle.Angle) (joined, ambiguous []link) {
 	var eligible []int
 
 	for _, i := range singletonIndices(candidates, uf) {
@@ -649,7 +658,7 @@ func unionByPosition(candidates []candidate, uf *unionFind, threshold angle.Angl
 				continue
 			}
 
-			ev, ok, err := posmatch.Compare(candidates[i].target, candidates[j].target, threshold)
+			ev, ok, err := posmatch.Compare(candidates[i].target, candidates[j].target, resolution)
 			if err == nil && ok {
 				compatible = append(compatible, positionalLink(i, j, ev))
 			}
@@ -753,94 +762,97 @@ func anchor(g group) (candidate, coord.ICRS, bool) {
 	return candidate{}, coord.ICRS{}, false
 }
 
-// bridgeConeSearch fires a ConeSearch against every registered
-// ConeSearcher around each group's anchor position (concurrently, ctx
-// cancellable), then folds any result within threshold of that anchor
-// into the group. Groups with no anchor position (e.g. JPL/SBDB-only
-// matches, which never set Coord) never trigger a ConeSearch call.
-func (r *Resolver) bridgeConeSearch(ctx context.Context, groups []group) []group {
-	type job struct {
-		groupIdx int
-		anchor   coord.ICRS
-	}
+// bridge asks the providers that resolve no names for each group's object,
+// concurrently and under ctx: every IdentifierResolver for the records the
+// group's identifiers name, and, when a resolution is set, every
+// ConeSearcher for the records within it of the group's position. It folds
+// what they answer into the groups. A group with neither identifiers nor a
+// position asks nothing.
+func (r *Resolver) bridge(ctx context.Context, groups []group) []group {
+	extra := make([][]candidate, len(groups))
 
-	var jobs []job
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+
+	collect := func(groupIdx int, provider string, seq resolve.SeqIterator[Target]) {
+		var found []candidate
+
+		seq(func(t resolve.Target, err error) bool {
+			if err == nil {
+				found = append(found, candidate{t, provider})
+			}
+
+			return true
+		})
+
+		mu.Lock()
+
+		extra[groupIdx] = append(extra[groupIdx], found...)
+
+		mu.Unlock()
+	}
 
 	for i, g := range groups {
-		if _, center, ok := anchor(g); ok {
-			jobs = append(jobs, job{i, center})
+		if ids := groupIdentifiers(g); len(ids) > 0 {
+			for _, ip := range r.idResolvers {
+				wg.Go(func() { collect(i, ip.name, ip.ir.ResolveIdentifiers(ctx, ids)) })
+			}
 		}
-	}
 
-	if len(jobs) == 0 {
-		return groups
-	}
+		if r.cfg.resolution <= 0 {
+			continue
+		}
 
-	extra := make([][]candidate, len(groups))
-	radius := r.cfg.positionMatchThreshold.MulScalar(coneSearchRadiusFactor)
-
-	var wg sync.WaitGroup
-
-	var mu sync.Mutex
-
-	for _, j := range jobs {
-		for _, cp := range r.coneSearchers {
-			groupIdx, anchor := j.groupIdx, j.anchor
-
-			wg.Go(func() {
-				req := resolve.ConeRequest{Center: anchor, Radius: radius, Limit: 20}
-
-				var found []candidate
-
-				iter := cp.cs.ConeSearch(ctx, req)
-				iter(func(t resolve.Target, err error) bool {
-					if err == nil {
-						found = append(found, candidate{t, cp.name})
-					}
-
-					return true
-				})
-
-				if len(found) == 0 {
-					return
-				}
-
-				mu.Lock()
-
-				extra[groupIdx] = append(extra[groupIdx], found...)
-
-				mu.Unlock()
-			})
+		if _, center, ok := anchor(g); ok {
+			req := resolve.ConeRequest{Center: center, Radius: r.cfg.resolution, Limit: 20}
+			for _, cp := range r.coneSearchers {
+				wg.Go(func() { collect(i, cp.name, cp.cs.ConeSearch(ctx, req)) })
+			}
 		}
 	}
 
 	wg.Wait()
 
 	for i := range groups {
-		if len(extra[i]) == 0 {
-			continue
+		if len(extra[i]) > 0 {
+			groups[i] = foldConeSearchResults(groups[i], extra[i], r.cfg.resolution)
 		}
-
-		groups[i] = foldConeSearchResults(groups[i], extra[i], r.cfg.positionMatchThreshold)
 	}
 
 	return groups
 }
 
-// foldConeSearchResults adds to g the results of a bridge query that are
-// g's object. newCandidates were retrieved within the wider
-// coneSearchRadiusFactor radius.
+// groupIdentifiers is every identifier g's records carry, each once.
+func groupIdentifiers(g group) []resolve.Identifier {
+	var ids []resolve.Identifier
+
+	for _, c := range g.candidates {
+		for _, id := range resolve.Identifiers(c.target) {
+			if id != (resolve.Identifier{}) && !slices.Contains(ids, id) {
+				ids = append(ids, id)
+			}
+		}
+	}
+
+	return ids
+}
+
+// foldConeSearchResults adds to g the bridged records that are g's object.
+// newCandidates are what the bridged providers answered: the records g's
+// identifiers name, and those within the resolution of its position.
 //
 // A result carrying one of g's identity keys is g's object by that
 // identifier. A result carrying none is compared with g's anchor record by
-// position, as posmatch.Compare decides it, and is g's object when the two
-// may be one. Either is added to g, unless g already holds that very record,
+// position, as posmatch.Compare decides it at resolution, and is g's object
+// when the two may be one. Either is added to g, unless g already holds that very record,
 // or adding it would make one object of two records from one provider: g
 // already holds a record from the result's provider, or another result from
 // that provider is g's object too. Such a result stays out of g, and the
 // association is kept as ambiguous. A close binary's two Gaia rows within
 // reach of one SIMBAD star are not both that star.
-func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.Angle) group {
+func foldConeSearchResults(g group, newCandidates []candidate, resolution angle.Angle) group {
 	anchorCand, _, ok := anchor(g)
 	if !ok {
 		return g
@@ -887,7 +899,7 @@ func foldConeSearchResults(g group, newCandidates []candidate, threshold angle.A
 				continue
 			}
 
-			ev, ok, err := posmatch.Compare(anchorCand.target, nc.target, threshold)
+			ev, ok, err := posmatch.Compare(anchorCand.target, nc.target, resolution)
 			if err != nil || !ok {
 				continue
 			}
