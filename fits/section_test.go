@@ -11,12 +11,15 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/apache/arrow-go/v18/arrow/tensor"
 
 	"github.com/TuSKan/astrogo/fits"
@@ -555,7 +558,18 @@ func multiHDUFile() []byte {
 		card("PCOUNT", "0"), card("GCOUNT", "1"))...),
 		pixelData(fits.BitpixFloat32, 10, func(i int) float64 { return float64(i) / 4 })...)
 
-	return append(append(primary, table...), extension...)
+	var rows bytes.Buffer
+
+	rows.WriteString("  123  456")
+	padBlock(&rows)
+
+	ascii := append(header(
+		card("XTENSION", "'TABLE   '"), card("BITPIX", "8"), card("NAXIS", "2"),
+		card("NAXIS1", "5"), card("NAXIS2", "2"), card("PCOUNT", "0"), card("GCOUNT", "1"),
+		card("TFIELDS", "1"), card("TBCOL1", "1"), card("TFORM1", "'I5      '"), card("TTYPE1", "'M       '"),
+	), rows.Bytes()...)
+
+	return slices.Concat(primary, table, extension, ascii)
 }
 
 // TestReadAtReadsWhatReadReads: ReadAt finds the HDUs Read finds, with the same
@@ -576,8 +590,8 @@ func TestReadAtReadsWhatReadReads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(sectioned.HDUs) != len(whole.HDUs) || len(whole.HDUs) != 3 {
-		t.Fatalf("ReadAt found %d HDUs, Read %d, want 3", len(sectioned.HDUs), len(whole.HDUs))
+	if len(sectioned.HDUs) != len(whole.HDUs) || len(whole.HDUs) != 4 {
+		t.Fatalf("ReadAt found %d HDUs, Read %d, want 4", len(sectioned.HDUs), len(whole.HDUs))
 	}
 
 	for i, w := range whole.HDUs {
@@ -592,6 +606,11 @@ func TestReadAtReadsWhatReadReads(t *testing.T) {
 			g, ok := g.(*fits.BintableHDU)
 			if !ok || g.Rows != w.Rows || !array.Equal(g.Batch.Column(0), w.Batch.Column(0)) {
 				t.Errorf("HDU %d: ReadAt's table %v differs from Read's %v", i, g, w)
+			}
+		case *fits.ASCIITableHDU:
+			g, ok := g.(*fits.ASCIITableHDU)
+			if !ok || g.Rows != w.Rows || w.Rows != 2 || !array.Equal(g.Batch.Column(0), w.Batch.Column(0)) {
+				t.Errorf("HDU %d: ReadAt's ASCII table %v differs from Read's %v", i, g, w)
 			}
 		case *fits.ImageHDU:
 			g, ok := g.(*fits.ImageHDU)
@@ -713,4 +732,177 @@ func TestWriteRefusesAnImageWithoutItsPixels(t *testing.T) {
 	}
 
 	checkSection(t, "written section", primaryImageOf(t, back).Tensor, sec, make([]int64, 3), sec.Shape())
+}
+
+// TestReadAtRefusesWhatReadRefuses: a malformed HDU is an error for ReadAt as it
+// is for Read, though ReadAt reads no pixel: calibration keywords it cannot
+// read, a BITPIX FITS does not define, data cut before its padding, and an
+// ASCII table that does not say where its column starts.
+func TestReadAtRefusesWhatReadRefuses(t *testing.T) {
+	t.Parallel()
+
+	ramp := func(i int) float64 { return float64(i) }
+	padded := primaryImage(fits.BitpixInt16, []int{3, 2}, nil, ramp)
+
+	noTBCOL := slices.Concat(
+		header(card("SIMPLE", "T"), card("BITPIX", "8"), card("NAXIS", "0")),
+		header(card("XTENSION", "'TABLE   '"), card("BITPIX", "8"), card("NAXIS", "2"),
+			card("NAXIS1", "5"), card("NAXIS2", "2"), card("PCOUNT", "0"), card("GCOUNT", "1"),
+			card("TFIELDS", "1"), card("TFORM1", "'I5      '")),
+		bytes.Repeat([]byte{' '}, fits.BlockSize),
+	)
+
+	for _, tc := range []struct {
+		name string
+		data []byte
+		want error // nil: any error
+	}{
+		{"an unreadable BSCALE", primaryImage(fits.BitpixInt16, []int{3, 2}, []string{card("BSCALE", "'abc'")}, ramp), nil},
+		{"BITPIX 12", append(header(imageCards(card("SIMPLE", "T"), 12, []int{3, 2})...), make([]byte, fits.BlockSize)...),
+			fits.ErrInvalidBitpix},
+		{"data cut before its padding", padded[:fits.BlockSize+12], nil},
+		{"an ASCII table with no TBCOL1", noTBCOL, nil},
+	} {
+		_, rerr := fits.Read(bytes.NewReader(tc.data))
+		_, aerr := fits.ReadAt(bytes.NewReader(tc.data), int64(len(tc.data)))
+
+		if rerr == nil || aerr == nil {
+			t.Errorf("%s: Read err %v, ReadAt err %v, want both to fail", tc.name, rerr, aerr)
+
+			continue
+		}
+
+		if tc.want != nil && (!errors.Is(rerr, tc.want) || !errors.Is(aerr, tc.want)) {
+			t.Errorf("%s: Read err %v, ReadAt err %v, want %v", tc.name, rerr, aerr, tc.want)
+		}
+	}
+}
+
+// TestReadAtIgnoresWhatFollowsTheLastHDU: bytes after the last HDU too few to
+// be a header end the file for ReadAt as for Read.
+func TestReadAtIgnoresWhatFollowsTheLastHDU(t *testing.T) {
+	t.Parallel()
+
+	data := append(multiHDUFile(), bytes.Repeat([]byte{'x'}, 100)...)
+
+	whole, err := fits.Read(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sectioned, err := fits.ReadAt(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("ReadAt: %v", err)
+	}
+
+	if len(sectioned.HDUs) != len(whole.HDUs) {
+		t.Errorf("ReadAt found %d HDUs, Read %d", len(sectioned.HDUs), len(whole.HDUs))
+	}
+}
+
+// TestSectionOfAnImageOfNoPixels: an image with an axis of length zero is read
+// as an image, by ReadAt as by Read, and no box is inside it.
+func TestSectionOfAnImageOfNoPixels(t *testing.T) {
+	t.Parallel()
+
+	data := header(imageCards(card("SIMPLE", "T"), fits.BitpixInt16, []int{0, 3})...)
+	eager, lazy := openBoth(t, data, 0)
+
+	for _, img := range []*fits.ImageHDU{lazy, eager} {
+		if !reflect.DeepEqual(img.Axes, []int64{3, 0}) {
+			t.Errorf("axes %v, want [3 0]", img.Axes)
+		}
+
+		if _, err := img.Section([]int64{0, 0}, []int64{1, 1}); !errors.Is(err, fits.ErrInvalidSection) {
+			t.Errorf("a box of an image of no pixels: err %v, want ErrInvalidSection", err)
+		}
+	}
+}
+
+// int16Tensor is a tensor over values with the given shape and byte strides,
+// nil for row-major.
+func int16Tensor(values []int16, shape, strides []int64) tensor.Interface {
+	var buf *memory.Buffer
+	if values != nil {
+		buf = memory.NewBufferBytes(arrow.Int16Traits.CastToBytes(values))
+	}
+
+	data := array.NewData(arrow.PrimitiveTypes.Int16, len(values), []*memory.Buffer{nil, buf}, nil, 0, 0)
+	defer data.Release()
+
+	return tensor.New(data, shape, strides, nil)
+}
+
+// TestSectionRefusesATensorItCannotCut: an image built around a tensor that is
+// not row-major, that holds no buffer, or whose shape describes more pixels
+// than its buffer holds, is ErrInvalidSection rather than a section read from
+// the wrong place or past the end.
+func TestSectionRefusesATensorItCannotCut(t *testing.T) {
+	t.Parallel()
+
+	six := []int16{1, 2, 3, 4, 5, 6}
+
+	for _, tc := range []struct {
+		name         string
+		tsr          tensor.Interface
+		lower, upper []int64
+	}{
+		{"column-major", int16Tensor(six, []int64{2, 3}, []int64{2, 4}), []int64{0, 0}, []int64{1, 2}},
+		{"no buffer", int16Tensor(nil, []int64{2, 3}, nil), []int64{0, 0}, []int64{1, 2}},
+		{"a shape larger than its buffer", int16Tensor(six, []int64{10, 10}, nil), []int64{0, 0}, []int64{1, 2}},
+		{"a shape whose size overflows", int16Tensor(six, []int64{1 << 40, 1 << 40}, nil), []int64{0, 0}, []int64{1, 2}},
+		{"no axes", int16Tensor(six[:1], []int64{}, nil), []int64{}, []int64{}},
+	} {
+		img := &fits.ImageHDU{Tensor: tc.tsr, Axes: tc.tsr.Shape()}
+
+		if sec, err := img.Section(tc.lower, tc.upper); !errors.Is(err, fits.ErrInvalidSection) {
+			t.Errorf("%s: tensor %v, err %v, want ErrInvalidSection", tc.name, sec, err)
+		}
+	}
+}
+
+// TestSectionOfASourceShorterThanItsSize: a source that holds less than the
+// size ReadAt was given fails the section that reaches past its end with
+// io.ErrUnexpectedEOF, rather than returning a box partly unread.
+func TestSectionOfASourceShorterThanItsSize(t *testing.T) {
+	t.Parallel()
+
+	data := primaryImage(fits.BitpixInt16, []int{7, 5, 3}, nil, func(i int) float64 { return float64(i) })
+
+	file, err := fits.ReadAt(bytes.NewReader(data[:fits.BlockSize+100]), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	img := primaryImageOf(t, file)
+
+	if _, err := img.Section([]int64{0, 0, 0}, []int64{3, 5, 7}); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("a section past the source's end: err %v, want io.ErrUnexpectedEOF", err)
+	}
+
+	// The first 50 pixels are there.
+	sec, err := img.Section([]int64{0, 0, 0}, []int64{1, 1, 7})
+	if err != nil {
+		t.Fatalf("a section the source holds: %v", err)
+	}
+
+	sec.Release()
+}
+
+// TestOpenMmapRefusesAFileThatIsNotFITS: a mapped file ReadAt cannot read is an
+// error from OpenMmap. Whether the mapping was released cannot be observed
+// from here: a mapped file stays removable on Windows too.
+func TestOpenMmapRefusesAFileThatIsNotFITS(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "not.fits")
+	if err := os.WriteFile(path, bytes.Repeat([]byte{'x'}, 100), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if mapped, err := fits.OpenMmap(path); err == nil {
+		_ = mapped.Close()
+
+		t.Fatal("OpenMmap read a file that is not FITS")
+	}
 }

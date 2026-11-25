@@ -29,8 +29,9 @@ import (
 //
 // A box whose axes do not match the image's in number, or whose extent on any
 // axis is empty, reversed or outside the image, is [ErrInvalidSection], and so
-// is an image that holds no pixels. A source too short for the box is an error
-// wrapping [io.ErrUnexpectedEOF].
+// is an image that holds no pixels, or a Tensor describing more pixels than
+// its buffer holds. A source too short for the box is an error wrapping
+// [io.ErrUnexpectedEOF].
 //
 // Any number of goroutines may take sections of one image at once, as
 // [io.ReaderAt] allows its callers to read in parallel.
@@ -45,11 +46,10 @@ func (img *ImageHDU) Section(lower, upper []int64) (tensor.Interface, error) {
 		return nil, err
 	}
 
-	size, err := mulSize(n, format.bytes)
-	if err != nil {
-		return nil, err
-	}
+	// No larger than the image, whose size pixels has checked fits.
+	size := n * format.bytes
 
+	// Only on a platform whose int is narrower than 64 bits.
 	if size > math.MaxInt {
 		return nil, fmt.Errorf("%w: %d bytes cannot be held", ErrInvalidSection, size)
 	}
@@ -101,7 +101,9 @@ func openImage(h *Header, r io.ReaderAt, off int64) (*ImageHDU, error) {
 
 // pixels returns where img's pixels are: the source a lazily read image keeps
 // them in, as the file stores them, or Tensor's buffer, decoded. dims are the
-// extents they are stored in, row-major.
+// extents they are stored in, row-major. A lazily read image's size was
+// checked at open; a tensor's shape is checked here against the buffer it
+// describes, since a caller may have built it.
 func (img *ImageHDU) pixels() (src io.ReaderAt, base int64, dims []int64, format pixelFormat, err error) {
 	if img.src != nil {
 		return img.src, img.srcOffset, img.Axes, img.format, nil
@@ -116,21 +118,32 @@ func (img *ImageHDU) pixels() (src io.ReaderAt, base int64, dims []int64, format
 	}
 
 	dt := img.Tensor.DataType()
-
-	fixed, ok := dt.(arrow.FixedWidthDataType)
-	if !ok || fixed.BitWidth()%8 != 0 {
-		return nil, 0, nil, pixelFormat{}, fmt.Errorf("%w: the image's tensor holds %s", ErrInvalidSection, dt)
-	}
-
 	buffers := img.Tensor.Data().Buffers()
-	if len(buffers) < 2 || buffers[1] == nil {
-		return nil, 0, nil, pixelFormat{}, fmt.Errorf("%w: the image's tensor holds no data buffer", ErrInvalidSection)
+
+	// Every Arrow tensor holds a fixed-width type of whole bytes; the check
+	// is the type assertion's.
+	fixed, ok := dt.(arrow.FixedWidthDataType)
+	if !ok || fixed.BitWidth()%8 != 0 || len(buffers) < 2 || buffers[1] == nil {
+		return nil, 0, nil, pixelFormat{}, fmt.Errorf("%w: the image's tensor of %s holds no data buffer", ErrInvalidSection, dt)
 	}
 
 	width := int64(fixed.BitWidth() / 8)
+	base = int64(img.Tensor.Data().Offset()) * width
+	held := int64(len(buffers[1].Bytes())) - base
 
-	return bytes.NewReader(buffers[1].Bytes()), int64(img.Tensor.Data().Offset()) * width,
-		img.Tensor.Shape(), pixelFormat{dt: dt, bytes: width}, nil
+	described := width
+	for _, d := range img.Tensor.Shape() {
+		if described, err = mulSize(described, d); err != nil {
+			return nil, 0, nil, pixelFormat{}, fmt.Errorf("%w: the image's tensor: %w", ErrInvalidSection, err)
+		}
+	}
+
+	if described > held {
+		return nil, 0, nil, pixelFormat{}, fmt.Errorf("%w: the image's tensor describes %d bytes and holds %d",
+			ErrInvalidSection, described, held)
+	}
+
+	return bytes.NewReader(buffers[1].Bytes()), base, img.Tensor.Shape(), pixelFormat{dt: dt, bytes: width}, nil
 }
 
 // sectionShape checks the box [lower, upper) against an image of extents
