@@ -31,11 +31,9 @@
 //  3. Otherwise, the query degrades to the zero-EOP fallback described
 //     below — EnsureLoaded never blocks indefinitely or errors loudly.
 //
-// Steps 1 and 2 are performed by a registered [Loader], not by this
-// package reaching for a cache directory or an HTTP client itself.
-// Blank-importing astrogo/remote/eop registers one; a program that
-// imports neither it nor a loader of its own degrades to zero EOP and links
-// no storage backend at all.
+// Steps 1 and 2 go through astrogo/remote ([GetLoader]), so offline mode, the
+// download policy, an endpoint override and the cache location apply to the
+// bulletin as to every other file.
 //
 // [RegisterModel] is authoritative: once called, none of the above runs —
 // the lazy loader will never replace what a caller explicitly registered,

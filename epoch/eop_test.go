@@ -9,7 +9,6 @@ import (
 
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	_ "github.com/TuSKan/astrogo/remote/eop" // registers the IERS EOP loader this file exercises
 
 	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"

@@ -75,7 +75,7 @@ var diurnalEpoch = epoch.Date(2026, time.June, 21, 18, 42, 9, 0, time.UTC)
 // together; a physical law they both have to satisfy is what catches that.
 func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	const (
 		dut1Seconds = 0.1237

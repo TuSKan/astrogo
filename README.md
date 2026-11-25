@@ -485,7 +485,7 @@ happens.
 | Planetary constants kernel (gm_de440.tpc) | `remote.NAIFPCK` | ~12 KB | validating `constants.DE440` against NAIF |
 | Small-body SPK (Horizons-generated) | `remote.JPLHorizonsSPK` | KB–few MB | `eph.NewProvider(eph.SmallBody, "433", ...)` |
 | Planetary satellite SPK (Io, Titan, Triton, ...) | `remote.NAIFSPK` | ~64 MB (Mars) – ~1.1 GB (Jupiter), ~2.4 GB for all 6 kernels | `eph.NewProvider(eph.Moons, "sat441")`, or `plan.VisibleTonight(..., plan.WithPlanetaryMoons())` |
-| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | blank-import `remote/eop`, then automatic on the first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
+| IERS Earth-orientation data | `remote.IERSFinals2000A` | ~3.7 MB | automatic on the first `Time.EOP()`/`.UTC()`/`.UT1()` query needing it |
 | OpenNGC catalog CSVs | `remote.OpenNGC` | ~3.9 MB combined | `catalog.NewResolver(catalog.OpenNGC, ...)` |
 | MPC observatory-code list | `remote.MPCObsCodes` | ~150 KB | `plan.NewMPCSite(ctx, "568")` / `plan.MPCObservatories(ctx)` |
 | MPC orbital elements (MPCORB format) | `remote.MPCORB` | 0.5 MB (`PHA.txt`) – 317 MB (`MPCORB.DAT`, 94 MB gzipped) | `mpcorb.Open(ctx, "NEA.txt")` — streamed, so a caller filtering 500 objects never holds the other million and a half |
@@ -593,7 +593,7 @@ p, err := eph.NewProvider(ctx, eph.Planets, "de442") // finds the pre-seeded ker
 Every downloader checks the cache before the network, and offline it goes no further,
 so a pre-seeded deployment never dials out — `remote` is the only thing that resolves or
 opens these files, there is no separate local-only constructor to bypass it with. IERS EOP data
-follows the same rule: blank-import `remote/eop`, put `finals2000A.data` at key
+follows the same rule: put `finals2000A.data` at key
 `iers/finals2000A.data`, and the first
 `Time.EOP()`/`.UTC()`/`.UT1()` call finds it automatically — no explicit loader call
 needed.
@@ -634,57 +634,50 @@ at runtime, lazily the first time it's needed: a pre-seeded
 finals2000A file on disk, then a network
 fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
 
-That fetch is supplied by `remote/eop`, not reached for by `epoch`, and it is one
-blank import:
+That fetch goes through `remote` like every other download, so offline mode, the
+download policy and a pre-seeded cache apply to it as they do to a kernel.
 
-```go
-import _ "github.com/TuSKan/astrogo/remote/eop"
-```
-
-It is a package of its own rather than part of `remote` for a plain reason: the
-loader needs `remote.GetFile`, so it has to sit one import *below* `remote`,
-which cannot then import it back. Naming it is what turns EOP on.
-
-The lazy load cannot report a failure, since `Time.EOP` returns no error: a
-missing import, or no network at the first lookup, costs every result up to 13.5″
+The lazy load cannot report a failure, since `Time.EOP` returns no error: no
+network at the first lookup, with nothing pre-seeded, costs every result up to 13.5″
 with only a log line to say so. To load the bulletin when you choose,
 under your context, and learn whether it worked, call `epoch.LoadEOP`:
 
 ```go
 if err := epoch.LoadEOP(ctx); err != nil {
-    log.Fatal(err) // no loader imported, nothing cached and no download, or the IERS unreachable
+    log.Fatal(err) // offline or refused with nothing cached, or the IERS unreachable
 }
 ```
 
-It takes the network step unless the download policy refuses it and falls back
-to a cached bulletin, and what it loads stays the model. A `coord.Context` then reports what
+It takes the network step unless offline mode or the download policy refuses it
+and falls back to a cached bulletin, and what it loads stays the model. A `coord.Context` then reports what
 its places were built with: `ctx.EOPSource()` gives `"network"` or `"cache"`, and
 whether the instant is inside the bulletin, or `"zero"` when nothing was loaded.
 
-A program that imports `astrogo/epoch` without it links no network stack at
-all — measured with go1.27 on windows/amd64, a binary computing a Julian date is
-**3.0 MB rather than 6.3 MB** — and degrades to zero EOP with a one-time warning,
-which costs about an arcsecond of topocentric position. To read a pre-seeded file
-without any `remote` dependency at all, register a filesystem loader instead:
+A program that wants no Earth orientation calls `epoch.RegisterModel(epoch.ZeroModel{})`
+first: no download and no warning, at about an arcsecond of topocentric position.
+A bulletin from elsewhere is a URL for `remote.IERSFinals2000A` set with
+`remote.SetURL`, or a file parsed with `epoch.ParseFinals2000A` and installed with
+`epoch.RegisterModel`.
 
-```go
-epoch.RegisterEOPLoader(epoch.FSEOPLoader{FS: os.DirFS("/data/eop"), Name: "finals2000A.data"})
-```
+Because `epoch` loads through `remote`, every program using it links Go's HTTP and
+TLS stack. Measured with go1.27.4 on windows/amd64, a binary computing a Julian date
+is **6.1 MB and 216 packages**, against 3.0 MB and 96 before `epoch` imported
+`remote`.
 
-`ephemeris` works the same way, and it buys more than a Julian date. The
-kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`, `Moons`)
-read SPK files, so they reach `remote` and through it `net/http` and `crypto/tls`;
-the SOFA path does not. The kernel half therefore registers itself:
+`ephemeris`'s kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`,
+`Moons`) read SPK files, and the SOFA path does not, so the kernel half registers
+itself:
 
 ```go
 import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 ```
 
-Measured with go1.27 on windows/amd64, a program asking `eph.Default()` where Mars
-is comes to **4.6 MB and 107 packages without the import, and 11.0 MB and 231 with
-it**. (When #112 introduced the registration the storage layer was `gocloud.dev`, and
-the import cost 13.9 MB and 424 packages, 64 of them gRPC.) Without the import those
-five sources return an error naming it; everything on SOFA is unaffected.
+Measured the same way, a program asking `eph.Default()` where Mars is comes to
+**11.1 MB and 227 packages without the import, and 11.5 MB and 231 with it**:
+`remote` is linked through `epoch` either way. (When #112 introduced the registration
+the storage layer was `gocloud.dev`, and the import cost 13.9 MB and 424 packages, 64
+of them gRPC.) Without the import those five sources return an error naming it;
+everything on SOFA is unaffected.
 
 OpenNGC works the same way — like every other catalog provider, it fetches over the
 network on first use (see "Controlling downloads" above).
@@ -779,7 +772,7 @@ The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the
 
 The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). EOP loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 

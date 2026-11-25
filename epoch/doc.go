@@ -98,11 +98,10 @@
 // value at every epoch, so no conversion disagrees with it, and
 // [DeltaTUncertainty] grows from the bulletin's end.
 //
-// Where those bytes come from is supplied by a registered [EOPLoader], not
-// reached for by this package. Blank-importing astrogo/remote/eop registers
-// the one that fetches through remote; importing remote alone does not. A
-// program that registers none degrades to zero EOP and links no storage backend at all, which is the
-// difference between a 2.5 MB binary and a 19.4 MB one.
+// Those bytes come through [github.com/TuSKan/astrogo/remote]: a bulletin
+// pre-seeded in its cache, then a download, unless offline mode or the
+// download policy stops it. A program that wants neither the download nor its
+// warning calls [RegisterModel] first, with [ZeroModel] or a model of its own.
 //
 // # The clock you are given
 //

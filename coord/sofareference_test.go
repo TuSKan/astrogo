@@ -71,7 +71,7 @@ import (
 // untested and those are precisely the ones a wiring error hides in.
 func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	// Realistic magnitudes for 2026: DUT1 within the 0.9 s UTC bound, polar
 	// motion a few tenths of an arcsecond.

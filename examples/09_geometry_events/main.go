@@ -12,7 +12,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -31,10 +30,10 @@ func main() {
 
 	fmt.Printf("=== Geometry events in %d (UTC) ===\n", year)
 
-	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
-	// download on first run and are cached.
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both download on
+	// first run and are cached. Earth orientation, for where the site is on the
+	// turning Earth: the IERS bulletin, which downloads on first need and is
+	// cached.
 
 	// 1. The JPL DE442 ephemeris
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")

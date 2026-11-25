@@ -1,7 +1,6 @@
 package iers
 
 import (
-	"errors"
 	"math"
 	"strings"
 	"sync"
@@ -135,40 +134,6 @@ func TestModelReadsTakeNoLock(t *testing.T) {
 
 	if blocked {
 		t.Fatal("a read of the model waited on modelMu")
-	}
-}
-
-// TestEnsureLoadedAnswersNoLoaderWithoutFetchMu: with no loader registered,
-// the state of every program that does not import remote/eop, the answer can
-// change only when RegisterLoader runs. It is given here while fetchMu is held,
-// which every lookup of such a program used to queue on to hear it (#953).
-func TestEnsureLoadedAnswersNoLoaderWithoutFetchMu(t *testing.T) {
-	installLoader(t, nil)
-
-	fetchMu.Lock()
-
-	result := make(chan error, 1)
-
-	go func() { result <- EnsureLoaded(41684) }()
-
-	var err error
-
-	blocked := false
-
-	select {
-	case err = <-result:
-	case <-time.After(5 * time.Second):
-		blocked = true
-	}
-
-	fetchMu.Unlock()
-
-	if blocked {
-		t.Fatalf("EnsureLoaded with no loader waited on fetchMu, then returned %v", <-result)
-	}
-
-	if !errors.Is(err, ErrNoLoader) {
-		t.Errorf("EnsureLoaded with no loader = %v, want ErrNoLoader", err)
 	}
 }
 

@@ -22,7 +22,6 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/unit"
@@ -56,8 +55,8 @@ func main() {
 	// matters here only through the zodiacal light's solar elongation.
 	when := time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC)
 
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation, for where the site is on the turning Earth: the IERS
+	// bulletin, which downloads on first need and is cached.
 
 	show.Title("How dark is the sky?",
 		fmt.Sprintf("%s at Cerro Paranal, %s UTC", preset, when.Format("2006-01-02 15:04")))

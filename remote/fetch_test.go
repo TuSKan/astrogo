@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
@@ -710,7 +709,7 @@ func TestGetFileStealsALockOlderThanTwiceItsTimeout(t *testing.T) {
 		t.Fatalf("plant lock: %v", err)
 	}
 
-	crashed := epoch.Now().ToGo().Add(-time.Minute)
+	crashed := time.Now().Add(-time.Minute)
 	if err := os.Chtimes(filepath.Join(dir, filepath.FromSlash(lockKey)), crashed, crashed); err != nil {
 		t.Fatalf("backdate lock: %v", err)
 	}

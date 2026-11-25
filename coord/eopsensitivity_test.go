@@ -83,7 +83,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
 	base := epoch.GetModel()
 
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -158,7 +158,7 @@ func TestHourAngleTracksUT1AtTheSiderealRate(t *testing.T) {
 // deterministic as well as honest — it asserts astrogo's response to a known
 // pole rather than to whatever a bulletin happens to say today.
 func TestPolarMotionMovesTheObservedPlace(t *testing.T) {
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -286,7 +286,7 @@ func altAzSeparationArcsec(a, b coord.AltAz) float64 {
 // gives zero, a doubled one gives twice — both are 100% away from a bound of
 // 0.1%.
 func TestObserverVectorRotatesWithUT1(t *testing.T) {
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {
@@ -373,7 +373,7 @@ func wrapArcsec(d float64) float64 {
 // arcseconds for the Moon and nothing at all for anything further away. Small,
 // and silent, which is the combination worth a test.
 func TestObserverVectorRespondsToPolarMotion(t *testing.T) {
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4042), 2635)
 	if err != nil {

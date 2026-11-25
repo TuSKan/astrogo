@@ -23,7 +23,6 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/unit"
@@ -48,8 +47,8 @@ func main() {
 	// elongation.
 	when := time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC)
 
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation, for where the site is on the turning Earth: the IERS
+	// bulletin, which downloads on first need and is cached.
 
 	show.Title("Does the model matter? Does the air?",
 		"Cerro Paranal, one night, changing one thing at a time")

@@ -2,12 +2,6 @@
 // seven planets were simultaneously above the horizon in the evening sky from Quinta Calixto.
 //
 // This example demonstrates:
-//   - JPL DE442 ephemerides for all 7 planets
-//   - USNO-validated rise/set/transit with standard atmospheric refraction
-//   - Twilight boundaries (civil, nautical, astronomical)
-//   - AltAz positions at any epoch via coord.Context
-//   - Ecliptic coordinates for clustering analysis
-//   - Appulse (closest approach) detection via plan.Appulses
 //
 // Run: go run ./examples/16_planet_parade/
 package main
@@ -25,7 +19,6 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -42,11 +35,11 @@ func main() {
 	show.Title("The great planet parade, February 28, 2025",
 		"Seven planets in the evening sky from Quinta Calixto")
 
-	// ── Setup: JPL DE442 ──────────────────────────────────────────────
-	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
-	// download on first run and are cached.
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// ── Setup: JPL DE442 ────────────────────────────────────────────── de442
+	// is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both download on first
+	// run and are cached. Earth orientation, for where the site is on the
+	// turning Earth: the IERS bulletin, which downloads on first need and is
+	// cached.
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {

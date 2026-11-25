@@ -17,7 +17,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -66,9 +65,9 @@ var (
 var metersPerAU = constants.IAU.AstronomicalUnit.Value
 
 func main() {
-	// Earth orientation: like every online example, this one imports
-	// remote/eop. A geocentric astrometric place does not use it, having no
-	// site and no Earth rotation in it.
+	// Earth orientation loads on first need, a download the first time. A
+	// geocentric astrometric place does not use it, having no site and no Earth
+	// rotation in it.
 	t := epoch.Date(2025, 7, 3, 12, 0, 0, 0, time.UTC)
 
 	show.Title("Mars, geocentric astrometric place", "astrogo against JPL Horizons and Skyfield")

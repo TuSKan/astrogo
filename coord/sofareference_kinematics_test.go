@@ -26,7 +26,7 @@ import (
 // each one by more than 0.1″, so it cannot pass on inputs that were zeroed.
 func TestKinematicStarIsSOFAsAtco13(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	const (
 		dut1Seconds = 0.1237

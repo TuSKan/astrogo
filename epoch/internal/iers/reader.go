@@ -191,7 +191,7 @@ func ParseFinals2000A(r io.Reader) (*Table, error) {
 	// A bulletin is a row a day since 1973, so one with none is not a short
 	// bulletin but something else: an HTML error page, whose every line is
 	// shorter than a row, parsed into an empty table with no error. As
-	// remote/eop's validator that let a page served with a 200 replace a good
+	// the loader's validator that let a page served with a 200 replace a good
 	// bulletin in the cache, and the empty table then replaced the model in
 	// memory, taking the EOP of every epoch with it (#1042).
 	if len(records) == 0 {

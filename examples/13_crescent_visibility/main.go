@@ -28,7 +28,8 @@ func main() {
 	// This example runs offline, so it uses no Earth-orientation data (UT1 =
 	// UTC, no polar motion). That can move the Moon's and Sun's altitudes by up
 	// to 13.5 arcsec, far below the tenths of a degree the criteria work in.
-	// For full accuracy, blank-import remote/eop, as 09_geometry_events does.
+	// For full accuracy, drop the RegisterModel line below: Earth orientation
+	// then loads on first need.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// ── Observer: Quinta Calixto, Brazil ─────────────────────────────────

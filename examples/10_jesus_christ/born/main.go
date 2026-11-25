@@ -15,7 +15,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -24,12 +23,11 @@ import (
 
 func main() {
 	// de441 parts are multi-GB each and download on first run, which is the
-	// point of this example. naif0012.tls (leap seconds) is ~5 KB.
-	// Earth orientation: like every online example, this one imports
-	// remote/eop. No bulletin covers the first century, though (it begins
-	// in 1973), so astrogo uses zero EOP here and says so once. What sets
-	// the accuracy is Delta T, the drift of the Earth's rotation, from the
-	// Espenak & Meeus (2006) model.
+	// point of this example. naif0012.tls (leap seconds) is ~5 KB. Earth
+	// orientation loads on first need, a download the first time. No bulletin
+	// covers the first century, though (it begins in 1973), so astrogo uses
+	// zero EOP here and says so once. What sets the accuracy is Delta T, the
+	// drift of the Earth's rotation, from the Espenak & Meeus (2006) model.
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)
@@ -122,7 +120,6 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	// Candidate 2: Jupiter–Regulus triple conjunction, 3–2 BC
 	// (Regulus is a fixed star — we compute Jupiter's ecliptic longitude
-	//  and check when it crosses Regulus's longitude at RA ≈ 10h08m)
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Venus Conjunction, June 17, 2 BC:")
 	// Astronomical year: 2 BC = year −1
@@ -181,9 +178,6 @@ func main() {
 // We use RA difference sign to distinguish morning (west of Sun = rises before)
 // from evening (east of Sun = sets after), but since Separation() returns an
 // unsigned angle, we use elongation magnitude as a proxy:
-//   - Low elongation early in the year → morning sky (approaching conjunction)
-//   - Low elongation late in the year → evening sky (receding from conjunction)
-//   - High elongation → all night (near opposition, retrograde)
 func skyPosition(elongDeg float64) string {
 	if elongDeg > 120 {
 		return "All night (near opposition)"

@@ -34,7 +34,7 @@ func (leapStepEOP) EOP(mjd float64) (epoch.EOP, error) {
 // comment at 0.007″.
 func TestSetTimeAcrossALeapSecond(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 	epoch.RegisterModel(leapStepEOP{})
 
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)

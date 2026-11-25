@@ -25,8 +25,8 @@ const (
 // Each is a registration and nothing else — it exports no symbol at all, so
 // importing one for a name is already impossible and importing it blank is the
 // only thing it is for. A storage one would register a URL scheme with
-// remote/file's registry, and none ships now; remote/eop registers the IERS
-// loader with astrogo/epoch.
+// remote/file's registry, and none ships now. remote/eop, which registered
+// the IERS loader with astrogo/epoch, went when epoch began importing remote.
 //
 // They are opt-in rather than always-on for the same reason in both cases: what
 // they pull in should not be in a build that never asked. An s3:// scheme costs
@@ -37,7 +37,6 @@ var optInSubpackages = map[string]bool{
 	remotePkg + "/file/gcs":   true,
 	remotePkg + "/file/azure": true,
 	remotePkg + "/file/sftp":  true,
-	remotePkg + "/eop":        true,
 }
 
 // TestSubpackagesAreNotImportedDirectly keeps remote's front door the only door.
@@ -59,7 +58,7 @@ var optInSubpackages = map[string]bool{
 // # The exceptions
 //
 // The packages in [optInSubpackages] are blank imports and export nothing at
-// all — a URL scheme registration, or the IERS EOP loader. A program that wants
+// all — a URL scheme registration. A program that wants
 // one has to name it, because what each pulls in does not belong in a build
 // that never asked. Blank only: importing one for a symbol would mean it had
 // grown one.
@@ -136,7 +135,7 @@ func TestSubpackagesAreNotImportedDirectly(t *testing.T) {
 			"NewAPIClient — and going around it skips the endpoint registry, offline "+
 			"mode and the download policy, silently and only for that call site.\n"+
 			"  The only exceptions are blank imports of the opt-in registrations: "+
-			"remote/file/{s3,gcs,azure,sftp} and remote/eop.", o)
+			"remote/file/{s3,gcs,azure,sftp}.", o)
 	}
 }
 

@@ -28,10 +28,10 @@
 //	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
 //
 // Measured with go1.27.4 on windows/amd64, a program calling
-// eph.Default().Locate(eph.MarsBarycenter, t) is 4.6 MB and 107 packages
-// without the import and 11.0 MB and 231 with it, 69 of them crypto. The
-// import adds those bytes only to the build that wants them, the pattern
-// remote/eop uses.
+// eph.Default().Locate(eph.Mars, t) is 11.1 MB and 227 packages without the
+// import and 11.5 MB and 231 with it. Since epoch loads Earth orientation
+// through remote, the network stack is linked either way, and the import
+// adds only the SPK reader and the kernel registration.
 //
 // Without the import, those five sources report an error naming it.
 // [Default] and everything built on SOFA are unaffected.

@@ -1,4 +1,4 @@
-package eop
+package resolve_test
 
 import (
 	"os"

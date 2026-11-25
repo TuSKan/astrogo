@@ -30,6 +30,7 @@ var benchEOPModes = []string{"zero", "table"}
 // authoritative, so a cache on disk can not replace it.
 func pinEOP(b *testing.B, mode string) {
 	b.Helper()
+	keepEOP(b)
 
 	switch mode {
 	case "zero":
@@ -45,8 +46,6 @@ func pinEOP(b *testing.B, mode string) {
 		b.Fatalf("unknown EOP mode %q", mode)
 	}
 
-	b.Cleanup(epoch.ResetEOP)
-
 	if got := epoch.EOPSource(); got != "explicit" {
 		b.Fatalf("EOP source = %q after pinning %q, want explicit: the benchmark would time ambient data", got, mode)
 	}
@@ -61,4 +60,24 @@ func BenchmarkGreedyStrategy50EOP(b *testing.B) {
 			benchScheduler(b, 50, &GreedyStrategy{})
 		})
 	}
+}
+
+// keepEOP puts back, when tb ends, the Earth orientation it found: the zero
+// model this package's TestMain pins, chosen explicitly, rather than
+// epoch.ResetEOP's default, which would let the lazy load replace it for every
+// benchmark after this one.
+func keepEOP(tb testing.TB) {
+	tb.Helper()
+
+	model, explicit := epoch.GetModel(), epoch.EOPSource() == "explicit"
+
+	tb.Cleanup(func() {
+		if explicit {
+			epoch.RegisterModel(model)
+
+			return
+		}
+
+		epoch.ResetEOP()
+	})
 }
