@@ -16,29 +16,15 @@
 // [github.com/TuSKan/astrogo/catalog.Resolver] pattern: users rarely need to
 // import subpackages directly.
 //
-// # The kernel sources need one blank import
+// # Kernel sources
 //
-// [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels,
-// which means files, a cache and a network: remote, and through it net/http
-// and crypto/tls. A build that only asks SOFA where Mars is has no use
-// for any of it.
-//
-// So the kernel half registers itself instead:
-//
-//	import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
-//
-// Measured with go1.27.4 on windows/amd64, a program calling
-// eph.Default().Locate(eph.Mars, t) is 11.1 MB and 227 packages without the
-// import and 11.5 MB and 231 with it. Since epoch loads Earth orientation
-// through remote, the network stack is linked either way, and the import
-// adds only the SPK reader and the kernel registration.
-//
-// Without the import, those five sources report an error naming it.
-// [Default] and everything built on SOFA are unaffected.
+// [Planets], [SmallBody], [Asteroids], [Comets] and [Moons] read SPK kernels
+// through [github.com/TuSKan/astrogo/ephemeris/jpl], downloading each on first
+// use and caching it; [Default] reads none and needs no network.
 //
 // # Quick Start
 //
-//	// JPL planetary ephemeris (DE442). Needs the registration import above.
+//	// JPL planetary ephemeris (DE442).
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de442")
 //	if err != nil { log.Fatal(err) }
 //	defer p.Close()

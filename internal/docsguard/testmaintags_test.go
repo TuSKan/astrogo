@@ -92,11 +92,10 @@ func TestTestMainCoversEveryTierItsPackageTests(t *testing.T) {
 		}
 	}
 
-	if checked == 0 {
-		t.Fatal("no package with a constrained setup file was examined; the check is " +
-			"not looking at anything")
-	}
-
+	// None is a state, not a broken walk, which the package count above already
+	// catches: plan's was the last constrained setup file, and it went when the
+	// kernel backend stopped needing a blank import (#238's subject). A new one
+	// is checked the day it appears.
 	t.Logf("%d packages with a constrained setup file checked", checked)
 }
 

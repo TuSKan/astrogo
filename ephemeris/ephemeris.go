@@ -10,6 +10,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/epoch"
@@ -261,12 +262,10 @@ func WithKernel(name string) Option {
 //	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 //	p, err := eph.NewProvider(ctx, eph.SmallBody, "433", eph.WithTimeInterval(start, end))
 //
-// It returns the Provider interface: the kernel backend registers itself
-// from ephemeris/jpl, so a build that never loads a kernel links no network
-// stack. A caller who needs the kernel provider's own methods calls
-// jpl.NewProvider, which returns *jpl.Provider. An artificial satellite is
-// not a source: satellite.NewFromTLE builds one from its element set and
-// returns *satellite.Satellite.
+// It returns the Provider interface. A caller who needs the kernel provider's
+// own methods calls jpl.NewProvider, which returns *jpl.Provider. An
+// artificial satellite is not a source: satellite.NewFromTLE builds one from
+// its element set and returns *satellite.Satellite.
 func NewProvider(ctx context.Context, source Source, kernel string, opts ...Option) (Provider, error) {
 	var cfg config
 	for _, opt := range opts {
@@ -275,22 +274,18 @@ func NewProvider(ctx context.Context, source Source, kernel string, opts ...Opti
 
 	switch source {
 	case Planets, SmallBody, Asteroids, Comets, Moons:
-		// Through the registered backend rather than by importing one. This
-		// package knows SOFA and a source vocabulary; the kernel half reaches
-		// remote and its network stack, and a build that never asks for a
-		// kernel should not link it. See ephemeris/core/kernel.go and #112.
-		p, err := core.KernelProvider(ctx, core.KernelRequest{
-			Source:       source,
-			Kernel:       kernel,
-			Start:        cfg.Start,
-			End:          cfg.End,
-			ExtraKernels: cfg.ExtraKernels,
-		})
+		var kopts []jpl.Option
+
+		if !cfg.Start.IsZero() && !cfg.End.IsZero() {
+			kopts = append(kopts, jpl.WithTimeInterval(cfg.Start, cfg.End))
+		}
+
+		for _, extra := range cfg.ExtraKernels {
+			kopts = append(kopts, jpl.WithKernel(extra))
+		}
+
+		p, err := jpl.NewProvider(ctx, source, kernel, kopts...)
 		if err != nil {
-			// Wrapped, not replaced: errors.Is against core.ErrNoKernelBackend
-			// is how a caller distinguishes "this build has no kernel support"
-			// from "that kernel could not be read", and the message already
-			// names the import to add.
 			return nil, fmt.Errorf("ephemeris: %w", err)
 		}
 
