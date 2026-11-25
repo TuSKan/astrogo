@@ -2,10 +2,39 @@ package remotetest
 
 import (
 	"io/fs"
+	"path/filepath"
 	"testing"
 
 	"github.com/TuSKan/astrogo/remote"
 )
+
+// TestRunWithoutAnEmptyCacheRunsNothing: when the untagged build cannot make
+// its empty cache, Run fails without running the tests, which would otherwise
+// run online against whatever this machine has cached.
+func TestRunWithoutAnEmptyCacheRunsNothing(t *testing.T) {
+	if tiered {
+		t.Skip("a tagged build makes no cache to fail at: Run only runs the tests")
+	}
+
+	t.Cleanup(remote.Capture().Restore)
+
+	// The temporary directory every platform reads, pointed somewhere that
+	// does not exist; os.MkdirTemp creates no parents.
+	missing := filepath.Join(t.TempDir(), "missing", "deeper")
+	for _, v := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(v, missing)
+	}
+
+	ran := false
+
+	if code := Run(func() int { ran = true; return 0 }); code != 1 {
+		t.Errorf("Run returned %d without its empty cache, want 1", code)
+	}
+
+	if ran {
+		t.Error("Run ran the tests without its empty cache")
+	}
+}
 
 // TestRunGivesTheUntaggedBuildAnEmptyCacheOffline: in the untagged build, Run
 // hands run an offline client with a cache directory of its own, empty, and
