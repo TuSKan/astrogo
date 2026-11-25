@@ -312,28 +312,18 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 
 	sourceETag, err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg)
 	if err != nil {
-		// A failed fetch is not the same as a missing file, and the difference
-		// used to be a whole class of CI failure.
+		// A failed fetch is not the same as a missing file. Before failing,
+		// this asks the question the caller asked once more: is the object
+		// there and current. It costs one Stat on a path that is already
+		// failing, re-runs the freshness check the cache hit above uses, and
+		// swallows nothing, so a fetch that failed for any other reason still
+		// finds nothing and still fails.
 		//
-		// This check was added because the lock above was exclusive within this
-		// process and only mostly exclusive across processes: fileblob's
-		// IfNotExist was a Stat followed by a Rename with a window in between,
-		// so two processes could both reach here for one key, and the loser's
-		// staging rename failed with "Access is denied" on Windows while the
-		// winner's download completed perfectly. Measured in CI at the time:
-		// `go test ./...` ran ephemeris/jpl and time as separate processes
-		// against one cache, both fetched de440s.bsp, and one died on exactly
-		// that rename while the other wrote a complete kernel (#241).
-		//
-		// Both halves of that are now gone — staging is named from the process
-		// id rather than a clock, and the lock is O_CREATE|O_EXCL rather than
-		// Stat-then-Rename — so this should no longer be reachable for that
-		// reason. It is kept because it is not a workaround: it asks the
-		// question the caller actually asked, is the object there and current,
-		// and costs one Stat on a path that is already failing. It re-runs the
-		// same freshness check the cache hit above uses and swallows nothing —
-		// a fetch that failed for any other reason still finds nothing and
-		// still fails.
+		// It was added when two processes could both download one key and the
+		// loser's staging rename failed while the winner's completed (#241).
+		// The exclusive lock and the pid-named staging file have closed that
+		// race; the check stays because it is the right question, not a
+		// workaround.
 		if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
 			return cacheFS, cacheKey, fetched{}, nil
 		}
@@ -401,14 +391,12 @@ func freshInCache(ctx context.Context, ep Endpoint, srcFS, cacheFS FS, name, cac
 // probe, offline mode — reports "changed", so GetFile falls through to its
 // normal download path.
 //
-// The recorded ETag is deliberately not the cached object's own, and the reason
-// survived the move off gocloud even though its mechanism did not. fileblob
-// derived an object's ETag from its (ModTime, Size), which has nothing to do
-// with the source's, so comparing those would never match and every reuse check
-// would degrade into a full re-download. There is now no local ETag at all —
-// [io/fs.FileInfo] has no such field — which makes the same point structurally:
-// what is compared is what the source said, written down when the object was
-// fetched. See file.SourceETagSuffix for where it is written down.
+// The recorded ETag is deliberately not the cached object's own. A local
+// copy's identity, its modification time and size, has nothing to do with the
+// source's ETag, so comparing the two would never match and every reuse check
+// would degrade into a full re-download. [io/fs.FileInfo] has no ETag field in
+// any case: what is compared is what the source said, written down when the
+// object was fetched. See file.SourceETagSuffix for where it is written down.
 //
 // When neither side offers an ETag the fallback is size equality. That is
 // weaker and is meant to be: it is the difference between re-downloading the
@@ -489,10 +477,9 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 	defer func() { _ = f.Close() }()
 
 	// Resuming means starting the body where the partial stopped. Seek rather
-	// than a range parameter: every backend here returns a File, and the HTTP
-	// one turns a seek into exactly the ranged GET the old NewRangeReader call
-	// issued — so the request on the wire is unchanged and the local backend
-	// gets a plain lseek instead of a second open.
+	// than a range parameter: every backend here returns a File, the HTTP one
+	// turns a seek into a ranged GET, and the local one into a plain lseek
+	// rather than a second open.
 	if offset > 0 {
 		seeker, ok := f.(io.Seeker)
 		if !ok {

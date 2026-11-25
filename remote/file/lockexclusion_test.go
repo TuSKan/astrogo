@@ -13,16 +13,15 @@ import (
 //
 // The existing contract test acquires, then starts a second contender, so
 // the second one genuinely finds the lock object already written and the
-// check-then-act window inside fileblob is never opened. Simultaneous
+// check-then-act window the old storage layer had was never opened. Simultaneous
 // contenders are the case that failed, and nothing exercised it.
 //
-// AcquireLock delegated exclusion to WriterOptions.IfNotExist, which this
-// package and remote/file both documented as being guarded by a per-Bucket
-// mutex. It is not: fileblob's fsys struct holds no mutex, and the mutex
-// that exists is constructed per writer, so IfNotExist is a bare os.Stat
-// followed by an os.Rename. Measured before the fix, 8 goroutines sharing
-// one Bucket over 200 rounds: 51 rounds with two or more holders, 2 with
-// three (#245).
+// AcquireLock once delegated exclusion to that layer's IfNotExist, which this
+// package and remote/file both documented as being guarded by a per-handle
+// mutex. It was not: the mutex was constructed per writer, so IfNotExist was
+// a bare os.Stat followed by an os.Rename. Measured before the fix, 8
+// goroutines sharing one handle over 200 rounds: 51 rounds with two or more
+// holders, 2 with three (#245). The lock is O_CREATE|O_EXCL now.
 //
 // The assertion is on overlap rather than on a winner count, because
 // AcquireLock is not a try-lock — every contender is supposed to get the

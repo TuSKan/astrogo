@@ -16,9 +16,8 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 )
 
-// These tests need the s3:// scheme, which went with gocloud.dev and has no
-// backend now: PR 5 of the plan in docs/storage.md, which would have rebuilt
-// it, was dropped, and §10 there records what the work is. Until somebody does
+// These tests need the s3:// scheme, which has no backend: PR 5 of the plan in
+// docs/storage.md, which would have written one, was dropped, and §10 there records what the work is. Until somebody does
 // it they skip rather than fail, which is the same thing they do for an
 // unreachable endpoint, and the skip names the reason so nobody reads it as a
 // passing test.
@@ -31,8 +30,8 @@ func requireS3(tb testing.TB) {
 		return
 	}
 
-	tb.Skip("the s3:// backend is not registered: astrogo has none since gocloud.dev's " +
-		"removal, and its rebuild was dropped (docs/storage.md, §10)")
+	tb.Skip("the s3:// backend is not registered: astrogo has none, " +
+		"and writing one was dropped (docs/storage.md, §10)")
 }
 
 // A date the archive is known to hold, used by every test here so they share

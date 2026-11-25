@@ -400,7 +400,7 @@ func TestEndpointFilesAreNotPreEncoded(t *testing.T) {
 }
 
 // The same rule for the endpoint URLs' path segments, which are joined to a
-// key and handed to blob.OpenBucket.
+// key and handed to file.OpenFS.
 func TestEndpointURLsHaveNoDoubleEncoding(t *testing.T) {
 	t.Parallel()
 

@@ -72,8 +72,7 @@ func WithCachedChunks(n int) ReaderAtOption {
 // directly and the type would be unnecessary. Measured, it is not: over HTTP an
 // uncached ReadAt is one ranged GET per call, which for SPK-shaped access is
 // 2000 requests and eleven seconds against a server on localhost. Locally it is
-// a pread — 48x cheaper than the gocloud path it replaces, and still 84x slower
-// than serving the same bytes from a resident chunk.
+// a pread, still 84x slower than serving the same bytes from a resident chunk.
 //
 // So the cache is not an optimization a caller opts into and forgets; it is the
 // difference between the layer working and not. Making Open the only door means
@@ -255,10 +254,9 @@ func (r *ReaderAt) ReadAt(p []byte, off int64) (int, error) {
 
 // Close releases the cached chunks and closes the underlying file.
 //
-// Unlike the gocloud implementation this replaces, the underlying handle is
-// this reader's own rather than a process-lived shared Bucket, so closing it
-// here is both correct and necessary — an unclosed one is a leaked descriptor
-// or a held HTTP connection.
+// The underlying handle is this reader's own, so closing it here is both
+// correct and necessary: an unclosed one is a leaked descriptor or a held HTTP
+// connection.
 func (r *ReaderAt) Close() error {
 	r.mu.Lock()
 	r.closed = true

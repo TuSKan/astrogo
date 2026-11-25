@@ -87,10 +87,9 @@ type (
 	// feeding it failed partway, because committing then replaces a good object
 	// with a truncated one.
 	//
-	// The old answer was to skip Close, which the gocloud implementation did
-	// and documented as leaking "the writer's temp resource on that rare path".
-	// On Windows that leak is not benign: the unclosed handle keeps the
-	// directory undeletable, which is how this surfaced.
+	// Skipping Close avoids that, but leaks the writer's staged resources, and
+	// on Windows that leak is not benign: the unclosed handle keeps the
+	// directory undeletable.
 	//
 	// So a writer says which one it means. Abort releases everything Close
 	// would and leaves the destination exactly as it was. Every writer this
