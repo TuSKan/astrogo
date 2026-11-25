@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -52,8 +53,26 @@ func TestBackendReportsTheKernelFailureNotAMissingImport(t *testing.T) {
 		t.Errorf("a kernel failure was reported as a missing backend:\n  %v", err)
 	}
 
-	if !strings.Contains(err.Error(), "ephemeris: new provider") {
+	if !strings.Contains(err.Error(), "jpl: new provider") {
 		t.Errorf("the error does not say which step failed:\n  %v", err)
+	}
+}
+
+// TestBackendErrorsNameTheEphemerisPackageOnce: ephemeris.NewProvider puts
+// "ephemeris: " before whatever the backend returns, so a backend that also
+// began its errors with it said "ephemeris: ephemeris: new provider".
+func TestBackendErrorsNameTheEphemerisPackageOnce(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.SetOffline(true)
+
+	_, err := ephemeris.NewProvider(context.Background(), ephemeris.Planets, "de440s")
+	if err == nil {
+		t.Fatal("an offline kernel fetch returned no error")
+	}
+
+	if got := strings.Count(err.Error(), "ephemeris:"); got != 1 {
+		t.Errorf("the error names the ephemeris package %d times, want once:\n  %v", got, err)
 	}
 }
 
