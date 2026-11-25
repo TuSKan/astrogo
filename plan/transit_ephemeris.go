@@ -154,13 +154,12 @@ func (e TransitEphemeris) Transits(w Window, need TransitWindow) ([]PredictedTra
 		n--
 	}
 
+	// From the cycle above that one every window ends at or after the
+	// interval's start, since each later one ends later still, so each
+	// starting by its end overlaps it.
 	var out []PredictedTransit
 
 	for n++; e.windowStart(n, need) <= to; n++ {
-		if e.windowEnd(n, need) < from {
-			continue
-		}
-
 		out = append(out, e.transit(n, need))
 	}
 

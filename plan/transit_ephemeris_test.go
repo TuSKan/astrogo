@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -207,6 +208,137 @@ func TestTransitsRefusesWhatCannotBePredicted(t *testing.T) {
 
 	if _, err := e.Transits(w, TransitWindow{Sigmas: 3}); err != nil {
 		t.Errorf("a correlation of -1: %v", err)
+	}
+
+	noEpoch := testEphemeris()
+	noEpoch.Epoch = epoch.FromJD(math.NaN(), epoch.TDB)
+
+	if _, err := noEpoch.Transits(w, TransitWindow{}); !errors.Is(err, ErrInvalidEphemeris) {
+		t.Errorf("an epoch that is not a time: err %v, want ErrInvalidEphemeris", err)
+	}
+
+	// The interval itself: reversed, and so far from the epoch that its cycle
+	// numbers are past what a float64 counts exactly.
+	if _, err := testEphemeris().Transits(Window{Start: w.End, End: w.Start}, TransitWindow{}); !errors.Is(err, ErrReversedInterval) {
+		t.Errorf("a reversed interval: err %v, want ErrReversedInterval", err)
+	}
+
+	second := TransitEphemeris{Epoch: e.Epoch, Period: unit.Seconds(1), Duration: unit.Seconds(0.1)}
+	far := Window{Start: e.Epoch.Add(unit.Days(1e12)), End: e.Epoch.Add(unit.Days(1e12 + 1))}
+
+	if _, err := second.Transits(far, TransitWindow{}); !errors.Is(err, ErrInvalidTransitWindow) {
+		t.Errorf("an interval 2^56 periods away: err %v, want ErrInvalidTransitWindow", err)
+	}
+}
+
+// errTestDouble is what this file's failing doubles return.
+var errTestDouble = errors.New("refused by a test double")
+
+// unplaceable is a star with no position.
+type unplaceable struct{ *Star }
+
+func (unplaceable) Position(epoch.Time) (coord.ICRS, error) { return coord.ICRS{}, errTestDouble }
+
+// doubleConstraint fails at every instant. The scan reads it through
+// CheckCtx, which returns scanErr, and the reason for a lost stretch through
+// Check, which returns checkErr: so each can fail without the other.
+type doubleConstraint struct {
+	scanErr, checkErr error
+}
+
+func (c doubleConstraint) Check(Observable, *Site, epoch.Time) (Result, error) {
+	return Result{}, c.checkErr
+}
+
+func (c doubleConstraint) CheckCtx(Observable, *Site, epoch.Time, *coord.Context) (Result, error) {
+	return Result{}, c.scanErr
+}
+
+// TestObserveTransitsPassesOnWhatStopsIt: an interval or ephemeris Transits
+// refuses, a target with no position and a constraint that fails to evaluate
+// all end ObserveTransits with that error, and a constraint failing without a
+// reason is still named.
+func TestObserveTransitsPassesOnWhatStopsIt(t *testing.T) {
+	t.Parallel()
+
+	site, err := NewSite("south", angle.LatDeg(-24.6), angle.LonDeg(-70.4), unit.Meters(2635))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	star := NewStar("δ = -25°", angle.Deg(90), angle.Deg(-25))
+	e := testEphemeris()
+	w := Window{Start: e.Epoch, End: e.Epoch.Add(unit.Days(3))}
+
+	invalid := e
+	invalid.Period = 0
+
+	for _, tc := range []struct {
+		name        string
+		e           TransitEphemeris
+		target      Observable
+		w           Window
+		constraints []Constraint
+		want        error
+	}{
+		{"a reversed interval", e, star, Window{Start: w.End, End: w.Start}, nil, ErrReversedInterval},
+		{"an invalid ephemeris", invalid, star, w, nil, ErrInvalidEphemeris},
+		{"a target with no position", e, unplaceable{star}, w, nil, errTestDouble},
+		{"a constraint the scan cannot evaluate", e, star, w, []Constraint{doubleConstraint{scanErr: errTestDouble}}, errTestDouble},
+		{"a constraint that cannot give its reason", e, star, w, []Constraint{doubleConstraint{checkErr: errTestDouble}}, errTestDouble},
+	} {
+		if _, err := ObserveTransits(tc.e, tc.target, site, tc.w, TransitWindow{}, tc.constraints...); !errors.Is(err, tc.want) {
+			t.Errorf("%s: err %v, want %v", tc.name, err, tc.want)
+		}
+	}
+
+	got, err := ObserveTransits(e, star, site, w, TransitWindow{}, doubleConstraint{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, o := range got {
+		if len(o.Lost) != 1 || !strings.Contains(o.Lost[0].Reason, "doubleConstraint") {
+			t.Errorf("cycle %d: lost %v, want the window to doubleConstraint, named", o.Predicted.Cycle, o.Lost)
+		}
+	}
+}
+
+// TestObserveTransitsListsLostTimeInOrder: lost stretches are listed by when
+// they start, whatever order the constraints were given in. From 40° N the
+// altitude constraint takes the whole window, and four hours late, ending
+// near 06:50 local time, the Sun takes its end as well.
+func TestObserveTransitsListsLostTimeInOrder(t *testing.T) {
+	t.Parallel()
+
+	south, err := NewSite("south", angle.LatDeg(-24.6), angle.LonDeg(-70.4), unit.Meters(2635))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	north, err := NewSite("north", angle.LatDeg(40), angle.LonDeg(-70.4), unit.Meters(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := NewStar("δ = -25°", angle.Deg(90), angle.Deg(-25))
+	e, culmination := nightFixture(t, south, target)
+	e.Epoch = e.Epoch.Add(unit.Hours(4))
+
+	o := observeOne(t, e, target, north, Window{Start: culmination.Add(unit.Hours(-6)), End: culmination.Add(unit.Hours(6))},
+		TransitWindow{Before: unit.Minutes(30), After: unit.Minutes(30)},
+		[]Constraint{Sun{Threshold: angle.Deg(-12)}, Altitude{Threshold: angle.Deg(30)}})
+
+	if len(o.Lost) != 2 {
+		t.Fatalf("lost %v, want the window to the altitude constraint and its end to the Sun", o.Lost)
+	}
+
+	if _, ok := o.Lost[0].Constraint.(Altitude); !ok || o.Lost[0].Start != o.Window.Start {
+		t.Errorf("first lost %v, want the altitude constraint from the window's start", o.Lost[0])
+	}
+
+	if _, ok := o.Lost[1].Constraint.(Sun); !ok || !o.Lost[1].Start.After(o.Lost[0].Start) {
+		t.Errorf("second lost %v, want the Sun's, later", o.Lost[1])
 	}
 }
 

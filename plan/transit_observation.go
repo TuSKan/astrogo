@@ -207,16 +207,7 @@ func (o *TransitObservation) cover(target Observable, site *Site, constraints []
 		}
 	}
 
-	slices.SortStableFunc(o.Lost, func(a, b LostInterval) int {
-		switch {
-		case a.Start.Before(b.Start):
-			return -1
-		case a.Start.After(b.Start):
-			return 1
-		default:
-			return 0
-		}
-	})
+	slices.SortStableFunc(o.Lost, func(a, b LostInterval) int { return compareTimes(a.Start, b.Start) })
 
 	transit := Window{Start: o.Ingress.Add(-o.Margin), End: o.Egress.Add(o.Margin)}
 

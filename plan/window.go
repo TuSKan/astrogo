@@ -63,6 +63,19 @@ func (w Window) Intersect(o Window) (Window, bool) {
 // inverted reports whether w ends before it starts, which makes it empty.
 func (w Window) inverted() bool { return w.End.Before(w.Start) }
 
+// compareTimes orders two instants for slices.SortFunc: negative when a is
+// before b, positive when after, zero when they are the same instant.
+func compareTimes(a, b epoch.Time) int {
+	switch {
+	case a.Before(b):
+		return -1
+	case a.After(b):
+		return 1
+	default:
+		return 0
+	}
+}
+
 // Union merges ws into a normalized set: sorted by Start, with every pair
 // of overlapping or touching windows (see Overlaps) collapsed into one, and
 // inverted windows, which are empty, left out. The result is pairwise
@@ -76,16 +89,7 @@ func Union(ws []Window) []Window {
 		return nil
 	}
 
-	slices.SortFunc(sorted, func(a, b Window) int {
-		switch {
-		case a.Start.Before(b.Start):
-			return -1
-		case a.Start.After(b.Start):
-			return 1
-		default:
-			return 0
-		}
-	})
+	slices.SortFunc(sorted, func(a, b Window) int { return compareTimes(a.Start, b.Start) })
 
 	merged := make([]Window, 0, len(sorted))
 	cur := sorted[0]

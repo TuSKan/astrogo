@@ -3,6 +3,7 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -93,6 +94,74 @@ func TestArrivalAtObserverInvertsTheDelay(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestArrivalAtObserverMatchesSwarthmoreTransitFinder compares
+// ArrivalAtObserver with an independent implementation: the Swarthmore
+// Transit Finder (astro.swarthmore.edu/transits), queried on 2026-11-25 for
+// WASP-4 b at its "European Southern Observatory: Paranal" site, with UTC
+// output. For each of six transits it published first contact, midpoint and
+// fourth contact as BJD_TDB, to 1e-4 day, and as UTC, to the minute; given
+// its BJD_TDB, astrogo must land within the two roundings, 30 s plus 4.32 s,
+// of its UTC.
+//
+// The September transits carry the largest Rømer delay WASP-4 sees, about
+// +6.8 minutes, and the December ones under a minute: a correction left out
+// or reversed misses the first set by most of seven minutes.
+func TestArrivalAtObserverMatchesSwarthmoreTransitFinder(t *testing.T) {
+	t.Parallel()
+
+	site, err := coord.NewGeodetic(angle.LatDeg(-24.625), angle.LonDeg(-70.403333), unit.Meters(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// WASP-4 as the Transit Finder lists it, 23:34:15.10 -42:03:42.41.
+	wasp4 := coord.NewICRS(angle.Deg((23+34/60.0+15.10/3600)*15), angle.Deg(-(42 + 3/60.0 + 42.41/3600)))
+
+	const tolerance = 30 + 0.5e-4*86400 // seconds: the UTC minute, and the BJD's last digit
+
+	events := []struct {
+		day string     // the UTC date of the transit
+		bjd [3]float64 // BJD_TDB - 2450000 at first contact, midpoint, fourth contact
+		utc [3]string  // the same, UTC, as hh:mm
+	}{
+		{"2026-09-02", [3]float64{11285.8661, 11285.9113, 11285.9566}, [3]string{"08:39", "09:44", "10:49"}},
+		{"2026-09-05", [3]float64{11288.5426, 11288.5878, 11288.6330}, [3]string{"00:53", "01:59", "03:04"}},
+		{"2026-09-06", [3]float64{11289.8808, 11289.9260, 11289.9712}, [3]string{"09:00", "10:06", "11:11"}},
+		{"2026-11-27", [3]float64{11371.5129, 11371.5582, 11371.6034}, [3]string{"00:17", "01:23", "02:28"}},
+		{"2026-12-01", [3]float64{11375.5276, 11375.5728, 11375.6181}, [3]string{"00:39", "01:44", "02:49"}},
+		{"2026-12-05", [3]float64{11379.5423, 11379.5875, 11379.6327}, [3]string{"01:01", "02:06", "03:11"}},
+	}
+
+	ctx, err := coord.NewContext(epoch.FromJD(2461285.9, epoch.UTC), site, atmosphere.Refraction{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	worst := 0.0
+
+	for _, ev := range events {
+		for i, b := range ev.bjd {
+			whole := math.Floor(b)
+			bary := epoch.FromJDParts(2450000+whole, b-whole, epoch.TDB)
+
+			published, err := time.Parse("2006-01-02 15:04", ev.day+" "+ev.utc[i])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			off := ctx.ArrivalAtObserver(wasp4, bary).Sub(epoch.FromGo(published)).Seconds()
+			worst = max(worst, math.Abs(off))
+
+			if math.Abs(off) > tolerance {
+				t.Errorf("%s %s: BJD_TDB %.4f arrives at %+.1f s from the Transit Finder's %s UTC, beyond its %.1f s of rounding",
+					ev.day, []string{"first contact", "midpoint", "fourth contact"}[i], 2450000+b, off, ev.utc[i], tolerance)
+			}
+		}
+	}
+
+	t.Logf("worst disagreement with the Transit Finder over 18 contacts: %.1f s, its rounding %.1f s", worst, tolerance)
 }
 
 // TestBarycentricDelayIsAProjection: the delay is the observer's barycentric
