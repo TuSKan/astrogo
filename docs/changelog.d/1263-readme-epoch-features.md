@@ -2,4 +2,4 @@
 type: Changed
 pr: 1263
 ---
-The README's feature lists name the `epoch` package: the Feature Highlights row and the full list's time-system entry described it without a name, and read as the `time` package it replaced.
+The README names the `epoch` package where it still read as the `time` package it replaced: the architecture graph's primitive, the Feature Highlights row and the full feature list's time-system entry.
