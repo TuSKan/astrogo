@@ -32,6 +32,33 @@ func failingSource(t *testing.T, id EndpointID) *atomic.Int32 {
 	return &requests
 }
 
+// silentSource points id at a server that accepts every request and never
+// answers it, counting them, and returns the count.
+func silentSource(t *testing.T, id EndpointID) *atomic.Int32 {
+	t.Helper()
+
+	var requests atomic.Int32
+
+	release := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(release) })
+
+	if err := SetURL(id, srv.URL+"/"); err != nil {
+		t.Fatal(err)
+	}
+
+	return &requests
+}
+
 // seedCached writes goodCopy where id caches readName, as a copy pre-seeded
 // by hand or left by an earlier run.
 func seedCached(t *testing.T, id EndpointID) {
@@ -87,21 +114,7 @@ func TestGetFileBoundsTheFreshnessCheck(t *testing.T) {
 	cleanRemoteState(t)
 
 	seedCached(t, OpenNGC)
-
-	release := make(chan struct{})
-
-	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		select {
-		case <-release:
-		case <-r.Context().Done():
-		}
-	}))
-	t.Cleanup(srv.Close)
-	t.Cleanup(func() { close(release) })
-
-	if err := SetURL(OpenNGC, srv.URL+"/"); err != nil {
-		t.Fatal(err)
-	}
+	silentSource(t, OpenNGC)
 
 	start := time.Now()
 
@@ -138,24 +151,7 @@ func TestGetFileAsksASilentHostOnce(t *testing.T) {
 		t.Fatalf("seed %s: %v", other, err)
 	}
 
-	var requests atomic.Int32
-
-	release := make(chan struct{})
-
-	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-
-		select {
-		case <-release:
-		case <-r.Context().Done():
-		}
-	}))
-	t.Cleanup(srv.Close)
-	t.Cleanup(func() { close(release) })
-
-	if err := SetURL(OpenNGC, srv.URL+"/"); err != nil {
-		t.Fatal(err)
-	}
+	requests := silentSource(t, OpenNGC)
 
 	for _, name := range []string{readName, other} {
 		if _, _, err := GetFile(context.Background(), OpenNGC, name, WithDownloadTimeout(200*time.Millisecond)); err != nil {
@@ -242,6 +238,25 @@ func TestWithoutCacheFallbackServesOnlyAConfirmedCopy(t *testing.T) {
 		}
 	})
 
+	t.Run("a host that gave no answer", func(t *testing.T) {
+		cleanRemoteState(t)
+		seedCached(t, OpenNGC)
+		requests := silentSource(t, OpenNGC)
+
+		if _, _, err := GetFile(context.Background(), OpenNGC, readName, WithDownloadTimeout(200*time.Millisecond)); err != nil {
+			t.Fatalf("GetFile with the host silent and a copy cached: %v", err)
+		}
+
+		_, _, err := GetFile(context.Background(), OpenNGC, readName, WithoutCacheFallback())
+		if !errors.Is(err, ErrDownloadFailed) || !errors.Is(err, ErrUnreachable) {
+			t.Errorf("err = %v, want ErrDownloadFailed and ErrUnreachable", err)
+		}
+
+		if n := requests.Load(); n != 1 {
+			t.Errorf("the silent host was asked %d times, want only by the first call", n)
+		}
+	})
+
 	t.Run("a copy the source confirms", func(t *testing.T) {
 		cleanRemoteState(t)
 		src := serveVersioned(t, OpenNGC, goodCopy, "v1")
@@ -278,6 +293,61 @@ func TestWithoutCacheFallbackServesOnlyAConfirmedCopy(t *testing.T) {
 			t.Errorf("GetFile of a cached immutable copy, offline: %v", err)
 		}
 	})
+}
+
+// TestGetFileTakesAMissingSourceObjectAsAnAnswer: a source that no longer has
+// a Mutable endpoint's object has answered, and the cached copy is not
+// current. GetFile fetches it and fails as the source does, where a source
+// that could not be asked has its copy served.
+func TestGetFileTakesAMissingSourceObjectAsAnAnswer(t *testing.T) {
+	cleanRemoteState(t)
+	seedCached(t, OpenNGC)
+
+	srv := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(srv.Close)
+
+	if err := SetURL(OpenNGC, srv.URL+"/"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := GetFile(context.Background(), OpenNGC, readName); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("err = %v, want fs.ErrNotExist", err)
+	}
+}
+
+// TestGetFileComparesSizesWithoutARecordedETag: a Mutable copy with no source
+// ETag recorded beside it, as one seeded by hand has none, is compared with its
+// source by size. The same size is current and is served with no download;
+// another size is downloaded.
+func TestGetFileComparesSizesWithoutARecordedETag(t *testing.T) {
+	const longer = "a newer catalog, longer than the cached one"
+
+	for _, tc := range []struct {
+		name, served, want string
+		downloads          int32
+	}{
+		{"the same size", strings.Repeat("x", len(goodCopy)), goodCopy, 0},
+		{"another size", longer, longer, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cleanRemoteState(t)
+			seedCached(t, OpenNGC)
+			src := serveVersioned(t, OpenNGC, tc.served, "")
+
+			fsys, key, err := GetFile(context.Background(), OpenNGC, readName)
+			if err != nil {
+				t.Fatalf("GetFile: %v", err)
+			}
+
+			if got := readCached(t, fsys, key); got != tc.want {
+				t.Errorf("GetFile served %q, want %q", got, tc.want)
+			}
+
+			if n := src.downloads(); n != tc.downloads {
+				t.Errorf("%d downloads, want %d", n, tc.downloads)
+			}
+		})
+	}
 }
 
 // errRefusedHere is the reason this file's refusing policy gives.
