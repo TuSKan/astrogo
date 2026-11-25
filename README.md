@@ -189,7 +189,7 @@ tables you can check against published references.
 
 | | |
 |---|---|
-| **Time** | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (≤1 µs over 1600–2400), explicit IERS UT1 error propagation |
+| **Time** (`epoch`) | Full `UTC↔TAI↔TT↔TDB↔UT1` graph, Fairhead & Bretagnon TDB (≤1 µs over 1600–2400), explicit IERS UT1 error propagation |
 | **Coordinates** | ICRS/Galactic/Ecliptic/AltAz/Geodetic, full Geometric→Astrometric→CIRS→Observed pipeline, `Context` caching (91 µs → 325 ns/transform) |
 | **Atmosphere** | SOFA-rigorous refraction by default at all altitudes, Pickering (2002) airmass down to 0°, pluggable `RefractionModel` |
 | **Ephemerides** | Sun/Moon/planets (SOFA), multi-kernel JPL SPK with on-demand Horizons fetching, SGP4 satellite propagation |
@@ -208,10 +208,10 @@ tables you can check against published references.
 ### Core Scientific Primitives
 - Angles (radians, degrees, sexagesimal — HMS/DMS parsing)
 - Units and quantities
-- **Scale-aware time system** (JD-based, full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph)
+- **Scale-aware time system** (`epoch`: JD-based, full `UTC↔TAI↔TT↔TDB↔UT1` conversion graph)
   - Fairhead & Bretagnon (1990) TDB correction, its leading 37 terms (≤0.79 µs over 1900–2100, ≤3 µs over −1000 to 3000)
   - Cross-scale comparisons auto-unify via TT (2 ns same-scale fast path)
-  - `UT1()` returns `(Time, error)`: an error when a loaded IERS bulletin starts after the epoch; past its end, ΔT held at its last measured value; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
+  - `Time.UT1()` returns `(epoch.Time, error)`: an error when a loaded IERS bulletin starts after the epoch; past its end, ΔT held at its last measured value; with none loaded it degrades to DUT1 = 0 with the one-time EOP warning
   - One ΔT = TT − UT1 for every conversion, `epoch.DeltaT`: Espenak & Meeus (2006) before 1960, the IERS bulletin's measured value where it covers, and that value held past its end, with `epoch.DeltaTUncertainty` growing from there
 
 ### Coordinate systems
@@ -368,7 +368,7 @@ flowchart TD
     %% Primitive Foundation
     subgraph Primitives
         direction LR
-        time[time]
+        epoch[epoch]
         angle[angle]
         vector[vector]
         unit[unit]
@@ -385,12 +385,12 @@ flowchart TD
     fitsplan --> plan
 
     catalog --> coord
-    catalog --> time
+    catalog --> epoch
     catalog --> angle
 
     fits --> coord
 
-    ephemeris --> time
+    ephemeris --> epoch
     ephemeris --> vector
     ephemeris --> coord
     satellite["ephemeris/satellite"] --> ephemeris
@@ -409,7 +409,7 @@ flowchart TD
     sbdata --> remote
 
     coord --> atmosphere
-    coord --> time
+    coord --> epoch
     coord --> vector
     coord --> angle
 
