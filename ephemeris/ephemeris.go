@@ -247,7 +247,7 @@ func WithTimeInterval(start, end epoch.Time) Option {
 // WithKernel adds an extra SPK kernel to load after the primary one.
 // Multiple WithKernel options can be chained.
 //
-//	p := eph.NewProvider(eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
+//	p, err := eph.NewProvider(ctx, eph.Planets, "de441_part-1", eph.WithKernel("de441_part-2"))
 func WithKernel(name string) Option {
 	return func(c *config) { c.ExtraKernels = append(c.ExtraKernels, name) }
 }
