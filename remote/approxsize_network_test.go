@@ -17,11 +17,9 @@ import (
 // TestListedFilesFitTheirApproxSize holds every downloadable endpoint that
 // lists a fixed file manifest to a size budget that covers each file it lists.
 //
-// Consent is checked against an endpoint's ApproxSize before a request and
-// against the size the source reports after it, and the documented way to
-// grant it is EnableDownloads(ApproxSize, ...). So a file even a few bytes
-// larger than its endpoint's ApproxSize is refused to every caller who follows
-// that recipe. Two were (#659): each SFD hemisphere is 67,115,520 bytes against
+// A size cap is checked against an endpoint's ApproxSize before a request and
+// against the size the source reports after it, so a policy capping downloads
+// at an endpoint's ApproxSize refuses a file even a few bytes larger than it. Two were (#659): each SFD hemisphere is 67,115,520 bytes against
 // a budget of 64 MiB, its FITS header over, and OpenNGC's NGC.csv is 3,876,288
 // bytes against 2,000,000.
 func TestListedFilesFitTheirApproxSize(t *testing.T) {

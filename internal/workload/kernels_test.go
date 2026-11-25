@@ -230,7 +230,7 @@ func (c *countingProvider) Locate(id core.ID, t epoch.Time) (core.State, error) 
 }
 
 // openCachedKernel adds an SPK kernel to p, counting its reads on c, only if
-// a previous consented run left it in the cache, and skips otherwise. The
+// a previous run left it in the cache, and skips otherwise. The
 // satellite kernels are a hundred megabytes and more, and a benchmark is no
 // reason to fetch one.
 func openCachedKernel(tb testing.TB, p *jpl.Provider, c *readCounter, name string) {

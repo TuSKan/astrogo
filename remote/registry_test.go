@@ -90,7 +90,7 @@ func TestSetURLOverride(t *testing.T) {
 func TestReset(t *testing.T) {
 	Disable(SIMBAD)
 	SetOffline(true)
-	EnableDownloads(1, NAIFSPK)
+	SetPolicy(func(Endpoint, int64) error { return errKernelsForbidden })
 	Reset()
 
 	if Offline() {
@@ -101,119 +101,69 @@ func TestReset(t *testing.T) {
 		t.Errorf("Reset should re-enable SIMBAD: %v", err)
 	}
 
-	if ok, _ := DownloadsEnabled(NAIFSPK); ok {
-		t.Error("Reset should revoke download consent")
-	}
-}
-
-func TestDownloadConsentDefaultDeny(t *testing.T) {
-	t.Cleanup(Reset)
-
-	err := CheckDownload(NAIFSPK, "de442.bsp", 115<<20)
-	if !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("expected ErrDownloadDenied by default, got %v", err)
-	}
-
-	// The error must be actionable: name the file, a size, and the enable call.
-	msg := err.Error()
-	for _, want := range []string{"de442.bsp", "MB", "EnableDownloads", "NAIFSPK"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("denial message missing %q: %s", want, msg)
-		}
-	}
-}
-
-func TestDownloadConsentEnableAndLimit(t *testing.T) {
-	t.Cleanup(Reset)
-
-	EnableDownloads(50<<20, NAIFSPK)
-
 	if err := CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
-		t.Errorf("32MB under a 50MB limit should pass: %v", err)
+		t.Errorf("Reset should clear the download policy: %v", err)
 	}
+}
 
-	err := CheckDownload(NAIFSPK, "de442.bsp", 115<<20)
-	if !errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("115MB over a 50MB limit should be denied, got %v", err)
-	}
-
-	// Unlimited.
-	EnableDownloads(0, NAIFSPK)
+// TestDownloadsAreAllowedByDefault: with no policy, every download is
+// allowed, of any size, on the default client and on a new one.
+func TestDownloadsAreAllowedByDefault(t *testing.T) {
+	t.Cleanup(Reset)
 
 	if err := CheckDownload(NAIFSPK, "de441_part-1.bsp", 3<<30); err != nil {
-		t.Errorf("unlimited consent should pass any size: %v", err)
+		t.Errorf("a 3 GB kernel with no policy set: %v, want nil", err)
 	}
 
-	// Unknown size passes an enabled endpoint (re-checked with the exact
-	// Content-Length once headers arrive).
-	EnableDownloads(50<<20, NAIFSPK)
+	if err := NewClient().CheckDownload(NAIFSPK, "de441_part-1.bsp", 3<<30); err != nil {
+		t.Errorf("a new client: %v, want nil", err)
+	}
+}
+
+// TestPolicyCapsTheSize is the size cap a policy expresses: under it passes,
+// over it is refused with a message naming the file, its size and SetPolicy,
+// and an unknown size passes, to be checked again against the size the source
+// reports. SetPolicy(nil) allows everything again.
+func TestPolicyCapsTheSize(t *testing.T) {
+	t.Cleanup(Reset)
+
+	SetPolicy(func(_ Endpoint, size int64) error {
+		if size > 50<<20 {
+			return errKernelsForbidden
+		}
+
+		return nil
+	})
+
+	if err := CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
+		t.Errorf("32 MB under a 50 MB cap should pass: %v", err)
+	}
+
+	err := CheckDownload(NAIFSPK, "de442.bsp", 115<<20)
+	if !errors.Is(err, ErrDownloadDenied) || !errors.Is(err, errKernelsForbidden) {
+		t.Fatalf("115 MB over a 50 MB cap: %v, want ErrDownloadDenied wrapping the policy's reason", err)
+	}
+
+	for _, want := range []string{"de442.bsp", "MB", "SetPolicy"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal message missing %q: %s", want, err)
+		}
+	}
 
 	if err := CheckDownload(NAIFSPK, "unknown.bsp", -1); err != nil {
-		t.Errorf("unknown size should defer to the Content-Length check: %v", err)
+		t.Errorf("an unknown size should defer to the size the source reports: %v", err)
 	}
 
-	DisableDownloads(NAIFSPK)
+	SetPolicy(nil)
 
-	if err := CheckDownload(NAIFSPK, "de440s.bsp", 1); !errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("DisableDownloads should restore denial, got %v", err)
-	}
-}
-
-func TestEnableAndDisableDownloadsWithNoIDs(t *testing.T) {
-	t.Cleanup(Reset)
-
-	EnableDownloads(50 << 20)
-
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizonsSPK} {
-		ok, maxSize := DownloadsEnabled(id)
-		if !ok {
-			t.Errorf("EnableDownloads: %s: expected DownloadsOK=true", id)
-		}
-
-		if maxSize != 50<<20 {
-			t.Errorf("EnableDownloads: %s: MaxDownloadSize = %d, want %d", id, maxSize, 50<<20)
-		}
-	}
-
-	// A non-Downloadable endpoint has no consent gate at all, so a
-	// blanket grant must leave it alone — including JPLHorizons, which
-	// shares a URL with JPLHorizonsSPK but only resolves names.
-	for _, id := range []EndpointID{SIMBAD, JPLHorizons} {
-		if ok, _ := DownloadsEnabled(id); ok {
-			t.Errorf("EnableDownloads must not grant consent to non-Downloadable %s", id)
-		}
-	}
-
-	DisableDownloads()
-
-	for _, id := range []EndpointID{IERSFinals2000A, NAIFSPK, NAIFLSK, OpenNGC, JPLHorizonsSPK} {
-		if ok, maxSize := DownloadsEnabled(id); ok || maxSize != 0 {
-			t.Errorf("DisableDownloads: %s: expected DownloadsOK=false, MaxDownloadSize=0, got ok=%v maxSize=%d", id, ok, maxSize)
-		}
-	}
-}
-
-// A blanket grant must cover JPLHorizonsSPK: it is KindAPI, but its
-// response carries a whole kernel, so it is a real download. Name
-// resolution through JPLHorizons stays ungated — that is why the two are
-// separate endpoints over one URL.
-func TestBlanketGrantCoversHorizonsSPKOnly(t *testing.T) {
-	t.Cleanup(Reset)
-
-	EnableDownloads(0)
-
-	if ok, _ := DownloadsEnabled(JPLHorizonsSPK); !ok {
-		t.Error("EnableDownloads(0) must grant consent to JPLHorizonsSPK — its response carries a kernel")
-	}
-
-	if ok, _ := DownloadsEnabled(JPLHorizons); ok {
-		t.Error("EnableDownloads(0) must not gate JPLHorizons — name resolution needs no consent")
+	if err := CheckDownload(NAIFSPK, "de442.bsp", 115<<20); err != nil {
+		t.Errorf("SetPolicy(nil) should allow every download again: %v", err)
 	}
 }
 
 // A golden list: an endpoint that can genuinely download must set
-// Downloadable explicitly, or a blanket EnableDownloads silently leaves
-// it ungranted.
+// Downloadable explicitly, which is what says the download policy is asked
+// about it and the log reports it.
 func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	want := map[EndpointID]bool{
 		IERSFinals2000A:       true,
@@ -240,43 +190,6 @@ func TestDownloadableEndpointsAreExactlyTheExpectedSet(t *testing.T) {
 	}
 }
 
-// TestConstName is a golden-list check: every registered EndpointID must
-// map back to its own exported Go constant name, so a download-denied
-// error message (the only caller of constName) always shows copy-pasteable
-// code rather than the raw registry key. An id with no case falls through
-// to the raw string — exercised via a made-up id that isn't registered.
-func TestConstName(t *testing.T) {
-	want := map[EndpointID]string{
-		IERSFinals2000A:  "IERSFinals2000A",
-		NAIFSPK:          "NAIFSPK",
-		NAIFLSK:          "NAIFLSK",
-		JPLHorizons:      "JPLHorizons",
-		JPLSBDB:          "JPLSBDB",
-		JPLSBDBQuery:     "JPLSBDBQuery",
-		SIMBAD:           "SIMBAD",
-		VizieR:           "VizieR",
-		GaiaTAP:          "GaiaTAP",
-		MAST:             "MAST",
-		CelesTrak:        "CelesTrak",
-		FINK:             "FINK",
-		OpenNGC:          "OpenNGC",
-		Nominatim:        "Nominatim",
-		OpenElevation:    "OpenElevation",
-		VIIRSAnnual:      "VIIRSAnnual",
-		CopernicusEODATA: "CopernicusEODATA",
-	}
-
-	for id, name := range want {
-		if got := constName(id); got != name {
-			t.Errorf("constName(%s) = %q, want %q", id, got, name)
-		}
-	}
-
-	if got := constName("no.such.endpoint"); got != "no.such.endpoint" {
-		t.Errorf("constName(unregistered) = %q, want the raw id back", got)
-	}
-}
-
 var errKernelsForbidden = errors.New("kernels forbidden here")
 
 func TestCustomPolicy(t *testing.T) {
@@ -295,15 +208,15 @@ func TestCustomPolicy(t *testing.T) {
 		t.Errorf("custom policy denial not surfaced: %v", err)
 	}
 
-	// Policy replaces per-endpoint consent: LSK passes without EnableDownloads.
+	// The policy decides per endpoint: LSK passes.
 	if err := CheckDownload(NAIFLSK, "naif0012.tls", 6000); err != nil {
 		t.Errorf("policy-allowed download should pass: %v", err)
 	}
 
 	SetPolicy(nil)
 
-	if err := CheckDownload(NAIFLSK, "naif0012.tls", 6000); !errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("nil policy should restore per-endpoint consent, got %v", err)
+	if err := CheckDownload(NAIFSPK, "de442.bsp", 115<<20); err != nil {
+		t.Errorf("a nil policy should allow every download, got %v", err)
 	}
 }
 
@@ -359,9 +272,9 @@ func TestRegistryConcurrency(t *testing.T) {
 
 				Disable(GaiaTAP)
 				Enable(GaiaTAP)
-				EnableDownloads(1<<20, NAIFSPK)
+				SetPolicy(nil)
 
-				_, _ = DownloadsEnabled(NAIFSPK)
+				_ = CheckDownload(NAIFSPK, "de440s.bsp", 1)
 
 				SetOffline(false)
 			}

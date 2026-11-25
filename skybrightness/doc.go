@@ -45,9 +45,6 @@
 // [github.com/TuSKan/astrogo/skybrightness/dataset.Inputs] gathers the
 // reference data it reads:
 //
-//	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
-//	remote.EnableDownloads(size, ids...)
-//
 //	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 //	model, err := skybrightness.NewPreset(skybrightness.GAMBONSWeb, in)
 //

@@ -71,8 +71,6 @@ func TestCacheAPIReportsAServerFaultAsBothRefusalAndFault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
-
 	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := epoch.FromJD(2451546.0, epoch.UTC)
 
@@ -117,8 +115,6 @@ func TestCacheAPIKeepsARealRefusalFatal(t *testing.T) {
 	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
-
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := epoch.FromJD(2451546.0, epoch.UTC)

@@ -17,11 +17,10 @@ import (
 )
 
 func main() {
-	// This example runs offline, so it uses no Earth-orientation data
-	// (UT1 = UTC, no polar motion). That moves an event by at most about a
-	// second, below the minute these times are read to. For full accuracy,
-	// blank-import remote/eop and consent to the IERS bulletin, as
-	// 09_geometry_events does.
+	// This example runs offline, so it uses no Earth-orientation data (UT1 =
+	// UTC, no polar motion). That moves an event by at most about a second,
+	// below the minute these times are read to. For full accuracy, blank-import
+	// remote/eop, as 09_geometry_events does.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Two sites on two nights. Quinta Calixto in Brazil, in August, has every

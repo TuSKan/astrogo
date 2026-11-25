@@ -16,11 +16,11 @@
 // API calls exactly as they do to files, decided in the one package that
 // owns them rather than reproduced down here.
 //
-// An API call needs no download consent — the request is the documented
-// purpose of the method that makes it — with one exception: JPLHorizonsSPK,
-// whose response carries a whole kernel, is registered as a separate
-// endpoint from JPLHorizons so that consent gates kernel generation without
-// also gating name resolution.
+// An API call is not a download, and the download policy is never asked
+// about it — the request is the documented purpose of the method that makes
+// it — with one exception: JPLHorizonsSPK, whose response carries a whole
+// kernel, is registered as a separate endpoint from JPLHorizons so that the
+// policy sees kernel generation without also seeing name resolution.
 //
 // This package is not importable from outside remote/. Reach it through
 // remote.NewAPIClient.

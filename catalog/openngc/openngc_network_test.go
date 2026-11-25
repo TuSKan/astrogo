@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 )
 
 // The real catalog, the two files remote.OpenNGC pins, resolved the way a
@@ -16,9 +15,6 @@ import (
 // both are naked-eye objects.
 func TestOpenNGCResolvesTheRealCatalog(t *testing.T) {
 	testutil.RequireReachable(t, "raw.githubusercontent.com:443")
-
-	remote.EnableDownloads(16<<20, remote.OpenNGC)
-	defer remote.DisableDownloads(remote.OpenNGC)
 
 	p := New()
 

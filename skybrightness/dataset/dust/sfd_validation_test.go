@@ -12,7 +12,6 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
 )
 
@@ -33,9 +32,6 @@ func TestSFDMatchesIRSA(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
 	defer cancel()
-
-	// Two hemispheres of 64 MB, consent-gated like every other bulk fetch.
-	remote.EnableDownloads(160<<20, remote.SFDDustMap)
 
 	// Fatal, not a skip, and the old message was the giveaway. CachedDirections
 	// returns an error only when the cache location cannot be resolved —

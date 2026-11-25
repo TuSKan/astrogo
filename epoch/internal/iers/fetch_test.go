@@ -19,13 +19,13 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 // fakeLoader stands in for astrogo/remote's loader.
 //
 // These tests used to drive the real thing: a temp-directory bucket, a
-// rewritten endpoint URL and download consent, all to exercise a retry
+// rewritten endpoint URL and a download policy, all to exercise a retry
 // cooldown. That was only possible because this package imported remote,
 // which is the dependency the Loader seam exists to remove — so what
 // remains here is the logic this package actually owns, and it no longer
 // needs a storage backend to run.
 //
-// Behavior that belongs to remote — ETag body-skip, consent default-deny,
+// Behavior that belongs to remote — ETag body-skip, the download policy,
 // corrupt-download rejection — is tested in remote's own eop_test.go
 // against astrogo/epoch's public API.
 type fakeLoader struct {
@@ -409,7 +409,7 @@ type nonTableModel struct{}
 func (nonTableModel) EOP(float64) (EOP, error) { return EOP{}, ErrNoRecords }
 
 // TestEnsureLoadedSettledAnswerAllocatesNothing is the allocation contract of
-// #931. With no data and no consent, every lookup lands inside the cooldown and
+// #931. With no data and no download, every lookup lands inside the cooldown and
 // gets the same answer; it used to take fetchMu and allocate a fresh
 // errors.Join each time, 2 allocations and 40 bytes per UT1.
 func TestEnsureLoadedSettledAnswerAllocatesNothing(t *testing.T) {

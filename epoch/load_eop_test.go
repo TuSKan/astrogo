@@ -104,7 +104,7 @@ func TestLoadEOPFetchesThenReadsTheCache(t *testing.T) {
 		wantErrs      []error
 	}{
 		{"the network answers", serve(good), serve(good), "network", nil},
-		{"no consent, a bulletin cached", serve(""), serve(good), "cache", nil},
+		{"the download refused, a bulletin cached", serve(""), serve(good), "cache", nil},
 		{"the network sends junk", serve("<html>not a bulletin</html>"), serve(good), "cache", nil},
 		{"neither", func(context.Context) (epoch.EOPData, error) { return epoch.EOPData{}, errIERSDown }, serve(""), "zero",
 			[]error{errIERSDown, epoch.ErrNoEOPData}},

@@ -32,11 +32,10 @@ import (
 )
 
 func main() {
-	// This example runs offline, so it uses no Earth-orientation data
-	// (UT1 = UTC, no polar motion). That changes the observatory's
-	// rotational velocity toward the star by a few centimeters per second,
-	// far below the meters per second printed. For full accuracy,
-	// blank-import remote/eop and consent to the IERS bulletin, as
+	// This example runs offline, so it uses no Earth-orientation data (UT1 =
+	// UTC, no polar motion). That changes the observatory's rotational velocity
+	// toward the star by a few centimeters per second, far below the meters per
+	// second printed. For full accuracy, blank-import remote/eop, as
 	// 09_geometry_events does.
 	epoch.RegisterModel(epoch.ZeroModel{})
 

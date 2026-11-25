@@ -42,8 +42,6 @@ var kernelAssignment = regexp.MustCompile(
 func TestDE440MatchesNAIF(t *testing.T) {
 	testutil.RequireReachable(t, "naif.jpl.nasa.gov:443")
 
-	remote.EnableDownloads(0, remote.NAIFPCK)
-
 	ctx := context.Background()
 
 	bucket, key, err := remote.GetFile(ctx, remote.NAIFPCK, "pck/gm_de440.tpc")
@@ -120,8 +118,6 @@ func TestDE440MatchesNAIF(t *testing.T) {
 // here as well as above.
 func TestDE440SystemExceedsBody(t *testing.T) {
 	testutil.RequireReachable(t, "naif.jpl.nasa.gov:443")
-
-	remote.EnableDownloads(0, remote.NAIFPCK)
 
 	ctx := context.Background()
 

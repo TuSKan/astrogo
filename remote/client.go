@@ -9,11 +9,11 @@ import (
 )
 
 // Client is one component's I/O policy: which endpoints it may reach, where
-// they live, what it has consented to download, and where it caches.
+// they live, which downloads it allows, and where it caches.
 //
 // # Why this exists
 //
-// The package-level [SetOffline], [EnableDownloads], [SetURL] and [SetDataDir]
+// The package-level [SetOffline], [SetPolicy], [SetURL] and [SetDataDir]
 // configure one policy for a whole process, which is fine for a program and
 // wrong for a service. Two components in one binary — an HTTP handler serving
 // user queries and a background kernel prefetcher — cannot hold different
@@ -24,13 +24,12 @@ import (
 // A Client is that policy as a value. Build one, configure it, pass it to the
 // component that owns it:
 //
-//	prefetch := remote.NewClient()
-//	prefetch.EnableDownloads(200<<20, remote.NAIFSPK)
+//	prefetch := remote.NewClient() // downloads what it is asked for
 //
 //	serve := remote.NewClient()
 //	serve.SetOffline(true)
 //
-// Nothing the prefetcher grants reaches the handler.
+// Nothing set on one reaches the other.
 //
 // # The package-level functions are still there
 //
@@ -61,7 +60,7 @@ type Client struct {
 	// built once per component, not per request.
 	endpoints map[EndpointID]Endpoint
 
-	// policy replaces the per-endpoint consent checks entirely when set.
+	// policy is asked about every download; nil allows every download.
 	policy Policy
 
 	// dataDirURL is where this client caches. Empty means "resolve the
@@ -108,7 +107,7 @@ type Client struct {
 }
 
 // NewClient returns a client with the default policy: online, every endpoint
-// enabled at its built-in URL, no download consent, and the default cache
+// enabled at its built-in URL, every download allowed, and the default cache
 // location.
 //
 // It is the same starting state the process-wide default has, so a component
@@ -130,7 +129,7 @@ func NewClient() *Client {
 //
 // It is how a component takes the program's configuration without taking its
 // connections or imposing its own settings back on it: the copy starts offline
-// if this client is offline and with whatever consent it has been granted, and
+// if this client is offline and with whatever download policy it has, and
 // then diverges. Changing either afterwards leaves the other alone.
 //
 // The alternative — [NewClient] — starts from the built-in defaults instead,

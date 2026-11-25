@@ -20,17 +20,21 @@ import (
 //	| [`01_where_is_mars`](examples/01_where_is_mars/) | ... | none |
 var offlineRow = regexp.MustCompile("(?m)^\\| \\[`([0-9]{2}_[a-z0-9_]+)`\\]\\(examples/[^)]+\\) \\|.*\\| none \\|\\s*$")
 
-// networkCalls are the calls that reach, or consent to reach, the network:
-// download consent, an endpoint override, and a catalog resolver or provider,
-// whose queries need no consent. A kernel-backed ephemeris provider is not
-// among them: without consent it can only read the cache, which is what
-// 19_offline_setup demonstrates.
+// networkCalls are the calls that reach the network: an endpoint override, a
+// catalog resolver or provider, and a kernel-backed ephemeris provider, which
+// downloads its kernel on first use. A program that turns offline mode on
+// with remote.SetOffline reads only the cache, so in one that does, a kernel
+// provider does not count — that is what 19_offline_setup demonstrates.
 var networkCalls = map[string]bool{
-	"remote.EnableDownloads": true,
-	"remote.SetURL":          true,
-	"catalog.NewResolver":    true,
-	"catalog.NewProvider":    true,
+	"remote.SetURL":       true,
+	"catalog.NewResolver": true,
+	"catalog.NewProvider": true,
+	"eph.NewProvider":     true,
 }
+
+// offlineOnlyCalls are the networkCalls that read only the cache once the
+// program has called remote.SetOffline.
+var offlineOnlyCalls = map[string]bool{"eph.NewProvider": true}
 
 // networkCallIn returns the first call in the Go source file at path that
 // networkCalls names, as "pkg.Func", or "" if it makes none. It reads the
@@ -43,12 +47,14 @@ func networkCallIn(t *testing.T, path string) string {
 		t.Fatalf("parse %s: %v", path, err)
 	}
 
-	found := ""
+	var calls []string
+
+	offline := false
 
 	ast.Inspect(f, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || found != "" {
-			return found == ""
+		if !ok {
+			return true
 		}
 
 		sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -56,14 +62,32 @@ func networkCallIn(t *testing.T, path string) string {
 			return true
 		}
 
-		if pkg, ok := sel.X.(*ast.Ident); ok && networkCalls[pkg.Name+"."+sel.Sel.Name] {
-			found = pkg.Name + "." + sel.Sel.Name
+		pkg, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+
+		name := pkg.Name + "." + sel.Sel.Name
+		if name == "remote.SetOffline" {
+			offline = true
+		}
+
+		if networkCalls[name] {
+			calls = append(calls, name)
 		}
 
 		return true
 	})
 
-	return found
+	for _, c := range calls {
+		if offline && offlineOnlyCalls[c] {
+			continue
+		}
+
+		return c
+	}
+
+	return ""
 }
 
 // offlineExamples returns the examples the README says need no network.

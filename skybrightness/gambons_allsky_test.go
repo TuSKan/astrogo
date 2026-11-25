@@ -189,8 +189,6 @@ func runAllSky(t *testing.T) allSkyRun {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 	defer cancel()
 
-	enableStarMapDownload(t)
-
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVTophat()
 	scene := gambonsScene(t)

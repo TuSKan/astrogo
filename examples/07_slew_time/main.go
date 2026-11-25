@@ -19,11 +19,10 @@ import (
 )
 
 func main() {
-	// This example runs offline, so it uses no Earth-orientation data
-	// (UT1 = UTC, no polar motion). That can move an alt/az position by up
-	// to 13.5 arcsec, which changes a slew time here by well under 0.1 s.
-	// For full accuracy, blank-import remote/eop and consent to the IERS
-	// bulletin, as 09_geometry_events does.
+	// This example runs offline, so it uses no Earth-orientation data (UT1 =
+	// UTC, no polar motion). That can move an alt/az position by up to 13.5
+	// arcsec, which changes a slew time here by well under 0.1 s. For full
+	// accuracy, blank-import remote/eop, as 09_geometry_events does.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)

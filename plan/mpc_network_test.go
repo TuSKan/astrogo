@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -22,7 +23,6 @@ func requireMPCList(t *testing.T) []MPCObservatory {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
 	t.Cleanup(remote.Capture(remote.MPCObsCodes).Restore)
-	remote.EnableDownloads(0, remote.MPCObsCodes)
 
 	list, err := MPCObservatories(context.Background())
 	if err != nil {
@@ -198,28 +198,24 @@ func TestNewMPCSiteRejectsCodesWithNoGroundPosition(t *testing.T) {
 	}
 }
 
-// TestMPCObservatoriesNeedsDownloadConsent pins that the list is behind the
-// same gate as every other bulk fetch — see CLAUDE.md's "Bulk file downloads
-// never happen without explicit consent".
+// TestMPCObservatoriesAsksTheDownloadPolicy pins that the list is behind the
+// same download policy as every other bulk fetch.
 //
 // The cache directory is pointed at an empty temporary bucket, which is the
-// whole point rather than tidiness: consent gates the *download*, not reading
-// something already cached. Run against a warm cache this test passes with the
-// gate removed, so it would be asserting nothing — which is exactly what it did
-// on the first attempt, and why the temp bucket is here.
-func TestMPCObservatoriesNeedsDownloadConsent(t *testing.T) {
+// whole point rather than tidiness: the policy decides the *download*, not
+// reading something already cached. Run against a warm cache this test passes
+// with the policy ignored, so it would be asserting nothing — which is exactly
+// what it did on the first attempt, and why the temp bucket is here.
+func TestMPCObservatoriesAsksTheDownloadPolicy(t *testing.T) {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
-	// Scoped to this one endpoint rather than remote.Reset, which restores
-	// the process default — no consent — and so revokes what
-	// integration_main_test.go's TestMain granted for the whole binary.
-	// Reset also leaves the data directory alone, so the empty bucket below
-	// would stay pointed there afterwards: a later test would find neither
-	// consent nor cache. That combination failed three unrelated eclipse and
-	// moon-phase tests (#239), which is the second time the same three have
-	// been broken this way — see visible_tonight_internal_test.go's note.
+	// Captured rather than remote.Reset, which leaves the data directory
+	// alone, so the empty bucket below would stay pointed there afterwards and
+	// a later test would find no cache. When a TestMain also granted download
+	// consent, the same mistake failed three unrelated eclipse and moon-phase
+	// tests (#239).
 	t.Cleanup(remote.Capture(remote.MPCObsCodes).Restore)
-	remote.DisableDownloads(remote.MPCObsCodes)
+	remotetest.RefuseDownloads(t, remote.MPCObsCodes)
 
 	remote.SetDataDir("file:///" + filepath.ToSlash(t.TempDir()) + "?create_dir=true")
 
@@ -237,23 +233,23 @@ func TestMPCObservatoriesNeedsDownloadConsent(t *testing.T) {
 
 	_, err := MPCObservatories(context.Background())
 	if !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("err = %v, want remote.ErrDownloadDenied without EnableDownloads", err)
+		t.Fatalf("err = %v, want remote.ErrDownloadDenied under a refusing policy", err)
 	}
 
-	// And the same empty bucket must work once consent is granted, or the
+	// And the same empty bucket must work once downloads are allowed, or the
 	// assertion above would hold for a test that had simply broken the cache
-	// directory — a denial produced by the fixture rather than by the gate.
-	remote.EnableDownloads(0, remote.MPCObsCodes)
+	// directory — a refusal produced by the fixture rather than by the policy.
+	remote.SetPolicy(nil)
 
 	list, err := MPCObservatories(context.Background())
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("MPCObservatories after consent: %v; the temporary cache directory "+
-			"is what failed above, not the consent gate", err)
+		t.Fatalf("MPCObservatories with downloads allowed: %v; the temporary cache "+
+			"directory is what failed above, not the download policy", err)
 	}
 
 	if len(list) == 0 {
-		t.Error("consent granted and the list came back empty")
+		t.Error("downloads allowed and the list came back empty")
 	}
 }
 

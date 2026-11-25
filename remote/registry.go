@@ -138,17 +138,16 @@ func (c *Client) Offline() bool {
 }
 
 // Reset restores the default registry state: every endpoint at its
-// built-in URL, downloads disabled, online, no custom policy. It does not
-// touch the data directory (see DataDir).
+// built-in URL, online, and no download policy, so every download allowed. It
+// does not touch the data directory (see DataDir).
 //
-// Reset discards consent a broader scope — a package TestMain — granted
-// for the whole binary, so a test using it can break tests that run
-// after. Prefer Capture/Restore or WithScope for scoped setup.
+// Reset discards what a broader scope — a package TestMain — set for the
+// whole binary, offline mode or a policy, so a test using it can break tests
+// that run after. Prefer Capture/Restore or WithScope for scoped setup.
 func Reset() { Default().Reset() }
 
 // Reset restores this client's registry to the state [NewClient] returns:
-// every endpoint at its built-in URL, downloads disabled, online, no custom
-// policy. Like the package-level [Reset], it leaves the data directory and the
+// every endpoint at its built-in URL, online, and no download policy. Like the package-level [Reset], it leaves the data directory and the
 // API options alone; [Client.Capture] restores the data directory too.
 func (c *Client) Reset() {
 	c.mu.Lock()
@@ -189,94 +188,29 @@ func (c *Client) URL(id EndpointID) (string, error) {
 	return ep.URL, nil
 }
 
-// EnableDownloads grants file-download consent, capping a single download
-// at maxSize bytes (0 means unlimited). With no ids it applies to every
-// Downloadable endpoint; otherwise only to the ones named. Downloads are
-// always denied until this is called — astrogo never auto-downloads.
-//
-//	remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK)
-//	remote.EnableDownloads(0) // everything, no size cap
-//
-// Naming an endpoint that cannot download (SIMBAD, VizieR, ...) does
-// nothing: it has no consent gate to open.
-func EnableDownloads(maxSize int64, ids ...EndpointID) {
-	Default().EnableDownloads(maxSize, ids...)
-}
-
-// EnableDownloads grants this client file-download consent, capping a single
-// download at maxSize bytes (0 means unlimited). Consent granted here reaches
-// no other client.
-func (c *Client) EnableDownloads(maxSize int64, ids ...EndpointID) {
-	c.setConsent(true, maxSize, ids)
-}
-
-// DisableDownloads revokes file-download consent — for every Downloadable
-// endpoint with no ids, or only the ones named. This is the default state.
-func DisableDownloads(ids ...EndpointID) { Default().DisableDownloads(ids...) }
-
-// DisableDownloads revokes this client's file-download consent.
-func (c *Client) DisableDownloads(ids ...EndpointID) { c.setConsent(false, 0, ids) }
-
-// setConsent applies a consent decision. An empty ids means every
-// Downloadable endpoint; naming ids explicitly still skips those with no
-// download path at all, so consent is never recorded against an endpoint
-// that would never consult it.
-func (c *Client) setConsent(ok bool, maxSize int64, ids []EndpointID) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if len(ids) == 0 {
-		ids = make([]EndpointID, 0, len(c.endpoints))
-		for id := range c.endpoints {
-			ids = append(ids, id)
-		}
-	}
-
-	for _, id := range ids {
-		ep, found := c.endpoints[id]
-		if !found || !ep.Downloadable {
-			continue
-		}
-
-		ep.DownloadsOK = ok
-		ep.MaxDownloadSize = maxSize
-		c.endpoints[id] = ep
-	}
-}
-
-// DownloadsEnabled reports whether downloads are enabled for id and the
-// configured per-download size cap (0 = unlimited).
-func DownloadsEnabled(id EndpointID) (ok bool, maxSize int64) {
-	return Default().DownloadsEnabled(id)
-}
-
-// DownloadsEnabled reports whether this client may download id, and its
-// per-download size cap (0 = unlimited).
-func (c *Client) DownloadsEnabled(id EndpointID) (ok bool, maxSize int64) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	ep, found := c.endpoints[id]
-	if !found {
-		return false, 0
-	}
-
-	return ep.DownloadsOK, ep.MaxDownloadSize
-}
-
 // Policy decides whether a file download may proceed. size is the exact
 // Content-Length when known, the endpoint's ApproxSize otherwise, or -1
-// when neither is available. Returning a non-nil error aborts the download,
+// when neither is available. Returning a non-nil error refuses the download,
 // wrapped in ErrDownloadDenied.
 type Policy func(ep Endpoint, size int64) error
 
-// SetPolicy installs a custom download-consent policy that replaces the
-// per-endpoint EnableDownloads checks entirely. Pass nil to restore the
-// default per-endpoint consent behavior.
+// SetPolicy installs the download policy, which every file download asks
+// before it starts. Without one, and after SetPolicy(nil), every download is
+// allowed, of any size. A policy can refuse everything, cap the size, or allow
+// only some endpoints:
+//
+//	remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
+//		if size > 500<<20 {
+//			return fmt.Errorf("%d bytes is over the 500 MB this program allows", size)
+//		}
+//
+//		return nil
+//	})
+//
+// SetOffline stops all network access, downloads included.
 func SetPolicy(p Policy) { Default().SetPolicy(p) }
 
-// SetPolicy installs a custom download-consent policy on this client. Pass nil
-// to restore the default per-endpoint consent behavior.
+// SetPolicy installs this client's download policy. Nil allows every download.
 func (c *Client) SetPolicy(p Policy) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -284,16 +218,15 @@ func (c *Client) SetPolicy(p Policy) {
 	c.policy = p
 }
 
-// CheckDownload applies the consent configuration to a prospective
-// download of the given size (semantics as in Policy), returning nil when
-// it may proceed. GetFile calls this itself; it is exported for
+// CheckDownload asks the download policy about a prospective download of the
+// given size (semantics as in Policy), returning nil when it may proceed. GetFile calls this itself; it is exported for
 // file-producing paths that bypass GetFile — JPLHorizonsSPK generation,
 // whose kernel arrives base64-encoded inside a JSON response.
 func CheckDownload(id EndpointID, name string, size int64) error {
 	return Default().CheckDownload(id, name, size)
 }
 
-// CheckDownload applies this client's consent configuration to a prospective
+// CheckDownload asks this client's download policy about a prospective
 // download. See the package-level [CheckDownload].
 func (c *Client) CheckDownload(id EndpointID, name string, size int64) error {
 	c.mu.RLock()
@@ -307,26 +240,13 @@ func (c *Client) CheckDownload(id EndpointID, name string, size int64) error {
 		return fmt.Errorf("%w: %q", ErrUnknownEndpoint, id)
 	}
 
-	if pol != nil {
-		if err := pol(ep, size); err != nil {
-			return fmt.Errorf("%w: %s from %s: %w", ErrDownloadDenied, name, ep.URL, err)
-		}
-
+	if pol == nil {
 		return nil
 	}
 
-	if !ep.DownloadsOK {
-		return fmt.Errorf(
-			"%w: %s (%s from %s); astrogo never downloads without consent — call remote.EnableDownloads(maxSize, remote.%s) or pre-seed the file (see README \"Data downloads & offline usage\")",
-			ErrDownloadDenied, name, sizeLabel(size), ep.URL, constName(id),
-		)
-	}
-
-	if ep.MaxDownloadSize > 0 && size > ep.MaxDownloadSize {
-		return fmt.Errorf(
-			"%w: %s is %s, above the %s limit set by remote.EnableDownloads(..., remote.%s)",
-			ErrDownloadDenied, name, sizeLabel(size), sizeLabel(ep.MaxDownloadSize), constName(id),
-		)
+	if err := pol(ep, size); err != nil {
+		return fmt.Errorf("%w by the policy set with remote.SetPolicy: %s (%s from %s): %w",
+			ErrDownloadDenied, name, sizeLabel(size), ep.URL, err)
 	}
 
 	return nil
@@ -346,78 +266,5 @@ func sizeLabel(size int64) string {
 		return fmt.Sprintf("~%.0f KB", float64(size)/(1<<10))
 	default:
 		return fmt.Sprintf("%d bytes", size)
-	}
-}
-
-// constName maps an EndpointID to its exported Go constant name so error
-// messages show copy-pasteable code.
-func constName(id EndpointID) string {
-	switch id {
-	case IERSFinals2000A:
-		return "IERSFinals2000A"
-	case IERSTimescales:
-		return "IERSTimescales"
-	case NAIFSPK:
-		return "NAIFSPK"
-	case NAIFLSK:
-		return "NAIFLSK"
-	case NAIFPCK:
-		return "NAIFPCK"
-	case JPLHorizons:
-		return "JPLHorizons"
-	case JPLHorizonsSPK:
-		return "JPLHorizonsSPK"
-	case JPLSBDB:
-		return "JPLSBDB"
-	case JPLSBDBQuery:
-		return "JPLSBDBQuery"
-	case SIMBAD:
-		return "SIMBAD"
-	case VizieR:
-		return "VizieR"
-	case GaiaTAP:
-		return "GaiaTAP"
-	case ESOSkyCalc:
-		return "ESOSkyCalc"
-	case GaiaAIP:
-		return "GaiaAIP"
-	case GaiaAIPAsync:
-		return "GaiaAIPAsync"
-	case IRSADust:
-		return "IRSADust"
-	case SFDDustMap:
-		return "SFDDustMap"
-	case SVOFilterProfile:
-		return "SVOFilterProfile"
-	case CIELuminosity:
-		return "CIELuminosity"
-	case GaiaStarMap:
-		return "GaiaStarMap"
-	case MPIMainzCrossSections:
-		return "MPIMainzCrossSections"
-	case MAST:
-		return "MAST"
-	case CelesTrak:
-		return "CelesTrak"
-	case FINK:
-		return "FINK"
-	case OpenNGC:
-		return "OpenNGC"
-	case MPCObsCodes:
-		return "MPCObsCodes"
-	case Nominatim:
-		return "Nominatim"
-	case OpenElevation:
-		return "OpenElevation"
-	case MPCORB:
-		return "MPCORB"
-	case CALSPEC:
-		return "CALSPEC"
-	case VIIRSAnnual:
-		return "VIIRSAnnual"
-	case CopernicusEODATA:
-		return "CopernicusEODATA"
-	default:
-		return string(id)
 	}
 }

@@ -37,9 +37,8 @@ var (
 // repeatedly costs a full download only the first time (or whenever the
 // upstream files actually change).
 //
-// Returns remote.ErrDownloadDenied unless
-// remote.EnableDownloads(maxSize, remote.OpenNGC) has been called; it
-// still respects remote.SetOffline and remote.Disable(remote.OpenNGC).
+// Returns remote.ErrDownloadDenied when the download policy refuses it; it
+// also respects remote.SetOffline and remote.Disable(remote.OpenNGC).
 func fetch(ctx context.Context) ([]resolve.Target, error) {
 	ep, ok := remote.Lookup(remote.OpenNGC)
 	if !ok {

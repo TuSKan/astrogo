@@ -49,8 +49,7 @@ func (v *versionedSource) serve(body, etag string) {
 // one-byte probe is metadata, like its HEAD, and is not counted.
 func (v *versionedSource) downloads() int32 { return v.bodies.Load() }
 
-// serveVersioned points id at a versionedSource serving body under etag, and
-// consents to id's downloads.
+// serveVersioned points id at a versionedSource serving body under etag.
 func serveVersioned(t *testing.T, id EndpointID, body, etag string) *versionedSource {
 	t.Helper()
 
@@ -85,8 +84,6 @@ func serveVersioned(t *testing.T, id EndpointID, body, etag string) *versionedSo
 	if err := SetURL(id, srv.URL+"/"); err != nil {
 		t.Fatal(err)
 	}
-
-	EnableDownloads(0, id)
 
 	return v
 }
@@ -292,13 +289,13 @@ func TestWithReadDamagedCopyOverABadSource(t *testing.T) {
 }
 
 // A heal that cannot fetch says so, with the read's error, and leaves nothing
-// cached: here the caller may not download.
-func TestWithReadHealWithoutConsent(t *testing.T) {
+// cached: here the caller's policy refuses the download.
+func TestWithReadHealUnderARefusingPolicy(t *testing.T) {
 	cleanRemoteState(t)
 
 	serveVersioned(t, NAIFSPK, goodCopy, "v1")
 	seedDamaged(t, NAIFSPK, "v1")
-	DisableDownloads(NAIFSPK)
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	var r reading
 

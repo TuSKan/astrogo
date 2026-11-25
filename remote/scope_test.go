@@ -8,9 +8,8 @@ import (
 var errCustomPolicyForTest = errors.New("custom policy")
 
 // TestCaptureRestoreFullSnapshot verifies Capture()/Restore() round-trips
-// every field the doc comment promises: per-endpoint URL/Enabled/
-// DownloadsOK/MaxDownloadSize, offline mode, the custom Policy, and the
-// data directory.
+// every field the doc comment promises: per-endpoint URL/Enabled, offline
+// mode, the custom Policy, and the data directory.
 func TestCaptureRestoreFullSnapshot(t *testing.T) {
 	t.Cleanup(Reset)
 	t.Cleanup(func() { SetDataDir("") })
@@ -20,13 +19,11 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 	// distinct from TestDataDirEnvOverride's real path-resolution check
 	// below.
 	SetDataDir("before")
-	EnableDownloads(10<<20, NAIFSPK)
 
 	snap := Capture()
 
 	// Mutate everything the snapshot should restore.
 	SetDataDir("after")
-	DisableDownloads(NAIFSPK)
 
 	if err := SetURL(NAIFSPK, "https://example.invalid/mutated"); err != nil {
 		t.Fatalf("SetURL: %v", err)
@@ -41,10 +38,6 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 
 	if got := DataDirURL(); got != "before" {
 		t.Errorf("DataDirURL after Restore = %q, want %q", got, "before")
-	}
-
-	if ok, maxSize := DownloadsEnabled(NAIFSPK); !ok || maxSize != 10<<20 {
-		t.Errorf("DownloadsEnabled(NAIFSPK) after Restore = (%v, %d), want (true, %d)", ok, maxSize, 10<<20)
 	}
 
 	ep, ok := Lookup(NAIFSPK)
@@ -71,28 +64,26 @@ func TestCaptureRestoreFullSnapshot(t *testing.T) {
 
 // TestCaptureSubsetLeavesOtherEndpointsAlone is the scenario that actually
 // motivated this primitive: a scope captured for one endpoint must not
-// clobber consent a broader scope (e.g. a package TestMain) granted for a
-// different endpoint.
+// clobber what a broader scope (e.g. a package TestMain) set for a different
+// endpoint.
 func TestCaptureSubsetLeavesOtherEndpointsAlone(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableDownloads(0, NAIFLSK) // stands in for a TestMain-wide grant
-
 	snap := Capture(NAIFSPK)
 
-	DisableDownloads(NAIFSPK)
+	Disable(NAIFSPK)
 	// A test mistakenly (or legitimately, mid-test) disabling NAIFLSK too —
 	// Restore() below must NOT touch it, since it wasn't captured.
-	DisableDownloads(NAIFLSK)
+	Disable(NAIFLSK)
 
 	snap.Restore()
 
-	if ok, _ := DownloadsEnabled(NAIFSPK); ok {
-		t.Error("Restore() re-enabled NAIFSPK, but it was never disabled before Capture — DisableDownloads should have stuck")
+	if _, err := URL(NAIFSPK); err != nil {
+		t.Errorf("Restore() left NAIFSPK as the test changed it: %v", err)
 	}
 
-	if ok, _ := DownloadsEnabled(NAIFLSK); ok {
-		t.Error("Restore(subset) touched NAIFLSK, which was outside the captured subset — it should have stayed as this test left it")
+	if _, err := URL(NAIFLSK); !errors.Is(err, ErrEndpointDisabled) {
+		t.Errorf("Restore(subset) touched NAIFLSK, which was outside the captured subset: URL = %v, want ErrEndpointDisabled", err)
 	}
 }
 
@@ -101,20 +92,18 @@ func TestCaptureSubsetLeavesOtherEndpointsAlone(t *testing.T) {
 func TestWithScopeRestoresOnPanic(t *testing.T) {
 	t.Cleanup(Reset)
 
-	EnableDownloads(5<<20, NAIFSPK)
-
 	func() {
 		defer func() { _ = recover() }()
 
 		WithScope(func() {
-			DisableDownloads(NAIFSPK)
+			SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 			panic("boom")
 		})
 	}()
 
-	if ok, maxSize := DownloadsEnabled(NAIFSPK); !ok || maxSize != 5<<20 {
-		t.Errorf("DownloadsEnabled(NAIFSPK) after a panicking WithScope = (%v, %d), want (true, %d) — Restore must run via defer", ok, maxSize, 5<<20)
+	if err := CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
+		t.Errorf("CheckDownload after a panicking WithScope = %v, want nil — Restore must run via defer", err)
 	}
 }
 

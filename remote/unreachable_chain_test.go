@@ -65,8 +65,6 @@ func TestAnUnreachableSourceStaysRecognizableThroughGetFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	EnableDownloads(0, NAIFSPK)
-
 	_, _, err = GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err == nil {
 		t.Fatal("GetFile succeeded against a port with nothing on it")

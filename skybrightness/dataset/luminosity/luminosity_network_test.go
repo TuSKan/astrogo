@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/luminosity"
 )
 
@@ -27,9 +26,6 @@ import (
 // failure a copy-paste in the endpoint's Files list would produce.
 func TestCurvesPeakWhereVisionDoes(t *testing.T) {
 	testutil.RequireReachable(t, "files.cie.co.at:443")
-
-	ids, size := []remote.EndpointID{remote.CIELuminosity}, int64(1<<20)
-	remote.EnableDownloads(size, ids...)
 
 	peak := func(v luminosity.Vision) float64 {
 		t.Helper()

@@ -363,7 +363,7 @@ func checkUSNOCivilTwilight(t *testing.T, phen string, h, m int, ev *plan.Event,
 // build that names an innocent subsystem costs somebody an afternoon.
 //
 // So a network failure skips, and everything else still falls back: a kernel
-// that is absent for any reason the network is not -- consent withheld, a bad
+// that is absent for any reason the network is not -- a download refused, a bad
 // local cache -- leaves the old behavior untouched.
 func newEph(t *testing.T) eph.Provider {
 	t.Helper()

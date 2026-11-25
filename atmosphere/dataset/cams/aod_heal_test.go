@@ -15,6 +15,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/vector"
@@ -95,7 +96,7 @@ func aodFixtureOnAxes(tb testing.TB, value float64, lat, lon string) []byte {
 }
 
 // camsCacheAndSource points remote.CopernicusEODATA's cache and source at
-// fresh directories and consents to its downloads, for the rest of t. It
+// fresh directories, for the rest of t. It
 // returns the cache with the key aodWhen's file caches under, and the source.
 func camsCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS) {
 	t.Helper()
@@ -120,8 +121,6 @@ func camsCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.F
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.CopernicusEODATA)
 
 	return cache, prefix + AODKey(aodWhen), src
 }
@@ -260,7 +259,7 @@ func TestAOD550DownloadsAFileOfAnotherProductOnce(t *testing.T) {
 // that is the one failure credentials can fix.
 func TestAOD550AdvisesOnAFailedFetch(t *testing.T) {
 	camsCacheAndSource(t)
-	remote.DisableDownloads(remote.CopernicusEODATA)
+	remotetest.RefuseDownloads(t, remote.CopernicusEODATA)
 
 	_, err := AOD550(context.Background(), aodSite(t), aodWhen)
 	if !errors.Is(err, remote.ErrDownloadDenied) || !errors.Is(err, ErrAOD) {

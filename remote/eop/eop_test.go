@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/TuSKan/astrogo/epoch"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/remote/file"
@@ -23,7 +24,7 @@ const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.0159
 
 // These tests moved here from epoch/internal/iers when the EOP dependency
 // was inverted. They were always testing this package's behavior —
-// consent, ETag revalidation, cache layout — through a package that had
+// the download policy, ETag revalidation, cache layout — through a package that had
 // no business knowing about any of it. They now sit next to the code they
 // exercise, and iers keeps only the tests about its own logic.
 
@@ -67,7 +68,6 @@ func scratchCache(t *testing.T) {
 func TestEOPLoaderFetchesAndParses(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	data, err := eopLoader{}.Fetch(context.Background())
 	if err != nil {
@@ -79,15 +79,16 @@ func TestEOPLoaderFetchesAndParses(t *testing.T) {
 	}
 }
 
-// TestEOPLoaderDefaultDenyWritesNoCache is the consent contract: without
-// remote.EnableDownloads the fetch is refused, and nothing is written.
-func TestEOPLoaderDefaultDenyWritesNoCache(t *testing.T) {
+// TestEOPLoaderUnderARefusingPolicyWritesNoCache is the download policy's
+// contract: a fetch it refuses is refused, and nothing is written.
+func TestEOPLoaderUnderARefusingPolicyWritesNoCache(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
+	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 
 	_, err := eopLoader{}.Fetch(context.Background())
 	if !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("Fetch without remote.EnableDownloads = %v, want remote.ErrDownloadDenied", err)
+		t.Fatalf("Fetch under a refusing policy = %v, want remote.ErrDownloadDenied", err)
 	}
 
 	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
@@ -106,7 +107,6 @@ func TestEOPLoaderDefaultDenyWritesNoCache(t *testing.T) {
 func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()
 
@@ -156,7 +156,6 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			scratchCache(t)
 			fakeIERSSource(t, c.body)
-			remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 			if _, err := (eopLoader{}).Fetch(context.Background()); err == nil {
 				t.Fatal("Fetch accepted a corrupt download")
@@ -187,7 +186,6 @@ const errorPage = "<html><body><h1>503 Service Unavailable</h1></body></html>\n"
 func TestEOPLoaderKeepsAGoodBulletinOverAnErrorPage(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()
 
@@ -226,7 +224,6 @@ func TestEOPLoaderKeepsAGoodBulletinOverAnErrorPage(t *testing.T) {
 func TestEOPLoaderReplacesADamagedCachedBulletin(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	ctx := context.Background()
 
@@ -308,7 +305,6 @@ func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	for range 3 {
 		if _, err := (eopLoader{}).Fetch(context.Background()); err != nil {
@@ -380,13 +376,15 @@ func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
 	}
 }
 
-// TestEOPFetchWithoutConsentIgnoresAForeignLock is #424's case at the loader:
-// another process holds the lock on the EOP cache entry, and this one never
-// granted consent. The fetch must be refused at once rather than wait for the
-// lock, which it used to do for up to half an hour, holding the EOP mutex.
-func TestEOPFetchWithoutConsentIgnoresAForeignLock(t *testing.T) {
+// TestEOPFetchUnderARefusingPolicyIgnoresAForeignLock is #424's case at the
+// loader: another process holds the lock on the EOP cache entry, and this one's
+// policy refuses the download. The fetch must be refused at once rather than
+// wait for the lock, which it used to do for up to half an hour, holding the
+// EOP mutex.
+func TestEOPFetchUnderARefusingPolicyIgnoresAForeignLock(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
+	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 
 	fsys, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
@@ -401,6 +399,6 @@ func TestEOPFetchWithoutConsentIgnoresAForeignLock(t *testing.T) {
 	defer cancel()
 
 	if _, err := (eopLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("Fetch with a foreign lock and no consent: %v, want ErrDownloadDenied at once", err)
+		t.Fatalf("Fetch with a foreign lock under a refusing policy: %v, want ErrDownloadDenied at once", err)
 	}
 }

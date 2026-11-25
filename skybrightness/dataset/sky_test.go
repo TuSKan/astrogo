@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
@@ -84,13 +85,13 @@ func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 //
 // The value of this function is that its optical depth was measured, so a
 // failed fetch must reach the caller rather than become a builder carrying
-// some other number. Without consent and with an empty cache the fetch is
+// some other number. Under a refusing policy and with an empty cache the fetch is
 // refused before any source is asked.
 func TestLiveAerosolPassesOnARefusedFetch(t *testing.T) {
-	// Not parallel: consent and the data directory are process-global.
+	// Not parallel: the download policy and the data directory are process-global.
 	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	remote.DisableDownloads()
+	remotetest.RefuseDownloads(t)
 
 	air, err := dataset.LiveAerosol(context.Background(), skySite(t),
 		time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC), atmosphere.RuralAerosol)

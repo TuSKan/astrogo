@@ -80,7 +80,7 @@ func state() *modelState {
 
 // RegisterModel sets the globally used Earth orientation parameter model,
 // and marks the choice authoritative: EnsureLoaded's lazy loader (an
-// on-disk cache probe, then — if download consent was granted — a network
+// on-disk cache probe, then — unless the download policy refuses it — a network
 // fetch) will not run again after this call, so it can never silently
 // replace what was explicitly registered.
 //

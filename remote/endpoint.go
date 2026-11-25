@@ -55,9 +55,9 @@ const (
 
 	// JPLHorizonsSPK is the same JPL Horizons service used to generate a
 	// small-body SPK kernel, which arrives base64-encoded inside the JSON
-	// response (KB-MB). It is registered separately from JPLHorizons so
-	// EnableDownloads gates kernel generation without also gating name
-	// resolution, which needs no consent.
+	// response (KB-MB). It is registered separately from JPLHorizons so the
+	// download policy is asked about kernel generation without also being
+	// asked about name resolution, which is not a download.
 	JPLHorizonsSPK EndpointID = "jpl.horizons.spk"
 
 	// JPLSBDB is the JPL Small-Body Database identify API (catalog/sbdb) —
@@ -276,8 +276,8 @@ const (
 	// Reachable by default; gate with Disable or SetOffline.
 	KindAPI Kind = "api"
 
-	// KindFile marks bulk file endpoints. Downloads are denied by default
-	// and need EnableDownloads.
+	// KindFile marks bulk file endpoints, whose fetches are downloads: the
+	// download policy is asked about each, and each is logged.
 	KindFile Kind = "file"
 )
 
@@ -373,9 +373,6 @@ type Endpoint struct {
 	// ApproxSize is the typical bytes moved per fetch; SizeVaries means it
 	// varies too much to state.
 	ApproxSize int64
-	// MaxDownloadSize caps a single download in bytes once DownloadsOK is
-	// set; 0 means unlimited.
-	MaxDownloadSize int64
 	// Timeout is the API request timeout (KindAPI). Zero means
 	// DefaultAPITimeout.
 	Timeout time.Duration
@@ -384,9 +381,6 @@ type Endpoint struct {
 	DownloadTimeout time.Duration
 	// Enabled gates all access to the endpoint.
 	Enabled bool
-	// DownloadsOK is the file-download consent flag, false by default.
-	// See EnableDownloads.
-	DownloadsOK bool
 	// IdempotentPost declares that a POST to this endpoint (KindAPI) is a
 	// query: sent again, it gets the same document back and changes nothing
 	// on the server, as a TAP sync query or a JSON search does. Such a POST is
@@ -399,11 +393,11 @@ type Endpoint struct {
 	// current ETag before reuse. false means versioned/immutable content
 	// (JPL kernels), reused on existence alone.
 	Mutable bool
-	// Downloadable reports whether EnableDownloads means anything for this
-	// endpoint — true for every KindFile endpoint, and for JPLHorizonsSPK,
-	// whose KindAPI response carries a whole kernel. A KindAPI endpoint
-	// returning only small payloads leaves this false and has no consent
-	// gate at all.
+	// Downloadable reports whether this endpoint serves file downloads, which
+	// the download policy is asked about and the log reports — true for every
+	// KindFile endpoint, and for JPLHorizonsSPK, whose KindAPI response
+	// carries a whole kernel. A KindAPI endpoint returning only small payloads
+	// leaves this false; the policy is never asked about it.
 	Downloadable bool
 }
 
@@ -416,7 +410,7 @@ const SizeVaries int64 = -1
 const DefaultDownloadTimeout = 10 * time.Minute
 
 // horizonsURL is shared by JPLHorizons and JPLHorizonsSPK: one service,
-// two consent scopes.
+// a name lookup and a download.
 const horizonsURL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 // copernicusEODATAURL addresses the Copernicus eodata bucket. Everything
@@ -639,8 +633,8 @@ func defaultEndpoints() map[EndpointID]Endpoint {
 			Subsystem:   "openngc",
 			Description: "OpenNGC catalog source CSVs (NGC.csv, addendum.csv), pinned to a fixed commit",
 			// The larger file, NGC.csv, is 3,876,288 bytes at the pinned
-			// commit. This read 2,000,000, and consent is checked against the
-			// size the source reports, so a grant of ApproxSize was refused
+			// commit. This read 2,000,000, and a size cap is checked against
+			// the size the source reports, so a cap of ApproxSize refused it
 			// (#659; TestListedFilesFitTheirApproxSize).
 			ApproxSize:      4_000_000,
 			Enabled:         true,

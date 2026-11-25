@@ -53,8 +53,6 @@ func TestGetFileFromHTTPSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	EnableDownloads(0, NAIFLSK)
-
 	fsys, key, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
@@ -70,20 +68,21 @@ func TestGetFileFromHTTPSource(t *testing.T) {
 	}
 }
 
-func TestGetFileFromHTTPSourceDeniedWithoutConsent(t *testing.T) {
+func TestGetFileFromHTTPSourceRefusedByThePolicy(t *testing.T) {
 	cleanRemoteState(t)
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	if err := SetURL(NAIFLSK, serveBytes(t, "naif0012.tls", []byte("x"))); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls"); !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("GetFile without consent = %v, want ErrDownloadDenied", err)
+		t.Fatalf("GetFile under a refusing policy = %v, want ErrDownloadDenied", err)
 	}
 }
 
 // A missing object on a reachable source is (false, nil) — distinct from
-// "could not tell", and reached without moving a body or asking consent.
+// "could not tell", and reached without moving a body or asking the download policy.
 func TestExistsAgainstHTTPSource(t *testing.T) {
 	cleanRemoteState(t)
 
@@ -111,8 +110,6 @@ func TestValidateFailureLeavesNothingCached(t *testing.T) {
 	if err := SetURL(NAIFLSK, serveBytes(t, "naif0012.tls", []byte("corrupt"))); err != nil {
 		t.Fatal(err)
 	}
-
-	EnableDownloads(0, NAIFLSK)
 
 	_, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
 		WithValidate(func(io.Reader) error { return errRejectEverything }))
@@ -142,8 +139,6 @@ func TestValidateSeesFullStagedContent(t *testing.T) {
 	if err := SetURL(IERSFinals2000A, serveBytes(t, "finals2000A.all", body)); err != nil {
 		t.Fatal(err)
 	}
-
-	EnableDownloads(0, IERSFinals2000A)
 
 	var seen int64
 
@@ -204,8 +199,6 @@ func TestMutableSourceRevalidatesByETag(t *testing.T) {
 	if err := SetURL(OpenNGC, srv.URL+"/"); err != nil {
 		t.Fatal(err)
 	}
-
-	EnableDownloads(0, OpenNGC)
 
 	for range 3 {
 		if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {

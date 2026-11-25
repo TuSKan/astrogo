@@ -25,7 +25,7 @@ const (
 )
 
 // mpcorbCacheAndSource points remote.MPCORB's cache and source at fresh
-// directories and consents to its downloads, for the rest of t. It returns the
+// directories, for the rest of t. It returns the
 // cache with the key healFile caches under, and the source.
 func mpcorbCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS) {
 	t.Helper()
@@ -50,8 +50,6 @@ func mpcorbCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.MPCORB)
 
 	return cache, prefix + healFile, src
 }

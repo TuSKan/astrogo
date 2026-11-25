@@ -21,15 +21,13 @@ var (
 	// registry.
 	ErrUnknownEndpoint = errors.New("remote: unknown endpoint")
 
-	// ErrDownloadDenied is returned when a file download is blocked by the
-	// consent configuration: the endpoint's downloads were never enabled
-	// (the default), the file exceeds the configured size limit, or a
-	// custom Policy rejected it. The wrapped message states the file, its
-	// size, and how to enable the download.
+	// ErrDownloadDenied is returned when the download policy set with
+	// SetPolicy refuses a file download. The wrapped message states the
+	// file, its size, its source and the policy's reason.
 	ErrDownloadDenied = errors.New("remote: download denied")
 
 	// ErrDownloadFailed indicates a download's HTTP exchange or local
-	// write failed after the consent checks passed.
+	// write failed after the download policy allowed it.
 	ErrDownloadFailed = errors.New("remote: download failed")
 
 	// ErrRejectedSource is returned by GetFile when the source still serves a

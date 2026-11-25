@@ -50,18 +50,18 @@ type settledAnswer struct {
 //  1. Fast path (no lock): the current model already covers mjd.
 //  2. Under fetchMu (re-checked immediately after acquiring it):
 //     [Loader.Cached] — whatever EOP data is already on disk, with no
-//     network access and no consent check. The parsed table is registered
+//     network access and no download policy. The parsed table is registered
 //     even if it does not cover mjd, since it is still the best available
 //     data, and the attempt falls through to step 3 if it does not help.
 //  3. If still uncovered and the retry cooldown has elapsed:
-//     [Loader.Fetch], which is consent-gated.
+//     [Loader.Fetch], which the download policy decides.
 //
 // Both steps go through the registered [Loader] rather than reaching for
 // a cache directory or an HTTP client directly. That is what lets this
 // package, and astrogo/epoch above it, link neither — see [Loader]. With
 // no loader registered the result is [ErrNoLoader], given without taking
 // fetchMu, and the caller degrades to zero EOP exactly as it does when
-// consent is absent.
+// the download policy refuses the bulletin.
 //
 // Safe for concurrent use: a mutex serializes attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
@@ -75,7 +75,7 @@ func EnsureLoaded(mjd float64) error {
 		return nil
 	}
 
-	// Without data and without consent this is every lookup, on every
+	// Without data and without a download this is every lookup, on every
 	// goroutine. It used to queue on fetchMu and allocate a fresh
 	// errors.Join each time, for the same answer (#931).
 	if a := settled.Load(); a != nil && time.Now().Before(a.until) {
@@ -174,7 +174,7 @@ func EnsureLoaded(mjd float64) error {
 }
 
 // Load loads EOP data now, under ctx, through the registered Loader: the
-// network step first, which the loader gates on download consent, then what
+// network step first, which the loader asks the download policy about, then what
 // is cached. The first bulletin that parses is installed as the model and
 // marked explicit, since loading it was the caller's own choice, so the lazy
 // load in EnsureLoaded leaves it alone; its source is recorded as

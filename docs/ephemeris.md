@@ -641,5 +641,5 @@ go test -tags=integration -count=1 -v -run 'Test' ./internal/workload/
 
 The suite downloads nothing beyond what jpl's own tests do: de440s and its
 leap-second file, and the IERS bulletin. nep097 and the Horizons comet kernel
-are used only if a previous consented run cached them; otherwise those cases
+are used only if a previous run cached them; otherwise those cases
 skip and say why.

@@ -48,7 +48,7 @@ import (
 // # What stays fatal
 //
 // Anything that is not the network. A kernel that downloads and then fails to
-// parse, a download refused for want of consent, a missing body — all of those
+// parse, a download the policy refused, a missing body — all of those
 // are astrogo's problem or the caller's, and all of them keep failing the
 // build.
 func requireKernel(t *testing.T, what string, err error) {

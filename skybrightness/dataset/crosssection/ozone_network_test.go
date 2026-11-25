@@ -11,7 +11,6 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/crosssection"
 	"github.com/TuSKan/astrogo/unit"
 )
@@ -28,9 +27,6 @@ func TestOzoneMatchesItsKnownBands(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-
-	remote.EnableDownloads(16<<20, remote.MPIMainzCrossSections)
-	defer remote.DisableDownloads(remote.MPIMainzCrossSections)
 
 	xs, err := crosssection.Ozone(ctx)
 	if err != nil {
@@ -93,9 +89,6 @@ func TestExtinctionOzoneIsTheDatasetBinned(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-
-	remote.EnableDownloads(16<<20, remote.MPIMainzCrossSections)
-	defer remote.DisableDownloads(remote.MPIMainzCrossSections)
 
 	xs, err := crosssection.Ozone(ctx)
 	if err != nil {

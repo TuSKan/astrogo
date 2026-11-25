@@ -37,8 +37,6 @@ func TestOzoneReplacesADamagedCachedCopy(t *testing.T) {
 		t.Fatalf("CacheDir: %v", err)
 	}
 
-	remote.EnableDownloads(0, remote.MPIMainzCrossSections)
-
 	good := chappuisFile(4.6e-21)
 	if err := parseAndCheck(good); err != nil {
 		t.Fatalf("the source file is not plausible ozone: %v", err)

@@ -73,9 +73,6 @@ func TestVisibleTonight_MinorBodiesRespectMagLimit(t *testing.T) {
 
 	t.Cleanup(remote.Capture(remote.NAIFSPK, remote.NAIFLSK, remote.JPLHorizonsSPK).Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	remote.EnableDownloads(0, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	site := quintaCalixtoSite(t)
 	sources := []resolve.BrightObjectSearcher{sbdb.New()}
@@ -156,10 +153,9 @@ func acceptOnlySBDBsCut(t *testing.T, call string, err error) {
 // satellite kernel, feeding into the same downstream pipeline (windows,
 // rise/transit/peak/set, extinction) every other category goes through.
 //
-// The NAIFSPK download cap is intentionally bounded to ~110 MB — just
-// above Mars's short-span kernel (mar099s.bsp, ~64 MB) and Neptune's
-// (nep097.bsp, ~100 MB) — rather than left unlimited like the sibling test
-// above: unlike a per-body Horizons SPK (KB-MB scale) or even de440s
+// A download policy caps NAIFSPK at ~110 MB — just above Mars's short-span
+// kernel (mar099s.bsp, ~64 MB) and Neptune's (nep097.bsp, ~100 MB) — rather
+// than leaving it unlimited like the sibling test above: unlike a per-body Horizons SPK (KB-MB scale) or even de440s
 // (~32 MB), the full planetaryMoons set spans six kernels totaling ~2.4 GB
 // (Jupiter's alone is ~1.1 GB), which would make this an unreasonably
 // expensive test to run routinely. Denied-by-cap kernels are skipped by
@@ -189,8 +185,13 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 
 	t.Cleanup(remote.Capture(remote.NAIFSPK, remote.NAIFLSK).Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	remote.EnableDownloads(110<<20, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
+	remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
+		if ep.ID == remote.NAIFSPK && size > 110<<20 {
+			return errOverMoonBudget
+		}
+
+		return nil
+	})
 
 	site := quintaCalixtoSite(t)
 
@@ -272,3 +273,7 @@ func TestVisibleTonightConsidersEverySIMBADObject(t *testing.T) {
 
 	t.Logf("SIMBAD objects visible at limit 4.5: %d", n)
 }
+
+// errOverMoonBudget is the reason TestVisibleTonight_PlanetaryMoons' policy
+// gives for a satellite kernel over its 110 MB cap.
+var errOverMoonBudget = errors.New("over this test's 110 MB satellite-kernel budget")

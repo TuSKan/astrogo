@@ -57,8 +57,6 @@ func TestEq11AgainstTheTable2Ratio(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Minute)
 	defer cancel()
 
-	enableStarMapDownload(t)
-
 	// A grid over Johnson V alone, at 2 nm. The integral costs one field evaluation per
 	// source direction per epoch, so the wavelength axis is the one place a
 	// factor of twenty is free: the quantity under test is a band ratio and

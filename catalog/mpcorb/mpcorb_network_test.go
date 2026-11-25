@@ -14,6 +14,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 )
@@ -30,7 +31,6 @@ func liveFile(t *testing.T, name string) []resolve.Target {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
 	t.Cleanup(remote.Reset)
-	remote.EnableDownloads(64<<20, remote.MPCORB)
 
 	seq, err := mpcorb.Open(context.Background(), name)
 	if err != nil {
@@ -201,15 +201,15 @@ func TestEveryParsedObjectPropagates(t *testing.T) {
 	t.Logf("%d objects propagated at their own epochs, every one inside its own apsides", checked)
 }
 
-// TestOpenRefusesWithoutDownloadConsent pins that MPCORB is behind the same
-// gate as every other bulk fetch — see CLAUDE.md's "Bulk file downloads never
-// happen without explicit consent".
+// TestOpenAsksTheDownloadPolicy pins that MPCORB is behind the same download
+// policy as every other bulk fetch.
 //
-// The endpoint declares SizeVaries, so the grant's own byte budget is what
-// decides; a grant too small for the file must be refused as clearly as no
-// grant at all, which is the second step of this test. Until #969 the doc
-// comment said so and the test did not check it.
-func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
+// The endpoint declares SizeVaries, so the check made before the request has
+// no size to judge and only the size the source reports can refuse a budget;
+// a policy whose budget is too small for the file must refuse it as clearly as
+// one that refuses everything, which is the second step of this test. Until
+// #969 the doc comment said so and the test did not check it.
+func TestOpenAsksTheDownloadPolicy(t *testing.T) {
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
 	ctx := context.Background()
@@ -218,22 +218,28 @@ func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 	// the temporary one below would stay configured after it is deleted, and
 	// the next test here would fail to create its cache lock inside it (#443).
 	t.Cleanup(remote.Capture(remote.MPCORB).Restore)
-	remote.DisableDownloads(remote.MPCORB)
+	remotetest.RefuseDownloads(t, remote.MPCORB)
 
 	remote.SetDataDir("file:///" + tempBucket(t) + "?create_dir=true")
 
 	if _, err := mpcorb.Open(ctx, "Distant.txt"); !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("Open with no EnableDownloads grant = %v, want ErrDownloadDenied", err)
+		t.Fatalf("Open under a refusing policy = %v, want ErrDownloadDenied", err)
 	}
 
-	// A budget far below Distant.txt's ~1.7 MB. SizeVaries lets any grant past
+	// A budget far below Distant.txt's ~1.7 MB. SizeVaries lets any budget past
 	// the check made before the request, so only the size the source reports
 	// can refuse this one.
-	remote.EnableDownloads(1<<10, remote.MPCORB)
+	remote.SetPolicy(func(_ remote.Endpoint, size int64) error {
+		if size > 1<<10 {
+			return errOverBudget
+		}
+
+		return nil
+	})
 
 	if _, err := mpcorb.Open(ctx, "Distant.txt"); !errors.Is(err, remote.ErrDownloadDenied) {
 		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("Open under a 1 KiB grant = %v, want ErrDownloadDenied", err)
+		t.Fatalf("Open under a 1 KiB budget = %v, want ErrDownloadDenied", err)
 	}
 
 	cache, prefix, err := remote.CacheDir(ctx, remote.MPCORB)
@@ -245,22 +251,22 @@ func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 		t.Fatalf("the cache holds Distant.txt after a refused Open (stat: %v)", err)
 	}
 
-	// And the same empty cache directory must work once consent is granted,
+	// And the same empty cache directory must work once downloads are allowed,
 	// or the refusals above prove only that the fixture is broken.
-	remote.EnableDownloads(64<<20, remote.MPCORB)
+	remote.SetPolicy(nil)
 
 	seq, err := mpcorb.Open(ctx, "Distant.txt")
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
-		t.Fatalf("Open after consent: %v; the temporary cache directory is what "+
-			"failed above, not the consent gate", err)
+		t.Fatalf("Open with downloads allowed: %v; the temporary cache directory "+
+			"is what failed above, not the download policy", err)
 	}
 
 	var n int
 
 	for _, err := range seq {
 		if err != nil {
-			t.Fatalf("row %d after consent: %v", n+1, err)
+			t.Fatalf("row %d with downloads allowed: %v", n+1, err)
 		}
 
 		n++
@@ -271,7 +277,7 @@ func TestOpenRefusesWithoutDownloadConsent(t *testing.T) {
 	}
 
 	if n != 10 {
-		t.Errorf("read %d rows after consent, want 10", n)
+		t.Errorf("read %d rows with downloads allowed, want 10", n)
 	}
 }
 
@@ -337,3 +343,6 @@ func TestOpenParsesTheCometFile(t *testing.T) {
 	t.Logf("%d comets, %d on open orbits, every one at its own perihelion distance at its own perihelion time",
 		len(list), open)
 }
+
+// errOverBudget is the reason TestOpenAsksTheDownloadPolicy's budget gives.
+var errOverBudget = errors.New("over this test's 1 KiB download budget")

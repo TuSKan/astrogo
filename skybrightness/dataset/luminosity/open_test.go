@@ -13,7 +13,7 @@ import (
 )
 
 // serveCIE points remote.CIELuminosity at a bucket holding the two CIE files
-// with the given bodies, and grants the download consent Open needs.
+// with the given bodies.
 func serveCIE(t *testing.T, photopic, scotopic string) {
 	t.Helper()
 
@@ -40,7 +40,6 @@ func serveCIE(t *testing.T, photopic, scotopic string) {
 		}
 	}
 
-	remote.EnableDownloads(0, remote.CIELuminosity)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 }
 

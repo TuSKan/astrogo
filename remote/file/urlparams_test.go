@@ -29,7 +29,7 @@ import (
 // working.
 //
 // They used to be tested through SetURL and GetFile, which reached this
-// behavior through the registry, the consent gate and the download path. Every
+// behavior through the registry, the download policy and the download path. Every
 // assertion was still on the path the server saw, so the subject was always
 // key resolution inside an opened bucket: this package's.
 

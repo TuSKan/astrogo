@@ -7,18 +7,19 @@ import (
 	"io/fs"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/solar"
 )
 
 // serveCALSPEC points remote.CALSPEC at a local bucket holding a solar
-// reference that parses, and the cache at an empty one, and leaves consent
-// withdrawn. Everything it changes is put back when the test ends.
+// reference that parses, and the cache at an empty one. Everything it changes
+// is put back when the test ends.
 //
-// The source holding a valid file is what lets a consent test fail: were the
-// gate to let the download through, Open would return a spectrum rather than
-// an error.
+// The source holding a valid file is what lets a refusal test fail: were the
+// policy to let the download through, Open would return a spectrum rather
+// than an error.
 func serveCALSPEC(t *testing.T) context.Context {
 	t.Helper()
 
@@ -42,22 +43,22 @@ func serveCALSPEC(t *testing.T) context.Context {
 	}
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	remote.DisableDownloads(remote.CALSPEC)
 
 	return ctx
 }
 
-// TestOpenWithoutConsentIsRefused holds solar.Open to the consent gate with
-// nothing cached: the actionable ErrDownloadDenied, and nothing written to the
-// cache. Until #967 the only test of this ran under the network tag, granted
-// every endpoint consent where it meant to withdraw it, and passed whatever
-// Open returned.
-func TestOpenWithoutConsentIsRefused(t *testing.T) {
+// TestOpenUnderARefusingPolicyIsRefused holds solar.Open to the download
+// policy with nothing cached: the actionable ErrDownloadDenied, and nothing
+// written to the cache. Until #967 the only test of this ran under the network
+// tag, allowed every endpoint where it meant to refuse one, and passed
+// whatever Open returned.
+func TestOpenUnderARefusingPolicyIsRefused(t *testing.T) {
 	ctx := serveCALSPEC(t)
+	remotetest.RefuseDownloads(t, remote.CALSPEC)
 
 	spectrum, err := solar.Open(ctx)
 	if !errors.Is(err, remote.ErrDownloadDenied) {
-		t.Fatalf("Open without consent = (%v, %v), want ErrDownloadDenied", spectrum, err)
+		t.Fatalf("Open under a refusing policy = (%v, %v), want ErrDownloadDenied", spectrum, err)
 	}
 
 	cache, prefix, err := remote.CacheDir(ctx, remote.CALSPEC)
@@ -70,17 +71,16 @@ func TestOpenWithoutConsentIsRefused(t *testing.T) {
 	}
 }
 
-// TestOpenWithConsentReadsTheSource is the control for the test above: the
-// same source, with consent, is downloaded, parsed and named. Without it a
-// refusal could come from a fixture Open cannot read at all.
-func TestOpenWithConsentReadsTheSource(t *testing.T) {
+// TestOpenWithDownloadsAllowedReadsTheSource is the control for the test
+// above: the same source, with downloads allowed, is downloaded, parsed and
+// named. Without it a refusal could come from a fixture Open cannot read at
+// all.
+func TestOpenWithDownloadsAllowedReadsTheSource(t *testing.T) {
 	ctx := serveCALSPEC(t)
-
-	remote.EnableDownloads(0, remote.CALSPEC)
 
 	spectrum, err := solar.Open(ctx)
 	if err != nil {
-		t.Fatalf("Open with consent: %v", err)
+		t.Fatalf("Open with downloads allowed: %v", err)
 	}
 
 	if got := len(spectrum.WavelengthNM); got != 3 {

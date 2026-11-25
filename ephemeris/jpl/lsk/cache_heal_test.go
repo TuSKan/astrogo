@@ -20,7 +20,7 @@ const (
 
 // lskCacheAndSource points remote.NAIFLSK's cache at a fresh directory and its
 // source at another, and returns both filesystems with the cache's key for
-// healKernel. Downloads are consented to by this package's TestMain.
+// healKernel. Downloads are allowed by default.
 func lskCacheAndSource(t *testing.T) (cache remote.FS, key string, source remote.FS) {
 	t.Helper()
 

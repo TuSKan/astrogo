@@ -16,7 +16,7 @@ import (
 const errorPage = "<html>503 Service Unavailable</html>"
 
 // sfdCacheAndSource points remote.SFDDustMap's cache and source at fresh
-// directories and consents to its downloads, for the rest of t. It returns the
+// directories, for the rest of t. It returns the
 // cache with the key the north hemisphere caches under, and the source.
 func sfdCacheAndSource(t *testing.T) (cache remote.FS, northKey string, src remote.FS) {
 	t.Helper()
@@ -41,8 +41,6 @@ func sfdCacheAndSource(t *testing.T) (cache remote.FS, northKey string, src remo
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.SFDDustMap)
 
 	return cache, prefix + northFile, src
 }

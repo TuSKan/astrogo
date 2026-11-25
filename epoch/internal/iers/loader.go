@@ -14,11 +14,11 @@ import (
 //
 // Blank-importing astrogo/remote/eop registers one. A program that neither
 // imports it nor registers its own gets this, and degrades to zero EOP
-// exactly as an unconsented one does.
+// exactly as one whose download policy refuses the bulletin does.
 var ErrNoLoader = errors.New("iers: no EOP loader registered")
 
 // ErrNoEOPData is returned by a Loader that found nothing to return —
-// no cached file, or a fetch that consent forbade.
+// no cached file, or a fetch the download policy refused.
 var ErrNoEOPData = errors.New("iers: no EOP data available")
 
 // Data is raw finals2000A content together with where it came from.
@@ -34,18 +34,19 @@ type Data struct {
 
 // Loader supplies raw EOP data. It exists so this package — and so
 // astrogo/epoch above it — needs no knowledge of caches, HTTP, download
-// consent or blob storage, and links none of it.
+// policy or blob storage, and links none of it.
 //
 // The two methods are the two steps the lazy load has always taken, kept
 // separate because they differ in more than where the bytes come from:
-// Cached must never touch the network and never needs consent, while
-// Fetch is consent-gated and may fail for that reason alone.
+// Cached must never touch the network and never asks the download policy,
+// while Fetch asks it and may fail for that reason alone.
 type Loader interface {
 	// Cached returns EOP data already on disk, without network access and
-	// without a consent check. Returns [ErrNoEOPData] when there is none.
+	// without asking the download policy. Returns [ErrNoEOPData] when there
+	// is none.
 	Cached(ctx context.Context) (Data, error)
 
-	// Fetch downloads fresh EOP data, subject to download consent.
+	// Fetch downloads fresh EOP data, subject to the download policy.
 	Fetch(ctx context.Context) (Data, error)
 }
 

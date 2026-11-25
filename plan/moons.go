@@ -103,10 +103,9 @@ type moonSpec struct {
 // group. Kernel sizes vary enormously — from ~64 MB (Mars, mar099s.bsp's
 // 1995-2050 short span) to ~1.1 GB (Jupiter, jup365.bsp) — since NAIF's
 // smaller per-planet kernels only cover obscure irregular moonlets, not
-// these bright, named ones. Nothing in this package downloads any of these
-// without the same explicit remote.EnableDownloads(maxSize, remote.NAIFSPK)
-// consent every other kernel in this library requires. See NewPlanetaryMoon
-// for name-based lookup.
+// these bright, named ones. Each download asks the same download policy,
+// set with remote.SetPolicy, as every other kernel in this library, and is
+// logged. See NewPlanetaryMoon for name-based lookup.
 var moonSpecs = map[string]moonSpec{
 	"phobos": {name: "Phobos", kernel: "mar099s", parent: eph.Mars, naifID: 401, h: 11.8},
 	"deimos": {name: "Deimos", kernel: "mar099s", parent: eph.Mars, naifID: 402, h: 12.89},

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/epoch"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote"
@@ -27,8 +28,9 @@ func TestNothingLoadedWarnsAndChosenZeroDoesNot(t *testing.T) {
 	// Not parallel: the EOP model, the logger and the warning's Once are all
 	// process-wide.
 
-	// An empty cache, so the lazy load finds no bulletin to read; downloads
-	// are not consented to, so it fetches none.
+	// An empty cache, so the lazy load finds no bulletin to read, and a policy
+	// refusing the download, so it fetches none.
+	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 

@@ -64,8 +64,7 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 		`topocentric_error="up to 13.5 arcsec`,
 		"remedy=",
 		// The remedy has to name the import: without remote/eop no loader is
-		// registered, and EnableDownloads alone consents to a fetch nothing
-		// will make.
+		// registered, and no fetch is made however the network is set.
 		"github.com/TuSKan/astrogo/remote/eop",
 	} {
 		if !strings.Contains(out, want) {

@@ -46,16 +46,15 @@ type AerosolPreset func(height unit.Length, aod550 float64) *atmosphere.Builder
 //
 // # Why it is not a default, and cannot be
 //
-// It downloads, which needs consent, and it reads Copernicus's S3 store,
-// which needs the caller's own credentials. None of that can be assumed of
-// somebody who has just typed a preset name, so
+// It reads Copernicus's S3 store, which needs the caller's own credentials.
+// That cannot be assumed of somebody who has just typed a preset name, so
 // [atmosphere.CleanMountainAOD550] and its siblings remain the zero-setup
 // path and this is the one you reach for deliberately.
 //
 // # It cannot reach Copernicus at present
 //
 // [remote.CopernicusEODATA] is an s3:// URL, and astrogo registers no s3://
-// backend, so the fetch fails however consent and credentials are set. See
+// backend, so the fetch fails however the credentials are set. See
 // [cams.AOD550] for what still works, and docs/storage.md.
 //
 // The value is a model analysis at roughly 40 km, not a measurement over the

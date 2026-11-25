@@ -44,8 +44,8 @@ type Provider struct {
 // no context to cancel it or set a deadline by: catalog.NewResolver takes
 // none either.
 //
-// A failed load is not remembered: a later query tries again, so a consent
-// gate granted later, or one bad fetch at start-up, does not leave the NGC/IC
+// A failed load is not remembered: a later query tries again, so a download
+// allowed later, or one bad fetch at start-up, does not leave the NGC/IC
 // catalog absent for the life of the process.
 func New() *Provider { return &Provider{} }
 

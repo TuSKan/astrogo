@@ -92,7 +92,7 @@ Existing astronomy tools are powerful, but often:
 - not designed for Go's type system and performance model
 
 What `astrogo` is: **the only SOFA-rigorous astronomy engine that deploys like software.**
-One static binary, no Python runtime, no C FFI, an explicit and consent-gated I/O boundary,
+One static binary, no Python runtime, no C FFI, an explicit, logged I/O boundary,
 an event solver, an observation scheduler, and a spectral sky-brightness engine.
 
 What it is not, and the honest list matters more than the flattering one: it has **no general
@@ -108,7 +108,7 @@ catalog's proper motion, parallax and radial velocity into km/s on the ICRS axes
 
 Designed from the ground up for Go: no dynamic magic, no *hidden* global state, zero-allocation hot paths.
 
-Process-wide state exists and is deliberate — download consent and offline mode (`remote.EnableDownloads`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`epoch.RegisterModel`, `epoch.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else astrogo owns is reassignable: `epoch` exports no mutable function values and re-exports nothing from the standard library, and `epoch.J2000()` is a function precisely so the standard epoch cannot be moved process-wide. `internal/docsguard` keeps an inventory of every remaining `var`, each with the reason Go offers no alternative, so the next one has to be argued for rather than added.
+Process-wide state exists and is deliberate — the download policy and offline mode (`remote.SetPolicy`, `remote.SetOffline`), the logger (`logging.Set`), the EOP and leap-second registries (`epoch.RegisterModel`, `epoch.RegisterLeapSeconds`). All of it is set by an explicitly named call and none of it is established by an `init()` or by importing a package. Nothing else astrogo owns is reassignable: `epoch` exports no mutable function values and re-exports nothing from the standard library, and `epoch.J2000()` is a function precisely so the standard epoch cannot be moved process-wide. `internal/docsguard` keeps an inventory of every remaining `var`, each with the reason Go offers no alternative, so the next one has to be argued for rather than added.
 
 ---
 
@@ -437,7 +437,7 @@ be able to break an API until 1.0 says otherwise.
 
 | Package | Purpose |
 | :--- | :--- |
-| `remote` | Centralized endpoint registry, HTTP client (retry/backoff), consent-gated downloads, configurable data storage |
+| `remote` | Centralized endpoint registry, HTTP client (retry/backoff), logged downloads under a policy you can set, configurable data storage |
 | `constants` | Typed, versioned constant sets (SI 2019, CODATA, IAU 2015, WGS 84, derived) |
 | `angle` | Angular types, HMS/DMS parsing |
 | `vector` | 3D geometry primitives |
@@ -467,8 +467,10 @@ See [`skybrightness.md`](docs/skybrightness.md) for the sky-brightness engine �
 
 ## Data downloads & offline usage
 
-`astrogo` never downloads a file without your explicit consent — this is a deliberate,
-enforced default, not a suggestion. Every external connection the library can make is
+`astrogo` downloads the data a call needs the first time it needs it — a JPL kernel, the
+IERS bulletin, a catalog — and caches it, so a second run reads the cache. Every download
+is logged at `Warn`, which the default logger shows, naming the endpoint, the file and its
+size; a cache hit logs nothing. Every external connection the library can make is
 enumerated in the [`remote`](remote/doc.go) package's endpoint registry; nothing else
 happens.
 
@@ -533,69 +535,28 @@ rather than yours.
 Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
 `catalog/sbdb`, `catalog/norad`, `catalog/fink`) and
 `plan.NewSiteFromAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
-site by address) make small request/response API calls, not bulk downloads — those are
-gated by endpoint enable/disable and offline mode, not by download-size consent (the
+site by address) make small request/response API calls, not downloads — endpoint
+enable/disable and offline mode govern those, and the download policy is never asked (the
 network call itself is the explicit purpose of the method you're calling).
 
-### Enabling a download
+### Controlling downloads
 
-Nothing above ever downloads silently. Construct a JPL ephemeris provider with a cold
-cache and no consent granted, and you get an explicit, actionable error instead of a
-multi-hundred-MB surprise:
-
-```go
-_, err := eph.NewProvider(ctx, eph.Planets, "de442")
-// err: jpl: SPK kernel planets/de442.bsp: remote: download denied: planets/de442.bsp
-// (size unknown from https://naif.jpl.nasa.gov/...); astrogo never downloads without
-// consent — call remote.EnableDownloads(maxSize, remote.NAIFSPK) or pre-seed the file
-```
-
-Grant consent per endpoint, with an optional size cap (`0` = unlimited):
-
-```go
-import "github.com/TuSKan/astrogo/remote"
-
-remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK) // allow up to 200 MB each
-
-p, err := eph.NewProvider(ctx, eph.Planets, "de442") // now downloads (once) and caches
-```
-
-`catalog.OpenNGC` follows the same pattern — enabling the endpoint is the only step required;
-`catalog.NewResolver`'s first use of it fetches and caches the catalog automatically:
-
-```go
-remote.EnableDownloads(5<<20, remote.OpenNGC) // ~3.9 MB combined source CSVs
-
-resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD) // fetches OpenNGC on first use
-```
-
-Omit the endpoint list to grant consent for every download-gated endpoint at once;
-`remote.DisableDownloads` is the counterpart and takes the same form:
-
-```go
-remote.EnableDownloads(200 << 20) // every Downloadable endpoint at once (NAIFSPK, NAIFLSK,
-                                  // IERSFinals2000A, OpenNGC, JPLHorizonsSPK, VIIRSAnnual,
-                                  // CopernicusEODATA, ...)
-```
-
-`JPLHorizonsSPK` is included even though it's an API endpoint, not a file endpoint — its
-small-body SPK generation (used for asteroid/comet ephemeris) returns a whole kernel
-base64-encoded in the JSON body, so it is a real download and is gated the same way. It is
-registered separately from `JPLHorizons`, which only resolves names: that split is what
-lets consent gate kernel generation without also gating name resolution. An endpoint that
-only ever returns small text/JSON payloads (SIMBAD, VizieR, SBDB, Gaia, MAST, ...) has no
-download-consent gate at all and is unaffected either way.
-
-For total control, install a custom policy instead of per-endpoint limits:
+Most programs never need to. One that should not download everything it asks for sets a
+policy, which every download asks first:
 
 ```go
 remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
     if size > 500<<20 {
-        return fmt.Errorf("refusing a %d-byte download of %s", size, ep.URL)
+        return fmt.Errorf("%d bytes is over the 500 MB this program allows", size)
     }
-    return nil // allow
+    return nil
 })
 ```
+
+A refused download is `remote.ErrDownloadDenied`, naming the file, its size and the policy's
+reason. `remote.SetOffline(true)` stops all network access instead, downloads and API calls
+alike. The [`remote`](remote/doc.go) package documentation covers the rest: a policy per
+component with `remote.Client`, per-endpoint control, and mirrors.
 
 ### Where data lives, and pointing it elsewhere
 
@@ -629,9 +590,9 @@ remote.SetOffline(true)
 p, err := eph.NewProvider(ctx, eph.Planets, "de442") // finds the pre-seeded kernel, zero network
 ```
 
-Every downloader checks the cache before the network, so a pre-seeded deployment never
-dials out even without `SetOffline` — `remote` is the only thing that resolves or opens
-these files, there is no separate local-only constructor to bypass it with. IERS EOP data
+Every downloader checks the cache before the network, and offline it goes no further,
+so a pre-seeded deployment never dials out — `remote` is the only thing that resolves or
+opens these files, there is no separate local-only constructor to bypass it with. IERS EOP data
 follows the same rule: blank-import `remote/eop`, put `finals2000A.data` at key
 `iers/finals2000A.data`, and the first
 `Time.EOP()`/`.UTC()`/`.UT1()` call finds it automatically — no explicit loader call
@@ -661,16 +622,16 @@ malformed among them, is the answer. SIMBAD has two, the Harvard CfA and IDIA co
 CDS outage of November 2026 needs no `SetURL` from a caller. `SetURL` clears an endpoint's
 mirrors, since a URL you chose is the one you want.
 
-`remote.Capture(ids...)` snapshots endpoint config, download consent, offline mode, and
+`remote.Capture(ids...)` snapshots endpoint config, the download policy, offline mode, and
 the data directory; `(Scope).Restore()` (or `WithScope`) puts it all back — useful in
-tests (`t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)`) without the over-broad
-revocation `remote.Reset()` causes when consent was granted at a wider scope.
+tests (`t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)`) without undoing, as
+`remote.Reset()` does, what a wider scope set.
 
 ### Building from source
 
 No package in astrogo embeds data at build time. IERS EOP data is obtained exclusively
 at runtime, lazily the first time it's needed: a pre-seeded
-finals2000A file on disk, then (consent-gated via `remote.EnableDownloads`) a network
+finals2000A file on disk, then a network
 fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
 
 That fetch is supplied by `remote/eop`, not reached for by `epoch`, and it is one
@@ -685,19 +646,18 @@ loader needs `remote.GetFile`, so it has to sit one import *below* `remote`,
 which cannot then import it back. Naming it is what turns EOP on.
 
 The lazy load cannot report a failure, since `Time.EOP` returns no error: a
-missing import, or consent granted after the first lookup, costs every result up
-to 13.5″ with only a log line to say so. To load the bulletin when you choose,
+missing import, or no network at the first lookup, costs every result up to 13.5″
+with only a log line to say so. To load the bulletin when you choose,
 under your context, and learn whether it worked, call `epoch.LoadEOP`:
 
 ```go
-remote.EnableDownloads(0, remote.IERSFinals2000A) // or pre-seed finals2000A.data
 if err := epoch.LoadEOP(ctx); err != nil {
-    log.Fatal(err) // no loader imported, no consent and nothing cached, or the IERS unreachable
+    log.Fatal(err) // no loader imported, nothing cached and no download, or the IERS unreachable
 }
 ```
 
-It takes the network step when consent allows and falls back to a cached
-bulletin, and what it loads stays the model. A `coord.Context` then reports what
+It takes the network step unless the download policy refuses it and falls back
+to a cached bulletin, and what it loads stays the model. A `coord.Context` then reports what
 its places were built with: `ctx.EOPSource()` gives `"network"` or `"cache"`, and
 whether the instant is inside the bulletin, or `"zero"` when nothing was loaded.
 
@@ -727,8 +687,7 @@ the import cost 13.9 MB and 424 packages, 64 of them gRPC.) Without the import t
 five sources return an error naming it; everything on SOFA is unaffected.
 
 OpenNGC works the same way — like every other catalog provider, it fetches over the
-network via
-`remote.EnableDownloads(0, remote.OpenNGC)` (see "Enabling a download" above).
+network on first use (see "Controlling downloads" above).
 
 ---
 
@@ -820,7 +779,7 @@ The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the
 
 The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a consent-gated network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). Blank-import `remote/eop` to turn EOP on; it then loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
 
 ### TDB Precision
 

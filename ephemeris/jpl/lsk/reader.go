@@ -45,13 +45,12 @@ type Reader struct {
 
 // Cache opens the LSK file named kernel, downloading it first when it is
 // absent, into remote's registered cache directory for remote.NAIFLSK.
-// Downloads are gated by remote's consent configuration — enable them with
-// remote.EnableDownloads(0, remote.NAIFLSK) (naif0012.tls is only ~5 KB) or
+// The download asks remote's download policy (naif0012.tls is only ~5 KB);
 // pre-seed the file to stay fully offline.
 //
 // A kernel that does not parse is never left in the cache, through
 // [remote.WithRead]. One cached long before is replaced in the same call where
-// downloads are consented to; one just downloaded (a truncated file, an error
+// downloads are allowed; one just downloaded (a truncated file, an error
 // page) is what NAIF serves, and is not downloaded again until NAIF serves
 // something else ([remote.ErrRejectedSource]).
 func Cache(ctx context.Context, kernel string) (*Reader, error) {

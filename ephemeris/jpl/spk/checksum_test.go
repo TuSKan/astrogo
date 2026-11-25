@@ -35,12 +35,11 @@ func fakeDAFHeader() []byte {
 }
 
 func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
-	// This package's TestMain grants NAIFSPK/NAIFLSK download consent once
-	// for the whole test binary — remote.Reset() would revoke that for
-	// every test that runs afterward (e.g. reader_test.go's TestSPKReader),
-	// so this captures and restores only NAIFSPK's own state (which also
+	// This captures and restores only NAIFSPK's own state (which also
 	// covers the data dir, captured unconditionally by Capture) instead of
-	// resetting the whole registry.
+	// resetting the whole registry, which would also undo whatever else a
+	// test running afterward depends on (e.g. reader_test.go's
+	// TestSPKReader).
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
@@ -67,10 +66,6 @@ func TestCacheDownloadDetectsChecksumCorruption(t *testing.T) {
 	if err := remote.SetURL(remote.NAIFSPK, srcURL); err != nil {
 		t.Fatal(err)
 	}
-
-	// Redundant with TestMain's grant, kept for self-containment; restored
-	// (not revoked) in cleanup via the Capture above.
-	remote.EnableDownloads(0, remote.NAIFSPK)
 
 	const kernel = "checksum-test.bsp"
 

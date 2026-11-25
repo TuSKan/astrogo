@@ -45,8 +45,8 @@ var optInSubpackages = map[string]bool{
 // # The rule
 //
 // remote/file and remote/api move bytes. remote decides whether bytes may move
-// at all: which endpoint, whether the process is offline, whether a download
-// was consented to, where the result is cached. Every one of those questions is
+// at all: which endpoint, whether the process is offline, whether the
+// download policy allows a download, where the result is cached. Every one of those questions is
 // answered in remote and nowhere else, so a package that imports a subpackage
 // directly is not taking a shortcut — it is reaching past the gate.
 //
@@ -134,7 +134,7 @@ func TestSubpackagesAreNotImportedDirectly(t *testing.T) {
 			"  remote/file and remote/api are internal to remote. Everything they do is "+
 			"reachable from remote itself — OpenBucket, Save, NewReaderAt, GetFile, "+
 			"NewAPIClient — and going around it skips the endpoint registry, offline "+
-			"mode and the download consent gate, silently and only for that call site.\n"+
+			"mode and the download policy, silently and only for that call site.\n"+
 			"  The only exceptions are blank imports of the opt-in registrations: "+
 			"remote/file/{s3,gcs,azure,sftp} and remote/eop.", o)
 	}

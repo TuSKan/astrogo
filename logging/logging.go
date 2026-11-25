@@ -8,7 +8,7 @@
 // astrogo takes no logger parameter anywhere. A library that threads one
 // through every signature makes every caller carry it, and almost none of them
 // want to; one logger for the module is set here, like the endpoint registry
-// and download consent in [github.com/TuSKan/astrogo/remote].
+// and the download policy in [github.com/TuSKan/astrogo/remote].
 //
 // # What astrogo logs
 //

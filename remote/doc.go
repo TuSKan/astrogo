@@ -1,6 +1,6 @@
 // Package remote is astrogo's I/O boundary: a registry of every external
-// endpoint the library can reach, a consent gate no bulk download bypasses,
-// and the cache all fetched data lands in.
+// endpoint the library can reach, the download policy every bulk download
+// asks, and the cache all fetched data lands in.
 //
 // It owns policy, and it is the only package a caller imports. Moving bytes
 // belongs to two subpackages internal to it, split by what is being
@@ -26,15 +26,14 @@
 //
 // # One policy, or one per component
 //
-// Everything below — offline mode, download consent, endpoint overrides, the
-// cache location — is a policy, and [Client] is that policy as a value. The
+// Everything below — offline mode, the download policy, endpoint overrides,
+// the cache location — is a policy, and [Client] is that policy as a value. The
 // package-level functions operate on [Default], the way net/http's
 // package-level Get operates on http.DefaultClient, so a program with a single
 // policy writes exactly what it always wrote. A binary whose components want
 // different ones builds them:
 //
-//	prefetch := remote.NewClient()
-//	prefetch.EnableDownloads(200<<20, remote.NAIFSPK)
+//	prefetch := remote.NewClient() // downloads what it is asked for
 //
 //	serve := remote.NewClient()
 //	serve.SetOffline(true)
@@ -49,28 +48,31 @@
 // [URL] is the single gate every call site passes through, so those three
 // controls apply uniformly to files and APIs alike.
 //
-// # Downloads are never automatic
+// # Downloads
 //
-// astrogo never fetches a bulk file without consent. Constructing a JPL
-// provider whose kernel is missing fails with [ErrDownloadDenied], naming
-// the file, its size and its source, until you pre-seed it or grant
-// consent:
+// A call that needs a file downloads it the first time, and caches it: a JPL
+// provider whose kernel is missing fetches it, of any size. Every download is
+// logged at Warn, which the default logger shows, naming the endpoint, the
+// object and its size; a cache hit logs nothing.
 //
-//	// Planetary kernels up to 200 MB, plus the ~5 KB leap-second kernel:
-//	remote.EnableDownloads(200<<20, remote.NAIFSPK, remote.NAIFLSK)
+// [SetPolicy] decides otherwise. Every download asks the policy first, once
+// against the endpoint's registered estimate before any request and again
+// against the size the source actually reports, and a refusal is
+// [ErrDownloadDenied] naming the file, its size and its source:
 //
-//	// Or everything that can download, with one cap:
-//	remote.EnableDownloads(0)
+//	remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
+//		if size > 500<<20 {
+//			return fmt.Errorf("%d bytes is over the 500 MB this program allows", size)
+//		}
 //
-// Consent is checked twice per fetch: once against the endpoint's
-// registered estimate before any request, then again against the size the
-// source actually reports. [SetPolicy] replaces both with your own rule.
+//		return nil
+//	})
 //
-// An API call needs no consent — the request is the documented purpose of
-// the method making it. The exception is [JPLHorizonsSPK], whose response
-// carries a whole kernel; it is a separate endpoint from [JPLHorizons] so
-// that consent gates kernel generation without also gating name
-// resolution.
+// An API call is not a download, and the policy is never asked about it — the
+// request is the documented purpose of the method making it. The exception is
+// [JPLHorizonsSPK], whose response carries a whole kernel; it is a separate
+// endpoint from [JPLHorizons] so that the policy sees kernel generation
+// without also seeing name resolution.
 //
 // # Where data lives
 //
@@ -96,9 +98,9 @@
 // validating them before anything appears at the cache key. An
 // interrupted transfer resumes from the partial rather than restarting.
 //
-// Consent is checked before any request. A caller without it is served
-// what is cached, mutable or not, as offline mode serves it, and refused
-// only when nothing is: it could not download a newer copy, so asking
+// The policy is asked before any request. A caller whose policy refuses is
+// served what is cached, mutable or not, as offline mode serves it, and
+// refused only when nothing is: it could not download a newer copy, so asking
 // the source whether there is one would only cost it.
 //
 // # Offline and air-gapped deployments

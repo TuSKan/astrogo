@@ -142,7 +142,7 @@ func horizonsStateReference() metrology.Reference {
 // attributable to astrogo alone.
 //
 // It is not worth what it costs. de441_part-2 is 1580 MB against de440's 114
-// MB, this package's TestMain grants unlimited NAIFSPK consent, and
+// MB, downloads are allowed by default with no size cap, and
 // pre-release.yml's network job runs on a clean runner — setup-go's cache
 // covers Go modules, not astrogo's data directory. Every scheduled run would
 // pull 1.58 GB from naif.jpl.nasa.gov rather than 114 MB. These suites already

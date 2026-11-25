@@ -349,7 +349,7 @@ Sun's GM; a planetary moon needs the same two-body machinery around its *parent
 planet's* GM instead, plus a Laplace-plane frame correction — real, non-trivial
 physics, not just missing plumbing. Verdict from investigation: forcing parity with
 asteroids now would ship confidently wrong numbers, so moons stay kernel-only
-(`ephemeris/jpl` SPK, gated by `remote.EnableDownloads`) until this is built properly.
+(`ephemeris/jpl` SPK, downloaded through `remote`) until this is built properly.
 
 - [x] `constants.DE440` — per-parent GM constants, both the system parameter (planet
       plus satellites, which the ephemeris integrates) and the body parameter (the

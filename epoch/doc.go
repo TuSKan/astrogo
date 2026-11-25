@@ -68,7 +68,7 @@
 // # Failure and degradation
 //
 // The EOP path degrades rather than failing: a pre-seeded cache object, then
-// a network fetch if consent was granted, then zero EOP with a one-time
+// a network fetch unless the download policy refuses it, then zero EOP with a one-time
 // warning. Zero EOP is a real answer with real error — up to about 0.9 s of
 // UT1 before 20 May 2027, and more after — so a caller who needs to know which
 // of the three it got asks

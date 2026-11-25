@@ -97,8 +97,6 @@ func aodAt(tb testing.TB, lonDeg, latDeg float64) float64 {
 func TestAODOrientationIsSane(t *testing.T) {
 	testutil.RequireReachable(t, "eodata.dataspace.copernicus.eu:443")
 
-	remote.EnableDownloads(50<<20, remote.CopernicusEODATA)
-
 	hazy := []struct {
 		name     string
 		lon, lat float64
@@ -156,8 +154,6 @@ func TestAODOrientationIsSane(t *testing.T) {
 // of them failing or landing on the far side of the world.
 func TestAODWrapsAtTheMeridian(t *testing.T) {
 	testutil.RequireReachable(t, "eodata.dataspace.copernicus.eu:443")
-
-	remote.EnableDownloads(50<<20, remote.CopernicusEODATA)
 
 	west := aodAt(t, -0.5, 51.5) // just west of Greenwich
 	east := aodAt(t, 0.5, 51.5)  // just east

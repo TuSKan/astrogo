@@ -45,7 +45,7 @@ type EOPData = iers.Data
 // [Time.EOP]/[Time.UTC]/[Time.UT1] query triggers.
 //
 // It exists so this package needs no knowledge of caches, HTTP or download
-// consent, and links none of it. Blank-importing
+// policy, and links none of it. Blank-importing
 // [github.com/TuSKan/astrogo/remote/eop] registers the loader that fetches
 // through remote; importing remote alone does not.
 //
@@ -67,11 +67,11 @@ type FSEOPLoader = iers.FSLoader
 var (
 	// ErrNoEOPLoader is returned when EOP data is needed and no
 	// [EOPLoader] has been registered. The query degrades to zero EOP,
-	// exactly as it does when download consent is absent.
+	// exactly as it does when the download policy refuses the bulletin.
 	ErrNoEOPLoader = iers.ErrNoLoader
 
 	// ErrNoEOPData is what an [EOPLoader] returns when it found nothing:
-	// no pre-seeded file, or a download consent forbade. It is an
+	// no pre-seeded file, or a download the policy refused. It is an
 	// ordinary state, not a failure worth propagating.
 	ErrNoEOPData = iers.ErrNoEOPData
 )
@@ -83,13 +83,12 @@ func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
 
 // LoadEOP loads Earth orientation now, under ctx, through the registered
 // [EOPLoader], and says whether it could: the network step first, which
-// remote/eop's loader gates on remote.EnableDownloads(0,
-// remote.IERSFinals2000A), then a cached bulletin. Blank-importing
-// [github.com/TuSKan/astrogo/remote/eop] registers that loader.
+// remote/eop's loader asks the download policy about, then a cached bulletin.
+// Blank-importing [github.com/TuSKan/astrogo/remote/eop] registers that
+// loader.
 //
 //	import _ "github.com/TuSKan/astrogo/remote/eop"
 //
-//	remote.EnableDownloads(0, remote.IERSFinals2000A) // or pre-seed the cache
 //	if err := epoch.LoadEOP(ctx); err != nil {
 //		return err
 //	}
@@ -120,8 +119,8 @@ func ParseFinals2000A(r io.Reader) (*Table, error) { return iers.ParseFinals2000
 // RegisterModel sets the process-wide Earth orientation parameter model
 // and marks the choice authoritative: the automatic lazy load a
 // [Time.EOP]/[Time.UTC]/[Time.UT1] query would otherwise trigger (a
-// pre-seeded on-disk cache file, then — if download consent was granted —
-// a network fetch) will not run afterward, so it can never silently
+// pre-seeded on-disk cache file, then — unless the download policy refuses
+// it — a network fetch) will not run afterward, so it can never silently
 // replace what was explicitly registered here.
 //
 // So RegisterModel(ZeroModel{}) gives deterministic zero EOP: a finals2000A
@@ -202,8 +201,8 @@ func logDeltaTHeld(mjd float64, held *deltaTHeldError) {
 		"delta_t", fmt.Sprintf("%.3f s, TT − UT1 on the bulletin's last day", held.deltaT),
 		"delta_t_sigma", fmt.Sprintf("%.1f s here, Huber (2000) from the bulletin's end", held.sigma),
 		"polar_motion", "zero",
-		"remedy", `a newer bulletin: import _ "github.com/TuSKan/astrogo/remote/eop", then `+
-			"remote.EnableDownloads(0, remote.IERSFinals2000A)")
+		"remedy", `a newer bulletin: import _ "github.com/TuSKan/astrogo/remote/eop", `+
+			"and run with network access")
 }
 
 // logEOPUnavailable writes the warning, separately from the [sync.Once] that
@@ -227,7 +226,7 @@ func logEOPUnavailable(mjd float64, cause error) {
 	// attribute.
 	// The remedy leads with the import because nothing else works without it:
 	// since #294 no loader is registered until remote/eop is imported, and
-	// EnableDownloads alone then consents to a fetch nothing will make.
+	// without one there is no fetch for the network to serve.
 	//
 	// The 0.9 s is not a property of this code. It is the bound leap seconds
 	// kept |UT1-UTC| inside, and they end on [continuousUTC]: from that date
@@ -235,7 +234,7 @@ func logEOPUnavailable(mjd float64, cause error) {
 	// error this warning states depends on the epoch it is about (#147, #879).
 	//
 	// The cause says which step failed: no loader registered, no cached
-	// bulletin and no consent to fetch one, or a bulletin that does not reach
+	// bulletin and a policy refusing to fetch one, or a bulletin that does not reach
 	// this epoch. It is what lets a caller tell the remedy apart from the rest.
 	//
 	// Before the bulletin begins no download can help, and the remedy says
@@ -254,9 +253,8 @@ func logEOPUnavailable(mjd float64, cause error) {
 
 	topocentric, ut1 := "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
 		"up to 0.9 s, the bound leap seconds kept |UT1-UTC| inside"
-	remedy := `import _ "github.com/TuSKan/astrogo/remote/eop", then ` +
-		"remote.EnableDownloads(0, remote.IERSFinals2000A) or pre-seed finals2000A.data, " +
-		"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
+	remedy := `import _ "github.com/TuSKan/astrogo/remote/eop" and run with network access ` +
+		"or pre-seed finals2000A.data, or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
 
 	switch {
 	case mjd >= continuousUTC:
@@ -319,7 +317,7 @@ func logBeforeUTC(mjd float64) {
 // lookupEOP is the single place that attempts an automatic lazy load
 // before looking up EOP for mjd: it checks whether the current model
 // already covers mjd, then (if not) a pre-seeded on-disk cache file, then
-// (if download consent was granted) a network fetch — see
+// (unless the download policy refuses it) a network fetch — see
 // iers.EnsureLoaded. It never logs; callers decide whether to
 // warn-and-degrade or propagate.
 //

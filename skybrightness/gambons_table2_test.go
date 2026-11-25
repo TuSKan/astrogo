@@ -109,8 +109,6 @@ func TestAgainstGAMBONSTable2(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 	defer cancel()
 
-	enableStarMapDownload(t)
-
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVFromTable1()
 
