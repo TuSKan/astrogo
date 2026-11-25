@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -183,6 +184,22 @@ func TestHTTPControlPassesOnlyAnAnswerHoldingTheValue(t *testing.T) {
 
 	if err := HTTPControl(context.Background(), unreachable+"/gp.php", want)(); err == nil {
 		t.Error("a host that does not answer passed the control")
+	}
+
+	if err := HTTPControl(context.Background(), "://no scheme", want)(); err == nil {
+		t.Error("a URL that cannot be requested passed the control")
+	}
+
+	// An answer that ends before the length it declared, though what arrived
+	// holds the value: a body that could not be read whole is not an answer.
+	cut := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "1000")
+		_, _ = w.Write([]byte(`[{"OBJECT_NAME":"ISS (ZARYA)"`))
+	}))
+	t.Cleanup(cut.Close)
+
+	if err := HTTPControl(context.Background(), cut.URL, want)(); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("an answer cut short: err %v, want io.ErrUnexpectedEOF", err)
 	}
 }
 
