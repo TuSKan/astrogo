@@ -1,9 +1,7 @@
 package fits
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"testing"
 )
@@ -50,49 +48,5 @@ func TestMMapOpenClose(t *testing.T) {
 	_, err = OpenMmap("does_not_exist_at_all_hopefully.fits")
 	if err == nil {
 		t.Errorf("expected error for nonexistent file")
-	}
-}
-
-func TestMMapSeeker(t *testing.T) {
-	seeker := &mmapSeeker{
-		len: 10,
-		off: 0,
-	}
-	p := make([]byte, 5)
-
-	// Read EOF bypassed
-	seeker.off = 10
-
-	n, err := seeker.Read(p)
-	if n != 0 || !errors.Is(err, io.EOF) {
-		t.Errorf("expected EOF, got n=%d, err=%v", n, err)
-	}
-
-	// Invalid Seek
-	_, err = seeker.Seek(0, 999)
-	if err == nil {
-		t.Errorf("expected error for invalid whence")
-	}
-
-	// Negative Seek
-	_, err = seeker.Seek(-10, io.SeekStart)
-	if err == nil {
-		t.Errorf("expected error for negative target")
-	}
-
-	// Valid Seeks
-	target, err := seeker.Seek(5, io.SeekStart)
-	if err != nil || target != 5 {
-		t.Errorf("expected target 5, got %d (err: %v)", target, err)
-	}
-
-	target, err = seeker.Seek(2, io.SeekCurrent)
-	if err != nil || target != 7 {
-		t.Errorf("expected target 7, got %d (err: %v)", target, err)
-	}
-
-	target, err = seeker.Seek(-1, io.SeekEnd)
-	if err != nil || target != 9 {
-		t.Errorf("expected target 9, got %d (err: %v)", target, err)
 	}
 }

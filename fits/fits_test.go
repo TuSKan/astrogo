@@ -191,12 +191,3 @@ func TestVerifyError(t *testing.T) {
 		t.Errorf("expected error for missing NAXIS")
 	}
 }
-
-func TestHDU_Load(t *testing.T) {
-	b := &basicHDU{}
-
-	err := b.Load(nil)
-	if err != nil {
-		t.Errorf("expected nil from basicHDU Load")
-	}
-}

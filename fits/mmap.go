@@ -2,35 +2,34 @@ package fits
 
 import (
 	"fmt"
-	"io"
 
 	"golang.org/x/exp/mmap"
 )
 
-// MMapFile represents a memory-mapped FITS dataset.
+// MMapFile is a FITS file read from a memory mapping of it. Its images are
+// read as [ReadAt] reads them: each one's pixels stay in the mapping, and
+// [ImageHDU.Section] copies out only the box asked for, so a section can be
+// taken until [MMapFile.Close] unmaps the file and not after.
 type MMapFile struct {
 	*File
 
 	mapped *mmap.ReaderAt
 }
 
-// OpenMmap creates a zero-copy memory mapped instance of a FITS file.
-// This is strictly read-only and safely bypasses IO overhead for enormous datasets.
+// OpenMmap maps the FITS file at path into memory, read-only, and reads its
+// structure from the mapping as [ReadAt] does.
 func OpenMmap(path string) (*MMapFile, error) {
 	at, err := mmap.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("fits: failed to mmap file %s: %w", path, err)
 	}
 
-	// mmap.ReaderAt only exposes ReadAt and Len. Our core parser expects io.Reader + io.Seeker.
-	wrap := &mmapSeeker{
-		at:  at,
-		off: 0,
-		len: int64(at.Len()),
-	}
-
-	f, err := Read(wrap)
+	f, err := ReadAt(at, int64(at.Len()))
 	if err != nil {
+		if cerr := at.Close(); cerr != nil {
+			return nil, fmt.Errorf("%w (and closing the mapping: %w)", err, cerr)
+		}
+
 		return nil, err
 	}
 
@@ -40,7 +39,8 @@ func OpenMmap(path string) (*MMapFile, error) {
 	}, nil
 }
 
-// Close gracefully releases the memory mapped handle mapping.
+// Close unmaps the file. A section of one of its images cannot be taken
+// afterwards.
 func (m *MMapFile) Close() error {
 	if m.mapped != nil {
 		err := m.mapped.Close()
@@ -52,49 +52,4 @@ func (m *MMapFile) Close() error {
 	}
 
 	return nil
-}
-
-// mmapSeeker implements io.ReadSeeker bridging an mmap.ReaderAt
-type mmapSeeker struct {
-	at  *mmap.ReaderAt
-	off int64
-	len int64
-}
-
-func (m *mmapSeeker) Read(p []byte) (int, error) {
-	if m.off >= m.len {
-		return 0, io.EOF
-	}
-
-	n, err := m.at.ReadAt(p, m.off)
-	m.off += int64(n)
-
-	if err != nil {
-		return n, fmt.Errorf("fits: mmap read: %w", err)
-	}
-
-	return n, nil
-}
-
-func (m *mmapSeeker) Seek(offset int64, whence int) (int64, error) {
-	var target int64
-
-	switch whence {
-	case io.SeekStart:
-		target = offset
-	case io.SeekCurrent:
-		target = m.off + offset
-	case io.SeekEnd:
-		target = m.len + offset
-	default:
-		return 0, fmt.Errorf("%w: %d", ErrInvalidWhence, whence)
-	}
-
-	if target < 0 {
-		return 0, ErrNegativeOffset
-	}
-
-	m.off = target
-
-	return target, nil
 }

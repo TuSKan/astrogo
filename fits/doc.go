@@ -3,10 +3,14 @@
 //
 // # FITS I/O
 //
-// The package reads standard FITS files via [Open] / [OpenMmap] and supports:
+// The package reads standard FITS files via [Open], [Read], [ReadAt] and
+// [OpenMmap], and supports:
 //   - Primary and extension HDUs (Image, BinTable, ASCII Table)
 //   - Gzip-compressed streams (.fits.gz)
-//   - Memory-mapped file access for zero-copy large-image workflows
+//   - Images larger than memory, a box at a time: [ReadAt] over any
+//     [io.ReaderAt] (a file, a memory mapping through [OpenMmap], or a
+//     remote.File) leaves each image's pixels where they are, and
+//     [ImageHDU.Section] reads only the bytes a box covers
 //   - Apache Arrow columnar batch export for catalog-scale table HDUs
 //
 // [Write] encodes a [File] back out: images at every BITPIX, and binary tables
@@ -58,5 +62,6 @@
 //
 // A [WCS] may be transformed through by any number of goroutines at once, and
 // its setters must not run beside them. A [Header] may be read from any number
-// of goroutines while nothing appends to it.
+// of goroutines while nothing appends to it. Sections of an image may be taken
+// by any number of goroutines at once.
 package fits

@@ -124,7 +124,8 @@ func Read(r io.Reader) (*File, error) {
 		//
 		// It costs what the image weighs. A caller who wants headers alone
 		// pays for pixels they will not read, which is the price of the
-		// alternative being a silent empty result.
+		// alternative being a silent empty result. ReadAt reads none until a
+		// section is asked for.
 		if isImagePayload(header) {
 			hdu, err := ReadImage(header, br)
 			if err != nil {
@@ -164,6 +165,96 @@ func Read(r io.Reader) (*File, error) {
 	}
 
 	return f, nil
+}
+
+// ReadAt reads the FITS file held in the first size bytes of r as [Read] reads
+// one, except that it reads no image's pixels. Each image HDU is an
+// [*ImageHDU] whose Tensor is nil and whose [ImageHDU.Section] reads the
+// pixels of a box from r when asked, so an image larger than memory can be
+// read a part at a time. Tables are decoded as Read decodes them.
+//
+// r must stay readable for as long as sections are taken: an open file, a
+// memory mapping, or a remote.File, whose chunk cache keeps at most a
+// mebibyte of an object resident. An HDU declaring more data than r holds is
+// an error wrapping [io.ErrUnexpectedEOF].
+func ReadAt(r io.ReaderAt, size int64) (*File, error) {
+	f := &File{HDUs: make([]HDU, 0)}
+
+	for off := int64(0); off < size; {
+		sr := io.NewSectionReader(r, off, size-off)
+
+		header, err := ReadHeader(NewBlockReader(sr))
+		if err != nil {
+			// As for Read: what follows the last HDU is not one.
+			if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) && len(f.HDUs) > 0 {
+				break
+			}
+
+			return nil, err
+		}
+
+		// A SectionReader reports its position without failing.
+		headerBytes, _ := sr.Seek(0, io.SeekCurrent)
+		dataOff := off + headerBytes
+
+		payload, err := payloadSize(header)
+		if err != nil {
+			return nil, err
+		}
+
+		if payload > size-dataOff {
+			return nil, fmt.Errorf("fits: HDU %d: %w: %d bytes of data declared, %d remain",
+				len(f.HDUs), io.ErrUnexpectedEOF, payload, size-dataOff)
+		}
+
+		hdu, err := readHDUAt(header, r, dataOff, payload)
+		if err != nil {
+			return nil, err
+		}
+
+		f.HDUs = append(f.HDUs, hdu)
+		off = dataOff + payload
+	}
+
+	if len(f.HDUs) == 0 {
+		return nil, ErrNoPrimaryHDU
+	}
+
+	return f, nil
+}
+
+// readHDUAt returns the HDU header describes, whose data is the size bytes of
+// r from off: a table decoded, an image with its pixels left in r.
+func readHDUAt(header *Header, r io.ReaderAt, off, size int64) (HDU, error) {
+	if xtension, err := header.GetString("XTENSION"); err == nil {
+		switch strings.TrimSpace(xtension) {
+		case "BINTABLE":
+			hdu, err := ReadBintable(header, io.NewSectionReader(r, off, size))
+			if err != nil {
+				return nil, fmt.Errorf("fits: read BINTABLE: %w", err)
+			}
+
+			return hdu, nil
+		case "TABLE":
+			hdu, err := ReadASCIITable(header, io.NewSectionReader(r, off, size))
+			if err != nil {
+				return nil, fmt.Errorf("fits: read TABLE: %w", err)
+			}
+
+			return hdu, nil
+		}
+	}
+
+	if isImagePayload(header) {
+		hdu, err := openImage(header, r, off)
+		if err != nil {
+			return nil, fmt.Errorf("fits: read image: %w", err)
+		}
+
+		return hdu, nil
+	}
+
+	return &basicHDU{header: header, hType: HDUTypeImage}, nil
 }
 
 // payloadSize is the size of an HDU's data, padded to whole blocks, from the
