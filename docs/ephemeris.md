@@ -643,3 +643,39 @@ The suite downloads nothing beyond what jpl's own tests do: de440s and its
 leap-second file, and the IERS bulletin. nep097 and the Horizons comet kernel
 are used only if a previous run cached them; otherwise those cases
 skip and say why.
+
+## 11. Without a kernel
+
+What `ephemeris.Default()` and `ephemeris/kepler` give a program that has no JPL kernel.
+
+`ephemeris.Default()` needs no kernel and no network, and it is a **planning-grade**
+provider — not an astrometric one. Measured against DE440, quarterly over 1972–2100
+(516 samples per body), worst case:
+
+| | Sun | Mercury | Venus | Moon | Neptune | Mars | Jupiter | Uranus | Saturn | Pluto |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| worst | 0.013″ | 1.5″ | 10.2″ | 10.2″ | 10.7″ | 53.8″ | 52.7″ | 71.9″ | 88.6″ | **197″** |
+| its disc | 1920″ | 5–13″ | 10–66″ | 1865″ | 2.3″ | 4–25″ | 40″ | 3.5″ | 18″ | 0.1″ |
+
+Compare the two rows. Saturn's worst case is five times its own apparent diameter and
+Uranus's is twenty times, so `Default()` will not reliably put a planet inside a narrow
+field. For visibility and scheduling — rise/set, altitude, airmass, twilight, Moon
+separation — it makes no difference at all: 90″ shifts a rise time by about six seconds.
+
+Reach for a JPL kernel (33 mm against Horizons) for astrometry, occultation timing,
+photometric aperture placement, or anything that must land inside a slit.
+
+**Pluto is the outlier**, ~30× worse than the worst planet: SOFA has no Pluto model, so
+it is two-body propagation of Standish elements. At 3′ it gives you the constellation,
+not the object.
+
+**The offline path for asteroids and comets is `ephemeris/kepler`** — `NewMovingBodyProvider`
+plus six elements from `catalog/sbdb`, which is what `plan.NewAsteroid` uses when no kernel is
+available. Measured against Horizons-generated SPK kernels, it holds roughly **1–4″ over a
+month** either side of the elements' epoch of osculation, degrading as t² beyond that. That is
+good enough to find the object in a finder and not good enough to measure it.
+
+Every figure above is generated from the `ephemeris.sofa.*` and `ephemeris.kepler.*`
+suites — see [docs/VALIDATION.md](VALIDATION.md) for the full distributions, the
+contract each is held to, and the commit each was last verified at. The
+[`ephemeris` package doc](../ephemeris/doc.go) carries the same table with the reasoning.

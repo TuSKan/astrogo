@@ -49,6 +49,23 @@
 // [URL] is the single gate every call site passes through, so those three
 // controls apply uniformly to files and APIs alike.
 //
+// An endpoint's [Endpoint.Mirrors] are asked in turn when its own host is not
+// serving: no answer, a 404, or a 5xx after its retries. SIMBAD carries the
+// CfA and IDIA copies. [SetURL] clears them, since a URL you chose is the one
+// you want, and takes any URL [OpenFS] understands, including its two portable
+// wrappers: ?prefix= scopes into a subdirectory, and ?key= serves one exact
+// object under whatever name astrogo asks for:
+//
+//	remote.SetURL(remote.IERSFinals2000A, "https://mirror.example/archive?key=2026-08/eop-dump.dat")
+//
+// # Scoped changes
+//
+// [Capture] snapshots the endpoints' configuration, the download policy,
+// offline mode and the data directory, and [Scope.Restore], or [WithScope],
+// puts back exactly that: a test cleans up with
+// t.Cleanup(remote.Capture().Restore). [Reset] restores the defaults instead,
+// which also undoes what a wider scope, such as a package's TestMain, set.
+//
 // # Downloads
 //
 // A call that needs a file downloads it the first time, and caches it: a JPL

@@ -27,10 +27,6 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
-
-	// The kernel-backed sources register their backend rather than being
-	// imported by the root package, so a build that wants them says so (#112).
-	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
 // cacheLocation names where an endpoint's files are expected, for display

@@ -114,6 +114,7 @@ type Provider struct {
 	mu               sync.RWMutex
 	startTime        epoch.Time
 	endTime          epoch.Time
+	extraKernels     []string
 	LSK              *lsk.Reader
 	ByTarget         map[int32][]SegmentRef
 	ByTargetCoverage map[int32]TargetCoverage
@@ -132,6 +133,12 @@ func WithTimeInterval(start, end epoch.Time) Option {
 		p.startTime = start
 		p.endTime = end
 	}
+}
+
+// WithKernel adds the planetary kernel planets/<name>.bsp, loaded after the
+// primary one; repeat it for several, as the parts of DE441 need.
+func WithKernel(name string) Option {
+	return func(p *Provider) { p.extraKernels = append(p.extraKernels, name) }
 }
 
 // NewProvider creates a new JPL ephemeris provider.
@@ -220,6 +227,21 @@ func NewProvider(ctx context.Context, source core.Source, kernel string, opts ..
 		}
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnknownSource, p.source)
+	}
+
+	for _, extra := range p.extraKernels {
+		key := "planets/" + extra + ".bsp"
+
+		k, err := spk.CacheDownload(ctx, key)
+		if err != nil {
+			return nil, errors.Join(fmt.Errorf("jpl: cache kernel %s: %w", extra, err), p.Close())
+		}
+
+		// addKernelPath closes a kernel it cannot add; what was loaded before
+		// it is closed here, since the caller never holds this provider.
+		if err := p.addKernelPath(k, key); err != nil {
+			return nil, errors.Join(fmt.Errorf("jpl: add kernel %s: %w", extra, err), p.Close())
+		}
 	}
 
 	p.LSK, err = lsk.Cache(ctx, "lsk/naif0012.tls")
