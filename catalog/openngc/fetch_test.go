@@ -70,7 +70,7 @@ func loadNow(t *testing.T) {
 	}
 }
 
-func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
+func TestResolveFetchesTheCatalogFromItsSource(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
