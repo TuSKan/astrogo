@@ -2,9 +2,10 @@ package ephemeris_test
 
 import (
 	"fmt"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // The task this package exists for: where is a body, at an instant.
@@ -19,7 +20,7 @@ import (
 // composes those into a state about any center at one instant, here the
 // Earth's.
 func Example() {
-	when := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	mars, err := eph.At(eph.Default(), when).Geometric(eph.MarsBarycenter, eph.Earth)
 	if err != nil {
@@ -38,7 +39,7 @@ func Example() {
 // light left, not where it is now — then the Sun's deflection of that light
 // and the aberration of the Earth's motion, in SOFA's order.
 func ExampleInstant_Apparent() {
-	when := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 	in := eph.At(eph.Default(), when)
 
 	geometric, err := in.Geometric(eph.MarsBarycenter, eph.Earth)

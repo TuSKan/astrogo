@@ -2,10 +2,11 @@ package coord
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -42,7 +43,7 @@ func readOnlyContexts(t *testing.T) []*Context {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	at := time.Date(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 20, 3, 0, 0, 0, time.UTC)
 
 	modeled := atmosphere.StandardRefraction()
 	modeled.Model = atmosphere.RefractionBennett{}

@@ -2,10 +2,11 @@ package coord_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -17,7 +18,7 @@ import (
 // relative to the Sun's own offset, so these are below the worst case the
 // distance allows -- 1099 arcsec and 0.0091 arcsec respectively.
 func ExampleBarycentricToHeliocentric() {
-	ep := time.Date(2023, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	ep := epoch.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	sun, err := coord.SunBarycentric(ep)
 	if err != nil {

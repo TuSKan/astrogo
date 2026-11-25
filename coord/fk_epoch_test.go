@@ -6,8 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +18,7 @@ func kinematicStarForEpoch() coord.ICRS {
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(0.150), angle.Arcsec(0.220),
 		angle.Arcsec(0.020), unit.KmPerSec(-22.4),
-		time.J2000(),
+		epoch.J2000(),
 	)
 }
 
@@ -45,19 +45,19 @@ func TestTheSixElementRouteLabelsItsOutputWithTheCatalogEquinox(t *testing.T) {
 
 	// Epochs far from the catalog equinoxes, so a stored argument cannot be
 	// mistaken for the right answer.
-	for _, epoch := range []float64{1900, 1950, 1975, 2000, 2050} {
-		if got := coord.ICRSToFK4(star, epoch).Epoch(); got != coord.B1950 {
+	for _, year := range []float64{1900, 1950, 1975, 2000, 2050} {
+		if got := coord.ICRSToFK4(star, year).Epoch(); got != coord.B1950 {
 			t.Errorf("ICRSToFK4(star, %g).Epoch() = %g, want B1950 — the six-element route "+
-				"answers at the catalog equinox and must say so", epoch, got)
+				"answers at the catalog equinox and must say so", year, got)
 		}
 
-		if got := coord.FK5ToFK4(fk5Star, epoch).Epoch(); got != coord.B1950 {
-			t.Errorf("FK5ToFK4(star, %g).Epoch() = %g, want B1950", epoch, got)
+		if got := coord.FK5ToFK4(fk5Star, year).Epoch(); got != coord.B1950 {
+			t.Errorf("FK5ToFK4(star, %g).Epoch() = %g, want B1950", year, got)
 		}
 
-		if got := coord.ICRSToFK5(star, epoch).Epoch(); got != coord.J2000Epoch {
+		if got := coord.ICRSToFK5(star, year).Epoch(); got != coord.J2000Epoch {
 			t.Errorf("ICRSToFK5(star, %g).Epoch() = %g, want J2000 — #330 recorded this "+
-				"defect for FK4 only, and FK5 had it too", epoch, got)
+				"defect for FK4 only, and FK5 had it too", year, got)
 		}
 	}
 }
@@ -111,8 +111,8 @@ func TestTheSixElementRouteIgnoresTheEpochEntirely(t *testing.T) {
 
 	base := coord.ICRSToFK4(star, coord.B1950)
 
-	for _, epoch := range []float64{1900, 1975, 2050} {
-		got := coord.ICRSToFK4(star, epoch)
+	for _, year := range []float64{1900, 1975, 2050} {
+		got := coord.ICRSToFK4(star, year)
 
 		basePmRA, basePmDec, _ := base.ProperMotion()
 		gotPmRA, gotPmDec, _ := got.ProperMotion()
@@ -121,7 +121,7 @@ func TestTheSixElementRouteIgnoresTheEpochEntirely(t *testing.T) {
 			gotPmRA != basePmRA || gotPmDec != basePmDec ||
 			got.Parallax() != base.Parallax() || got.RV() != base.RV() {
 			t.Errorf("epoch %g: the six-element route produced different numbers from B1950, "+
-				"so the epoch is partly used and B1950 is the wrong label", epoch)
+				"so the epoch is partly used and B1950 is the wrong label", year)
 		}
 	}
 }
@@ -136,13 +136,13 @@ func TestFKConversionStartsFromTheStarsEpoch(t *testing.T) {
 	star := kinematicStarForEpoch()
 
 	// Twenty-five Julian years after J2000.
-	later := time.J2000().Add(unit.JulianYears(25))
+	later := epoch.J2000().Add(unit.JulianYears(25))
 
 	moved, err := coord.PropagateEpoch(star, later)
 	testutil.AssertNoError(t, err)
 
 	mislabeled := coord.NewICRSWithKinematics(moved.RA(), moved.Dec(), moved.PmRA(), moved.PmDec(),
-		moved.Parallax(), moved.RV(), time.J2000())
+		moved.Parallax(), moved.RV(), epoch.J2000())
 
 	fk4 := func(c coord.ICRS) coord.ICRS {
 		f := coord.ICRSToFK4(c, coord.B1950)
@@ -180,13 +180,13 @@ func TestTheRoundTripStillClosesAfterTheRelabeling(t *testing.T) {
 		{"with recorded kinematics", kinematicStarForEpoch()},
 		{"position only", positionOnlyStarForEpoch()},
 	} {
-		for _, epoch := range []float64{coord.B1950, 1900, 1975, 2000, 2050} {
-			back := coord.FK4ToICRS(coord.ICRSToFK4(tc.star, epoch))
+		for _, year := range []float64{coord.B1950, 1900, 1975, 2000, 2050} {
+			back := coord.FK4ToICRS(coord.ICRSToFK4(tc.star, year))
 
 			sep := coord.Separation(tc.star, back).Arcseconds()
 			if sep > 1e-3 {
 				t.Errorf("%s at epoch %g: ICRS -> FK4 -> ICRS moved the position %.6f arcsec",
-					tc.name, epoch, sep)
+					tc.name, year, sep)
 			}
 		}
 	}

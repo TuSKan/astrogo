@@ -5,8 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/fits"
-	"github.com/TuSKan/astrogo/time"
 )
 
 func TestSiteFromFITS(t *testing.T) {
@@ -56,7 +56,7 @@ func TestTargetFromFITS(t *testing.T) {
 	}
 
 	// test RA and Dec
-	pos, _ := target.Position(time.Time{})
+	pos, _ := target.Position(epoch.Time{})
 	if pos.RA().Degrees() != 83.82208 {
 		t.Errorf("expected RA 83.82208, got: %v", pos.RA().Degrees())
 	}
@@ -185,7 +185,7 @@ func TestTargetFromFITSReadsTheWCS(t *testing.T) {
 			tol = 2e-6
 		}
 
-		pos, _ := target.Position(time.Time{})
+		pos, _ := target.Position(epoch.Time{})
 		if math.Abs(pos.RA().Degrees()-c.ra) > tol || math.Abs(pos.Dec().Degrees()-c.dec) > tol {
 			t.Errorf("%s: (%.7f°, %.7f°), want (%.7f°, %.7f°)", c.name, pos.RA().Degrees(), pos.Dec().Degrees(), c.ra, c.dec)
 		}
@@ -245,7 +245,7 @@ func TestTargetFromFITSTakesCRVALWithNoDataArray(t *testing.T) {
 		t.Fatalf("NAXIS = 0: %v", err)
 	}
 
-	pos, _ := target.Position(time.Time{})
+	pos, _ := target.Position(epoch.Time{})
 	if math.Abs(pos.RA().Degrees()-83.82208) > 2e-6 || math.Abs(pos.Dec().Degrees()+5.39111) > 2e-6 {
 		t.Errorf("NAXIS = 0: (%.7f°, %.7f°), want CRVAL (83.82208°, -5.39111°)", pos.RA().Degrees(), pos.Dec().Degrees())
 	}

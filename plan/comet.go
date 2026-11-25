@@ -6,8 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	mag "github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -62,7 +62,7 @@ func (c *Comet) EphID() eph.ID { return c.id }
 
 // Position returns the apparent ICRS position of the comet — see
 // [apparentVec].
-func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
+func (c *Comet) Position(t epoch.Time) (coord.ICRS, error) {
 	icrs, err := apparentICRS(c.provider, c.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("comet %s: %w", c.name, err)
@@ -73,7 +73,7 @@ func (c *Comet) Position(t time.Time) (coord.ICRS, error) {
 
 // GeocentricVec returns the apparent geocentric vector of the comet — see
 // [apparentVec].
-func (c *Comet) GeocentricVec(t time.Time) (vector.Vec3, error) {
+func (c *Comet) GeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	v, err := apparentVec(c.provider, c.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("comet %s: %w", c.name, err)
@@ -88,7 +88,7 @@ func (c *Comet) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDet
 }
 
 // ApparentMagnitude computes total apparent magnitude using M1/k1.
-func (c *Comet) ApparentMagnitude(t time.Time) (float64, error) {
+func (c *Comet) ApparentMagnitude(t epoch.Time) (float64, error) {
 	r, delta, err := c.distances(t)
 	if err != nil {
 		return 0, err
@@ -98,12 +98,12 @@ func (c *Comet) ApparentMagnitude(t time.Time) (float64, error) {
 }
 
 // ApparentMagnitudeCtx provides cached magnitude computation.
-func (c *Comet) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, error) {
+func (c *Comet) ApparentMagnitudeCtx(t epoch.Time, _ *coord.Context) (float64, error) {
 	return c.ApparentMagnitude(t)
 }
 
 // distances returns heliocentric and geocentric distances.
-func (c *Comet) distances(t time.Time) (r, delta float64, err error) {
+func (c *Comet) distances(t epoch.Time) (r, delta float64, err error) {
 	in := eph.At(c.provider, t)
 
 	st, err := in.Geometric(c.id, eph.Earth)

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -265,10 +266,10 @@ const alpha5Letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 // Nothing here indexes a month table, so nothing here would panic. The bound
 // stays anyway, because a day of year outside its own year is not an epoch and
 // silently producing a date in the following March is worse than saying so.
-func parseEpoch(l1 string) (time.Time, error) {
+func parseEpoch(l1 string) (epoch.Time, error) {
 	yy, err := parseIntField(l1, spanEpochYear, "epoch year")
 	if err != nil {
-		return time.Time{}, err
+		return epoch.Time{}, err
 	}
 
 	// The TLE format's own pivot, which expires in 2057.
@@ -279,7 +280,7 @@ func parseEpoch(l1 string) (time.Time, error) {
 
 	doy, err := parseFloatField(l1, spanEpochDay, "epoch day")
 	if err != nil {
-		return time.Time{}, err
+		return epoch.Time{}, err
 	}
 
 	daysInYear := 365.0
@@ -290,12 +291,12 @@ func parseEpoch(l1 string) (time.Time, error) {
 	// Day 1.0 is midnight on January 1st, so the valid half-open range is
 	// [1, daysInYear+1).
 	if doy < 1.0 || doy >= daysInYear+1.0 {
-		return time.Time{}, fmt.Errorf(
+		return epoch.Time{}, fmt.Errorf(
 			"%w: epoch day %g is outside [1, %g) for year %d",
 			ErrMalformedTLE, doy, daysInYear+1.0, year)
 	}
 
-	jan1 := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	jan1 := epoch.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	// unit.Days, not the standard library's Duration: that type quantizes to
 	// nanoseconds via a float64 product that exceeds 2^53 ns for a late-year

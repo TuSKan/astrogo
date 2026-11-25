@@ -5,10 +5,10 @@ package airglow_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // The almanac's solar flux tracks the real solar cycle.
@@ -29,14 +29,14 @@ func TestAlmanacFluxFollowsTheSolarCycle(t *testing.T) {
 	testutil.RequireReachable(t, "etimecalret-002.eso.org:443")
 
 	quiet, err := airglow.AlmanacAt(context.Background(),
-		time.GoDate(2020, time.June, 15, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
+		time.Date(2020, time.June, 15, 2, 0, 0, 0, time.UTC), airglow.Paranal)
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("AlmanacAt at solar minimum: %v", err)
 	}
 
 	active, err := airglow.AlmanacAt(context.Background(),
-		time.GoDate(2014, time.March, 10, 2, 0, 0, 0, time.LocationUTC), airglow.Paranal)
+		time.Date(2014, time.March, 10, 2, 0, 0, 0, time.UTC), airglow.Paranal)
 	if err != nil {
 		testutil.SkipOnUpstreamFailure(t, err)
 		t.Fatalf("AlmanacAt at solar maximum: %v", err)

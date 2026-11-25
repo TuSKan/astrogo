@@ -6,16 +6,17 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -44,7 +45,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	zenith := coord.NewAltAz(angle.Deg(89.9), angle.Deg(0))
 
 	// ── where the zenith is pointing ────────────────────────────────────────
-	cc := mustContext(t, time.FromGo(scene.Time), scene.Observer,
+	cc := mustContext(t, epoch.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	icrs, err := cc.AltAzToICRS(zenith)
@@ -53,7 +54,7 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	}
 
 	gal := coord.ICRSToGalactic(icrs)
-	ecl := coord.ICRSToEcliptic(icrs, time.FromGo(scene.Time))
+	ecl := coord.ICRSToEcliptic(icrs, epoch.FromGo(scene.Time))
 
 	t.Logf("zenith: RA %.2f Dec %+.2f | galactic l %.2f b %+.2f | ecliptic lon %.2f lat %+.2f",
 		icrs.RA().Degrees(), icrs.Dec().Degrees(),

@@ -3,13 +3,14 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -39,10 +40,10 @@ func TestObsVelIsTheVelocityApcoAberratesWith(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, at := range []time.Time{
-			time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC),
-			time.Date(2026, time.June, 21, 15, 17, 0, 0, time.LocationUTC),
-			time.Date(2031, time.December, 1, 6, 0, 0, 0, time.LocationUTC),
+		for _, at := range []epoch.Time{
+			epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC),
+			epoch.Date(2026, time.June, 21, 15, 17, 0, 0, time.UTC),
+			epoch.Date(2031, time.December, 1, 6, 0, 0, 0, time.UTC),
 		} {
 			ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
 			if err != nil {
@@ -92,7 +93,7 @@ func TestObsVelIsPerpendicularToTheAxis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, err := coord.NewContext(time.Date(2026, time.June, 21, 3, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
+	ctx, err := coord.NewContext(epoch.Date(2026, time.June, 21, 3, 0, 0, 0, time.UTC), site, atmosphere.Refraction{})
 	if err != nil {
 		t.Fatal(err)
 	}

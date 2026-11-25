@@ -4,17 +4,18 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // paranalMoonNight is Paranal at 2026-09-26 00:00 UTC, the Moon at 27°
 // altitude, where the site sees it 0.85° from where the Earth's center does.
-func paranalMoonNight(t *testing.T) (*Site, time.Time) {
+func paranalMoonNight(t *testing.T) (*Site, epoch.Time) {
 	t.Helper()
 
 	site, err := NewSite("Paranal", angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635))
@@ -22,7 +23,7 @@ func paranalMoonNight(t *testing.T) (*Site, time.Time) {
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	return site, time.Date(2026, 9, 26, 0, 0, 0, 0, time.LocationUTC)
+	return site, epoch.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC)
 }
 
 // TestMoonSepIsTheSeparationTheSiteSees holds MoonSep to Skyfield 1.55 on

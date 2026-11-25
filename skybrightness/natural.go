@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -31,7 +32,7 @@ var ErrNoDustMap = errors.New("skybrightness: diffuse galactic light needs a 100
 // and rebuilds it only when the scene changes.
 type sceneFrame struct {
 	observer *coord.Geodetic
-	at       time.GoTime
+	at       time.Time
 
 	// refraction is part of the cache key, because ctx was built with it.
 	refraction atmosphere.Refraction
@@ -121,7 +122,7 @@ func newSceneFrame(scene *Scene, needSun bool) (*sceneFrame, error) {
 		return nil, err
 	}
 
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	ctx, err := coord.NewContext(at, scene.Observer, scene.Atmosphere.Refraction())
 	if err != nil {
@@ -531,7 +532,7 @@ func (z *ZodiacalLight) AddRadiance(
 		return Contribution{}, fmt.Errorf("skybrightness: zodiacal: direction: %w", err)
 	}
 
-	ecliptic := coord.ICRSToEcliptic(icrs, time.FromGo(scene.Time))
+	ecliptic := coord.ICRSToEcliptic(icrs, epoch.FromGo(scene.Time))
 
 	geom := ZodiacalGeometry{
 		DifferentialLongitude: ecliptic.Lon().Angle - frame.sunEcliptic.Lon().Angle,

@@ -4,12 +4,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // crescentSite is a sea-level site for the crescent tests.
@@ -33,10 +34,10 @@ func crescentSite(tb testing.TB, latDeg, lonDeg float64) *Site {
 // at Port of Spain: a crescent whose geocentric elongation at sunset, 6.87°,
 // clears MABIMS 2021's 6.4° while its topocentric one, 5.98°, does not, with
 // the Moon 4.3° up. Each margin is at least 0.4°.
-func portOfSpainEvening(tb testing.TB) (*Site, time.Time) {
+func portOfSpainEvening(tb testing.TB) (*Site, epoch.Time) {
 	tb.Helper()
 
-	return crescentSite(tb, 10.65, -61.52), time.Date(2025, 3, 29, 16, 0, 0, 0, time.LocationUTC)
+	return crescentSite(tb, 10.65, -61.52), epoch.Date(2025, 3, 29, 16, 0, 0, 0, time.UTC)
 }
 
 func TestCrescentVisibilityReadsTheMABIMSElongationGeocentric(t *testing.T) {
@@ -185,7 +186,7 @@ func TestCrescentVisibilityMoonSetBeforeTheSun(t *testing.T) {
 	// the Sun, so there is no best time after sunset.
 	site := crescentSite(t, 10.65, -61.52)
 
-	r, err := CrescentVisibility(site, time.Date(2025, 3, 28, 16, 0, 0, 0, time.LocationUTC), eph.Default())
+	r, err := CrescentVisibility(site, epoch.Date(2025, 3, 28, 16, 0, 0, 0, time.UTC), eph.Default())
 	if err != nil {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
@@ -212,11 +213,11 @@ func TestCrescentVisibilityPolarEvenings(t *testing.T) {
 
 	for _, c := range []struct {
 		name    string
-		evening time.Time
+		evening epoch.Time
 		want    error
 	}{
-		{"midsummer", time.Date(2025, 6, 21, 11, 0, 0, 0, time.LocationUTC), errNoSunset},
-		{"circumpolar Moon", time.Date(2025, 3, 7, 11, 0, 0, 0, time.LocationUTC), errNoMoonset},
+		{"midsummer", epoch.Date(2025, 6, 21, 11, 0, 0, 0, time.UTC), errNoSunset},
+		{"circumpolar Moon", epoch.Date(2025, 3, 7, 11, 0, 0, 0, time.UTC), errNoMoonset},
 	} {
 		_, err := CrescentVisibility(site, c.evening, eph.Default())
 		if !errors.Is(err, c.want) {

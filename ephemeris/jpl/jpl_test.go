@@ -12,8 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 func TestTimeConv(t *testing.T) {
@@ -25,7 +25,7 @@ func TestTimeConv(t *testing.T) {
 	}
 
 	// 2023-JAN-1
-	tm := time.FromJD(2459945.5, time.UTC)
+	tm := epoch.FromJD(2459945.5, epoch.UTC)
 	// ET seconds past J2000, the argument SPK segments are indexed by. The
 	// Julian-date pair this used to go through is gone: summing it quantized
 	// the result to about 40 microseconds (#150).
@@ -115,7 +115,7 @@ func TestJPLOutOfCoverageEpoch(t *testing.T) {
 	})
 
 	// Year 5000
-	tm := time.FromJD(3545000.0, time.UTC)
+	tm := epoch.FromJD(3545000.0, epoch.UTC)
 
 	_, err := eph.At(p, tm).Geometric(core.Sun, core.Earth)
 	if err == nil {
@@ -184,8 +184,8 @@ func TestSourceSelection(t *testing.T) {
 func TestSmallBodyEros(t *testing.T) {
 	// Eros (433)
 	// We use a specific time where it has coverage
-	start := time.FromJD(2460000.5, time.UTC) // 2023-FEB-25
-	end := time.FromJD(2460001.5, time.UTC)   // 2023-FEB-26
+	start := epoch.FromJD(2460000.5, epoch.UTC) // 2023-FEB-25
+	end := epoch.FromJD(2460001.5, epoch.UTC)   // 2023-FEB-26
 
 	p, err := jpl.NewProvider(
 		context.Background(),
@@ -265,8 +265,8 @@ func TestSmallBodyMultiMatch(t *testing.T) {
 	// Querying "Apophis" matches multiple entries in SBDB,
 	// but here we are passing a "kernel" command to Horizons.
 	// Horizons might return a list if the command is ambiguous.
-	start := time.FromJD(2460000.5, time.UTC)
-	end := time.FromJD(2460001.5, time.UTC)
+	start := epoch.FromJD(2460000.5, epoch.UTC)
+	end := epoch.FromJD(2460001.5, epoch.UTC)
 
 	p, err := jpl.NewProvider(
 		context.Background(),

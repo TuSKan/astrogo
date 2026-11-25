@@ -9,8 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -70,7 +70,7 @@ type Satellite struct {
 
 	// epoch is the element set's own epoch. Read straight from prop's
 	// elements, so the two cannot disagree.
-	epoch time.Time
+	epoch epoch.Time
 
 	// id is the satellite's NAIF code, from its NORAD catalog number.
 	id core.ID
@@ -148,7 +148,7 @@ func (s *Satellite) Propagator() *sgp4.Propagator { return s.prop }
 // 2006/2000A bias-precession-nutation matrix (Pnm06a). That matrix is nearly
 // all of the cost; a caller holding a [coord.Context] at t has it already, and
 // [Satellite.LocateCtx] uses it.
-func (s *Satellite) Locate(id core.ID, t time.Time) (core.State, error) {
+func (s *Satellite) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	if id != s.id {
 		return core.State{}, fmt.Errorf("%w: %d", ErrUnexpectedID, id)
 	}
@@ -226,7 +226,7 @@ func (s *Satellite) OrbitalPeriod() unit.Duration {
 //
 // It is not rotated first: a rotation buys nothing for the height, and would
 // cost a UT1 lookup and a nutation series per call.
-func (s *Satellite) Altitude(t time.Time) (unit.Length, error) {
+func (s *Satellite) Altitude(t epoch.Time) (unit.Length, error) {
 	pos, _, err := s.propagateECI(t)
 	if err != nil {
 		return 0, err
@@ -291,7 +291,7 @@ func ValidateTLE(line1, line2 string) error {
 // Vallado's satellite 5 before the reference suite caught it.
 //
 // [sgp4.Propagator.AtTime] takes the instant. There is nothing to correct.
-func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) {
+func (s *Satellite) propagateECI(t epoch.Time) (pos, vel vector.Vec3, err error) {
 	pos, vel, err = s.prop.AtTime(t)
 	if err != nil {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: %w", ErrPropagation, err)
@@ -317,7 +317,7 @@ func (s *Satellite) propagateECI(t time.Time) (pos, vel vector.Vec3, err error) 
 // Error budget after EqEq correction:
 //   - IAU-76/FK5 (SGP4) vs. IAU 2006 frame tie: ~20 mas → negligible
 //   - Well within SGP4's intrinsic ~1 km accuracy
-func temeToGCRS(pos, vel vector.Vec3, t time.Time) (gcrsPos, gcrsVel vector.Vec3) {
+func temeToGCRS(pos, vel vector.Vec3, t epoch.Time) (gcrsPos, gcrsVel vector.Vec3) {
 	tt := t.TT()
 	tta, ttb := tt.JDParts()
 

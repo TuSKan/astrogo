@@ -3,8 +3,8 @@ package coord
 import (
 	"fmt"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -70,7 +70,7 @@ import (
 // own Sun, which its provider locates about the barycenter; moved with
 // [BarycentricToHeliocentric], it carries the offset, 0.16″ seen from one
 // AU.
-func SunBarycentric(t time.Time) (vector.Vec3, error) {
+func SunBarycentric(t epoch.Time) (vector.Vec3, error) {
 	d1, d2 := t.TDB().JDParts()
 
 	pvh, pvb, status := gofaext.Epv00(d1, d2)
@@ -104,7 +104,7 @@ func SunBarycentric(t time.Time) (vector.Vec3, error) {
 //
 //	sun, err := coord.SunBarycentric(t)
 //	// ... then v.Sub(sun) per body.
-func BarycentricToHeliocentric(v vector.Vec3, t time.Time) (vector.Vec3, error) {
+func BarycentricToHeliocentric(v vector.Vec3, t epoch.Time) (vector.Vec3, error) {
 	sun, err := SunBarycentric(t)
 	if err != nil {
 		return vector.Vec3{}, err
@@ -114,7 +114,7 @@ func BarycentricToHeliocentric(v vector.Vec3, t time.Time) (vector.Vec3, error) 
 }
 
 // HeliocentricToBarycentric is the inverse of [BarycentricToHeliocentric].
-func HeliocentricToBarycentric(v vector.Vec3, t time.Time) (vector.Vec3, error) {
+func HeliocentricToBarycentric(v vector.Vec3, t epoch.Time) (vector.Vec3, error) {
 	sun, err := SunBarycentric(t)
 	if err != nil {
 		return vector.Vec3{}, err

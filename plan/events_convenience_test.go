@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -23,7 +24,7 @@ func TestConjunctions_MarsJupiter(t *testing.T) {
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(730)) // 2 years: conjunctions are infrequent for outer planets
 
 	events, err := Conjunctions(mars, jupiter, Window{Start: start, End: end})
@@ -45,7 +46,7 @@ func TestConjunctionsEcliptic_MarsJupiter(t *testing.T) {
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(730))
 
 	events, err := ConjunctionsEcliptic(mars, jupiter, Window{Start: start, End: end})
@@ -67,7 +68,7 @@ func TestAppulses_MarsJupiter(t *testing.T) {
 	mars := NewMars(prov)
 	jupiter := NewJupiter(prov)
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(730))
 
 	events, err := Appulses(mars, jupiter, Window{Start: start, End: end})
@@ -91,7 +92,7 @@ func TestOppositions_MarsSun(t *testing.T) {
 	mars := NewMars(prov)
 	sun := NewSun(prov)
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(365 * 3)) // Mars oppositions occur roughly every ~26 months
 
 	events, err := Oppositions(mars, sun, Window{Start: start, End: end})
@@ -111,7 +112,7 @@ func TestGreatestElongations_Venus(t *testing.T) {
 	venus := NewVenus(prov)
 	sun := NewSun(prov)
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(584)) // one full Venus synodic period
 
 	events, err := GreatestElongations(venus, sun, Window{Start: start, End: end})
@@ -141,7 +142,7 @@ func TestGreatestElongations_Venus(t *testing.T) {
 func TestFullMoonOppositions_MatchesMoonPhases(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(90))
 
 	events, err := FullMoonOppositions(Window{Start: start, End: end}, prov)
@@ -191,7 +192,7 @@ func TestVisibilityEvents_Star(t *testing.T) {
 
 	star := NewStar("Test Star", angle.Deg(100), angle.Deg(-10))
 
-	start := time.Date(2026, 6, 15, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(1))
 
 	events, err := VisibilityEvents(star, site, Window{Start: start, End: end})
@@ -213,7 +214,7 @@ func TestVisibilityEvents_Star(t *testing.T) {
 func TestNextNewMoonAndNextFullMoon(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	newMoon, err := NextNewMoon(start, prov)
 	if err != nil {
@@ -239,7 +240,7 @@ func TestNextNewMoonAndNextFullMoon(t *testing.T) {
 		t.Fatalf("MoonPhases: %v", err)
 	}
 
-	var wantNew, wantFull time.Time
+	var wantNew, wantFull epoch.Time
 
 	for _, p := range phases {
 		switch p.Phase { //nolint:exhaustive // only New/Full are relevant here

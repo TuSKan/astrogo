@@ -5,8 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // nonFiniteAt returns an Evaluator that returns badVal on the callN'th
@@ -20,13 +20,13 @@ import (
 func nonFiniteAt(f func(float64) float64, badVal float64, callN int) plan.Evaluator {
 	calls := 0
 
-	return func(t time.Time) (float64, error) {
+	return func(t epoch.Time) (float64, error) {
 		calls++
 		if calls == callN {
 			return badVal, nil
 		}
 
-		return f(t.Sub(epoch).Seconds()), nil
+		return f(t.Sub(refEpoch).Seconds()), nil
 	}
 }
 
@@ -120,7 +120,7 @@ func TestFindRoot_WellBehavedStillConverges(t *testing.T) {
 		t.Fatalf("FindRoot: unexpected error for a well-behaved evaluator: %v", err)
 	}
 
-	rootSec := root.Sub(epoch).Seconds()
+	rootSec := root.Sub(refEpoch).Seconds()
 	if math.Abs(rootSec-5) > 1e-6 {
 		t.Errorf("root = %.9f, want 5.0", rootSec)
 	}
@@ -140,7 +140,7 @@ func TestFindExtremum_WellBehavedStillConverges(t *testing.T) {
 		t.Fatalf("FindExtremum: unexpected error for a well-behaved evaluator: %v", err)
 	}
 
-	extSec := tExt.Sub(epoch).Seconds()
+	extSec := tExt.Sub(refEpoch).Seconds()
 	if math.Abs(extSec-5) > 1e-4 {
 		t.Errorf("extremum time = %.6f, want ~5.0", extSec)
 	}

@@ -3,17 +3,18 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // transitsOf keeps the transits among events.
-func transitsOf(events []Event) []time.Time {
-	var out []time.Time
+func transitsOf(events []Event) []epoch.Time {
+	var out []epoch.Time
 
 	for _, e := range events {
 		if e.Kind == EventTransit {
@@ -26,7 +27,7 @@ func transitsOf(events []Event) []time.Time {
 
 // requireTransits fails unless got holds exactly the want instants, each
 // within tol.
-func requireTransits(t *testing.T, what string, got, want []time.Time, tol unit.Duration) {
+func requireTransits(t *testing.T, what string, got, want []epoch.Time, tol unit.Duration) {
 	t.Helper()
 
 	if len(got) != len(want) {
@@ -57,16 +58,16 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 	}
 
 	moon, err := MoonEvents(
-		north75, Window{Start: time.Date(2026, 1, 8, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 1, 11, 0, 0, 0, 0, time.LocationUTC)},
+		north75, Window{Start: epoch.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC), End: epoch.Date(2026, 1, 11, 0, 0, 0, 0, time.UTC)},
 		prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	requireTransits(t, "Moon at 75°N", transitsOf(moon), []time.Time{
-		time.Date(2026, 1, 8, 4, 8, 50, 0, time.LocationUTC),
-		time.Date(2026, 1, 9, 4, 51, 3, 0, time.LocationUTC),
-		time.Date(2026, 1, 10, 5, 32, 22, 0, time.LocationUTC),
+	requireTransits(t, "Moon at 75°N", transitsOf(moon), []epoch.Time{
+		epoch.Date(2026, 1, 8, 4, 8, 50, 0, time.UTC),
+		epoch.Date(2026, 1, 9, 4, 51, 3, 0, time.UTC),
+		epoch.Date(2026, 1, 10, 5, 32, 22, 0, time.UTC),
 	}, unit.Seconds(2))
 
 	north89, err := NewSite("89N", angle.LatDeg(89), angle.LonDeg(15), unit.Meters(0))
@@ -74,15 +75,15 @@ func TestTransitsWhereTheAltitudeMaximumLeavesTheMeridian(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	day := time.Date(2026, 1, 28, 0, 0, 0, 0, time.LocationUTC)
+	day := epoch.Date(2026, 1, 28, 0, 0, 0, 0, time.UTC)
 
 	sun, err := SunEvents(north89, Window{Start: day, End: day.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	requireTransits(t, "Sun at 89°N", transitsOf(sun), []time.Time{
-		time.Date(2026, 1, 28, 11, 12, 54, 0, time.LocationUTC),
+	requireTransits(t, "Sun at 89°N", transitsOf(sun), []epoch.Time{
+		epoch.Date(2026, 1, 28, 11, 12, 54, 0, time.UTC),
 	}, unit.Seconds(2))
 }
 
@@ -98,28 +99,28 @@ func TestTransitInTheWindowsFirstStep(t *testing.T) {
 	}
 
 	// The Sun transits at 10:45:36, three minutes in.
-	start := time.Date(2026, 9, 24, 10, 42, 36, 0, time.LocationUTC)
+	start := epoch.Date(2026, 9, 24, 10, 42, 36, 0, time.UTC)
 
 	sun, err := SunEvents(brno, Window{Start: start, End: start.Add(unit.Hours(12))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	requireTransits(t, "Sun at Brno", transitsOf(sun), []time.Time{
-		time.Date(2026, 9, 24, 10, 45, 36, 0, time.LocationUTC),
+	requireTransits(t, "Sun at Brno", transitsOf(sun), []epoch.Time{
+		epoch.Date(2026, 9, 24, 10, 45, 36, 0, time.UTC),
 	}, unit.Seconds(2))
 
 	// The Moon transits at 22:04:25, four minutes in, and not again within
 	// the day.
-	start = time.Date(2026, 3, 31, 22, 0, 0, 0, time.LocationUTC)
+	start = epoch.Date(2026, 3, 31, 22, 0, 0, 0, time.UTC)
 
 	moon, err := MoonEvents(brno, Window{Start: start, End: start.Add(unit.Hours(24))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	requireTransits(t, "Moon at Brno", transitsOf(moon), []time.Time{
-		time.Date(2026, 3, 31, 22, 4, 25, 0, time.LocationUTC),
+	requireTransits(t, "Moon at Brno", transitsOf(moon), []epoch.Time{
+		epoch.Date(2026, 3, 31, 22, 4, 25, 0, time.UTC),
 	}, unit.Seconds(2))
 }
 
@@ -137,12 +138,12 @@ func TestTransitsDoNotDependOnTheStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.Date(2026, 7, 20, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 7, 22, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 7, 22, 0, 0, 0, 0, time.UTC)
 	spec := EventSpec{Family: EventFamilyVisibility, Kind: EventTransit, Target: NewMoon(prov), Observer: site}
 
 	steps := []unit.Duration{unit.Minutes(1), unit.Minutes(15), unit.Hours(2)}
-	runs := make([][]time.Time, 0, len(steps))
+	runs := make([][]epoch.Time, 0, len(steps))
 
 	for _, step := range steps {
 		events, err := NewEventSolver(step, unit.Seconds(1)).Find(spec, Window{Start: start, End: end})
@@ -176,8 +177,8 @@ func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 4, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 
 	events, err := MoonEvents(site, Window{Start: start, End: end}, prov)
 	if err != nil {
@@ -210,7 +211,7 @@ func TestEveryLunarMeridianPassageIsATransit(t *testing.T) {
 // 19″ late.
 func TestTransitIsWhereSiderealTimeMeetsRightAscension(t *testing.T) {
 	prov := eph.Default()
-	start := time.Date(2026, 3, 31, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC)
 
 	// A millisecond, where SunEvents and MoonEvents settle for a second.
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(0.001))

@@ -11,10 +11,10 @@ import (
 	"os/exec"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestNetworkExamplesRun runs every example the README says reaches the

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/scigolib/hdf5"
 
@@ -16,13 +17,12 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // aodWhen is the hour every test here asks about; its key is where the
 // fixture is served and cached.
-var aodWhen = time.GoDate(2026, time.March, 20, 5, 0, 0, 0, time.LocationUTC)
+var aodWhen = time.Date(2026, time.March, 20, 5, 0, 0, 0, time.UTC)
 
 // aodErrorPage is what a server answering with an error page under a 200 puts
 // where the NetCDF file should be.

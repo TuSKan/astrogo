@@ -2,12 +2,13 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -36,7 +37,7 @@ func TestPlanSatellite_PositionAndDetails(t *testing.T) {
 	prov := newISSProvider(t)
 	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
-	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	icrs, err := sat.Position(tm)
 	if err != nil {
@@ -96,7 +97,7 @@ func TestPlanSatellite_ApparentMagnitudeRequiresContext(t *testing.T) {
 	prov := newISSProvider(t)
 	sat := NewSatellite("ISS", prov.ID(), prov, WithStdMag(-1.3, magnitude.ConventionMcCants))
 
-	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	// Without a context, ApparentMagnitude must fail with a clear error
 	// (use ApparentMagnitudeCtx instead) rather than silently returning 0.
@@ -135,7 +136,7 @@ func TestLookAngle_ISS(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	tm := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	ctx, err := coord.NewContext(tm, loc, defaultAtm)
 	if err != nil {
@@ -167,7 +168,7 @@ func TestSatellitePasses_ISS(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	start := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Hours(24))
 
 	passes, err := SatellitePasses(NewSatellite("ISS", prov.ID(), prov), siteAt(t, loc), Window{Start: start, End: end}, WithMinElevation(angle.Deg(10)))

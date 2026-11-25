@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // issGP is CelesTrak's GP answer for the ISS, in the JSON form catalog/norad
@@ -51,7 +52,7 @@ func TestResolverKeepsTheTLEEpoch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := time.Date(2026, 4, 19, 11, 45, 32, 833440000, time.LocationUTC)
+	want := epoch.Date(2026, 4, 19, 11, 45, 32, 833440000, time.UTC)
 	r := NewResolver(NORAD)
 
 	resolved, err := r.Resolve(context.Background(), "ISS")
@@ -85,8 +86,8 @@ func TestResolverKeepsTheTLEEpoch(t *testing.T) {
 // whose first candidate had only line 1 paired it with another candidate's
 // line 2.
 func TestMergeGroupTakesTheTLEFromOneCandidate(t *testing.T) {
-	first := time.Date(2026, 4, 18, 0, 0, 0, 0, time.LocationUTC)
-	second := time.Date(2026, 4, 19, 0, 0, 0, 0, time.LocationUTC)
+	first := epoch.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
+	second := epoch.Date(2026, 4, 19, 0, 0, 0, 0, time.UTC)
 
 	got := mergeGroup(group{candidates: []candidate{
 		{provider: "norad", target: Target{ID: "25544", TLELine1: "first line 1", Epoch: first}},
@@ -106,11 +107,11 @@ func TestMergeGroupTakesTheTLEFromOneCandidate(t *testing.T) {
 // catalog position, the TLE keeps its own epoch, as SBDB's elements do,
 // since SGP4 reads Epoch as the element set's.
 func TestMergeGroupTLEEpochWinsOverAPositionEpoch(t *testing.T) {
-	tleEpoch := time.Date(2026, 4, 19, 11, 45, 32, 0, time.LocationUTC)
+	tleEpoch := epoch.Date(2026, 4, 19, 11, 45, 32, 0, time.UTC)
 
 	got := mergeGroup(group{candidates: []candidate{
 		{provider: "simbad", target: Target{
-			ID: "shared", Coord: coord.NewICRS(angle.Deg(10), angle.Deg(20)), HasCoord: true, Epoch: time.J2000(),
+			ID: "shared", Coord: coord.NewICRS(angle.Deg(10), angle.Deg(20)), HasCoord: true, Epoch: epoch.J2000(),
 		}},
 		{provider: "norad", target: Target{ID: "shared", TLELine1: "line 1", TLELine2: "line 2", Epoch: tleEpoch}},
 	}})

@@ -5,16 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrSpec is returned for a request this package cannot honestly answer.
@@ -34,7 +35,7 @@ var ErrSpec = errors.New("skybrightness/skyplan: unusable request")
 // need. The interface is a narrowing, not an extension point.
 type Sky interface {
 	// Scene fixes the observer, the instant and the air.
-	Scene(site *coord.Geodetic, when time.GoTime, air *atmosphere.Builder) (*skybrightness.Scene, error)
+	Scene(site *coord.Geodetic, when time.Time, air *atmosphere.Builder) (*skybrightness.Scene, error)
 
 	// Direction evaluates one pointing within that scene.
 	Direction(ctx context.Context, scene *skybrightness.Scene, alt, az angle.Angle) (*skybrightness.Estimate, error)
@@ -204,8 +205,8 @@ func NewImaging(spec Spec) (*Imaging, error) {
 // So declare the filter. [Imaging.Band] reports which one the magnitudes are
 // on, and the answer is fully meaningful only when the instrument passes that
 // band and little else.
-func (i *Imaging) LimitingMagnitudeAt(t time.Time, alt, az angle.Angle) (float64, error) {
-	scene, err := i.spec.Sky.Scene(i.spec.Site, t.GoTime(), i.spec.Air)
+func (i *Imaging) LimitingMagnitudeAt(t epoch.Time, alt, az angle.Angle) (float64, error) {
+	scene, err := i.spec.Sky.Scene(i.spec.Site, t.ToGo(), i.spec.Air)
 	if err != nil {
 		return 0, fmt.Errorf("skybrightness/skyplan: scene: %w", err)
 	}

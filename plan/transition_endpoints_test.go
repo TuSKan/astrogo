@@ -5,10 +5,11 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -50,7 +51,7 @@ func TestNewTransitionReportsAnEndItCannotObserve(t *testing.T) {
 	site := transitionSite(t)
 	star := &Block{ID: "star", Target: NewStar("a", angle.Hour(5.5), angle.Deg(-5))}
 	moving := &Block{ID: "moving", Target: errMovingBody{}}
-	start := time.Date(2026, time.March, 20, 1, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 1, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		name     string
@@ -83,24 +84,24 @@ func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {
 	from := &Block{ID: "from", Target: NewStar("a", angle.Hour(5.5), angle.Deg(-5))}
 	to := &Block{ID: "to", Target: NewStar("b", angle.Hour(8.1), angle.Deg(-40))}
 	model := &BasicTransitionModel{SlewRate: unit.DegreesPerSec(2)}
-	start := time.Date(2026, time.March, 20, 1, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 1, 0, 0, 0, time.UTC)
 
 	ctxAt := mustMoving(t, start, site.Location(), site.Refraction())
 	ctxAt(start.Add(unit.Minutes(40)))
 
 	builders := []struct {
 		name  string
-		build func(toTime time.Time) (Transition, error)
+		build func(toTime epoch.Time) (Transition, error)
 	}{
-		{"NewTransition", func(toTime time.Time) (Transition, error) {
+		{"NewTransition", func(toTime epoch.Time) (Transition, error) {
 			return NewTransition(from, to, site, Window{Start: start, End: toTime})
 		}},
-		{"a strategy's moving Context", func(toTime time.Time) (Transition, error) {
+		{"a strategy's moving Context", func(toTime epoch.Time) (Transition, error) {
 			return newTransition(from, to, start, toTime, site, ctxAt)
 		}},
 	}
 
-	for _, toTime := range []time.Time{start, start.Add(unit.Minutes(3))} {
+	for _, toTime := range []epoch.Time{start, start.Add(unit.Minutes(3))} {
 		wantFrom, wantTo := fullContextAltAz(t, from, start, site), fullContextAltAz(t, to, toTime, site)
 
 		want, err := model.Overhead(Transition{FromBlock: from, ToBlock: to, FromAltAz: wantFrom, ToAltAz: wantTo})
@@ -140,7 +141,7 @@ func TestTransitionEndpointsAreTheFullContextAnswer(t *testing.T) {
 
 // fullContextAltAz is b's target at the instant at, observed from a fresh
 // coord.Context.
-func fullContextAltAz(t *testing.T, b *Block, at time.Time, site *Site) coord.AltAz {
+func fullContextAltAz(t *testing.T, b *Block, at epoch.Time, site *Site) coord.AltAz {
 	t.Helper()
 
 	pos, err := b.Target.Position(at)
@@ -166,7 +167,7 @@ func BenchmarkGreedyStrategy_10Slew(b *testing.B) {
 	planner, _ := NewPlanner(site, nil)
 	tm := &BasicTransitionModel{BaseSetup: 0, SlewRate: unit.DegreesPerSec(2)}
 	blocks := makeBlocks(10)
-	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 	window := Window{Start: start, End: start.Add(unit.Minutes(150))}
 
 	for b.Loop() {

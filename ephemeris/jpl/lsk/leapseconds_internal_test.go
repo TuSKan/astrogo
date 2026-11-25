@@ -3,7 +3,7 @@ package lsk
 import "testing"
 
 // TestLeapTableReadsMidnightAsTheDayItStarts pins the one piece of arithmetic
-// between a kernel's DELTA_AT block and time's registry.
+// between a kernel's DELTA_AT block and epoch's registry.
 //
 // The kernel records each step as a Julian Date at midnight UTC — a JD ending
 // in .5, because JD rolls over at noon. A calendar conversion handed a value

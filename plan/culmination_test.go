@@ -4,23 +4,24 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // culminationByFullContexts is findCulmination as it was before #476: a full
 // coord.NewContext at every sample. Kept here as the reference the cached
 // version is held to.
-func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geodetic, start, end time.Time) (PassEvent, error) {
+func culminationByFullContexts(prov eph.Provider, id eph.ID, observer *coord.Geodetic, start, end epoch.Time) (PassEvent, error) {
 	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
 
-	sample := func(t time.Time) error {
+	sample := func(t epoch.Time) error {
 		ctx, err := coord.NewContext(t, observer, defaultAtm)
 		if err != nil {
 			return fmt.Errorf("context: %w", err)
@@ -85,7 +86,7 @@ func TestCulminationThroughTheContextCache(t *testing.T) {
 	t.Parallel()
 
 	sat, site := testISS(t)
-	start := time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 17, 0, 0, 0, 0, time.UTC)
 
 	// Four days rather than the week measured: the reference builds a full
 	// Context at every sample, and plan's race job has little time to spare.

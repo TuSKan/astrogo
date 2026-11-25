@@ -209,7 +209,7 @@ type Elements struct {
     ElementSet     int
     RevAtEpoch     int
 
-    Epoch time.Time // astrogo time, UTC
+    Epoch epoch.Time // UTC
 
     Inclination angle.Angle
     RAAN        angle.Angle
@@ -253,7 +253,7 @@ func New(el Elements, opts ...Option) (*Propagator, error)
 func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error)
 
 // AtTime is At for an absolute instant. t is converted to UTC.
-func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error)
+func (p *Propagator) AtTime(t epoch.Time) (pos, vel vector.Vec3, err error)
 
 func (p *Propagator) Elements() Elements
 func (p *Propagator) DeepSpace() bool     // SGP4's own 225-minute branch
@@ -291,7 +291,7 @@ SGP4's own argument is minutes-since-epoch as a real number. Taking it directly:
 `AtTime` is the convenience wrapper. It subtracts the UTC labels of the time and
 the epoch as whole seconds and nanoseconds since the Unix epoch (`utcLabel`), so
 the difference is exact integer arithmetic rather than a subtraction of two
-nearly equal Julian Dates. It does not use `time.Time.JDParts`, which an earlier
+nearly equal Julian Dates. It does not use `epoch.Time.JDParts`, which an earlier
 version of this section said it did: a UTC Julian Date lets a day that ends in a
 leap second run to 86401 seconds, and a difference across such a day came out a
 second off (#144).
@@ -433,7 +433,7 @@ hidden mutation. Not before it is measured.
 ### 6.7 SGP4 keeps its own GMST, and the comment says why
 
 `dscom`/`dsinit` need Greenwich sidereal time, and Vallado's `gstime` is the
-1982 IAU expression evaluated on UTC-as-UT1. astrogo has `time.Time.GAST` — IAU
+1982 IAU expression evaluated on UTC-as-UT1. astrogo has `epoch.Time.GAST` — IAU
 2006/2000A, with real EOP — and using it here would be a *worse* answer, because
 the lunisolar terms were fitted against the 1982 expression and the model is
 self-consistent, not accurate. The package therefore carries a private `gmst82`

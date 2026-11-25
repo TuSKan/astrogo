@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -14,7 +14,7 @@ type mockConstraint struct {
 	pass bool
 }
 
-func (m mockConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
+func (m mockConstraint) Check(_ Observable, _ *Site, _ epoch.Time) (Result, error) {
 	return Result{Pass: m.pass}, nil
 }
 
@@ -30,7 +30,7 @@ func TestSchedulerAndStrategies(t *testing.T) {
 
 	tm := &BasicTransitionModel{BaseSetup: 0} // Simplify time math by zeroing base setup
 
-	start := time.ZeroTime()
+	start := epoch.ZeroTime()
 	window := Window{Start: start, End: start.Add(unit.Hours(1))}
 
 	b1 := &Block{ID: "B1", Target: NewStar("T", angle.Zero(), angle.Zero()), Duration: unit.Minutes(10)}

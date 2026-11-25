@@ -2,13 +2,14 @@ package plan_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -46,19 +47,19 @@ func TestDetailsRiseAndSetAreTheEventAPIs(t *testing.T) {
 	for _, c := range []struct {
 		name   string
 		target plan.Observable
-		events func(start, end time.Time) ([]plan.Event, error)
+		events func(start, end epoch.Time) ([]plan.Event, error)
 	}{
-		{"Sun", plan.NewSun(prov), func(s, e time.Time) ([]plan.Event, error) {
+		{"Sun", plan.NewSun(prov), func(s, e epoch.Time) ([]plan.Event, error) {
 			return plan.SunEvents(site, plan.Window{Start: s, End: e}, prov)
 		}},
-		{"Moon", plan.NewMoon(prov), func(s, e time.Time) ([]plan.Event, error) {
+		{"Moon", plan.NewMoon(prov), func(s, e epoch.Time) ([]plan.Event, error) {
 			return plan.MoonEvents(site, plan.Window{Start: s, End: e}, prov)
 		}},
-		{"Sirius", sirius, func(s, e time.Time) ([]plan.Event, error) {
+		{"Sirius", sirius, func(s, e epoch.Time) ([]plan.Event, error) {
 			return plan.VisibilityEvents(sirius, site, plan.Window{Start: s, End: e})
 		}},
 	} {
-		start := time.Date(2026, time.March, 3, 0, 0, 0, 0, time.LocationUTC)
+		start := epoch.Date(2026, time.March, 3, 0, 0, 0, 0, time.UTC)
 		end := start.Add(unit.Days(3))
 		up, down := 0, 0
 
@@ -109,7 +110,7 @@ func TestDetailsRiseAndSetAreTheEventAPIs(t *testing.T) {
 
 			for _, f := range []struct {
 				what      string
-				got, want *time.Time
+				got, want *epoch.Time
 			}{{"rise", d.RiseTime, &rise.Time}, {"set", d.SetTime, &set.Time}} {
 				switch {
 				case f.got == nil:

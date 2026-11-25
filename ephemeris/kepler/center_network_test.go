@@ -13,8 +13,8 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -98,11 +98,11 @@ func barycentricVectors(command string, jds []float64) (pos, vel []vector.Vec3, 
 // instant, as Horizons does — the Sun a JPL kernel base gives Register — and
 // nothing else.
 type horizonsSun struct {
-	at       time.Time
+	at       epoch.Time
 	pos, vel vector.Vec3
 }
 
-func (b horizonsSun) Locate(id core.ID, t time.Time) (core.State, error) {
+func (b horizonsSun) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	if id != core.Sun || !t.Equal(b.at) {
 		return core.State{}, errNotHere
 	}
@@ -116,7 +116,7 @@ func (horizonsSun) Close() error { return nil }
 // distance r AU from the Sun at t: the Sun's and every planet system's nearer
 // the Sun, placed by the provider's SOFA base, the source Register's choice
 // reads.
-func interiorMass(t *testing.T, sofa *kepler.Provider, at time.Time, r float64) float64 {
+func interiorMass(t *testing.T, sofa *kepler.Provider, at epoch.Time, r float64) float64 {
 	t.Helper()
 
 	gm := constants.Ephemeris
@@ -174,7 +174,7 @@ func TestRegisterChoosesTheBetterCenterAgainstHorizons(t *testing.T) {
 
 	const jd0 = 2460676.5 // 2025-01-01 TDB, the study's epoch
 
-	epoch := time.FromJDParts(jd0, 0, time.TDB)
+	studyEpoch := epoch.FromJDParts(jd0, 0, epoch.TDB)
 	spans := []float64{30, 365.25}
 
 	jds := make([]float64, 1, 1+2*len(spans))
@@ -211,13 +211,13 @@ func TestRegisterChoosesTheBetterCenterAgainstHorizons(t *testing.T) {
 
 		r := pos[0].Sub(sun[0])
 
-		given, err := kepler.FromState(epoch, r, vel[0].Sub(sunVel[0]), sunCenter)
+		given, err := kepler.FromState(studyEpoch, r, vel[0].Sub(sunVel[0]), sunCenter)
 		if err != nil {
 			t.Fatalf("%s: heliocentric fit: %v", body.name, err)
 		}
 
-		barycentric, err := kepler.FromState(epoch, pos[0], vel[0], kepler.CentralBody{
-			ID: core.SolarSystemBarycenter, GM: interiorMass(t, sofa, epoch, r.Norm()),
+		barycentric, err := kepler.FromState(studyEpoch, pos[0], vel[0], kepler.CentralBody{
+			ID: core.SolarSystemBarycenter, GM: interiorMass(t, sofa, studyEpoch, r.Norm()),
 		})
 		if err != nil {
 			t.Fatalf("%s: barycentric fit: %v", body.name, err)
@@ -225,12 +225,12 @@ func TestRegisterChoosesTheBetterCenterAgainstHorizons(t *testing.T) {
 
 		const id core.ID = 1_000_000
 
-		provider := kepler.New(kepler.WithBase(horizonsSun{at: epoch, pos: sun[0], vel: sunVel[0]}))
+		provider := kepler.New(kepler.WithBase(horizonsSun{at: studyEpoch, pos: sun[0], vel: sunVel[0]}))
 		if err := provider.Register(id, given); err != nil {
 			t.Fatalf("%s: Register: %v", body.name, err)
 		}
 
-		st, err := provider.Locate(id, epoch)
+		st, err := provider.Locate(id, studyEpoch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -245,7 +245,7 @@ func TestRegisterChoosesTheBetterCenterAgainstHorizons(t *testing.T) {
 			var helioKm, baryKm, storedKm float64
 
 			for _, k := range []int{1 + 2*i, 2 + 2*i} {
-				at := time.FromJDParts(jds[k], 0, time.TDB)
+				at := epoch.FromJDParts(jds[k], 0, epoch.TDB)
 
 				h, _, err := given.StateAt(at)
 				if err != nil {

@@ -7,17 +7,18 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/skyplan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -54,7 +55,7 @@ type localSky struct {
 
 	// What the last call carried, so the wiring can be asserted.
 	gotSite *coord.Geodetic
-	gotWhen time.GoTime
+	gotWhen time.Time
 	gotAir  *atmosphere.Builder
 	gotAlt  angle.Angle
 	gotAz   angle.Angle
@@ -114,7 +115,7 @@ func newLocalSky(t *testing.T) *localSky {
 }
 
 func (s *localSky) Scene(
-	site *coord.Geodetic, when time.GoTime, air *atmosphere.Builder,
+	site *coord.Geodetic, when time.Time, air *atmosphere.Builder,
 ) (*skybrightness.Scene, error) {
 	s.gotSite, s.gotWhen, s.gotAir = site, when, air
 
@@ -226,8 +227,8 @@ func testSpec(t *testing.T, sky skyplan.Sky) skyplan.Spec {
 	}
 }
 
-func testEpoch() time.Time {
-	return time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+func testEpoch() epoch.Time {
+	return epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 }
 
 // TestLimitingMagnitudeAtCarriesTheRequestThrough is the wiring. A depth
@@ -255,8 +256,8 @@ func TestLimitingMagnitudeAtCarriesTheRequestThrough(t *testing.T) {
 		t.Error("the scene was built for a different site than the spec holds")
 	}
 
-	if !sky.gotWhen.Equal(when.GoTime()) {
-		t.Errorf("the scene was built at %v, want %v", sky.gotWhen, when.GoTime())
+	if !sky.gotWhen.Equal(when.ToGo()) {
+		t.Errorf("the scene was built at %v, want %v", sky.gotWhen, when.ToGo())
 	}
 
 	if sky.gotAir != spec.Air {
@@ -358,11 +359,11 @@ func TestDepthFollowsTheSky(t *testing.T) {
 // on the sky's magnitude scale. It returns the scene too, so a test can ask
 // the scene's own air what it takes.
 func groundDepth(
-	t *testing.T, sky *localSky, spec skyplan.Spec, when time.Time, alt, az angle.Angle,
+	t *testing.T, sky *localSky, spec skyplan.Spec, when epoch.Time, alt, az angle.Angle,
 ) (float64, *skybrightness.Scene) {
 	t.Helper()
 
-	scene, err := sky.Scene(spec.Site, when.GoTime(), spec.Air)
+	scene, err := sky.Scene(spec.Site, when.ToGo(), spec.Air)
 	if err != nil {
 		t.Fatalf("Scene: %v", err)
 	}

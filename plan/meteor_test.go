@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -58,15 +59,15 @@ func TestMeteorShowersTableIntegrity(t *testing.T) {
 // refining with DefaultSolver.FindRoot — used below to test
 // RadiantAt/IsActive against a real, precisely-found instant rather than a
 // hardcoded calendar date.
-func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, year int) time.Time {
+func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, year int) epoch.Time {
 	t.Helper()
 
-	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	step := unit.Hours(24)
 
-	eval := func(tm time.Time) (float64, error) {
+	eval := func(tm epoch.Time) (float64, error) {
 		lon, err := sunLongitudeJ2000(tm, prov)
 
 		return math.Remainder(lon-target, 360), err
@@ -100,7 +101,7 @@ func findSolarLongitudeInstant(t *testing.T, target float64, prov eph.Provider, 
 
 	t.Fatalf("solar longitude %v never crossed in %d", target, year)
 
-	return time.Time{}
+	return epoch.Time{}
 }
 
 // TestMeteorShower_RadiantAt_AtPeak confirms RadiantAt, evaluated at the
@@ -230,7 +231,7 @@ func TestMeteorShower_ObservedRate_ZeroBelowHorizon(t *testing.T) {
 	// The limiting magnitude is now a direct input, so these tests pin it
 	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
 	// arithmetic from any sky-brightness model.
-	rate, err := m.ObservedRate(site, time.FromJD(2451545.0, time.UTC), prov, 6.5)
+	rate, err := m.ObservedRate(site, epoch.FromJD(2451545.0, epoch.UTC), prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}
@@ -270,7 +271,7 @@ func TestMeteorShower_ObservedRate_StandardConditionsEqualsZHR(t *testing.T) {
 	// The limiting magnitude is now a direct input, so these tests pin it
 	// to the IMO standard 6.5 and isolate the ZHR/altitude/population-index
 	// arithmetic from any sky-brightness model.
-	rate, err := m.ObservedRate(site, time.FromJD(2451545.0, time.UTC), prov, 6.5)
+	rate, err := m.ObservedRate(site, epoch.FromJD(2451545.0, epoch.UTC), prov, 6.5)
 	if err != nil {
 		t.Fatalf("ObservedRate: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestMeteorShower_Radiant(t *testing.T) {
 		t.Fatalf("NewMeteorShower(Geminids): %v", err)
 	}
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	wantRA, wantDec, err := m.RadiantAt(tm, prov)
 	if err != nil {

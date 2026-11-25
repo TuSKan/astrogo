@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -37,21 +38,21 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.Date(2026, time.April, 19, 12, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 19, 12, 0, 0, 0, time.UTC)
 
 	passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: start, End: start.Add(unit.Days(2))}, WithMinElevation(angle.Deg(10)))
 	if err != nil {
 		t.Fatalf("SatellitePasses: %v", err)
 	}
 
-	at := func(d, h, m int, s float64) time.Time {
+	at := func(d, h, m int, s float64) epoch.Time {
 		whole := math.Floor(s)
 
-		return time.Date(2026, time.April, d, h, m, int(whole), int((s-whole)*1e9), time.LocationUTC)
+		return epoch.Date(2026, time.April, d, h, m, int(whole), int((s-whole)*1e9), time.UTC)
 	}
 
 	want := []struct {
-		rise, culm, set time.Time
+		rise, culm, set epoch.Time
 		maxElevDeg      float64
 	}{
 		{at(19, 17, 14, 18.99), at(19, 17, 17, 15.19), at(19, 17, 20, 12.74), 27.463},
@@ -75,7 +76,7 @@ func TestSatellitePassesAgreeWithSkyfield(t *testing.T) {
 
 		for _, e := range []struct {
 			name      string
-			got, want time.Time
+			got, want epoch.Time
 		}{
 			{"rise", p.Rise.Time, w.rise},
 			{"culmination", p.Culmination.Time, w.culm},
@@ -118,19 +119,19 @@ func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	at := func(h, m int, s float64) time.Time {
+	at := func(h, m int, s float64) epoch.Time {
 		whole := math.Floor(s)
 
-		return time.Date(2026, time.April, 20, h, m, int(whole), int((s-whole)*1e9), time.LocationUTC)
+		return epoch.Date(2026, time.April, 20, h, m, int(whole), int((s-whole)*1e9), time.UTC)
 	}
 
 	rise, culmination, set := at(3, 3, 34.10), at(3, 6, 56.58), at(3, 10, 17.07)
 
 	for _, tc := range []struct {
 		name                        string
-		start, end                  time.Time
+		start, end                  epoch.Time
 		riseCutOff, setCutOff       bool
-		wantRise, wantCulm, wantSet time.Time
+		wantRise, wantCulm, wantSet epoch.Time
 		culmIsPeak                  bool // whether the window holds the real culmination
 	}{
 		{"opens mid-pass", at(3, 6, 0), at(4, 0, 0), true, false, at(3, 6, 0), culmination, set, true},
@@ -159,7 +160,7 @@ func TestSatellitePassesCutOffAtTheWindowEdges(t *testing.T) {
 			// Skyfield's crossing, to the second.
 			for _, e := range []struct {
 				name      string
-				got, want time.Time
+				got, want epoch.Time
 				cut       bool
 			}{
 				{"rise", p.Rise.Time, tc.wantRise, tc.riseCutOff},
@@ -214,10 +215,10 @@ func TestSatellitePassesFindAPassThatBarelyClearsTheThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	culmination := time.Date(2026, time.April, 20, 16, 30, 5, 10_000_000, time.LocationUTC)
+	culmination := epoch.Date(2026, time.April, 20, 16, 30, 5, 10_000_000, time.UTC)
 
 	for offset := range 30 {
-		start := time.Date(2026, time.April, 20, 16, 0, offset, 0, time.LocationUTC)
+		start := epoch.Date(2026, time.April, 20, 16, 0, offset, 0, time.UTC)
 		end := start.Add(unit.Seconds(3600))
 
 		passes, err := SatellitePasses(NewSatellite("ISS", sat.ID(), sat), siteAt(t, observer), Window{Start: start, End: end}, WithMinElevation(angle.Deg(13.84)))

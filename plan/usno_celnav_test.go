@@ -3,13 +3,14 @@ package plan_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -50,7 +51,7 @@ func TestUSNO_CelNav(t *testing.T) {
 	sirius := coord.NewICRSWithKinematics(
 		angle.Deg(101.2871553333), angle.Deg(-16.7161158611),
 		angle.Arcsec(-0.54601), angle.Arcsec(-1.22307),
-		angle.Arcsec(0.37921), unit.KmPerSec(-5.5), time.J2000())
+		angle.Arcsec(0.37921), unit.KmPerSec(-5.5), epoch.J2000())
 
 	sun := plan.NewSun(eph.Default())
 
@@ -73,14 +74,14 @@ func TestUSNO_CelNav(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.place+" "+c.object, func(t *testing.T) {
-			epoch := celNavEpoch(t, c.date, c.ut1)
+			at := celNavEpoch(t, c.date, c.ut1)
 
 			site, err := coord.NewGeodetic(angle.LatDeg(c.lat), angle.LonDeg(c.lon), 0)
 			if err != nil {
 				t.Fatalf("NewGeodetic: %v", err)
 			}
 
-			ctx, err := coord.NewContext(epoch, site, atmosphere.Refraction{})
+			ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,7 +97,7 @@ func TestUSNO_CelNav(t *testing.T) {
 
 				alt, az = aa.Alt().Degrees(), aa.Az().Degrees()
 			case "Sun":
-				vec, err := sun.GeocentricVec(epoch)
+				vec, err := sun.GeocentricVec(at)
 				if err != nil {
 					t.Fatalf("GeocentricVec: %v", err)
 				}
@@ -122,7 +123,7 @@ func TestUSNO_CelNav(t *testing.T) {
 // UT1, so the calendar reading becomes a Julian Date labeled UT1 rather than
 // one converted from UTC; none of these dates holds a leap second, so the
 // calendar arithmetic is the same on both scales.
-func celNavEpoch(t *testing.T, date, clock string) time.Time {
+func celNavEpoch(t *testing.T, date, clock string) epoch.Time {
 	t.Helper()
 
 	cal, err := time.Parse("2006-01-02 15:04:05", date+" "+clock)
@@ -130,9 +131,9 @@ func celNavEpoch(t *testing.T, date, clock string) time.Time {
 		t.Fatalf("parse %s %s: %v", date, clock, err)
 	}
 
-	jd1, jd2 := time.FromGo(cal).JDParts()
+	jd1, jd2 := epoch.FromGo(cal).JDParts()
 
-	return time.FromJDParts(jd1, jd2, time.UT1)
+	return epoch.FromJDParts(jd1, jd2, epoch.UT1)
 }
 
 // geocentricParallaxDeg is how much higher a body at distAU stands from the

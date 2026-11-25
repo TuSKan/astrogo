@@ -3,13 +3,14 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/metrology"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -70,7 +71,7 @@ import (
 // untested and those are precisely the ones a wiring error hides in.
 func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	// Realistic magnitudes for 2026: DUT1 within the 0.9 s UTC bound, polar
 	// motion a few tenths of an arcsecond.
@@ -80,7 +81,7 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 		ypArcsec    = 0.4021
 	)
 
-	time.RegisterModel(fixedEOP{
+	epoch.RegisterModel(fixedEOP{
 		dut1: dut1Seconds,
 		xp:   angle.Arcsec(xpArcsec).Radians(),
 		yp:   angle.Arcsec(ypArcsec).Radians(),
@@ -128,12 +129,12 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 		{"equator", 9.0, 0.0},
 	}
 
-	epochs := []time.Time{
-		time.Date(2026, time.January, 5, 3, 17, 41, 0, time.LocationUTC),
-		time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.June, 21, 18, 42, 9, 0, time.LocationUTC),
-		time.Date(2026, time.September, 23, 0, 5, 33, 0, time.LocationUTC),
-		time.Date(2026, time.December, 21, 21, 55, 2, 0, time.LocationUTC),
+	epochs := []epoch.Time{
+		epoch.Date(2026, time.January, 5, 3, 17, 41, 0, time.UTC),
+		epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.June, 21, 18, 42, 9, 0, time.UTC),
+		epoch.Date(2026, time.September, 23, 0, 5, 33, 0, time.UTC),
+		epoch.Date(2026, time.December, 21, 21, 55, 2, 0, time.UTC),
 	}
 
 	ref := metrology.Reference{
@@ -179,13 +180,13 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		for _, epoch := range epochs {
-			ctx, err := coord.NewContext(epoch, site, atm)
+		for _, at := range epochs {
+			ctx, err := coord.NewContext(at, site, atm)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			utc1, utc2 := epoch.UTC().JDParts()
+			utc1, utc2 := at.UTC().JDParts()
 
 			for _, tg := range targets {
 				ra, dec := angle.Hour(tg.raHr), angle.Deg(tg.decD)
@@ -204,13 +205,13 @@ func TestTopocentricPathIsSOFAsAtco13(t *testing.T) {
 				)
 				if status < 0 {
 					t.Fatalf("%s @ %s %s: Atco13 status %d",
-						tg.name, s.name, epoch.Format(time.RFC3339), status)
+						tg.name, s.name, at.Format(time.RFC3339), status)
 				}
 
 				want := coord.NewAltAz(angle.Rad(math.Pi/2-zob), angle.Rad(aob).Wrap360())
 
 				label := tg.name + " @ " + s.name
-				scenario := epoch.Format(time.RFC3339)
+				scenario := at.Format(time.RFC3339)
 
 				stepwise.Add(metrology.Sample{
 					Error:   horizonSeparationArcsec(got, want),

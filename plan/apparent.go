@@ -6,7 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -45,7 +45,7 @@ import (
 // other direction. Which routine a target reaches is decided by whether it
 // implements [MovingBody] (see observedAltAz), so the two must not be mixed:
 // everything in this file is on the MovingBody side.
-func apparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
+func apparentVec(p eph.Provider, id eph.ID, t epoch.Time) (vector.Vec3, error) {
 	st, err := eph.At(p, t).Apparent(id, eph.Geocenter())
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("plan: apparent state: %w", err)
@@ -62,7 +62,7 @@ func apparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
 // other — and a target whose altitude is apparent while its Moon separation is
 // geometric is wrong in a way no single test would catch, because each answer
 // is defensible on its own.
-func apparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
+func apparentICRS(p eph.Provider, id eph.ID, t epoch.Time) (coord.ICRS, error) {
 	vec, err := apparentVec(p, id, t)
 	if err != nil {
 		return coord.ICRS{}, err
@@ -113,7 +113,7 @@ func seenFromTheSite(mb MovingBody) bool {
 // turned by up to 0.95°: the Moon was misplaced by up to 0.33″ near the
 // horizon, against SOFA's Atciq from the site (#840). For a planet the same
 // misprojection is under a milliarcsecond.
-func observedPlace(mb MovingBody, t time.Time, ctx *coord.Context) (coord.AltAz, error) {
+func observedPlace(mb MovingBody, t epoch.Time, ctx *coord.Context) (coord.AltAz, error) {
 	if !seenFromTheSite(mb) {
 		vec, err := mb.GeocentricVec(t)
 		if err != nil {
@@ -133,7 +133,7 @@ func observedPlace(mb MovingBody, t time.Time, ctx *coord.Context) (coord.AltAz,
 
 // geocentric is the geometric position of id about the Earth at t, with no
 // light time: where the body is, not where it is seen.
-func geocentric(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
+func geocentric(p eph.Provider, id eph.ID, t epoch.Time) (vector.Vec3, error) {
 	st, err := eph.At(p, t).Geometric(id, eph.Earth)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("plan: geocentric state: %w", err)
@@ -160,7 +160,7 @@ var lightAUPerDay = constants.SI2019.SpeedOfLight.Value *
 // on the analytical ephemeris each is an Epv00, 34 µs: the lunar elongation
 // built on it cost 2.8 times the geometric one, and a year of MoonPhases 3.3
 // times, which put plan's race-detector run past CI's ten minutes (#430).
-func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS, error) {
+func firstOrderApparentICRS(p eph.Provider, id eph.ID, t epoch.Time) (coord.ICRS, error) {
 	vec, err := firstOrderApparentVec(p, id, t)
 	if err != nil {
 		return coord.ICRS{}, err
@@ -177,7 +177,7 @@ func firstOrderApparentICRS(p eph.Provider, id eph.ID, t time.Time) (coord.ICRS,
 // firstOrderApparentVec is the retarded geocentric vector
 // firstOrderApparentICRS takes the direction of, for a caller that wants the
 // vector: apparentVec to the same first order, from one State call.
-func firstOrderApparentVec(p eph.Provider, id eph.ID, t time.Time) (vector.Vec3, error) {
+func firstOrderApparentVec(p eph.Provider, id eph.ID, t epoch.Time) (vector.Vec3, error) {
 	st, err := eph.At(p, t).Geometric(id, eph.Earth)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("plan: state: %w", err)

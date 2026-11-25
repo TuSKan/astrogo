@@ -72,8 +72,7 @@ func NewContract(maximum float64, units, rationale, source string) (Contract, er
 
 // MustContract is [NewContract] for package-level declarations in tests,
 // where an invalid contract is a programming error rather than a condition to
-// handle. Follows the same convention as coord.MustGeodetic and
-// time.MustLocation.
+// handle. Follows the same convention as coord.MustGeodetic.
 func MustContract(maximum float64, units, rationale, source string) Contract {
 	c, err := NewContract(maximum, units, rationale, source)
 	if err != nil {

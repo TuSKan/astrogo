@@ -9,12 +9,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -88,87 +90,77 @@ func KnownSiteNames() []string {
 // NewSite — this table is a convenience for "somewhere near Mauna Kea,"
 // not a substitute for that. Callers reach it through KnownSiteNames and
 // NewKnownSite.
-var knownSites = map[string]*Site{
-	"greenwich": {
+var knownSites = map[string]knownSite{
+	"greenwich": known(Site{
 		name:     "Greenwich",
 		location: coord.MustGeodetic(angle.LatDeg(51.4772), angle.Longitude{}, 45),
-		timeZone: time.MustLocation("Europe/London"),
 		mpcCode:  "000",
 		aliases:  []string{"Royal Observatory"},
 		horizon:  angle.Zero(),
-	},
-	"mauna_kea": {
+	}, "Europe/London"),
+	"mauna_kea": known(Site{
 		name:     "Mauna Kea",
 		location: coord.MustGeodetic(angle.LatDeg(19.8263), angle.LonDeg(-155.47441), 4145),
-		timeZone: time.MustLocation("Pacific/Honolulu"),
 		mpcCode:  "568",
 		aliases:  []string{"Keck", "W. M. Keck Observatory"},
 		horizon:  angle.Zero(),
-	},
-	"paranal": {
+	}, "Pacific/Honolulu"),
+	"paranal": known(Site{
 		name:     "Paranal",
 		location: coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
-		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "309",
 		aliases:  []string{"VLT", "Cerro Paranal", "Very Large Telescope"},
 		horizon:  angle.Zero(),
-	},
-	"la_palma": {
+	}, "America/Santiago"),
+	"la_palma": known(Site{
 		name:     "La Palma",
 		location: coord.MustGeodetic(angle.LatDeg(28.7636), angle.LonDeg(-17.8947), 2396),
-		timeZone: time.MustLocation("Atlantic/Canary"),
 		mpcCode:  "950",
 		aliases:  []string{"Roque de los Muchachos", "ORM"},
 		horizon:  angle.Zero(),
-	},
-	"cerro_tololo": {
+	}, "Atlantic/Canary"),
+	"cerro_tololo": known(Site{
 		name:     "Cerro Tololo",
 		location: coord.MustGeodetic(angle.LatDeg(-30.16917), angle.LonDeg(-70.80639), 2207),
-		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "807",
 		aliases:  []string{"CTIO"},
 		horizon:  angle.Zero(),
-	},
-	"kitt_peak": {
+	}, "America/Santiago"),
+	"kitt_peak": known(Site{
 		name:     "Kitt Peak",
 		location: coord.MustGeodetic(angle.LatDeg(31.9583), angle.LonDeg(-111.5967), 2096),
-		timeZone: time.MustLocation("America/Phoenix"),
 		mpcCode:  "695",
 		aliases:  []string{"KPNO"},
 		horizon:  angle.Zero(),
-	},
-	"la_silla": {
+	}, "America/Phoenix"),
+	"la_silla": known(Site{
 		name:     "La Silla",
 		location: coord.MustGeodetic(angle.LatDeg(-29.2575), angle.LonDeg(-70.7375), 2400),
-		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "809",
 		aliases:  []string{"ESO La Silla"},
 		horizon:  angle.Zero(),
-	},
-	"siding_spring": {
+	}, "America/Santiago"),
+	"siding_spring": known(Site{
 		name:     "Siding Spring",
 		location: coord.MustGeodetic(angle.LatDeg(-31.27333), angle.LonDeg(149.06444), 1165),
-		timeZone: time.MustLocation("Australia/Sydney"),
 		mpcCode:  "413",
 		aliases:  []string{"SSO"},
 		horizon:  angle.Zero(),
-	},
-	"palomar": {
+	}, "Australia/Sydney"),
+	"palomar": known(Site{
 		name:     "Palomar",
 		location: coord.MustGeodetic(angle.LatDeg(33.3564), angle.LonDeg(-116.865), 1712),
-		timeZone: time.MustLocation("America/Los_Angeles"),
 		mpcCode:  "675",
 		aliases:  []string{"Palomar Mountain", "Palomar Observatory"},
 		horizon:  angle.Zero(),
-	},
-	"cerro_pachon": {
+	}, "America/Los_Angeles"),
+	"cerro_pachon": known(Site{
 		name:     "Cerro Pachón",
 		location: coord.MustGeodetic(angle.LatDeg(-30.24464), angle.LonDeg(-70.74942), 2647),
-		timeZone: time.MustLocation("America/Santiago"),
 		mpcCode:  "X05",
 		aliases:  []string{"Rubin Observatory", "Vera C. Rubin Observatory", "LSST"},
 		horizon:  angle.Zero(),
-	},
+	}, "America/Santiago"),
 }
 
 // normalizeSiteName lowercases and replaces spaces with underscores so lookups match
@@ -179,7 +171,7 @@ func normalizeSiteName(s string) string {
 
 // lookupKnownSite finds a knownSites entry by its map key (the normalized
 // form of its Name) or any Alias, case- and space-insensitive.
-func lookupKnownSite(name string) (*Site, bool) {
+func lookupKnownSite(name string) (knownSite, bool) {
 	want := normalizeSiteName(name)
 
 	if s, ok := knownSites[want]; ok {
@@ -206,24 +198,59 @@ func lookupKnownSite(name string) (*Site, bool) {
 		}
 	}
 
-	return nil, false
+	return knownSite{}, false
 }
 
 // NewKnownSite looks up name (matched against every built-in site's Name
 // and Aliases, case- and space-insensitive; [KnownSiteNames] lists them) and
-// returns its *Site, or
-// ErrUnknownSite if no entry matches. The registry's shared *Site is
-// returned directly — a caller wanting a variant (a different horizon,
-// time zone, ...) should chain the returned Site's own WithHorizon/
-// WithTimeZone rather than have NewKnownSite rebuild one, since those
-// already do exactly that without duplicating this lookup's logic.
+// returns its *Site, or ErrUnknownSite if no entry matches. Every call for
+// one site returns the same *Site.
+//
+// The site's time zone comes from the host's zone database, and the error
+// loading it is returned: a Windows machine without Go installed, or a
+// minimal container, has none. A program that must run there imports
+// time/tzdata.
+//
+// A caller wanting a variant (a different horizon, time zone, ...) chains
+// the returned Site's own WithHorizon/WithTimeZone rather than have
+// NewKnownSite rebuild one, since those already do exactly that without
+// duplicating this lookup's logic.
 func NewKnownSite(name string) (*Site, error) {
-	s, ok := lookupKnownSite(name)
+	k, ok := lookupKnownSite(name)
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownSite, name)
 	}
 
-	return s, nil
+	return k.site()
+}
+
+// knownSite is a built-in site whose time zone is named, not yet loaded.
+// Loading one reads the host's zone database, which may be absent, and at
+// package initialization that failure would have no caller to go to.
+type knownSite struct {
+	Site
+
+	// site returns the Site with its time zone, built on the first call;
+	// every call after returns that call's *Site, or its error.
+	site func() (*Site, error)
+}
+
+// known is the knownSites entry for s, in the IANA time zone named zone.
+func known(s Site, zone string) knownSite {
+	return knownSite{
+		Site: s,
+		site: sync.OnceValues(func() (*Site, error) {
+			tz, err := time.LoadLocation(zone)
+			if err != nil {
+				return nil, fmt.Errorf("plan: time zone of known site %q: %w", s.name, err)
+			}
+
+			built := s
+			built.timeZone = tz
+
+			return &built, nil
+		}),
+	}
 }
 
 // SiteOption configures optional NewSite parameters.
@@ -484,7 +511,7 @@ func (s *Site) Aliases() []string {
 // TimeZone returns the site's local time zone, or UTC if nil.
 func (s *Site) TimeZone() *time.Location {
 	if s.timeZone == nil {
-		return time.LocationUTC
+		return time.UTC
 	}
 
 	return s.timeZone
@@ -683,7 +710,7 @@ func (s *Site) WithTimeZone(tz *time.Location) *Site {
 //
 // It uses the IAU 2006 GAST model (Gst06a).
 // Returns an error if IERS EOP data is unavailable for the UT1 conversion.
-func (s *Site) LocalSiderealTime(t time.Time) (angle.Angle, error) {
+func (s *Site) LocalSiderealTime(t epoch.Time) (angle.Angle, error) {
 	gast, err := t.GAST()
 	if err != nil {
 		return angle.Zero(), fmt.Errorf("LocalSiderealTime: %w", err)

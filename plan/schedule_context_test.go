@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // plannerContexts is the Context source a strategy builds for one Schedule.
-func plannerContexts(tb testing.TB, planner *Planner, start time.Time) func(time.Time) *coord.Context {
+func plannerContexts(tb testing.TB, planner *Planner, start epoch.Time) func(epoch.Time) *coord.Context {
 	tb.Helper()
 
 	return mustMoving(tb, start, planner.Site.Location(), planner.Site.Refraction())
@@ -20,10 +21,10 @@ func plannerContexts(tb testing.TB, planner *Planner, start time.Time) func(time
 
 // everyInstantContexts is the Context source the scheduler used before #481:
 // a full coord.NewContext at every instant.
-func everyInstantContexts(tb testing.TB, planner *Planner) func(time.Time) *coord.Context {
+func everyInstantContexts(tb testing.TB, planner *Planner) func(epoch.Time) *coord.Context {
 	tb.Helper()
 
-	return func(t time.Time) *coord.Context {
+	return func(t epoch.Time) *coord.Context {
 		return mustContext(tb, t, planner.Site.Location(), planner.Site.Refraction())
 	}
 }
@@ -49,7 +50,7 @@ func scheduleFixture(t *testing.T) (*Planner, Window, []*Block, TransitionModel)
 		t.Fatalf("NewPlanner: %v", err)
 	}
 
-	start := time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC)
 	window := Window{Start: start, End: start.Add(unit.Hours(9))}
 
 	blocks := make([]*Block, 0, 10)
@@ -84,12 +85,12 @@ func TestScheduleThroughTheContextCache(t *testing.T) {
 
 	for _, run := range []struct {
 		name     string
-		schedule func(ctxAt func(time.Time) *coord.Context) (*Schedule, error)
+		schedule func(ctxAt func(epoch.Time) *coord.Context) (*Schedule, error)
 	}{
-		{"greedy", func(ctxAt func(time.Time) *coord.Context) (*Schedule, error) {
+		{"greedy", func(ctxAt func(epoch.Time) *coord.Context) (*Schedule, error) {
 			return (&GreedyStrategy{}).schedule(planner, window, blocks, transition, ctxAt, newRunSky(false))
 		}},
-		{"swap", func(ctxAt func(time.Time) *coord.Context) (*Schedule, error) {
+		{"swap", func(ctxAt func(epoch.Time) *coord.Context) (*Schedule, error) {
 			return (&SwapOptimizedStrategy{Base: &PriorityStrategy{}, MaxPasses: 3}).schedule(planner, window, blocks, transition, ctxAt, nil)
 		}},
 	} {
@@ -184,7 +185,7 @@ func TestHoursUntilSetProbesMoveACopy(t *testing.T) {
 	// differing only in where each probe's Context comes from. Until #554 it
 	// restated the old interpolation, from now to the first probe below the
 	// horizon, and so held that defect in place as well as testing the probes.
-	reference := func(obj Observable, t0 time.Time, currentAlt float64) float64 {
+	reference := func(obj Observable, t0 epoch.Time, currentAlt float64) float64 {
 		if currentAlt <= 0 {
 			return 0
 		}
@@ -192,7 +193,7 @@ func TestHoursUntilSetProbesMoveACopy(t *testing.T) {
 		prevHours, prevAlt := 0.0, currentAlt
 
 		for _, offset := range [5]time.Duration{30 * time.Minute, time.Hour, 2 * time.Hour, 4 * time.Hour, 8 * time.Hour} {
-			ft := t0.Add(time.FromGoDuration(offset))
+			ft := t0.Add(epoch.FromGoDuration(offset))
 
 			pos, err := obj.Position(ft)
 			if err != nil {

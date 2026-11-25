@@ -7,12 +7,12 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // j2016 is Gaia DR3's epoch, J2016.0.
-var j2016 = time.FromJD(2457389.0, time.TT)
+var j2016 = epoch.FromJD(2457389.0, epoch.TT)
 
 // mas is v milliarcseconds.
 func mas(v float64) angle.Angle { return angle.Arcsec(v / 1000) }
@@ -22,7 +22,7 @@ func mas(v float64) angle.Angle { return angle.Arcsec(v / 1000) }
 func still(decDeg, northMas float64, e resolve.AstrometricError) resolve.Target {
 	return resolve.Target{
 		Coord:    coord.NewICRS(angle.Deg(10), angle.Deg(decDeg).Add(mas(northMas))),
-		HasCoord: true, Epoch: time.J2000(), AstrometricError: e,
+		HasCoord: true, Epoch: epoch.J2000(), AstrometricError: e,
 	}
 }
 
@@ -79,7 +79,7 @@ func TestCompareWeighsTheCorrelation(t *testing.T) {
 		// At the equator α* is α, so 3 mas of right ascension is 3 mas east.
 		b := resolve.Target{
 			Coord:    coord.NewICRS(angle.Deg(10).Add(mas(3)), mas(tc.dec)),
-			HasCoord: true, Epoch: time.J2000(), AstrometricError: e,
+			HasCoord: true, Epoch: epoch.J2000(), AstrometricError: e,
 		}
 
 		ev, ok, err := Compare(a, b, angle.Arcsec(2))
@@ -108,12 +108,12 @@ func TestCompareMovesTheErrorsToTheComparisonEpoch(t *testing.T) {
 		},
 	}
 
-	at2000, err := coord.PropagateEpoch(Coord(star), time.J2000())
+	at2000, err := coord.PropagateEpoch(Coord(star), epoch.J2000())
 	testutil.AssertNoError(t, err)
 
 	other := resolve.Target{
 		Coord:    coord.NewICRS(at2000.RA(), at2000.Dec().Add(mas(20))),
-		HasCoord: true, Epoch: time.J2000(),
+		HasCoord: true, Epoch: epoch.J2000(),
 		AstrometricError: resolve.AstrometricError{RA: mas(0.001), Dec: mas(0.001)},
 	}
 
@@ -135,7 +135,7 @@ func TestCovarianceHoldsWhereTheErrorsDo(t *testing.T) {
 	t.Parallel()
 
 	star := resolve.Target{
-		Epoch: time.J2000(), PmDec: mas(100),
+		Epoch: epoch.J2000(), PmDec: mas(100),
 		AstrometricError: resolve.AstrometricError{
 			RA: mas(0.03), Dec: mas(0.04), PmRA: mas(0.05), PmDec: mas(0.06), Epoch: j2016,
 		},
@@ -151,7 +151,7 @@ func TestCovarianceHoldsWhereTheErrorsDo(t *testing.T) {
 	testutil.AssertRelNear(t, "σ²(α*) at J2016.0", at2016.xx, sq(0.03), 1e-12)
 	testutil.AssertRelNear(t, "σ²(δ) at J2016.0", at2016.yy, sq(0.04), 1e-12)
 
-	at2000, ok := covarianceAt(star, time.J2000())
+	at2000, ok := covarianceAt(star, epoch.J2000())
 	if !ok {
 		t.Fatal("no covariance at J2000.0")
 	}
@@ -172,12 +172,12 @@ func TestCompareFallsBackToTheThreshold(t *testing.T) {
 		AstrometricError: resolve.AstrometricError{RA: mas(0.1), Dec: mas(0.1)},
 	}
 
-	at2000, err := coord.PropagateEpoch(Coord(moving), time.J2000())
+	at2000, err := coord.PropagateEpoch(Coord(moving), epoch.J2000())
 	testutil.AssertNoError(t, err)
 
 	near := resolve.Target{
 		Coord:    coord.NewICRS(at2000.RA(), at2000.Dec().Add(mas(500))),
-		HasCoord: true, Epoch: time.J2000(),
+		HasCoord: true, Epoch: epoch.J2000(),
 		AstrometricError: resolve.AstrometricError{RA: mas(0.1), Dec: mas(0.1)},
 	}
 

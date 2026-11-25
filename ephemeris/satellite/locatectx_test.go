@@ -3,13 +3,14 @@ package satellite_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -36,7 +37,7 @@ func TestLocateCtxIsStateAtTheContextInstant(t *testing.T) {
 	}
 
 	site := paranal(t)
-	start := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
 	// Rounding in two 3×3 rotations, relative: 1e-12 is 7 µm at the ISS.
 	const tol = 1e-12
@@ -82,7 +83,7 @@ func TestLocateCtxRejectsUnexpectedID(t *testing.T) {
 		t.Fatalf("NewFromTLE: %v", err)
 	}
 
-	ctx, err := coord.NewContext(time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC), paranal(t), atmosphere.Refraction{})
+	ctx, err := coord.NewContext(epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC), paranal(t), atmosphere.Refraction{})
 	if err != nil {
 		t.Fatal(err)
 	}

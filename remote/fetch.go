@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"time"
 
 	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // readConfig carries per-GetFile options.

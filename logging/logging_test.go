@@ -20,7 +20,7 @@ import (
 //   - progress, which a library has no business putting on someone's stderr
 //   - a warning that a result silently degraded, which is the *only* notice a
 //     caller gets that EOP were unavailable and topocentric accuracy dropped
-//     to about an arcsecond, because time.Time.EOP has no error return
+//     to about an arcsecond, because epoch.Time.EOP has no error return
 //
 // Discarding by default would have quieted the second along with the first,
 // removing the sole signal that the numbers changed. So the default is

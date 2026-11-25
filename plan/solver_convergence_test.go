@@ -4,9 +4,10 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -42,11 +43,11 @@ func convergenceCases() []convergenceCase {
 func TestFindRootReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
-	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	t1 := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(unit.Days(1))
 
 	// A straight line crossing zero 7.3 hours in.
-	eval := plan.Evaluator(func(x time.Time) (float64, error) {
+	eval := plan.Evaluator(func(x epoch.Time) (float64, error) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 
@@ -93,11 +94,11 @@ func TestFindRootReportsNonConvergence(t *testing.T) {
 func TestFindExtremumReportsNonConvergence(t *testing.T) {
 	t.Parallel()
 
-	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	t1 := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t3 := t1.Add(unit.Days(1))
 
 	// A parabola with its maximum 7.3 hours in.
-	eval := plan.Evaluator(func(x time.Time) (float64, error) {
+	eval := plan.Evaluator(func(x epoch.Time) (float64, error) {
 		h := (x.JD() - t1.JD()) * 24
 
 		return -(h - 7.3) * (h - 7.3), nil
@@ -137,10 +138,10 @@ func TestFindExtremumReportsNonConvergence(t *testing.T) {
 func TestNoConvergenceNamesWhatRanOut(t *testing.T) {
 	t.Parallel()
 
-	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	t1 := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	s := plan.Solver{Tolerance: unit.Seconds(1), MaxIter: 1}
-	eval := plan.Evaluator(func(x time.Time) (float64, error) {
+	eval := plan.Evaluator(func(x epoch.Time) (float64, error) {
 		return x.JD() - (t1.JD() + 7.3/24), nil
 	})
 

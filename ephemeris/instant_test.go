@@ -5,11 +5,12 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -28,10 +29,10 @@ const sceneLight = 86400.0 / 499.00478383615643
 // scene is a synthetic solar system that answers as a real provider does:
 // each body about the center it is computed from, on a function of time.
 type scene struct {
-	epoch  time.Time
+	epoch  epoch.Time
 	bodies map[eph.ID]sceneBody
 	frame  eph.Frame
-	fail   func(id eph.ID, t time.Time) bool
+	fail   func(id eph.ID, t epoch.Time) bool
 	calls  map[eph.ID]int
 }
 
@@ -42,7 +43,7 @@ type sceneBody struct {
 	at     func(days float64) (pos, vel vector.Vec3)
 }
 
-func (s *scene) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (s *scene) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	if s.calls != nil {
 		s.calls[id]++
 	}
@@ -99,10 +100,10 @@ var (
 )
 
 func kernelScene() *scene {
-	epoch := time.Date(2026, time.June, 21, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 21, 0, 0, 0, 0, time.UTC)
 
 	return &scene{
-		epoch: epoch,
+		epoch: at,
 		calls: map[eph.ID]int{},
 		bodies: map[eph.ID]sceneBody{
 			eph.EarthMoonBarycenter: still(eph.SolarSystemBarycenter, sceneEMB),
@@ -232,7 +233,7 @@ type mixedProvider struct {
 	sat        eph.ID
 }
 
-func (m *mixedProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (m *mixedProvider) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	if id == m.sat {
 		return m.gcrs.Locate(id, t)
 	}
@@ -297,7 +298,7 @@ func TestGeometricAllocatesNothing(t *testing.T) {
 // square to the line of sight, and aberration is at its largest.
 func orbitingScene() *scene {
 	return &scene{
-		epoch: time.Date(2026, time.August, 21, 0, 0, 0, 0, time.LocationUTC),
+		epoch: epoch.Date(2026, time.August, 21, 0, 0, 0, 0, time.UTC),
 		bodies: map[eph.ID]sceneBody{
 			eph.Sun:            still(eph.SolarSystemBarycenter, vector.Zero()),
 			eph.Earth:          circling(eph.Sun, 1, 365.25, 0),
@@ -381,7 +382,7 @@ func staticScene(target vector.Vec3) *scene {
 	earth := vector.V3(-0.322, -0.940, 0)
 
 	return &scene{
-		epoch: time.Date(2026, time.August, 21, 0, 0, 0, 0, time.LocationUTC),
+		epoch: epoch.Date(2026, time.August, 21, 0, 0, 0, 0, time.UTC),
 		bodies: map[eph.ID]sceneBody{
 			eph.Sun:               still(eph.SolarSystemBarycenter, vector.Zero()),
 			eph.Earth:             still(eph.Sun, earth),
@@ -482,7 +483,7 @@ func TestPlacesReportWhichFetchFailed(t *testing.T) {
 		{"the Sun retarded", eph.Sun, false, "the Sun at the retarded epoch"},
 	} {
 		s := kernelScene()
-		s.fail = func(id eph.ID, t time.Time) bool { return id == c.body && t.Equal(s.epoch) == c.atObs }
+		s.fail = func(id eph.ID, t epoch.Time) bool { return id == c.body && t.Equal(s.epoch) == c.atObs }
 
 		st, err := eph.At(s, s.epoch).Apparent(eph.MarsBarycenter, eph.Geocenter())
 
@@ -513,7 +514,7 @@ func TestApparentOfDegenerateGeometry(t *testing.T) {
 
 	at := func(earth, target vector.Vec3) *scene {
 		return &scene{
-			epoch: time.Date(2026, time.June, 21, 0, 0, 0, 0, time.LocationUTC),
+			epoch: epoch.Date(2026, time.June, 21, 0, 0, 0, 0, time.UTC),
 			bodies: map[eph.ID]sceneBody{
 				eph.Sun:            still(eph.SolarSystemBarycenter, vector.Zero()),
 				eph.Earth:          still(eph.Sun, earth),
@@ -565,7 +566,7 @@ func TestAstrometricHasConverged(t *testing.T) {
 		var worst, worstBound, worstRatio float64
 
 		for d := 0; d < 365; d += 7 {
-			tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC).Add(unit.Days(float64(d)))
+			tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Add(unit.Days(float64(d)))
 
 			settled, err := eph.At(prov, tm).Astrometric(id, eph.Geocenter())
 			if err != nil {
@@ -599,5 +600,17 @@ func TestAstrometricHasConverged(t *testing.T) {
 		if worstRatio > 1 {
 			t.Errorf("one more light-time pass moves %v by %.3g″, over %.3g″ there", id, worst, worstBound)
 		}
+	}
+}
+
+// TestInstantTimeIsTheInstantAsked: At keeps the instant it is given, on its
+// own scale, and Time returns it.
+func TestInstantTimeIsTheInstantAsked(t *testing.T) {
+	t.Parallel()
+
+	at := epoch.FromJD(2460000.5, epoch.TDB)
+
+	if got := eph.At(eph.Default(), at).Time(); !got.Equal(at) || got.Scale() != epoch.TDB {
+		t.Errorf("At(p, %v).Time() = %v on %v, want the instant given, on TDB", at, got, got.Scale())
 	}
 }

@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -267,7 +267,7 @@ func TestICRSFK5RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewICRSWithKinematics(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv), time.J2000())
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv), epoch.J2000())
 
 			back := coord.FK5ToICRS(coord.ICRSToFK5(start, coord.J2000Epoch))
 
@@ -308,7 +308,7 @@ func TestICRSFK4RoundTripsAllSixElements(t *testing.T) {
 			t.Parallel()
 
 			start := coord.NewICRSWithKinematics(
-				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv), time.J2000())
+				star.ra, star.dec, star.pmRA, star.pmDec, star.parallax, unit.KmPerSec(star.rv), epoch.J2000())
 
 			back := coord.FK4ToICRS(coord.ICRSToFK4(start, coord.B1950))
 
@@ -410,7 +410,7 @@ func TestProperMotionSurvivesWithoutAParallax(t *testing.T) {
 		start := coord.NewICRSWithKinematics(
 			angle.Deg(123.4), angle.Deg(0),
 			angle.Arcsec(pmRAIn/1000), angle.Arcsec(pmDecIn/1000),
-			angle.Arcsec(parallax), 0, time.J2000())
+			angle.Arcsec(parallax), 0, epoch.J2000())
 
 		back := coord.FK5ToICRS(coord.ICRSToFK5(start, coord.J2000Epoch))
 

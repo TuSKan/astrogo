@@ -3,9 +3,10 @@ package kepler
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -34,7 +35,7 @@ func rotated(el Elements, v vector.Vec3, dtDays float64) vector.Vec3 {
 func TestPreparedOrientationIsTheRotation(t *testing.T) {
 	t.Parallel()
 
-	base, err := NewElements(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+	base, err := NewElements(epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 		unit.AU(0.0028), 0.0041, angle.Deg(2.2), angle.Deg(43.1), angle.Deg(85.7), angle.Deg(171.3))
 	if err != nil {
 		t.Fatal(err)
@@ -75,15 +76,15 @@ func TestPreparedOrientationIsTheRotation(t *testing.T) {
 func TestABareLiteralIsPreparedWhenAsked(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	t0 := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	built, err := NewElements(epoch, unit.AU(2.77), 0.0785, angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(291.4))
+	built, err := NewElements(t0, unit.AU(2.77), 0.0785, angle.Deg(10.6), angle.Deg(80.3), angle.Deg(73.6), angle.Deg(291.4))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	literal := Elements{
-		epoch: epoch, semiMajorAxis: unit.AU(2.77), eccentricity: 0.0785,
+		epoch: t0, semiMajorAxis: unit.AU(2.77), eccentricity: 0.0785,
 		inclination: angle.Deg(10.6), ascendingNode: angle.Deg(80.3),
 		argPeriapsis: angle.Deg(73.6), meanAnomaly: angle.Deg(291.4),
 	}
@@ -92,7 +93,7 @@ func TestABareLiteralIsPreparedWhenAsked(t *testing.T) {
 		t.Fatal("a bare literal claims to be prepared")
 	}
 
-	at := epoch.Add(unit.Days(123.4))
+	at := t0.Add(unit.Days(123.4))
 
 	wantPos, wantVel, err := built.StateAt(at)
 	if err != nil {
@@ -115,7 +116,7 @@ func TestABareLiteralIsPreparedWhenAsked(t *testing.T) {
 func TestAnInvalidatedSetIsReported(t *testing.T) {
 	t.Parallel()
 
-	tp := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tp := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	el, err := FromPerihelion(tp, tp,
 		unit.AU(1.1), 1.2, angle.Deg(40), angle.Deg(10), angle.Deg(20))

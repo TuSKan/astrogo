@@ -6,8 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -360,7 +360,7 @@ func TestSeparationAndPositionAngle(t *testing.T) {
 func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 	c := coord.NewICRS(angle.Deg(10), angle.Deg(20))
 
-	later := time.J2000().Add(unit.JulianYears(50))
+	later := epoch.J2000().Add(unit.JulianYears(50))
 
 	out, err := coord.PropagateEpoch(c, later)
 	testutil.AssertNoError(t, err)
@@ -369,9 +369,9 @@ func TestPropagateEpoch_NoKinematicsIsNoOp(t *testing.T) {
 }
 
 func TestPropagateEpoch_SameEpochIsNoOp(t *testing.T) {
-	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, time.J2000())
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, epoch.J2000())
 
-	out, err := coord.PropagateEpoch(c, time.J2000())
+	out, err := coord.PropagateEpoch(c, epoch.J2000())
 	testutil.AssertNoError(t, err)
 	testutil.AssertNear(t, "RA unchanged at same epoch", out.RA().Degrees(), c.RA().Degrees(), 1e-15)
 }
@@ -380,9 +380,9 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 	// dec=0 so cos(dec)=1: coordinate-angle pmRA of 1 arcsec/yr over 10
 	// years should shift RA by ~10 arcsec, to within a small tolerance for
 	// the relativistic/parallax correction Pmsafe also applies.
-	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, time.J2000())
+	c := coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, epoch.J2000())
 
-	later := time.J2000().Add(unit.JulianYears(10))
+	later := epoch.J2000().Add(unit.JulianYears(10))
 
 	out, err := coord.PropagateEpoch(c, later)
 	testutil.AssertNoError(t, err)
@@ -392,16 +392,16 @@ func TestPropagateEpoch_AppliesProperMotion(t *testing.T) {
 }
 
 func TestPropagateEpoch_ZeroEpochDefaultsToJ2000(t *testing.T) {
-	at := func(epoch time.Time) coord.ICRS {
-		return coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, epoch)
+	at := func(at epoch.Time) coord.ICRS {
+		return coord.NewICRSWithKinematics(angle.Deg(10), angle.Deg(0), angle.Arcsec(1), angle.Arcsec(0), angle.Arcsec(0.1), 0, at)
 	}
 
-	later := time.J2000().Add(unit.JulianYears(10))
+	later := epoch.J2000().Add(unit.JulianYears(10))
 
-	explicit, err := coord.PropagateEpoch(at(time.J2000()), later)
+	explicit, err := coord.PropagateEpoch(at(epoch.J2000()), later)
 	testutil.AssertNoError(t, err)
 
-	implicit, err := coord.PropagateEpoch(at(time.Time{}), later)
+	implicit, err := coord.PropagateEpoch(at(epoch.Time{}), later)
 	testutil.AssertNoError(t, err)
 
 	testutil.AssertNear(t, "zero epoch matches explicit J2000", implicit.RA().Degrees(), explicit.RA().Degrees(), 1e-15)

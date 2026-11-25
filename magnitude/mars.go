@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // ── Mars — Mallama & Hilton 2018, Eq. 6–7 ───────────────────────────────────
@@ -122,7 +122,7 @@ func marsCorrection(table *[40]float64, deg float64) float64 {
 // Mars turns to the observer and the face it turns to the Sun. Ls is Mars's
 // heliocentric J2000 ecliptic longitude less 85°, the model's approximation to
 // the areocentric solar longitude.
-func marsAngles(sunToPlanet, observerToPlanet [3]float64, delta float64, t time.Time) (centralMeridian, ls float64) {
+func marsAngles(sunToPlanet, observerToPlanet [3]float64, delta float64, t epoch.Time) (centralMeridian, ls float64) {
 	subObserver, subSolar := marsSubLongitudes(sunToPlanet, observerToPlanet, delta, t)
 
 	return marsEffectiveCentralMeridian(subObserver, subSolar), marsSolarLongitude(eclipticLongitude(sunToPlanet))
@@ -134,7 +134,7 @@ func marsAngles(sunToPlanet, observerToPlanet [3]float64, delta float64, t time.
 // Mars is seen as it was when the light left it, so its rotation is evaluated
 // a light time before t. That matters: at 2.4 AU the light time is 20 minutes,
 // which Mars turns through 4.9° of longitude.
-func marsSubLongitudes(sunToPlanet, observerToPlanet [3]float64, delta float64, t time.Time) (subObserver, subSolar float64) {
+func marsSubLongitudes(sunToPlanet, observerToPlanet [3]float64, delta float64, t epoch.Time) (subObserver, subSolar float64) {
 	jd1, jd2 := t.TDB().JDParts()
 	d := (jd1 - 2451545.0) + jd2 - delta/lightAUPerDay
 

@@ -5,7 +5,7 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Elements is the mean element set SGP4 propagates.
@@ -67,7 +67,7 @@ type Elements struct {
 	// resolves to about 0.9 ms and nothing finer. The two-digit year pivots at
 	// 57: 57-99 are 1957-1999, 00-56 are 2000-2056. That is the format's own
 	// rule and it expires in 2057.
-	Epoch time.Time
+	Epoch epoch.Time
 
 	// Inclination is measured from the equator, in [0, pi].
 	Inclination angle.Angle

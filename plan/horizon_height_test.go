@@ -4,18 +4,19 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // sunriseSunset returns site's first sunrise and sunset in the 24 hours from
 // start.
-func sunriseSunset(t *testing.T, site *plan.Site, start time.Time) (rise, set time.Time) {
+func sunriseSunset(t *testing.T, site *plan.Site, start epoch.Time) (rise, set epoch.Time) {
 	t.Helper()
 
 	events, err := plan.SunEvents(site, plan.Window{Start: start, End: start.Add(unit.Hours(24))}, ephemeris.Default())
@@ -52,13 +53,13 @@ func sunriseSunset(t *testing.T, site *plan.Site, start time.Time) (rise, set ti
 func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 	t.Parallel()
 
-	start := time.Date(2026, 11, 14, 0, 0, 0, 0, time.LocationUTC)
-	at := func(h, m int) time.Time { return time.Date(2026, 11, 14, h, m, 0, 0, time.LocationUTC) }
+	start := epoch.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
+	at := func(h, m int) epoch.Time { return epoch.Date(2026, 11, 14, h, m, 0, 0, time.UTC) }
 
 	for _, c := range []struct {
 		name                     string
 		latDeg, lonDeg, heightM  float64
-		usnoRise, usnoSet        time.Time
+		usnoRise, usnoSet        epoch.Time
 		dipEarlierAtLeastMinutes float64
 	}{
 		{"Denver", 39.7392, -104.9903, 1609, at(13, 44), at(23, 45), 6},
@@ -84,7 +85,7 @@ func TestAHeightAloneDoesNotDipTheHorizon(t *testing.T) {
 		// a minute is the README's claim.
 		for _, e := range []struct {
 			what      string
-			got, usno time.Time
+			got, usno epoch.Time
 		}{{"sunrise", rise, c.usnoRise}, {"sunset", set, c.usnoSet}} {
 			if off := math.Abs(e.got.Sub(e.usno).Seconds()); off > 60 {
 				t.Errorf("%s at %g m: %s %s, %.0f s from USNO's %s", c.name, c.heightM, e.what,

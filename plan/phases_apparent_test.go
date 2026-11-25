@@ -2,9 +2,10 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,8 +20,8 @@ func TestMoonPhasesAreApparent(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2027, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
 	if err != nil {
@@ -32,7 +33,7 @@ func TestMoonPhasesAreApparent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var fulls []time.Time
+	var fulls []epoch.Time
 
 	for _, p := range phases {
 		if p.Phase == PhaseFullMoon {
@@ -52,7 +53,7 @@ func TestMoonPhasesAreApparent(t *testing.T) {
 		}
 	}
 
-	skyfield := time.Date(2026, 9, 26, 16, 49, 2, 0, time.LocationUTC)
+	skyfield := epoch.Date(2026, 9, 26, 16, 49, 2, 0, time.UTC)
 
 	for _, full := range fulls {
 		if full.Sub(skyfield).Abs() > unit.Days(1) {

@@ -5,9 +5,9 @@ package plan_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // requireKernel turns a provider-construction failure into the right kind of

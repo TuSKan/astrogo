@@ -8,8 +8,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -53,8 +53,8 @@ func TestFromCatalogReadsNonFiniteExtrasAsAbsent(t *testing.T) {
 	t.Parallel()
 
 	nan := math.NaN()
-	gaiaEpoch := time.FromJD(2457389.0, time.TT) // J2016.0
-	night := time.FromJD(2461000.5, time.UTC).Add(unit.Hours(3))
+	gaiaEpoch := epoch.FromJD(2457389.0, epoch.TT) // J2016.0
+	night := epoch.FromJD(2461000.5, epoch.UTC).Add(unit.Hours(3))
 
 	base := resolve.Target{
 		Name: "Rigel", Kind: resolve.KindStar, HasCoord: true,

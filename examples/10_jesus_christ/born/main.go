@@ -13,10 +13,10 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -60,8 +60,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn Conjunctions, 7 BC (astronomical year −6):")
 
-	s1 := time.DateJulianCal(-6, 1, 1, 0, 0, 0)
-	e1 := time.DateJulianCal(-5, 1, 1, 0, 0, 0)
+	s1 := epoch.DateJulianCal(-6, 1, 1, 0, 0, 0)
+	e1 := epoch.DateJulianCal(-5, 1, 1, 0, 0, 0)
 
 	conjs, err := plan.Conjunctions(jupiter, saturn, plan.Window{Start: s1, End: e1})
 	if err != nil {
@@ -131,8 +131,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Venus Conjunction, June 17, 2 BC:")
 	// Astronomical year: 2 BC = year −1
-	s2 := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
-	e2 := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
+	s2 := epoch.DateJulianCal(-1, 6, 1, 0, 0, 0)
+	e2 := epoch.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
 	conjs2, err := plan.Conjunctions(jupiter, venus, plan.Window{Start: s2, End: e2})
 	if err != nil {
@@ -163,8 +163,8 @@ func main() {
 	// ──────────────────────────────────────────────────────────────────
 	fmt.Println("\n▸ Jupiter–Saturn geometry, 3–2 BC (for comparison):")
 
-	s3 := time.DateJulianCal(-2, 1, 1, 0, 0, 0)
-	e3 := time.DateJulianCal(0, 1, 1, 0, 0, 0)
+	s3 := epoch.DateJulianCal(-2, 1, 1, 0, 0, 0)
+	e3 := epoch.DateJulianCal(0, 1, 1, 0, 0, 0)
 
 	conjs3, err := plan.Conjunctions(jupiter, saturn, plan.Window{Start: s3, End: e3})
 	if err != nil {

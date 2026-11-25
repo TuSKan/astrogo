@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -43,7 +43,7 @@ type stateVector struct {
 // to it: [Elements.WithLaplacePlane], [Elements.WithSecularPrecession] and
 // [Elements.WithPeriod] make [Elements.StateAt] fail. [Elements.WithCentralBody]
 // re-derives the orbit through the same state under the new mass.
-func FromState(epoch time.Time, pos, vel vector.Vec3, central CentralBody) (Elements, error) {
+func FromState(epoch epoch.Time, pos, vel vector.Vec3, central CentralBody) (Elements, error) {
 	el := Elements{epoch: epoch, central: central, state: &stateVector{pos: pos, vel: vel}}
 	if err := el.Validate(); err != nil {
 		return Elements{}, err

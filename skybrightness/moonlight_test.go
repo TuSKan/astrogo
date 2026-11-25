@@ -6,14 +6,15 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -54,7 +55,7 @@ func solarSpectrumFixture(tb testing.TB) []float64 {
 
 // moonlightScene builds a Paranal scene at t with a clear standard
 // atmosphere and the offline SOFA ephemeris.
-func moonlightScene(t *testing.T, when time.GoTime) *skybrightness.Scene {
+func moonlightScene(t *testing.T, when time.Time) *skybrightness.Scene {
 	t.Helper()
 
 	loc, err := coord.NewGeodetic(angle.LatDeg(-24.6), angle.LonDeg(-70.4), 2635)
@@ -81,7 +82,7 @@ func moonlightScene(t *testing.T, when time.GoTime) *skybrightness.Scene {
 // nearFullMoonUp scans a lunation for the moment the Moon is closest to full
 // while well above the horizon at Paranal, so the absolute check below runs
 // in the geometry it is calibrated against. Deterministic and offline.
-func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
+func nearFullMoonUp(t *testing.T) (time.Time, angle.Angle) {
 	t.Helper()
 
 	provider := eph.Default()
@@ -91,10 +92,10 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	start := time.GoDate(2026, 3, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 
 	var (
-		best      time.GoTime
+		best      time.Time
 		bestPhase = angle.Deg(360)
 	)
 
@@ -102,7 +103,7 @@ func nearFullMoonUp(t *testing.T) (time.GoTime, angle.Angle) {
 		// step is a count of hours, not a duration, so the multiplication is
 		// a scaling and not a duration times a duration.
 		when := start.Add(time.Hour * time.Duration(step))
-		at := time.FromGo(when)
+		at := epoch.FromGo(when)
 
 		phase, err := magnitude.PhaseAngle(provider, eph.Moon, at)
 		if err != nil {
@@ -425,7 +426,7 @@ func TestScatteredMoonlightProvenance(t *testing.T) {
 func moonDirection(t *testing.T, scene *skybrightness.Scene) coord.AltAz {
 	t.Helper()
 
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	moon, err := eph.At(scene.Ephemeris, at).Geometric(eph.Moon, eph.Earth)
 	if err != nil {
@@ -458,7 +459,7 @@ func BenchmarkScatteredMoonlight(b *testing.B) {
 
 	scene := &skybrightness.Scene{
 		Observer:   loc,
-		Time:       time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC),
+		Time:       time.Date(2026, 3, 3, 5, 0, 0, 0, time.UTC),
 		Atmosphere: atm,
 		Ephemeris:  eph.Default(),
 	}

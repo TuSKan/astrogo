@@ -5,12 +5,12 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestMain grants download consent for the whole package's default test

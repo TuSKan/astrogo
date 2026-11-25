@@ -12,8 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // DefaultTimeout applies to an endpoint whose registered Timeout is zero.
@@ -121,7 +120,7 @@ type Client struct {
 	// minimum interval was asked for.
 	minInterval time.Duration
 	mu          sync.Mutex
-	last        time.GoTime
+	last        time.Time
 }
 
 // NewClient builds a client with timeout as the deadline of each call, its

@@ -9,8 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -47,7 +47,7 @@ func TestObservableWindows_Fixed(t *testing.T) {
 	// Target at zenith at Greenwich J2000 (LST ~18.69h)
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
-	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon (Observable)
+	start := epoch.FromJD(2451545.0, epoch.UTC) // J2000 Noon (Observable)
 	end := start.Add(unit.Hours(1))
 	step := unit.Minutes(10)
 
@@ -79,7 +79,7 @@ func TestObservableWindows_Moving(t *testing.T) {
 	sun := NewSun(eph.Default())
 
 	// Start at Noon J2000 (Sun high)
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	// End 24 hours later
 	end := start.Add(unit.Hours(24))
 	step := unit.Minutes(15) // ≤ 15min max
@@ -102,7 +102,7 @@ type flipConstraint struct {
 	count int
 }
 
-func (f *flipConstraint) Check(_ Observable, _ *Site, _ time.Time) (Result, error) {
+func (f *flipConstraint) Check(_ Observable, _ *Site, _ epoch.Time) (Result, error) {
 	f.count++
 	pass := f.count%2 == 0
 
@@ -142,7 +142,7 @@ func TestIsObservable(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	// Equinox 2000 noon
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	// Target at zenith
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
@@ -209,7 +209,7 @@ func TestIsObservable(t *testing.T) {
 func TestScorer(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
-	tm := time.FromJD(2451545.0, time.UTC) // J2000 Noon (LST ~18.69h)
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000 Noon (LST ~18.69h)
 
 	t.Run("AltitudeScoring", func(t *testing.T) {
 		// Target 1: Near zenith (Alt ~90)
@@ -280,7 +280,7 @@ func (p prioritizedTarget) Priority() float64 { return p.priority }
 func TestRankObservables(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	t.Run("RankingStability", func(t *testing.T) {
 		objs := []Observable{
@@ -329,7 +329,7 @@ func TestPlannerRankObservable(t *testing.T) {
 	p, err := NewPlanner(site, nil)
 	testutil.AssertNoError(t, err)
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Days(1))
 
 	objs := []Observable{
@@ -361,7 +361,7 @@ type erroringCoordObject struct{}
 
 func (erroringCoordObject) Name() string { return "erroring" }
 
-func (erroringCoordObject) Position(time.Time) (coord.ICRS, error) {
+func (erroringCoordObject) Position(epoch.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errCoordObjectICRS
 }
 
@@ -369,7 +369,7 @@ func (erroringCoordObject) GetDetails(*coord.Context, DetailOverrides) (*TargetD
 	return nil, errCoordObjectICRS
 }
 
-func (erroringCoordObject) ICRS(time.Time) (coord.ICRS, error) {
+func (erroringCoordObject) ICRS(epoch.Time) (coord.ICRS, error) {
 	return coord.ICRS{}, errCoordObjectICRS
 }
 
@@ -380,7 +380,7 @@ func TestPlannerRankObservable_DirectCoordObjectAndTransitError(t *testing.T) {
 	p, err := NewPlanner(site, nil)
 	testutil.AssertNoError(t, err)
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Days(1))
 
 	_, err = p.RankObservable([]Observable{erroringCoordObject{}}, Window{Start: start, End: end})
@@ -440,9 +440,9 @@ func TestObservableWindows_StepNotPositive(t *testing.T) {
 // pattern (many targets/goroutines revisiting a small set of shared epochs)
 // and asserts the ephemeris is only computed once per distinct epoch.
 func TestGetMoonGeocentricVec_MultiEpochCacheHits(t *testing.T) {
-	epochs := make([]time.Time, 5)
+	epochs := make([]epoch.Time, 5)
 	for i := range epochs {
-		epochs[i] = time.FromJD(2460000.5+float64(i), time.UTC)
+		epochs[i] = epoch.FromJD(2460000.5+float64(i), epoch.UTC)
 	}
 
 	var wg sync.WaitGroup
@@ -503,7 +503,7 @@ func TestScorerConfigIsUsed(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC) // J2000 noon, LST ~18.69h
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000 noon, LST ~18.69h
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
 	eval, err := IsObservable(obj, site, tm)
@@ -547,7 +547,7 @@ func TestScorerContextIsReusedAndFixesTheEpoch(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 	obj := NewStar("T", angle.Hour(18.69), angle.Deg(0))
 
 	fresh, err := Scorer{Site: site}.Score(obj, tm)
@@ -589,7 +589,7 @@ func TestScorerMeritTerms(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	t.Run("priority multiplies the composite", func(t *testing.T) {
 		t.Parallel()

@@ -26,7 +26,7 @@ actually contains:
 
 | import | total | gRPC | OpenTelemetry | gocloud |
 | :--- | ---: | ---: | ---: | ---: |
-| `astrogo/time` | 93 | 0 | 0 | 0 |
+| `astrogo/time` (now `epoch`) | 93 | 0 | 0 | 0 |
 | `astrogo/coord` | 100 | 0 | 0 | 0 |
 | `astrogo/ephemeris` | 105 | 0 | 0 | 0 |
 | **`astrogo/remote`** | **406** | **64** | **34** | **9** |
@@ -36,7 +36,7 @@ And after, measured the same way on the same machine once PR 4 landed:
 
 | import | total | gRPC | OpenTelemetry | gocloud |
 | :--- | ---: | ---: | ---: | ---: |
-| `astrogo/time` | 93 | 0 | 0 | 0 |
+| `astrogo/time` (now `epoch`) | 93 | 0 | 0 | 0 |
 | `astrogo/coord` | 100 | 0 | 0 | 0 |
 | `astrogo/ephemeris` | 105 | 0 | 0 | 0 |
 | **`astrogo/remote`** | **219** | **0** | **0** | **0** |

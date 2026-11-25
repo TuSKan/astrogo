@@ -7,8 +7,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 var (

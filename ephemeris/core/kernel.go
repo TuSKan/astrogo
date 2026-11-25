@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // The kernel-backed sources are reached through a registered backend rather
@@ -46,7 +46,7 @@ type KernelRequest struct {
 
 	// Start and End restrict the coverage window for a generated small-body
 	// kernel. Both zero means the backend's own default.
-	Start, End time.Time
+	Start, End epoch.Time
 
 	// ExtraKernels are additional kernels to load after the primary one.
 	ExtraKernels []string
@@ -67,7 +67,7 @@ var ErrNoKernelBackend = errors.New(
 
 // kernelBackend holds the registered backend, or nil.
 //
-// Atomic rather than mutex-guarded for the same reason time's leap-second
+// Atomic rather than mutex-guarded for the same reason epoch's leap-second
 // registry is: it is read on a path callers hit repeatedly and written at most
 // once, by an init.
 var kernelBackend atomic.Pointer[KernelBackend]

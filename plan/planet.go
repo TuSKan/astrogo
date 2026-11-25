@@ -5,8 +5,8 @@ import (
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	mag "github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -123,7 +123,7 @@ func (p *Planet) EphID() eph.ID {
 // place, with light time and aberration in it. See [apparentVec] for how far
 // that is from the geometric direction and why it is the one this package
 // wants.
-func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
+func (p *Planet) Position(t epoch.Time) (coord.ICRS, error) {
 	icrs, err := apparentICRS(p.provider, p.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("planet %s: %w", p.name, err)
@@ -135,7 +135,7 @@ func (p *Planet) Position(t time.Time) (coord.ICRS, error) {
 // GeocentricVec returns the planet's apparent geocentric position vector,
 // which is what [coord.Context.GeocentricToObserved] expects — see
 // [apparentVec].
-func (p *Planet) GeocentricVec(t time.Time) (vector.Vec3, error) {
+func (p *Planet) GeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	v, err := apparentVec(p.provider, p.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("planet %s: %w", p.name, err)
@@ -150,7 +150,7 @@ func (p *Planet) GetDetails(ctx *coord.Context, over DetailOverrides) (*TargetDe
 }
 
 // ApparentMagnitude returns the Mallama & Hilton (2018) apparent magnitude.
-func (p *Planet) ApparentMagnitude(t time.Time) (float64, error) {
+func (p *Planet) ApparentMagnitude(t epoch.Time) (float64, error) {
 	m, err := mag.PlanetApparent(p.provider, p.id, t)
 	if err != nil {
 		return 0, fmt.Errorf("planet: apparent magnitude: %w", err)
@@ -160,7 +160,7 @@ func (p *Planet) ApparentMagnitude(t time.Time) (float64, error) {
 }
 
 // ApparentMagnitudeCtx returns apparent magnitude (planets don't need atmospheric context).
-func (p *Planet) ApparentMagnitudeCtx(t time.Time, _ *coord.Context) (float64, error) {
+func (p *Planet) ApparentMagnitudeCtx(t epoch.Time, _ *coord.Context) (float64, error) {
 	return p.ApparentMagnitude(t)
 }
 

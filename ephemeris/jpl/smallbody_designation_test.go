@@ -6,13 +6,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -41,7 +42,7 @@ import (
 func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, tc := range []struct {
 		des  string
@@ -70,7 +71,7 @@ func TestSmallBodyDesignationFailuresAreLoud(t *testing.T) {
 func TestSmallBodyDesignationsThatResolve(t *testing.T) {
 	testutil.RequireReachable(t, "ssd.jpl.nasa.gov:443")
 
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Asked for by NAIF code: a bare 433 is no body (#809).
 	eros, _ := core.SmallBodyID(433)

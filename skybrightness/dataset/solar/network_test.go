@@ -6,13 +6,13 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/solar"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // reachable skips when STScI is down rather than failing CI for someone

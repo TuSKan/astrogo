@@ -6,21 +6,21 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // setTimeFixture is the site, atmosphere, epoch and star the SetTime tests
 // share: Barcelona, no refraction, 2025-11-17.
-func setTimeFixture(t *testing.T) (*coord.Geodetic, atmosphere.Refraction, time.Time, coord.ICRS) {
+func setTimeFixture(t *testing.T) (*coord.Geodetic, atmosphere.Refraction, epoch.Time, coord.ICRS) {
 	t.Helper()
 
 	site, err := coord.NewGeodetic(angle.LatDeg(41.3874), angle.LonDeg(2.1686), 0)
 	testutil.AssertNoError(t, err)
 
-	return site, atmosphere.Refraction{Pressure: 0}, time.FromJD(2461000.0, time.UTC),
+	return site, atmosphere.Refraction{Pressure: 0}, epoch.FromJD(2461000.0, epoch.UTC),
 		coord.NewICRS(angle.Hour(6.75), angle.Deg(-16.7))
 }
 
@@ -104,7 +104,7 @@ func TestSetTime_IsNewContextAtANode(t *testing.T) {
 
 	ctx.SetTime(base.Add(unit.Hours(12))) // evaluates the bracket's far end, a day out
 
-	for _, at := range []time.Time{base.Add(unit.Days(1)), base} {
+	for _, at := range []epoch.Time{base.Add(unit.Days(1)), base} {
 		ctx.SetTime(at)
 
 		if d := sameAsNewContext(t, ctx, site, atm, star); d > 1e-12 {

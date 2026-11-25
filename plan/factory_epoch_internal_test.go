@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -16,12 +16,12 @@ import (
 func TestElementsFromTargetKeepsTheOsculationEpoch(t *testing.T) {
 	t.Parallel()
 
-	tp := time.FromJDParts(2450536.5, 0.0319, time.TT)
-	epoch := time.FromJDParts(2461305.5, 0, time.TT)
+	tp := epoch.FromJDParts(2450536.5, 0.0319, epoch.TT)
+	at := epoch.FromJDParts(2461305.5, 0, epoch.TT)
 
 	halebopp := resolve.Target{
 		Name: "C/1995 O1 (Hale-Bopp)", Kind: resolve.KindComet, HasElements: true,
-		Epoch:              epoch,
+		Epoch:              at,
 		Eccentricity:       0.994897,
 		PerihelionDistance: unit.AU(0.925246),
 		PerihelionTime:     tp,
@@ -35,12 +35,12 @@ func TestElementsFromTargetKeepsTheOsculationEpoch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !el.Epoch().Equal(epoch) {
-		t.Errorf("Epoch = %v, want the published osculation epoch %v", el.Epoch(), epoch)
+	if !el.Epoch().Equal(at) {
+		t.Errorf("Epoch = %v, want the published osculation epoch %v", el.Epoch(), at)
 	}
 
 	unpublished := halebopp
-	unpublished.Epoch = time.Time{}
+	unpublished.Epoch = epoch.Time{}
 
 	el, err = elementsFromTarget(unpublished)
 	if err != nil {

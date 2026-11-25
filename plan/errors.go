@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Sentinel errors for observation planning.
@@ -167,7 +167,7 @@ var (
 // checkInterval refuses a search interval that ends before it starts, or whose
 // start or end is not a finite time. An empty one, start equal to end, is
 // valid: it has nothing in it.
-func checkInterval(start, end time.Time) error {
+func checkInterval(start, end epoch.Time) error {
 	// First, because a non-finite time compares false both ways and so is
 	// never reversed. FromJD(+Inf) is one too: its JD is NaN (#996).
 	if !finiteTime(start) || !finiteTime(end) {
@@ -182,7 +182,7 @@ func checkInterval(start, end time.Time) error {
 }
 
 // finiteTime reports whether t's Julian date is a finite number.
-func finiteTime(t time.Time) bool {
+func finiteTime(t epoch.Time) bool {
 	jd := t.JD()
 
 	return !math.IsNaN(jd) && !math.IsInf(jd, 0)

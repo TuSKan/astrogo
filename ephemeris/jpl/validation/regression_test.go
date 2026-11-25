@@ -11,8 +11,8 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -29,14 +29,14 @@ import (
 // light time, and the Sun, for deflection: rest gives those, SOFA's analytical
 // series, whose Earth velocity is good to 1.4 mm/s.
 type mockLinearProvider struct {
-	baseTime time.Time
+	baseTime epoch.Time
 	target   eph.ID
 	pos      vector.Vec3
 	vel      vector.Vec3
 	rest     eph.Provider
 }
 
-func (m *mockLinearProvider) Locate(id eph.ID, t time.Time) (eph.State, error) {
+func (m *mockLinearProvider) Locate(id eph.ID, t epoch.Time) (eph.State, error) {
 	if id != m.target {
 		st, err := m.rest.Locate(id, t)
 		if err != nil {
@@ -159,7 +159,7 @@ func TestScientificStability(t *testing.T) {
 			t.Fatalf("%s: %v", cs.Name, err)
 		}
 
-		obsTime := time.FromJD(e.EpochJDUT, time.UTC)
+		obsTime := epoch.FromJD(e.EpochJDUT, epoch.UTC)
 
 		mock := &mockLinearProvider{
 			baseTime: obsTime,

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Sentinel errors for LSK parsing.
@@ -117,7 +117,7 @@ func NewReader(r io.ReadCloser) (*Reader, error) {
 		// neither arm of the guard matched. The table therefore ended at
 		// 36 leap seconds (2015-07-01), and every UTC epoch from
 		// 2017-01-01 onward converted one second early: measured as a
-		// 1.0000 s offset against time.TDB(), which put the geocentric Sun
+		// 1.0000 s offset against epoch.TDB(), which put the geocentric Sun
 		// about 30 km — one second of Earth's orbital motion — from where
 		// DE440 has it.
 		inBlock := inDeltaAt
@@ -373,7 +373,7 @@ const (
 // small against the 33 mm this library claims against Horizons, so the term
 // is applied, as SPICE's own str2et applies it.
 //
-// # Why the kernel drives this and not time.Time.TDB
+// # Why the kernel drives this and not epoch.Time.TDB
 //
 // Because an SPK segment is indexed by the ET that *its own kernel set*
 // defines, and the LSK is where that definition lives. Evaluating a JPL kernel
@@ -404,7 +404,7 @@ const (
 // 4 cm of lunar motion and 31 cm for the ISS, at the level of the 33 mm this
 // library claims against Horizons.
 //
-// Subtracting the epoch first keeps the value small. time.Time stores the day
+// Subtracting the epoch first keeps the value small. epoch.Time stores the day
 // number and the fraction separately for exactly this reason, and JDParts
 // hands both over:
 //
@@ -416,7 +416,7 @@ const (
 // J2000 for the same reason.
 //
 // The model is Moyer's, read from the kernel; see above.
-func UTCToET(t time.Time, l *Reader) float64 {
+func UTCToET(t epoch.Time, l *Reader) float64 {
 	utc := t.UTC()
 	d1, d2 := utc.JDParts()
 	jdUTC := d1 + d2

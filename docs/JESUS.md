@@ -122,14 +122,14 @@ For the first century AD, ΔT is approximately **10,000 seconds** (about 2.8 hou
 10,128 s. This is critically important. An eclipse or a moonrise is computed in TT, from the
 ephemeris, and only ΔT says what clock time on the turning Earth it fell at.
 
-The `astrogo` time package handles this natively:
+astrogo's `epoch` package handles this natively:
 
 ```go
-import "github.com/TuSKan/astrogo/time"
+import "github.com/TuSKan/astrogo/epoch"
 
 // 3 April AD 33, 15:00 UT. Dates before the 1582 reform are Julian calendar dates:
-// time.Date is the proleptic Gregorian calendar, two days apart in the first century.
-t := time.DateJulianCal(33, 4, 3, 15, 0, 0)
+// epoch.Date is the proleptic Gregorian calendar, two days apart in the first century.
+t := epoch.DateJulianCal(33, 4, 3, 15, 0, 0)
 
 // Convert to Terrestrial Time (deterministic, no Earth orientation data needed)
 tt := t.TT()
@@ -264,8 +264,8 @@ prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 defer prov.Close()
 
 // Search for all lunar eclipses from 5 BC to AD 1
-start := time.DateJulianCal(-4, 1, 1, 0, 0, 0)
-end   := time.DateJulianCal(2, 1, 1, 0, 0, 0)
+start := epoch.DateJulianCal(-4, 1, 1, 0, 0, 0)
+end   := epoch.DateJulianCal(2, 1, 1, 0, 0, 0)
 
 eclipses, _ := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 for _, e := range eclipses {
@@ -353,8 +353,8 @@ jupiter := plan.NewJupiter(prov)
 venus   := plan.NewVenus(prov)
 
 // Jupiter-Venus conjunction, June 2 BC (astronomical year -1)
-s := time.DateJulianCal(-1, 6, 1, 0, 0, 0)
-e := time.DateJulianCal(-1, 7, 15, 0, 0, 0)
+s := epoch.DateJulianCal(-1, 6, 1, 0, 0, 0)
+e := epoch.DateJulianCal(-1, 7, 15, 0, 0, 0)
 
 conjs, _ := plan.Conjunctions(jupiter, venus, plan.Window{Start: s, End: e})
 for _, c := range conjs {
@@ -566,8 +566,8 @@ import "github.com/TuSKan/astrogo/plan"
 prov, _ := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 defer prov.Close()
 
-start := time.DateJulianCal(33, 3, 1, 0, 0, 0)
-end   := time.DateJulianCal(33, 5, 1, 0, 0, 0)
+start := epoch.DateJulianCal(33, 3, 1, 0, 0, 0)
+end   := epoch.DateJulianCal(33, 5, 1, 0, 0, 0)
 
 eclipses, _ := plan.LunarEclipses(plan.Window{Start: start, End: end}, prov)
 for _, e := range eclipses {
@@ -600,10 +600,10 @@ reddish-copper. Then, as the sky darkened, it would have hung in the penumbra un
 import "github.com/TuSKan/astrogo/plan"
 
 // Compute moonrise over Jerusalem on April 3, AD 33
-site, _ := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.LocationUTC))
+site, _ := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.UTC))
 
-dayStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
-dayEnd   := time.DateJulianCal(33, 4, 3, 20, 0, 0)
+dayStart := epoch.DateJulianCal(33, 4, 3, 12, 0, 0)
+dayEnd   := epoch.DateJulianCal(33, 4, 3, 20, 0, 0)
 
 rise, _, _ := plan.MoonriseMoonset(site, plan.Window{Start: dayStart, End: dayEnd}, prov)
 if rise != nil {

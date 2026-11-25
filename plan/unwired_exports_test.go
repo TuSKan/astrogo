@@ -2,9 +2,10 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -34,7 +35,7 @@ func TestEventAnyPhaseFindsAllFour(t *testing.T) {
 
 	// One full lunation is 29.53 days, so 40 days contains all four phases
 	// with room for the window to start anywhere within a cycle.
-	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(40))
 
 	events, err := solver.Find(EventSpec{

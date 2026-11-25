@@ -3,8 +3,8 @@ package unit_test
 import (
 	"math"
 	"testing"
+	"time"
 
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 

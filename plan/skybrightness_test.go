@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // fixedDepth is a SkyDepth that always reports the same limit.
@@ -19,7 +20,7 @@ import (
 // them, which is one method wide precisely so it can be stubbed like this.
 type fixedDepth float64
 
-func (d fixedDepth) LimitingMagnitudeAt(_ time.Time, _, _ angle.Angle) (float64, error) {
+func (d fixedDepth) LimitingMagnitudeAt(_ epoch.Time, _, _ angle.Angle) (float64, error) {
 	return float64(d), nil
 }
 
@@ -28,7 +29,7 @@ type failingDepth struct{}
 
 var errDepth = errors.New("no depth")
 
-func (failingDepth) LimitingMagnitudeAt(_ time.Time, _, _ angle.Angle) (float64, error) {
+func (failingDepth) LimitingMagnitudeAt(_ epoch.Time, _, _ angle.Angle) (float64, error) {
 	return 0, errDepth
 }
 
@@ -47,7 +48,7 @@ func skyConstraintFixture(t *testing.T, vmag float64) (*Star, *Site, *coord.Cont
 		t.Fatalf("NewSite: %v", err)
 	}
 
-	when := time.Date(2026, time.March, 2, 5, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 2, 5, 0, 0, 0, time.UTC)
 
 	// Declination matching the site's latitude puts the target near the
 	// zenith when it transits, so the horizon branch is not what is being
@@ -210,7 +211,7 @@ func TestLimitingMagnitudeBelowHorizonScoresZero(t *testing.T) {
 	// The north celestial pole, permanently below the horizon at -24.6.
 	star := NewStar("north pole", angle.Hour(0), angle.Deg(89.9), WithStarMagnitude(2))
 
-	ctx := mustContext(t, time.Date(2026, time.March, 2, 5, 0, 0, 0, time.LocationUTC),
+	ctx := mustContext(t, epoch.Date(2026, time.March, 2, 5, 0, 0, 0, time.UTC),
 		site.Location(), site.Refraction())
 
 	c := LimitingMagnitudeConstraint{Sky: fixedDepth(20)}

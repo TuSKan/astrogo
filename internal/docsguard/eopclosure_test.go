@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// eopLoaderPkg registers the IERS loader with astrogo/time from its init, and
+// eopLoaderPkg registers the IERS loader with astrogo/epoch from its init, and
 // is the only package in the module that does.
 const eopLoaderPkg = "github.com/TuSKan/astrogo/remote/eop"
 
@@ -48,7 +48,7 @@ const eopLoaderPkg = "github.com/TuSKan/astrogo/remote/eop"
 // Test-only imports are invisible to this check, because it reads the import
 // list `go list` reports for the package itself rather than the separate one it
 // reports for that package's tests. That distinction is what makes
-// `time/eop_test.go` and the validation suite legitimate while a blank import
+// `epoch/eop_test.go` and the validation suite legitimate while a blank import
 // in `plan` is not.
 func TestTheEOPLoaderIsNeverInALibraryClosure(t *testing.T) {
 	t.Parallel()

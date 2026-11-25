@@ -3,13 +3,14 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -39,7 +40,7 @@ var diurnalDirections = []struct{ raHr, decDeg float64 }{
 
 // diurnalEpoch is fixed. A validation result whose epoch is "now" cannot be
 // reproduced.
-var diurnalEpoch = time.Date(2026, time.June, 21, 18, 42, 9, 0, time.LocationUTC)
+var diurnalEpoch = epoch.Date(2026, time.June, 21, 18, 42, 9, 0, time.UTC)
 
 // TestGeocentricToObservedAppliesDiurnalAberration is the regression test for
 // #261, where the vector reduction route omitted the term entirely.
@@ -74,7 +75,7 @@ var diurnalEpoch = time.Date(2026, time.June, 21, 18, 42, 9, 0, time.LocationUTC
 // together; a physical law they both have to satisfy is what catches that.
 func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	const (
 		dut1Seconds = 0.1237
@@ -95,7 +96,7 @@ func TestGeocentricToObservedAppliesDiurnalAberration(t *testing.T) {
 
 	xp, yp := angle.Arcsec(xpArcsec).Radians(), angle.Arcsec(ypArcsec).Radians()
 
-	time.RegisterModel(fixedEOP{dut1: dut1Seconds, xp: xp, yp: yp})
+	epoch.RegisterModel(fixedEOP{dut1: dut1Seconds, xp: xp, yp: yp})
 
 	atm := atmosphere.StandardRefraction()
 	atm.Model = atmosphere.RefractionNone{}

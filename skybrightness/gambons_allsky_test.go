@@ -9,17 +9,18 @@ import (
 	"slices"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -213,7 +214,7 @@ func runAllSky(t *testing.T) allSkyRun {
 		galactic coord.Galactic
 	}
 
-	cc := mustContext(t, time.FromGo(scene.Time), scene.Observer,
+	cc := mustContext(t, epoch.FromGo(scene.Time), scene.Observer,
 		scene.Atmosphere.Refraction())
 
 	var samples []sample

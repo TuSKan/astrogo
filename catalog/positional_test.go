@@ -12,8 +12,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/catalog/simbad"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -24,7 +24,7 @@ func mas(v float64) angle.Angle { return angle.Arcsec(v / 1000) }
 // the errors e.
 func at(id, name string, raDeg, decDeg, northArcsec float64, e resolve.AstrometricError) Target {
 	return Target{
-		ID: id, Name: name, HasCoord: true, Epoch: time.J2000(), AstrometricError: e,
+		ID: id, Name: name, HasCoord: true, Epoch: epoch.J2000(), AstrometricError: e,
 		Coord: coord.NewICRS(angle.Deg(raDeg), angle.Deg(decDeg).Add(angle.Arcsec(northArcsec))),
 	}
 }
@@ -210,18 +210,18 @@ var (
 	cyg61Simbad = Target{
 		ID: "*  61 Cyg A", Name: "61 Cyg A", Aliases: []string{"Gaia DR3 1872046609345556480"},
 		Coord:    coord.NewICRS(angle.Deg(316.7247482895925), angle.Deg(38.74941731943694)),
-		HasCoord: true, Epoch: time.J2000(),
+		HasCoord: true, Epoch: epoch.J2000(),
 		PmRA: mas(4164.209), PmDec: mas(3249.614), Parallax: mas(285.9949),
 		RadialVelocity: unit.KmPerSec(-65.82), HasRadialVelocity: true,
 		AstrometricError: resolve.AstrometricError{
 			RA: mas(0.0388), Dec: mas(0.0485), PmRA: mas(0.055), PmDec: mas(0.055),
-			Epoch: time.FromJD(2457389.0, time.TT),
+			Epoch: epoch.FromJD(2457389.0, epoch.TT),
 		},
 	}
 	cyg61Gaia = Target{
 		ID: "1872046609345556480", Name: "Gaia DR3 1872046609345556480", Designation: "Gaia DR3 1872046609345556480",
 		Coord:    coord.NewICRS(angle.Deg(316.7484792940004), angle.Deg(38.76386244649797)),
-		HasCoord: true, Epoch: time.FromJD(2457389.0, time.TT),
+		HasCoord: true, Epoch: epoch.FromJD(2457389.0, epoch.TT),
 		PmRA: mas(4164.2086922846665), PmDec: mas(3249.613883848584), Parallax: mas(285.99494829578117),
 		RadialVelocity: unit.KmPerSec(-65.97495), HasRadialVelocity: true,
 		AstrometricError: resolve.AstrometricError{

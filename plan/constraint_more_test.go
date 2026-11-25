@@ -3,11 +3,12 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +34,7 @@ func moreSite(t *testing.T) *Site {
 // nearly 180 degrees.
 func TestSunSep(t *testing.T) {
 	site := moreSite(t)
-	when := time.Date(2026, time.June, 21, 12, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 21, 12, 0, 0, 0, time.UTC)
 
 	sun := NewSun(nil)
 
@@ -76,7 +77,7 @@ func TestSunSep(t *testing.T) {
 // zero would otherwise fail every threshold.
 func TestSunSepPassesTheSunItself(t *testing.T) {
 	site := moreSite(t)
-	when := time.Date(2026, time.June, 21, 12, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 21, 12, 0, 0, 0, time.UTC)
 
 	res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewSun(nil), site, when)
 	testutil.AssertNoError(t, err)
@@ -92,7 +93,7 @@ func TestSunSepPassesTheSunItself(t *testing.T) {
 // center b = 0.
 func TestGalacticLatitude(t *testing.T) {
 	site := moreSite(t)
-	when := time.FromJD(2451545.0, time.UTC)
+	when := epoch.FromJD(2451545.0, epoch.UTC)
 
 	// IAU 1958 Galactic frame, on ICRS: the pole and the center.
 	pole := NewStar("north galactic pole", angle.Deg(192.85948), angle.Deg(27.12825))
@@ -129,7 +130,7 @@ func TestGalacticLatitude(t *testing.T) {
 // and nothing in the southern, which is a plausible-looking half-sky bug.
 func TestGalacticLatitudeIsUnsigned(t *testing.T) {
 	site := moreSite(t)
-	when := time.FromJD(2451545.0, time.UTC)
+	when := epoch.FromJD(2451545.0, epoch.UTC)
 
 	// The south galactic pole is the north one's antipode.
 	south := NewStar("south galactic pole", angle.Deg(12.85948), angle.Deg(-27.12825))
@@ -150,12 +151,12 @@ func TestTimeWindow(t *testing.T) {
 	site := moreSite(t)
 	obj := NewStar("anything", angle.Deg(0), angle.Deg(0))
 
-	open := time.Date(2026, time.April, 20, 2, 0, 0, 0, time.LocationUTC)
-	shut := time.Date(2026, time.April, 20, 6, 0, 0, 0, time.LocationUTC)
+	open := epoch.Date(2026, time.April, 20, 2, 0, 0, 0, time.UTC)
+	shut := epoch.Date(2026, time.April, 20, 6, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name string
-		when time.Time
+		when epoch.Time
 		win  TimeWindow
 		pass bool
 	}{
@@ -196,11 +197,11 @@ func TestTimeWindowValueRanksByHeadroom(t *testing.T) {
 	site := moreSite(t)
 	obj := NewStar("anything", angle.Deg(0), angle.Deg(0))
 
-	open := time.Date(2026, time.April, 20, 2, 0, 0, 0, time.LocationUTC)
-	shut := time.Date(2026, time.April, 20, 6, 0, 0, 0, time.LocationUTC)
+	open := epoch.Date(2026, time.April, 20, 2, 0, 0, 0, time.UTC)
+	shut := epoch.Date(2026, time.April, 20, 6, 0, 0, 0, time.UTC)
 	win := TimeWindow{Start: open, End: shut}
 
-	value := func(when time.Time) float64 {
+	value := func(when epoch.Time) float64 {
 		t.Helper()
 
 		res, err := win.Check(obj, site, when)
@@ -268,7 +269,7 @@ func ridgeSite(t *testing.T, opts ...SiteOption) *Site {
 // — and names this constraint as the one it was waiting for.
 func TestHorizon(t *testing.T) {
 	site := ridgeSite(t, WithHorizonProfile(ridgeProfile))
-	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 
 	c := Horizon{}
 
@@ -333,7 +334,7 @@ func TestHorizonVariesWithAzimuth(t *testing.T) {
 // which is what keeps it usable at the many sites nobody has surveyed.
 func TestHorizonFallsBackToTheScalarLimit(t *testing.T) {
 	site := ridgeSite(t) // no profile
-	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 	obj := NewStar("target", angle.Deg(120), angle.Deg(-20))
 
 	ctx, err := coord.NewContext(when, site.Location(), site.Refraction())
@@ -357,7 +358,7 @@ func TestHorizonFallsBackToTheScalarLimit(t *testing.T) {
 // rather than on it, so it can only make a constraint stricter.
 func TestHorizonMarginRaisesTheBar(t *testing.T) {
 	site := ridgeSite(t, WithHorizonProfile(ridgeProfile))
-	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 	obj := NewStar("target", angle.Deg(120), angle.Deg(-20))
 
 	bare, err := Horizon{}.Check(obj, site, when)
@@ -381,7 +382,7 @@ func TestHorizonMarginRaisesTheBar(t *testing.T) {
 // ridge sector, the target rose outside it, and both sites agreed for a reason
 // that had nothing to do with the property under test.
 func TestHorizonReadsTheSiteItIsGiven(t *testing.T) {
-	when := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 	obj := NewStar("target", angle.Deg(120), angle.Deg(-20))
 
 	flat := ridgeSite(t, WithHorizonProfile(func(angle.Angle) angle.Angle { return angle.Deg(0) }))
@@ -437,10 +438,10 @@ func TestHorizonReadsTheSiteItIsGiven(t *testing.T) {
 func TestSunSepDoesNotExemptOtherPlanets(t *testing.T) {
 	site := moreSite(t)
 
-	for _, when := range []time.Time{
-		time.Date(2026, time.January, 15, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.June, 21, 12, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.November, 3, 6, 0, 0, 0, time.LocationUTC),
+	for _, when := range []epoch.Time{
+		epoch.Date(2026, time.January, 15, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.June, 21, 12, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.November, 3, 6, 0, 0, 0, time.UTC),
 	} {
 		res, err := SunSep{Threshold: angle.Deg(30)}.Check(NewMercury(nil), site, when)
 		testutil.AssertNoError(t, err)

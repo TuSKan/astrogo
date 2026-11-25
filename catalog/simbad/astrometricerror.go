@@ -6,7 +6,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // gaiaCoordinateEpochs are the epochs of the Gaia releases SIMBAD takes
@@ -17,9 +17,9 @@ import (
 // for a position from any other source hold at J2000.0. readKinematics
 // reports a position from one of these releases at its epoch, where the
 // errors hold.
-var gaiaCoordinateEpochs = map[string]time.Time{
-	"2020yCat.1350....0G": time.FromJD(2457389.0, time.TT),   // Gaia EDR3, J2016.0
-	"2018yCat.1345....0G": time.FromJD(2457206.375, time.TT), // Gaia DR2, J2015.5
+var gaiaCoordinateEpochs = map[string]epoch.Time{
+	"2020yCat.1350....0G": epoch.FromJD(2457389.0, epoch.TT),   // Gaia EDR3, J2016.0
+	"2018yCat.1345....0G": epoch.FromJD(2457206.375, epoch.TT), // Gaia DR2, J2015.5
 }
 
 // astrometricError reads a row's error ellipses, the position's in mas and

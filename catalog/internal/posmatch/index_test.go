@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -24,11 +24,11 @@ func pairSet(pairs [][2]int) map[[2]int]bool {
 
 // epochs a random target is given at: none, J2000.0, Gaia DR2's and DR3's,
 // Hipparcos's, and 2MASS-like observation dates.
-var randomEpochs = []time.Time{
-	{}, time.J2000(),
-	time.FromJD(2457206.375, time.TT), time.FromJD(2457389.0, time.TT),
-	time.FromJD(2448349.0625, time.TT),
-	time.FromJD(2450500.5, time.TT), time.FromJD(2451800.5, time.TT),
+var randomEpochs = []epoch.Time{
+	{}, epoch.J2000(),
+	epoch.FromJD(2457206.375, epoch.TT), epoch.FromJD(2457389.0, epoch.TT),
+	epoch.FromJD(2448349.0625, epoch.TT),
+	epoch.FromJD(2450500.5, epoch.TT), epoch.FromJD(2451800.5, epoch.TT),
 }
 
 // randomTarget is a target near (raDeg, decDeg): moving or still, with or
@@ -78,16 +78,16 @@ func randomTarget(rng *rand.Rand, raDeg, decDeg float64) resolve.Target {
 	return t
 }
 
-// seenBy is a still row that saw t where t was at epoch, a few mas off: the
+// seenBy is a still row that saw t where t was at rowEpoch, a few mas off: the
 // pair Compare compares at the row's epoch, away from where t is indexed.
-func seenBy(rng *rand.Rand, t resolve.Target, epoch time.Time) (resolve.Target, bool) {
-	at, err := coord.PropagateEpoch(Coord(t), epoch)
+func seenBy(rng *rand.Rand, t resolve.Target, rowEpoch epoch.Time) (resolve.Target, bool) {
+	at, err := coord.PropagateEpoch(Coord(t), rowEpoch)
 	if err != nil {
 		return resolve.Target{}, false
 	}
 
 	row := resolve.Target{
-		HasCoord: true, Epoch: epoch,
+		HasCoord: true, Epoch: rowEpoch,
 		Coord: coord.NewICRS(at.RA().Add(mas(rng.Float64()*5)), at.Dec().Add(mas(rng.Float64()*5))),
 	}
 
@@ -160,7 +160,7 @@ func TestCandidatePairsHoldEveryCompatiblePair(t *testing.T) {
 func TestCandidatePairsFindAMovingStarWhereTheRowSawIt(t *testing.T) {
 	t.Parallel()
 
-	j2016 := time.FromJD(2457389.0, time.TT)
+	j2016 := epoch.FromJD(2457389.0, epoch.TT)
 	barnard := resolve.Target{
 		HasCoord: true, Epoch: j2016,
 		Coord: coord.NewICRS(angle.Deg(269.44850252543836), angle.Deg(4.739420051112412)),

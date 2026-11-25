@@ -2,10 +2,11 @@ package kepler
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -20,9 +21,9 @@ func TestProvidersShareOneSOFABaseAndNothingElse(t *testing.T) {
 		t.Fatalf("two Providers built with no base hold %p and %p, not the shared base %p", a.base, b.base, sharedSOFA)
 	}
 
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	el, err := NewElements(epoch, unit.AU(2.77), 0.1, angle.Zero(), angle.Zero(), angle.Zero(), angle.Zero())
+	el, err := NewElements(at, unit.AU(2.77), 0.1, angle.Zero(), angle.Zero(), angle.Zero(), angle.Zero())
 	if err != nil {
 		t.Fatal(err)
 	}

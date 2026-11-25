@@ -9,7 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // eopRecordTail is a real finals2000A record's columns after its date and
@@ -21,24 +21,24 @@ const eopRecordTail = " I  0.120733 0.009786  0.136966 0.015902  " +
 // records from MJD start, and whose cache holds nothing.
 type fetchedBulletin struct{ start, n int }
 
-func (b fetchedBulletin) Fetch(context.Context) (time.EOPData, error) {
+func (b fetchedBulletin) Fetch(context.Context) (epoch.EOPData, error) {
 	var s strings.Builder
 
 	for i := range b.n {
 		mjd := b.start + i
-		t := time.FromJD(float64(mjd)+2400000.5, time.UTC)
+		t := epoch.FromJD(float64(mjd)+2400000.5, epoch.UTC)
 		fmt.Fprintf(&s, "%2d%2d%2d %8.2f%s\n", t.Year()%100, int(t.Month()), t.Day(), float64(mjd), eopRecordTail)
 	}
 
-	return time.EOPData{Raw: []byte(s.String())}, nil
+	return epoch.EOPData{Raw: []byte(s.String())}, nil
 }
 
-func (fetchedBulletin) Cached(context.Context) (time.EOPData, error) {
-	return time.EOPData{}, time.ErrNoEOPData
+func (fetchedBulletin) Cached(context.Context) (epoch.EOPData, error) {
+	return epoch.EOPData{}, epoch.ErrNoEOPData
 }
 
 // TestContextReportsTheEOPItWasPlacedWith: a Context says which Earth
-// orientation its instant was placed with, as time.EOPSource names it, and
+// orientation its instant was placed with, as epoch.EOPSource names it, and
 // whether the instant is inside the loaded bulletin (#1187). With nothing
 // loaded it is "zero" and outside; with a bulletin LoadEOP fetched it is
 // "network", inside for an instant the bulletin covers and outside once
@@ -46,17 +46,17 @@ func (fetchedBulletin) Cached(context.Context) (time.EOPData, error) {
 // "explicit".
 func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 	// Not parallel: the EOP model and loader are process-wide.
-	time.RegisterEOPLoader(nil)
-	time.ResetEOP()
+	epoch.RegisterEOPLoader(nil)
+	epoch.ResetEOP()
 
 	t.Cleanup(func() {
-		time.RegisterEOPLoader(nil)
-		time.ResetEOP()
+		epoch.RegisterEOPLoader(nil)
+		epoch.ResetEOP()
 	})
 
 	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635)
-	inside := time.FromJD(61050.5+2400000.5, time.UTC) // 2026-01-10
-	past := time.FromJD(61400.5+2400000.5, time.UTC)
+	inside := epoch.FromJD(61050.5+2400000.5, epoch.UTC) // 2026-01-10
+	past := epoch.FromJD(61400.5+2400000.5, epoch.UTC)
 
 	check := func(name string, ctx *coord.Context, wantSource string, wantCovered bool) {
 		t.Helper()
@@ -68,9 +68,9 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 
 	check("nothing loaded", mustContext(t, inside, site, atmosphere.Refraction{}), "zero", false)
 
-	time.RegisterEOPLoader(fetchedBulletin{start: 61041, n: 30})
+	epoch.RegisterEOPLoader(fetchedBulletin{start: 61041, n: 30})
 
-	if err := time.LoadEOP(t.Context()); err != nil {
+	if err := epoch.LoadEOP(t.Context()); err != nil {
 		t.Fatalf("LoadEOP: %v", err)
 	}
 
@@ -80,6 +80,6 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 	ctx.SetTime(past)
 	check("moved past the bulletin", ctx, "network", false)
 
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 	check("an explicit model", mustContext(t, inside, site, atmosphere.Refraction{}), "explicit", false)
 }

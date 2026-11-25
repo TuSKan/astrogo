@@ -11,8 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // errEarlier stands in for the failure a client remembers about a host.

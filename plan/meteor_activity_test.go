@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -82,14 +83,14 @@ func TestZHRAtFollowsTheSun(t *testing.T) {
 
 	for _, c := range []struct {
 		key    string
-		at     time.Time
+		at     epoch.Time
 		lambda float64 // Skyfield's λ☉ (J2000) at that instant
 	}{
-		{"perseids", time.Date(2026, 8, 4, 2, 0, 0, 0, time.LocationUTC), 131.3705},
-		{"perseids", time.Date(2026, 8, 13, 2, 0, 33, 0, time.LocationUTC), 140.0000},
-		{"perseids", time.Date(2026, 8, 20, 2, 0, 0, 0, time.LocationUTC), 146.7295},
-		{"geminids", time.Date(2026, 12, 12, 0, 0, 0, 0, time.LocationUTC), 259.5861},
-		{"geminids", time.Date(2026, 12, 15, 12, 0, 0, 0, time.LocationUTC), 263.1458},
+		{"perseids", epoch.Date(2026, 8, 4, 2, 0, 0, 0, time.UTC), 131.3705},
+		{"perseids", epoch.Date(2026, 8, 13, 2, 0, 33, 0, time.UTC), 140.0000},
+		{"perseids", epoch.Date(2026, 8, 20, 2, 0, 0, 0, time.UTC), 146.7295},
+		{"geminids", epoch.Date(2026, 12, 12, 0, 0, 0, 0, time.UTC), 259.5861},
+		{"geminids", epoch.Date(2026, 12, 15, 12, 0, 0, 0, time.UTC), 263.1458},
 	} {
 		m := meteorShowers[c.key]
 
@@ -126,7 +127,7 @@ func TestObservedRateFollowsTheDate(t *testing.T) {
 	rate := func(month, day, hour int) float64 {
 		t.Helper()
 
-		r, err := per.ObservedRate(site, time.Date(2026, time.Month(month), day, hour, 0, 0, 0, time.LocationUTC), prov, 6.5)
+		r, err := per.ObservedRate(site, epoch.Date(2026, time.Month(month), day, hour, 0, 0, 0, time.UTC), prov, 6.5)
 		if err != nil {
 			t.Fatalf("ObservedRate: %v", err)
 		}

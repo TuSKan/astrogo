@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -20,7 +21,7 @@ var roundingFloor = 9.6e-3 / constants.IAU.AstronomicalUnit.Value
 
 // carryEpochs are the instants the carry tests sample: every six hours through
 // 2026, every five days under -short.
-func carryEpochs(t *testing.T) []time.Time {
+func carryEpochs(t *testing.T) []epoch.Time {
 	t.Helper()
 
 	step := 0.25
@@ -28,9 +29,9 @@ func carryEpochs(t *testing.T) []time.Time {
 		step = 5
 	}
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	var out []time.Time
+	var out []epoch.Time
 	for d := 0.0; d < 365; d += step {
 		out = append(out, start.Add(unit.Days(d)))
 	}
@@ -161,7 +162,7 @@ type countingProvider struct {
 	epochs map[ID]map[float64]bool
 }
 
-func (c *countingProvider) Locate(id ID, t time.Time) (State, error) {
+func (c *countingProvider) Locate(id ID, t epoch.Time) (State, error) {
 	if c.epochs[id] == nil {
 		c.epochs[id] = map[float64]bool{}
 	}
@@ -183,7 +184,7 @@ func (c *countingProvider) Locate(id ID, t time.Time) (State, error) {
 func TestCarriedPlaceLocatesTheEarthAndSunOnce(t *testing.T) {
 	t.Parallel()
 
-	at := time.Date(2026, time.June, 10, 21, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 10, 21, 0, 0, 0, time.UTC)
 
 	for _, tc := range []struct {
 		id     ID

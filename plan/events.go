@@ -10,8 +10,8 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -232,7 +232,7 @@ func isPhaseEvent(k EventKind) bool {
 }
 
 // evaluator is a function that returns the metric to be solved (e.g. altitude diff, separation angle).
-type evaluator func(t time.Time) (float64, error)
+type evaluator func(t epoch.Time) (float64, error)
 
 // EventSolver searches for astronomical events based on an EventSpec over a time interval.
 type EventSolver struct {
@@ -317,12 +317,12 @@ func (s EventSolver) Find(spec EventSpec, w Window) ([]Event, error) {
 // refineRoot refines the crossing a sweep found between t1 and t2, from the
 // values f1 and f2 it sampled there — see [Solver.findRootFrom] for why they
 // are not evaluated again.
-func (s EventSolver) refineRoot(eval evaluator, t1, t2 time.Time, f1, f2 float64) (time.Time, float64, error) {
+func (s EventSolver) refineRoot(eval evaluator, t1, t2 epoch.Time, f1, f2 float64) (epoch.Time, float64, error) {
 	return s.Solver.findRootFrom(Evaluator(eval), t1, t2, f1, f2)
 }
 
 // refineExtremum delegates to the unified Solver.FindExtremum.
-func (s EventSolver) refineExtremum(eval evaluator, t1, t3 time.Time, isMax bool) (time.Time, float64, error) {
+func (s EventSolver) refineExtremum(eval evaluator, t1, t3 epoch.Time, isMax bool) (epoch.Time, float64, error) {
 	return s.Solver.FindExtremum(Evaluator(eval), Window{Start: t1, End: t3}, isMax)
 }
 
@@ -348,7 +348,7 @@ func bracketedExtremum(val, lo, hi float64, isMax bool) bool {
 	return val <= lo && val <= hi
 }
 
-func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Event, error) {
+func (s EventSolver) solveVisibility(spec EventSpec, start, end epoch.Time) ([]Event, error) {
 	var events []Event
 
 	// Build a no-refraction atmosphere for geometric altitude evaluation.
@@ -368,12 +368,12 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	// limb is what spec.UpperLimb adds to the geometric altitude, in degrees:
 	// the target's semi-diameter at t, or nothing for its center.
-	limb := func(time.Time, *coord.Context) (float64, error) { return 0, nil }
+	limb := func(epoch.Time, *coord.Context) (float64, error) { return 0, nil }
 
 	if spec.UpperLimb {
 		mb, _ := spec.Target.(MovingBody) // Validate has checked it is one
 
-		limb = func(t time.Time, ctx *coord.Context) (float64, error) {
+		limb = func(t epoch.Time, ctx *coord.Context) (float64, error) {
 			d, err := AngularDiameter(mb, t, ctx)
 			if err != nil {
 				return 0, fmt.Errorf("events: upper limb: %w", err)
@@ -384,7 +384,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	}
 
 	// observeCenter is the target's center, geometric and observed.
-	observeCenter := func(t time.Time) (coord.AltAz, error) {
+	observeCenter := func(t epoch.Time) (coord.AltAz, error) {
 		ctx := evalCtx(t)
 
 		// A solar-system body is observed from the site itself, which is
@@ -415,7 +415,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	// observe is the target's geometric observed position, and the altitude
 	// the threshold is measured against there: its center's, or its upper
 	// limb's with spec.UpperLimb, less the threshold.
-	observe := func(t time.Time) (coord.AltAz, float64, error) {
+	observe := func(t epoch.Time) (coord.AltAz, float64, error) {
 		aa, err := observeCenter(t)
 		if err != nil {
 			return coord.AltAz{}, 0, err
@@ -444,13 +444,13 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 		return ha * 180 / math.Pi
 	}
 
-	evalVal := func(t time.Time) (float64, error) {
+	evalVal := func(t epoch.Time) (float64, error) {
 		_, h, err := observe(t)
 
 		return h, err
 	}
 
-	evalHA := func(t time.Time) (float64, error) {
+	evalHA := func(t epoch.Time) (float64, error) {
 		aa, err := observeCenter(t)
 
 		return hourAngle(aa), err
@@ -459,7 +459,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	wantTransit := spec.Kind == EventTransit || spec.Kind == EventAnyVisibility
 
 	n := int(end.Sub(start)/s.Step) + 2
-	times := make([]time.Time, 0, n)
+	times := make([]epoch.Time, 0, n)
 	alts := make([]float64, 0, n)
 
 	var has []float64
@@ -468,7 +468,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 	}
 
 	// One observation per sample serves the rise/set and the transit search.
-	sample := func(t time.Time) error {
+	sample := func(t epoch.Time) error {
 		aa, h, err := observe(t)
 		if err != nil {
 			return err
@@ -498,7 +498,7 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 
 	// crossing refines the rise or set between t1 and t2, where the threshold
 	// is crossed once, from h1 to h2, and records it if spec asks for it.
-	crossing := func(t1, t2 time.Time, h1, h2 float64) error {
+	crossing := func(t1, t2 epoch.Time, h1, h2 float64) error {
 		kind := EventRise
 		if h1 > 0 {
 			kind = EventSet
@@ -610,8 +610,8 @@ func (s EventSolver) solveVisibility(spec EventSpec, start, end time.Time) ([]Ev
 // not pass the threshold costs one refinement and adds nothing — once a day
 // for a body that never rises or never sets, and not at all on an ordinary day,
 // whose extremes are far past it.
-func (s EventSolver) hiddenCrossings(evalVal evaluator, times []time.Time, alts []float64,
-	crossing func(t1, t2 time.Time, h1, h2 float64) error,
+func (s EventSolver) hiddenCrossings(evalVal evaluator, times []epoch.Time, alts []float64,
+	crossing func(t1, t2 epoch.Time, h1, h2 float64) error,
 ) error {
 	for i := range alts {
 		lo, hi := max(i-1, 0), min(i+1, len(alts)-1)
@@ -650,11 +650,11 @@ func (s EventSolver) hiddenCrossings(evalVal evaluator, times []time.Time, alts 
 	return nil
 }
 
-func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Event, error) {
+func (s EventSolver) solveGeometry(spec EventSpec, start, end epoch.Time) ([]Event, error) {
 	var events []Event
 
 	// Geometry solver handles Conjunction, Opposition, and Greatest Elongation.
-	evalVal := func(t time.Time) (float64, error) {
+	evalVal := func(t epoch.Time) (float64, error) {
 		pos1, err := spec.Target.Position(t)
 		if err != nil {
 			return 0, fmt.Errorf("events: target position: %w", err)
@@ -683,7 +683,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 	}
 
 	n := int(end.Sub(start)/s.Step) + 2
-	times := make([]time.Time, 0, n)
+	times := make([]epoch.Time, 0, n)
 	vals := make([]float64, 0, n)
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
@@ -813,7 +813,7 @@ func (s EventSolver) solveGeometry(spec EventSpec, start, end time.Time) ([]Even
 
 // Event represents a specific occurrence of a celestial target in the coord.
 type Event struct {
-	Time time.Time
+	Time epoch.Time
 	Kind EventKind
 
 	// Altitude is the refracted altitude — what an observer would see — at
@@ -1081,7 +1081,7 @@ func TwilightEvents(site *Site, w Window, prov eph.Provider, kind TwilightKind) 
 // twilightCrossings returns every instant in [start, end] the Sun crosses
 // threshold, in degrees, at site: an EventSet descending, an EventRise
 // climbing.
-func twilightCrossings(start, end time.Time, site *Site, prov eph.Provider, threshold float64) ([]Event, error) {
+func twilightCrossings(start, end epoch.Time, site *Site, prov eph.Provider, threshold float64) ([]Event, error) {
 	solver := NewEventSolver(unit.Minutes(15), unit.Seconds(1))
 
 	return solver.Find(EventSpec{
@@ -1098,7 +1098,7 @@ func twilightCrossings(start, end time.Time, site *Site, prov eph.Provider, thre
 // Sun climbing back through it. Dusk is before Dawn, and both belong to the
 // same night.
 type Night struct {
-	Dusk, Dawn time.Time
+	Dusk, Dawn epoch.Time
 	Kind       TwilightKind
 }
 
@@ -1115,7 +1115,7 @@ type Night struct {
 // day, NightOf returns [ErrNoTwilight]: astronomical twilight never ends on a
 // summer night at 51°N, and a polar day or night lasts weeks. A kind
 // [TwilightThreshold] does not know is [ErrUnknownTwilightKind].
-func NightOf(site *Site, t time.Time, prov eph.Provider, kind TwilightKind) (Night, error) {
+func NightOf(site *Site, t epoch.Time, prov eph.Provider, kind TwilightKind) (Night, error) {
 	threshold, ok := TwilightThreshold(kind)
 	if !ok {
 		return Night{}, fmt.Errorf("%w: %d", ErrUnknownTwilightKind, int(kind))
@@ -1132,7 +1132,7 @@ func NightOf(site *Site, t time.Time, prov eph.Provider, kind TwilightKind) (Nig
 // nightAcross is NightOf for any solar altitude threshold, in degrees: the
 // Sun's descent through it that begins the night t is in, or the one after t,
 // and the ascent that ends it. what names the threshold in an error.
-func nightAcross(t time.Time, site *Site, prov eph.Provider, threshold float64, what string) (dusk, dawn time.Time, err error) {
+func nightAcross(t epoch.Time, site *Site, prov eph.Provider, threshold float64, what string) (dusk, dawn epoch.Time, err error) {
 	day := unit.Days(1)
 
 	ahead, err := twilightCrossings(t, t.Add(day), site, prov, threshold)
@@ -1355,7 +1355,7 @@ const EventAnyPhase EventKind = -2
 // This method delegates to moonElongation (phases.go) for rigorous ecliptic
 // coordinate computation and wraps the results as Event types for the
 // unified EventSolver framework.
-func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]Event, error) {
+func (s EventSolver) solveIllumination(spec EventSpec, start, end epoch.Time) ([]Event, error) {
 	var prov eph.Provider
 	if p, ok := spec.Target.(*Planet); ok && p.IsMoon() {
 		prov = p.Provider()
@@ -1389,7 +1389,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 	}
 
 	n := int(end.Sub(start)/s.Step) + 2
-	times := make([]time.Time, 0, n)
+	times := make([]epoch.Time, 0, n)
 	elongs := make([]float64, 0, n)
 
 	for t := start; !t.After(end); t = t.Add(s.Step) {
@@ -1432,7 +1432,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 			return d
 		}
 
-		evalDist := func(t time.Time) (float64, error) {
+		evalDist := func(t epoch.Time) (float64, error) {
 			e, err := moonElongation(t, prov)
 			if err != nil {
 				return 0, err
@@ -1477,7 +1477,7 @@ func (s EventSolver) solveIllumination(spec EventSpec, start, end time.Time) ([]
 
 // NextNewMoon returns the first New Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
-func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
+func NextNewMoon(start epoch.Time, provider eph.Provider) (*Event, error) {
 	end := start.Add(unit.Days(35))
 	moon := NewMoon(provider)
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
@@ -1501,7 +1501,7 @@ func NextNewMoon(start time.Time, provider eph.Provider) (*Event, error) {
 
 // NextFullMoon returns the first Full Moon event after the given start time.
 // Searches up to 35 days ahead (slightly more than one synodic month).
-func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
+func NextFullMoon(start epoch.Time, provider eph.Provider) (*Event, error) {
 	end := start.Add(unit.Days(35))
 	moon := NewMoon(provider)
 	solver := NewEventSolver(unit.Hours(6), unit.Seconds(1))
@@ -1548,7 +1548,7 @@ func NextFullMoon(start time.Time, provider eph.Provider) (*Event, error) {
 // be an ok of false that the callers took as "skip this event", so an
 // ephemeris failure at a refined instant left a rise, set or transit missing
 // with a nil error, indistinguishable from a quiet sky (#437).
-func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, err error) {
+func altitudesAt(spec EventSpec, t epoch.Time, geomAtm atmosphere.Refraction) (geom, refr coord.AltAz, err error) {
 	at := func(atm atmosphere.Refraction) (coord.AltAz, error) {
 		ctx, err := coord.NewContext(t, spec.Observer.Location(), atm)
 		if err != nil {
@@ -1602,7 +1602,7 @@ func altitudesAt(spec EventSpec, t time.Time, geomAtm atmosphere.Refraction) (ge
 // The rotation is to CIRS. Its RA differs from equinox-based apparent RA by
 // the equation of the origins, one angle for every body at a given instant,
 // so the difference — and the instant it crosses zero — is the same.
-func raOfDateDifference(pos1, pos2 coord.ICRS, t time.Time) float64 {
+func raOfDateDifference(pos1, pos2 coord.ICRS, t epoch.Time) float64 {
 	tt1, tt2 := t.TT().JDParts()
 	rc2i := gofaext.C2i06a(tt1, tt2)
 

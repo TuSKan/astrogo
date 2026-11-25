@@ -170,16 +170,22 @@ func TestEveryCometRowPropagates(t *testing.T) {
 }
 
 // TestReadYieldsABadCometRowAndKeepsGoing checks a comet row that is the right
-// shape with a field that is not a number, and one whose date cannot be a
-// date: each is an ErrMalformedRow for that row alone.
+// shape with a field that is not a number, one whose date cannot be a date,
+// and epochs that are not eight digits: each is an ErrMalformedRow for that
+// row alone.
 func TestReadYieldsABadCometRowAndKeepsGoing(t *testing.T) {
 	good := cometRows[0]
 
 	badQ := good[:31] + "0.9x5246" + good[39:]
 	badMonth := good[:19] + "13" + good[21:]
 	badEpoch := good[:81] + "20261399" + good[89:]
+	shortEpoch := good[:81] + " 2026092" + good[89:]
+	letterEpoch := good[:81] + "2026O922" + good[89:]
 
-	for name, row := range map[string]string{"q": badQ, "month": badMonth, "epoch": badEpoch} {
+	for name, row := range map[string]string{
+		"q": badQ, "month": badMonth, "epoch": badEpoch,
+		"seven-digit epoch": shortEpoch, "epoch with a letter": letterEpoch,
+	} {
 		var (
 			errs []error
 			read int

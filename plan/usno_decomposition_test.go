@@ -8,12 +8,13 @@ import (
 	"math"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestUSNODecomposesTheTopocentricBias splits the topocentric residual into
@@ -143,9 +144,9 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 			t.Fatalf("%s %s: parsing the CelNav response: %v", e.date, e.utcTime, err)
 		}
 
-		epoch := parseUSNOEpoch(t, e.date, e.utcTime)
+		at := parseUSNOEpoch(t, e.date, e.utcTime)
 
-		gast, err := epoch.GAST()
+		gast, err := at.GAST()
 		if err != nil {
 			t.Fatalf("%s %s: GAST: %v", e.date, e.utcTime, err)
 		}
@@ -158,7 +159,7 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 				continue
 			}
 
-			gotDec, gotGHA := geocentricApparent(t, provider, id, epoch, gast)
+			gotDec, gotGHA := geocentricApparent(t, provider, id, at, gast)
 
 			dDec := (gotDec - entry.AlmanacData.Dec) * 3600
 			dGHA := wrapDegrees180(gotGHA-entry.AlmanacData.GHA) * 3600 *
@@ -262,12 +263,12 @@ func TestUSNODecomposesTheTopocentricBias(t *testing.T) {
 // corrected, no aberration — which is what Atci13 expects as input. Atci13
 // then applies precession-nutation, annual aberration and light deflection
 // geocentrically, and returns the equation of the origins alongside.
-func geocentricApparent(t *testing.T, p eph.Provider, id eph.ID, epoch time.Time,
+func geocentricApparent(t *testing.T, p eph.Provider, id eph.ID, at epoch.Time,
 	gast angle.Angle,
 ) (decDeg, ghaDeg float64) {
 	t.Helper()
 
-	state, err := eph.At(p, epoch).Astrometric(id, eph.Geocenter())
+	state, err := eph.At(p, at).Astrometric(id, eph.Geocenter())
 	if err != nil {
 		t.Fatalf("Astrometric(%s): %v", id, err)
 	}
@@ -276,7 +277,7 @@ func geocentricApparent(t *testing.T, p eph.Provider, id eph.ID, epoch time.Time
 
 	astrometric.FromUnitVector(state.Pos.Unit())
 
-	tt1, tt2 := epoch.TT().JDParts()
+	tt1, tt2 := at.TT().JDParts()
 
 	ri, di, eo := gofaext.Atci13(
 		astrometric.RA().Radians(), astrometric.Dec().Radians(),
@@ -335,7 +336,7 @@ func usnoNavigationalBody(name string) (eph.ID, bool) {
 
 // parseUSNOEpoch builds the epoch from the strings the request was made with,
 // so the comparison cannot drift from what was asked for.
-func parseUSNOEpoch(t *testing.T, date, utcTime string) time.Time {
+func parseUSNOEpoch(t *testing.T, date, utcTime string) epoch.Time {
 	t.Helper()
 
 	var y, mo, d int
@@ -348,7 +349,7 @@ func parseUSNOEpoch(t *testing.T, date, utcTime string) time.Time {
 		t.Fatalf("parsing time %q: %v", utcTime, err)
 	}
 
-	return time.Date(y, time.Month(mo), d, h, m, s, 0, time.LocationUTC)
+	return epoch.Date(y, time.Month(mo), d, h, m, s, 0, time.UTC)
 }
 
 // summarize logs a residual distribution and returns its signed mean.

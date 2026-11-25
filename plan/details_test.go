@@ -6,14 +6,15 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -30,7 +31,7 @@ func TestGetDetails_Star(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC) // J2000
+	tm := epoch.FromJD(2451545.0, epoch.UTC) // J2000
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -91,7 +92,7 @@ func TestGetDetails_DeepSkyObject(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -118,7 +119,7 @@ func TestGetDetails_MovingBody(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -157,7 +158,7 @@ func TestGetDetails_String(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -185,7 +186,7 @@ func TestGetDetails_RadialVelocity(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -231,7 +232,7 @@ func TestGetDetails_RadialVelocity_NotSet(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -264,7 +265,7 @@ func TestGetDetails_RadialVelocity_PropOverride(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	ctx := mustContext(t, tm, loc, site.Refraction())
 
@@ -296,10 +297,10 @@ func TestGetDetails_RadialVelocity_SixMonthSwing(t *testing.T) {
 	ra, dec := angle.Zero(), angle.Zero()
 	star := NewStar("EclipticTarget", ra, dec, WithRadialVelocity(0))
 
-	t1 := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	t1 := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(unit.Days(182))
 
-	parseTopo := func(tm time.Time) float64 {
+	parseTopo := func(tm epoch.Time) float64 {
 		ctx := mustContext(t, tm, loc, site.Refraction())
 
 		d, err := star.GetDetails(ctx, DetailOverrides{})
@@ -339,7 +340,7 @@ func TestRadialVelocityDispatchesOnTargetKind(t *testing.T) {
 	}
 
 	ctx := mustContext(t,
-		time.Date(2026, time.March, 15, 0, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, time.March, 15, 0, 0, 0, 0, time.UTC),
 		site, atmosphere.Refraction{Pressure: 0})
 
 	t.Run("fixed target with a catalog value", func(t *testing.T) {
@@ -430,7 +431,7 @@ type failingProvider struct{}
 
 var errFailingProvider = errors.New("failingProvider: no state")
 
-func (failingProvider) Locate(eph.ID, time.Time) (core.State, error) {
+func (failingProvider) Locate(eph.ID, epoch.Time) (core.State, error) {
 	return core.State{}, errFailingProvider
 }
 
@@ -515,7 +516,7 @@ func TestDetailOverridesAppliesEveryField(t *testing.T) {
 			site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 			testutil.AssertNoError(t, err)
 
-			ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+			ctx := mustContext(t, epoch.FromJD(2451545.0, epoch.UTC), loc, site.Refraction())
 
 			base, err := tc.target.GetDetails(ctx, DetailOverrides{})
 			testutil.AssertNoError(t, err)
@@ -554,7 +555,7 @@ func TestDetailOverridesZeroValueOverridesNothing(t *testing.T) {
 	site, err := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	testutil.AssertNoError(t, err)
 
-	ctx := mustContext(t, time.FromJD(2451545.0, time.UTC), loc, site.Refraction())
+	ctx := mustContext(t, epoch.FromJD(2451545.0, epoch.UTC), loc, site.Refraction())
 
 	star := NewStar("Vega", angle.Hour(18.615), angle.Deg(38.78),
 		WithStarMagnitude(0.03),

@@ -29,12 +29,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -228,9 +229,9 @@ func parseNASACatalog(t *testing.T, html string, key *regexp.Regexp) []nasaEclip
 
 		var jdTD float64
 		if isJulianCal {
-			jdTD = time.DateJulianCal(year, month, day, hour, minute, sec).JD()
+			jdTD = epoch.DateJulianCal(year, month, day, hour, minute, sec).JD()
 		} else {
-			jdTD = time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.LocationUTC).JD()
+			jdTD = epoch.Date(year, time.Month(month), day, hour, minute, sec, 0, time.UTC).JD()
 		}
 
 		eclipses = append(eclipses, nasaEclipseRef{
@@ -341,8 +342,8 @@ func checkNoEclipseOutsideCatalog(t *testing.T, kind string,
 ) {
 	t.Helper()
 
-	start := time.FromJD(refs[0].JDtd-1, time.TDB)
-	end := time.FromJD(refs[len(refs)-1].JDtd+1, time.TDB)
+	start := epoch.FromJD(refs[0].JDtd-1, epoch.TDB)
+	end := epoch.FromJD(refs[len(refs)-1].JDtd+1, epoch.TDB)
 
 	events, err := find(plan.Window{Start: start, End: end}, prov)
 	if err != nil {
@@ -512,7 +513,7 @@ func TestNASA_LunarEclipses_Historical(t *testing.T) {
 				totalRef++
 
 				// Use TDB scale for TD reference time (TDB ≈ TT to ~1.7ms)
-				refTime := time.FromJD(ref.JDtd, time.TDB)
+				refTime := epoch.FromJD(ref.JDtd, epoch.TDB)
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
@@ -647,7 +648,7 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 				tested++
 				totalRef++
 
-				refTime := time.FromJD(ref.JDtd, time.TDB)
+				refTime := epoch.FromJD(ref.JDtd, epoch.TDB)
 				searchStart := refTime.Add(unit.Days(-30))
 				searchEnd := refTime.Add(unit.Days(30))
 
@@ -728,24 +729,24 @@ func TestNASA_SolarEclipses_Historical(t *testing.T) {
 
 // eclipseDate is the calendar date of a catalog eclipse at 0h, in the
 // calendar the catalog prints it in: Julian before 1582 October 15.
-func eclipseDate(ref nasaEclipseRef) time.Time {
+func eclipseDate(ref nasaEclipseRef) epoch.Time {
 	if ref.Year < 1582 || (ref.Year == 1582 && (ref.Month < 10 || (ref.Month == 10 && ref.Day < 15))) {
-		return time.DateJulianCal(ref.Year, ref.Month, ref.Day, 0, 0, 0)
+		return epoch.DateJulianCal(ref.Year, ref.Month, ref.Day, 0, 0, 0)
 	}
 
-	return time.Date(ref.Year, time.Month(ref.Month), ref.Day, 0, 0, 0, 0, time.LocationUTC)
+	return epoch.Date(ref.Year, time.Month(ref.Month), ref.Day, 0, 0, 0, 0, time.UTC)
 }
 
-// TestNASA_DeltaT_CrossValidation verifies that astrogo's time.DeltaT
+// TestNASA_DeltaT_CrossValidation verifies that astrogo's epoch.DeltaT
 // matches NASA's tabulated ΔT values from the Five Millennium Eclipse Catalog.
 // Before 1960 both are the Espenak & Meeus (2006) model, so they should agree
-// closely. From 1960 time.DeltaT is the measured TT − UT1 the conversions use
+// closely. From 1960 epoch.DeltaT is the measured TT − UT1 the conversions use
 // (#696), and this test binary loads no IERS bulletin, so it is the zero-DUT1
 // fallback, ΔAT + 32.184 s: within the 0.9 s leap seconds keep UT1 − UTC
 // inside, as the catalog's observed values are.
 //
 // Until #398 it asserted nothing: a difference over 10 s was logged as a
-// warning, and the test passed whatever time.DeltaT returned. The bound now
+// warning, and the test passed whatever epoch.DeltaT returned. The bound now
 // comes from the two things that separate the sides when the model agrees.
 // The catalog prints ΔT in whole seconds, 1 s at most, and from 1960 the
 // zero-DUT1 fallback adds up to 0.9 s. ΔT is evaluated on the eclipse's date;
@@ -797,7 +798,7 @@ func TestNASA_DeltaT_CrossValidation(t *testing.T) {
 			// for eclipses around 1902, when ΔT crossed zero — and a field
 			// that does not parse was already reported by the parser.
 			for _, ref := range refs {
-				computed := time.DeltaT(eclipseDate(ref)).Seconds()
+				computed := epoch.DeltaT(eclipseDate(ref)).Seconds()
 				delta := math.Abs(computed - ref.DeltaT)
 
 				count++

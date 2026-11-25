@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -77,7 +77,7 @@ const (
 type Target struct {
 	// Epoch is the epoch of the target: when its position held, or, for a
 	// target with orbital elements or a TLE, the epoch of those elements.
-	Epoch time.Time
+	Epoch epoch.Time
 	// Catalog is the catalog of the target.
 	Catalog string
 	// Name is the name of the target.
@@ -191,7 +191,7 @@ type Target struct {
 	// PerihelionTime is the time of perihelion passage of the osculating
 	// orbit, TT or TDB as the source publishes it. Set only when HasElements
 	// is true.
-	PerihelionTime time.Time
+	PerihelionTime epoch.Time
 	// HasElements is true if the target has real published osculating
 	// orbital elements: Eccentricity, Inclination, AscendingNode,
 	// ArgPeriapsis and an elements-epoch Epoch, and at least one of the two
@@ -247,7 +247,7 @@ type Target struct {
 }
 
 // ICRS implements coord.Object for a static catalog Target.
-func (t Target) ICRS(_ time.Time) (coord.ICRS, error) {
+func (t Target) ICRS(_ epoch.Time) (coord.ICRS, error) {
 	return t.Coord, nil
 }
 

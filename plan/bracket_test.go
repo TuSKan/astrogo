@@ -3,12 +3,13 @@ package plan
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,12 +20,12 @@ import (
 // and FindRoot, which evaluates both ends again, refuses the bracket.
 // findRootFrom starts from what the sweep saw and finds the root (#425).
 func TestARefinementStartsFromTheSampledBracket(t *testing.T) {
-	a := time.Date(2026, 6, 11, 22, 15, 0, 0, time.LocationUTC)
+	a := epoch.Date(2026, 6, 11, 22, 15, 0, 0, time.UTC)
 	b := a.Add(unit.Minutes(15))
 
 	// What a re-evaluation reads: -1e-7 at a, falling to -1 at b. The sweep
 	// read +1e-7 at a.
-	f := func(at time.Time) (float64, error) {
+	f := func(at epoch.Time) (float64, error) {
 		return -1e-7 - at.Sub(a).Seconds()/900, nil
 	}
 
@@ -58,9 +59,9 @@ func TestTwilightNearASampleOnTheThreshold(t *testing.T) {
 	t.Parallel()
 
 	prov := eph.Default()
-	sample := time.Date(2026, 6, 11, 22, 15, 0, 0, time.LocationUTC)
-	start := time.Date(2026, 6, 11, 20, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 6, 12, 8, 0, 0, 0, time.LocationUTC)
+	sample := epoch.Date(2026, 6, 11, 22, 15, 0, 0, time.UTC)
+	start := epoch.Date(2026, 6, 11, 20, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 6, 12, 8, 0, 0, 0, time.UTC)
 
 	// The Sun's geometric altitude plus 18° at the sample, from a context
 	// based at the sample itself.

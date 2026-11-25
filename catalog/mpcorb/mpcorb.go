@@ -48,12 +48,13 @@ import (
 	"iter"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -313,7 +314,7 @@ func parseRow(row string) (resolve.Target, error) {
 		Kind:        resolve.KindAsteroid,
 	}
 
-	epoch, err := ParseEpoch(strings.TrimSpace(row[colEpochStart:colEpochEnd]))
+	at, err := ParseEpoch(strings.TrimSpace(row[colEpochStart:colEpochEnd]))
 	if err != nil {
 		return resolve.Target{}, fmt.Errorf("%s: %w", t.ID, err)
 	}
@@ -339,7 +340,7 @@ func parseRow(row string) (resolve.Target, error) {
 		f.set(v)
 	}
 
-	t.Epoch = epoch
+	t.Epoch = at
 	t.HasElements = true
 
 	// H is absent from a handful of rows — one in Distant.txt — and G is
@@ -373,35 +374,35 @@ func parseRow(row string) (resolve.Target, error) {
 //
 // Exported because the same packing appears throughout the MPC's files and a
 // caller reading one of the others has the same problem to solve.
-func ParseEpoch(packed string) (time.Time, error) {
+func ParseEpoch(packed string) (epoch.Time, error) {
 	if len(packed) != epochWidth {
-		return time.Time{}, fmt.Errorf("%w: %q is %d characters, want %d",
+		return epoch.Time{}, fmt.Errorf("%w: %q is %d characters, want %d",
 			ErrMalformedEpoch, packed, len(packed), epochWidth)
 	}
 
 	century, ok := map[byte]int{'I': 1800, 'J': 1900, 'K': 2000}[packed[0]]
 	if !ok {
-		return time.Time{}, fmt.Errorf("%w: %q has century marker %q, want I, J or K",
+		return epoch.Time{}, fmt.Errorf("%w: %q has century marker %q, want I, J or K",
 			ErrMalformedEpoch, packed, packed[0:1])
 	}
 
 	yy, err := strconv.Atoi(packed[1:3])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %q has non-numeric year %q", ErrMalformedEpoch, packed, packed[1:3])
+		return epoch.Time{}, fmt.Errorf("%w: %q has non-numeric year %q", ErrMalformedEpoch, packed, packed[1:3])
 	}
 
 	month, err := unpackDigit(packed[3])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %q: month: %w", ErrMalformedEpoch, packed, err)
+		return epoch.Time{}, fmt.Errorf("%w: %q: month: %w", ErrMalformedEpoch, packed, err)
 	}
 
 	day, err := unpackDigit(packed[4])
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %q: day: %w", ErrMalformedEpoch, packed, err)
+		return epoch.Time{}, fmt.Errorf("%w: %q: day: %w", ErrMalformedEpoch, packed, err)
 	}
 
 	if month < 1 || month > 12 || day < 1 || day > 31 {
-		return time.Time{}, fmt.Errorf("%w: %q decodes to month %d day %d", ErrMalformedEpoch, packed, month, day)
+		return epoch.Time{}, fmt.Errorf("%w: %q decodes to month %d day %d", ErrMalformedEpoch, packed, month, day)
 	}
 
 	// The Julian Date of a calendar midnight is the same number whichever
@@ -410,9 +411,9 @@ func ParseEpoch(packed string) (time.Time, error) {
 	// labeled TT, which is the scale MPCORB's epochs are actually given in.
 	// Reading it back as UTC instead would be wrong by ΔT — 69 s today, and
 	// a minute is not nothing when the elements are osculating.
-	midnight := time.Date(century+yy, time.Month(month), day, 0, 0, 0, 0, time.LocationUTC)
+	midnight := epoch.Date(century+yy, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 
-	return time.FromJD(midnight.JD(), time.TT), nil
+	return epoch.FromJD(midnight.JD(), epoch.TT), nil
 }
 
 // epochWidth is the packed date's fixed width in the MPCORB record.

@@ -8,13 +8,13 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 func TestStarPosition(t *testing.T) {
 	s := NewStar("Sirius", angle.Hour(6.7525), angle.Deg(-16.7161))
 
-	pos, err := s.Position(time.FromJD(2451545.0, time.UTC))
+	pos, err := s.Position(epoch.FromJD(2451545.0, epoch.UTC))
 	if err != nil {
 		t.Fatalf("Position() error: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestStarPosition(t *testing.T) {
 func TestStarNoCoordinate(t *testing.T) {
 	s := NewStar("Empty", angle.Zero(), angle.Zero())
 
-	pos, err := s.Position(time.FromJD(2451545.0, time.UTC))
+	pos, err := s.Position(epoch.FromJD(2451545.0, epoch.UTC))
 	if err != nil {
 		t.Fatalf("Position() error: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestStarNoCoordinate(t *testing.T) {
 func TestPlanetPosition(t *testing.T) {
 	p := eph.Default()
 	sun := NewSun(p)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	pos, err := sun.Position(tm)
 	if err != nil {
@@ -55,7 +55,7 @@ func TestPlanetPosition(t *testing.T) {
 func TestMoonPosition(t *testing.T) {
 	p := eph.Default()
 	moon := NewMoon(p)
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	pos, err := moon.Position(tm)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestMoonPosition(t *testing.T) {
 
 func TestPlanetGeocentricVec(t *testing.T) {
 	mars := NewMars(eph.Default())
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	vec, err := mars.GeocentricVec(tm)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestDeepSkyObject(t *testing.T) {
 		t.Errorf("Name() = %q, want M31", m31.Name())
 	}
 
-	pos, err := m31.Position(time.FromJD(2451545.0, time.UTC))
+	pos, err := m31.Position(epoch.FromJD(2451545.0, epoch.UTC))
 	if err != nil {
 		t.Fatalf("Position() error: %v", err)
 	}
@@ -173,25 +173,25 @@ func TestFromCatalog(t *testing.T) {
 // Every convenience constructor (NewSun, NewMoon, NewMercury...NewPluto)
 // delegates through NewPlanet, so fixing it there covers all of them.
 func TestNewPlanet_NilProviderDefaults(t *testing.T) {
-	epoch := time.FromJD(2451545.0, time.UTC)
+	at := epoch.FromJD(2451545.0, epoch.UTC)
 
 	mars := NewMars(nil)
-	if _, err := mars.Position(epoch); err != nil {
+	if _, err := mars.Position(at); err != nil {
 		t.Errorf("NewMars(nil).Position(): unexpected error: %v", err)
 	}
 
 	sun := NewSun(nil)
-	if _, err := sun.Position(epoch); err != nil {
+	if _, err := sun.Position(at); err != nil {
 		t.Errorf("NewSun(nil).Position(): unexpected error: %v", err)
 	}
 
 	moon := NewMoon(nil)
-	if _, err := moon.Position(epoch); err != nil {
+	if _, err := moon.Position(at); err != nil {
 		t.Errorf("NewMoon(nil).Position(): unexpected error: %v", err)
 	}
 
 	pluto := NewPluto(nil)
-	if _, err := pluto.Position(epoch); err != nil {
+	if _, err := pluto.Position(at); err != nil {
 		t.Errorf("NewPluto(nil).Position(): unexpected error: %v", err)
 	}
 }

@@ -5,11 +5,12 @@ import (
 	"math/rand/v2"
 	"slices"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -86,7 +87,7 @@ func TestStateFromCachedRecordsAllocatesNothing(t *testing.T) {
 
 	t.Cleanup(func() { _ = p.Close() })
 
-	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, id := range []core.ID{core.Sun, core.Moon, core.Mercury, core.MarsBarycenter, core.NeptuneBarycenter} {
 		if _, err := eph.At(p, at).Geometric(id, core.Earth); err != nil {

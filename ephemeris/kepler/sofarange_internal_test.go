@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/logging"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Plan94 returns +2 when its solution failed to converge, and the position
@@ -21,7 +21,7 @@ func TestPlan94NonConvergenceIsAnError(t *testing.T) {
 	t.Parallel()
 
 	p := New()
-	at := time.FromJD(1e12, time.TT)
+	at := epoch.FromJD(1e12, epoch.TT)
 
 	for _, id := range []core.ID{
 		core.MercuryBarycenter, core.VenusBarycenter, core.MarsBarycenter,
@@ -56,7 +56,7 @@ func TestADateOutsideASofaSpanWarnsOncePerTheory(t *testing.T) {
 
 	p := New()
 
-	year := func(y float64) time.Time { return time.FromJD(2451545.0+(y-2000)*365.25, time.TT) }
+	year := func(y float64) epoch.Time { return epoch.FromJD(2451545.0+(y-2000)*365.25, epoch.TT) }
 
 	locate := func(id core.ID, y float64) {
 		t.Helper()
@@ -126,7 +126,7 @@ func TestAHeldDateOutsideTheSpanStillWarns(t *testing.T) {
 
 	p := New()
 	// A date no other test asks for, outside 1900-2100.
-	at := time.FromJD(2451545.0+(1750-2000)*365.25+0.123456789, time.TT)
+	at := epoch.FromJD(2451545.0+(1750-2000)*365.25+0.123456789, epoch.TT)
 
 	if _, err := p.Locate(core.Sun, at); err != nil {
 		t.Fatalf("first request: %v", err)

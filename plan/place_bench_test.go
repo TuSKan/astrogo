@@ -2,9 +2,10 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -13,7 +14,7 @@ import (
 // #791's measurement, the Sun, the Moon and Mars.
 func BenchmarkGeocentricVec(b *testing.B) {
 	prov := eph.Default()
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, body := range []*Planet{NewSun(prov), NewMoon(prov), NewMars(prov)} {
 		b.Run(body.Name(), func(b *testing.B) {
@@ -34,7 +35,7 @@ func BenchmarkGeocentricVec(b *testing.B) {
 // analytical ephemeris, at a new instant each time: #792's measurement.
 func BenchmarkMoonIllumination(b *testing.B) {
 	prov := eph.Default()
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	i := 0
 
 	for b.Loop() {

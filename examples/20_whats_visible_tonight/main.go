@@ -42,15 +42,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 
 	// The kernel-backed sources register their backend rather than being
@@ -140,7 +141,7 @@ func main() {
 	// August 1, 2026, a clear midwinter night from Quinta Calixto's southern
 	// hemisphere. VisibleTonight plans the night under way at night, or the
 	// coming one, so local noon names that date's evening.
-	night := time.Date(2026, time.August, 1, 12, 0, 0, 0, brtz)
+	night := epoch.Date(2026, time.August, 1, 12, 0, 0, 0, brtz)
 
 	fmt.Printf("\nSite: %s (%.4f, %.4f)\n", site.Name(), -22.528478, -46.473002)
 	fmt.Printf("Night of: %s\n", night.Format("2006-01-02"))
@@ -273,7 +274,7 @@ type tableRow struct {
 // hardcoded), so it stays correctly sized whether magLimit surfaces 5
 // objects or 50.
 func printVisibleTonightTable(results []plan.VisibleObject, loc *time.Location) {
-	clock := func(t time.Time) string {
+	clock := func(t epoch.Time) string {
 		if t.IsZero() {
 			return "—"
 		}

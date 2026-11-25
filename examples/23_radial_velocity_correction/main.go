@@ -20,13 +20,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -37,7 +38,7 @@ func main() {
 	// far below the meters per second printed. For full accuracy,
 	// blank-import remote/eop and consent to the IERS bulletin, as
 	// 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Sirius (α CMa): a well-known bright star with a real published
 	// radial velocity — re-verifiable against any modern stellar catalog
@@ -76,10 +77,10 @@ func main() {
 	tab := show.NewTable(show.Left("Date"), show.Right("Barycentric corr."),
 		show.Right("Heliocentric corr."), show.Right("Measured"), show.Right("Corrected"))
 
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for m := range 12 {
-		t := epoch.Add(unit.Days(float64(m) * 30))
+		t := at.Add(unit.Days(float64(m) * 30))
 
 		ctx, err := coord.NewContext(t, site.Location(), atmosphere.StandardRefraction())
 		if err != nil {

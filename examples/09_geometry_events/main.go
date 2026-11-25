@@ -6,13 +6,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -22,12 +23,12 @@ import (
 
 func main() {
 	// One calendar year, fixed so the output is the same on every run and
-	// can be checked against published almanacs. Use time.NowUTC() as the
+	// can be checked against published almanacs. Use epoch.Now() as the
 	// start to look ahead from today instead.
 	const year = 2027
 
-	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	fmt.Printf("=== Geometry events in %d (UTC) ===\n", year)
 

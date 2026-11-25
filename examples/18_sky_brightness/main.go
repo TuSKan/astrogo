@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -25,7 +26,6 @@ import (
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -55,7 +55,7 @@ func main() {
 
 	// A moonless night. GAMBONSWeb has no moonlight term at all, so the date
 	// matters here only through the zodiacal light's solar elongation.
-	when := time.GoDate(2026, 3, 20, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, 3, 20, 5, 0, 0, 0, time.UTC)
 
 	// Consent, granted explicitly and only for what this preset fetches.
 	// Nothing in astrogo downloads a file without it.

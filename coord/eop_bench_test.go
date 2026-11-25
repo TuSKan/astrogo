@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -43,29 +43,29 @@ func pinEOP(b *testing.B, mode string) {
 
 	switch mode {
 	case "untouched":
-		time.ResetEOP()
+		epoch.ResetEOP()
 
 		want = "zero"
 	case "zero":
-		time.RegisterModel(time.ZeroModel{})
+		epoch.RegisterModel(epoch.ZeroModel{})
 	case "table":
-		table, err := time.ParseFinals2000A(strings.NewReader(testutil.FinalsText(benchEOPStart, benchEOPDays)))
+		table, err := epoch.ParseFinals2000A(strings.NewReader(testutil.FinalsText(benchEOPStart, benchEOPDays)))
 		if err != nil {
 			b.Fatal(err)
 		}
 
-		time.RegisterModel(table)
+		epoch.RegisterModel(table)
 	default:
 		b.Fatalf("unknown EOP mode %q", mode)
 	}
 
-	b.Cleanup(time.ResetEOP)
+	b.Cleanup(epoch.ResetEOP)
 
 	// After a lookup: one that found a bulletin to load would leave the source
 	// "cache", and "untouched" would time a table.
-	_ = time.FromJD(2461056.25, time.UTC).EOP()
+	_ = epoch.FromJD(2461056.25, epoch.UTC).EOP()
 
-	if got := time.EOPSource(); got != want {
+	if got := epoch.EOPSource(); got != want {
 		b.Fatalf("EOP source = %q after pinning %q, want %s: the benchmark would time ambient data", got, mode, want)
 	}
 }
@@ -82,7 +82,7 @@ func BenchmarkNewContextEOP(b *testing.B) {
 		b.Run(mode, func(b *testing.B) {
 			pinEOP(b, mode)
 
-			t := time.FromJD(2461056.25, time.UTC)
+			t := epoch.FromJD(2461056.25, epoch.UTC)
 			atm := atmosphere.StandardRefraction()
 
 			b.ReportAllocs()
@@ -104,7 +104,7 @@ func BenchmarkSetTimeEOP(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	start := time.FromJD(2461056.25, time.UTC)
+	start := epoch.FromJD(2461056.25, epoch.UTC)
 
 	for _, mode := range benchEOPModes {
 		for _, c := range []struct {
@@ -116,7 +116,7 @@ func BenchmarkSetTimeEOP(b *testing.B) {
 
 				ctx := mustContext(b, start, loc, atmosphere.StandardRefraction())
 
-				steps := make([]time.Time, c.steps)
+				steps := make([]epoch.Time, c.steps)
 				for i := range steps {
 					steps[i] = start.Add(unit.Minutes(5 * float64(i+1)))
 				}
@@ -147,9 +147,9 @@ func BenchmarkSetTimeEOPParallel(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	start := time.FromJD(2461056.25, time.UTC)
+	start := epoch.FromJD(2461056.25, epoch.UTC)
 
-	steps := make([]time.Time, 96)
+	steps := make([]epoch.Time, 96)
 	for i := range steps {
 		steps[i] = start.Add(unit.Minutes(5 * float64(i+1)))
 	}

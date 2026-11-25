@@ -3,12 +3,12 @@ package skybrightness_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // kocifaj2008Scene is the cloudless atmosphere of Kocifaj (2008), Appl. Opt.
@@ -46,7 +46,7 @@ func kocifaj2008Scene(tb testing.TB) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   observer,
-		Time:       time.GoDate(2026, 3, 20, 3, 0, 0, 0, time.LocationUTC),
+		Time:       time.Date(2026, 3, 20, 3, 0, 0, 0, time.UTC),
 		Atmosphere: air,
 	}
 }

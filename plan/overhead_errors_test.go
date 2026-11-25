@@ -4,9 +4,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -100,8 +101,8 @@ func TestSwapAndInsertPassesReportAnOverheadFailure(t *testing.T) {
 		return ScheduledBlock{
 			Block: b,
 			Window: Window{
-				Start: start.Add(time.FromGoDuration(offset)),
-				End:   start.Add(time.FromGoDuration(offset) + unit.Minutes(10)),
+				Start: start.Add(epoch.FromGoDuration(offset)),
+				End:   start.Add(epoch.FromGoDuration(offset) + unit.Minutes(10)),
 			},
 		}
 	}

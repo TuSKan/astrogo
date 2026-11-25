@@ -21,8 +21,8 @@ const finalsWidth = 100
 // another does not, and without the network. The values are not the Earth's:
 // nothing that asserts an accuracy may use them.
 //
-// Hand the text to time.ParseFinals2000A and the result to time.RegisterModel.
-// The columns are the ones that parser reads, and time's own tests parse this
+// Hand the text to epoch.ParseFinals2000A and the result to epoch.RegisterModel.
+// The columns are the ones that parser reads, and epoch's own tests parse this
 // output to keep the two in step.
 func FinalsText(startMJD float64, days int) string {
 	var sb strings.Builder

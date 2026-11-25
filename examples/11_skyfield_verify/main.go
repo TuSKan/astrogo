@@ -9,15 +9,16 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -71,7 +72,7 @@ func main() {
 	// place does not use it, having no site and no Earth rotation in it.
 	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
-	t := time.Date(2025, 7, 3, 12, 0, 0, 0, time.LocationUTC)
+	t := epoch.Date(2025, 7, 3, 12, 0, 0, 0, time.UTC)
 
 	show.Title("Mars, geocentric astrometric place", "astrogo against JPL Horizons and Skyfield")
 	fmt.Println()
@@ -185,7 +186,7 @@ type result struct {
 // time applied, no aberration or light deflection, which is what Horizons and
 // Skyfield's radec() report. limitArcsec is the provider's documented
 // accuracy, starred when the offset from Horizons is outside it.
-func place(prov eph.Provider, t time.Time, name string, limitArcsec float64) *result {
+func place(prov eph.Provider, t epoch.Time, name string, limitArcsec float64) *result {
 	st, err := eph.At(prov, t).Astrometric(eph.MarsBarycenter, eph.Geocenter())
 	if err != nil {
 		log.Fatalf("%s: %v", name, err)

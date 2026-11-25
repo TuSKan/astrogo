@@ -6,6 +6,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
@@ -16,7 +17,6 @@ import (
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/passband"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/solar"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ks91Scatter is the rms scatter Krisciunas & Schaefer (1991) report for their

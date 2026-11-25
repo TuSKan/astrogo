@@ -3,7 +3,7 @@ package plan
 import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -80,7 +80,7 @@ func (s *Star) Name() string {
 }
 
 // Position returns the star position.
-func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
+func (s *Star) Position(_ epoch.Time) (coord.ICRS, error) {
 	hasPM := s.pmRA.Radians() != 0 || s.pmDec.Radians() != 0
 
 	hasParallax := s.parallax.Radians() != 0
@@ -89,7 +89,7 @@ func (s *Star) Position(_ time.Time) (coord.ICRS, error) {
 			s.coord.RA(), s.coord.Dec(),
 			s.pmRA, s.pmDec,
 			s.parallax, s.radialVelocity,
-			time.J2000(),
+			epoch.J2000(),
 		), nil
 	}
 

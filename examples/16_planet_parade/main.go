@@ -16,16 +16,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -86,7 +87,7 @@ func main() {
 	}
 
 	// ── Part 1: Solar Events ──────────────────────────────────────────
-	day := time.Date(2025, time.February, 28, 0, 0, 0, 0, brtz)
+	day := epoch.Date(2025, time.February, 28, 0, 0, 0, 0, brtz)
 	next := day.Add(unit.Hours(24))
 
 	_, sunset, err := plan.SunriseSunset(site, plan.Window{Start: day, End: next}, prov)
@@ -255,8 +256,8 @@ func main() {
 	)
 
 	// ── Part 5: Near-Conjunctions ────────────────────────────────────
-	searchStart := time.Date(2025, time.February, 15, 0, 0, 0, 0, time.LocationUTC)
-	searchEnd := time.Date(2025, time.March, 15, 0, 0, 0, 0, time.LocationUTC)
+	searchStart := epoch.Date(2025, time.February, 15, 0, 0, 0, 0, time.UTC)
+	searchEnd := epoch.Date(2025, time.March, 15, 0, 0, 0, 0, time.UTC)
 
 	pairs := [][2]int{
 		{1, 6}, // Venus–Neptune

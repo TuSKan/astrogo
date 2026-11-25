@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -13,11 +14,11 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -49,7 +50,7 @@ func main() {
 	// A TLE describes an orbit well for a few days either side of its
 	// epoch, and CelesTrak serves the current one, so this example works
 	// from the present moment rather than a fixed date.
-	now := time.NowUTC()
+	now := epoch.Now()
 
 	show.Title("Tracking the ISS", "From CelesTrak's current element set, through SGP4")
 

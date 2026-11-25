@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -29,7 +30,7 @@ func TestNightOfIsOneNightFromAnyInstantInIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
+	noon := epoch.Date(2026, time.November, 17, 12, 0, 0, 0, time.UTC)
 
 	for _, kind := range []plan.TwilightKind{plan.CivilTwilight, plan.NauticalTwilight, plan.AstronomicalTwilight} {
 		pairs, err := plan.TwilightEvents(site, plan.Window{Start: noon, End: noon.Add(unit.Hours(24))}, prov, kind)
@@ -45,7 +46,7 @@ func TestNightOfIsOneNightFromAnyInstantInIt(t *testing.T) {
 
 		for _, at := range []struct {
 			name string
-			t    time.Time
+			t    epoch.Time
 		}{
 			{"noon", noon},
 			{"23:00", noon.Add(unit.Hours(11))},
@@ -83,7 +84,7 @@ func TestNightOfAfterDawnIsTheComingNight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tonight, err := plan.NightOf(site, time.Date(2026, time.November, 17, 23, 0, 0, 0, time.LocationUTC), prov, plan.AstronomicalTwilight)
+	tonight, err := plan.NightOf(site, epoch.Date(2026, time.November, 17, 23, 0, 0, 0, time.UTC), prov, plan.AstronomicalTwilight)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,13 +134,13 @@ func TestNightOfFindsNoNightThatLastsADayOrNever(t *testing.T) {
 
 	for _, c := range []struct {
 		name string
-		at   time.Time
+		at   epoch.Time
 		kind plan.TwilightKind
 	}{
-		{"June, astronomical, noon", time.Date(2026, time.June, 21, 11, 0, 0, 0, time.LocationUTC), plan.AstronomicalTwilight},
-		{"June, astronomical, midnight", time.Date(2026, time.June, 21, 23, 0, 0, 0, time.LocationUTC), plan.AstronomicalTwilight},
-		{"December, civil, noon", time.Date(2026, time.December, 21, 11, 0, 0, 0, time.LocationUTC), plan.CivilTwilight},
-		{"December, civil, midnight", time.Date(2026, time.December, 21, 23, 0, 0, 0, time.LocationUTC), plan.CivilTwilight},
+		{"June, astronomical, noon", epoch.Date(2026, time.June, 21, 11, 0, 0, 0, time.UTC), plan.AstronomicalTwilight},
+		{"June, astronomical, midnight", epoch.Date(2026, time.June, 21, 23, 0, 0, 0, time.UTC), plan.AstronomicalTwilight},
+		{"December, civil, noon", epoch.Date(2026, time.December, 21, 11, 0, 0, 0, time.UTC), plan.CivilTwilight},
+		{"December, civil, midnight", epoch.Date(2026, time.December, 21, 23, 0, 0, 0, time.UTC), plan.CivilTwilight},
 	} {
 		if n, err := plan.NightOf(site, c.at, prov, c.kind); !errors.Is(err, plan.ErrNoTwilight) {
 			t.Errorf("%s: %+v, %v, want ErrNoTwilight", c.name, n, err)
@@ -161,14 +162,14 @@ func TestNightOfRefusesWhatIsNotAnInstantOrAKind(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
+	noon := epoch.Date(2026, time.November, 17, 12, 0, 0, 0, time.UTC)
 
 	if _, err := plan.NightOf(site, noon, prov, plan.TwilightKind(99)); !errors.Is(err, plan.ErrUnknownTwilightKind) {
 		t.Errorf("kind 99: %v, want ErrUnknownTwilightKind", err)
 	}
 
 	for _, jd := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
-		if _, err := plan.NightOf(site, time.FromJD(jd, time.UTC), prov, plan.CivilTwilight); !errors.Is(err, plan.ErrNonFiniteInterval) {
+		if _, err := plan.NightOf(site, epoch.FromJD(jd, epoch.UTC), prov, plan.CivilTwilight); !errors.Is(err, plan.ErrNonFiniteInterval) {
 			t.Errorf("FromJD(%v): %v, want ErrNonFiniteInterval", jd, err)
 		}
 	}

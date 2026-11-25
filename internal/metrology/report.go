@@ -11,8 +11,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // SchemaVersion is the version of the result document written by [Suite].

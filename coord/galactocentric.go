@@ -5,8 +5,8 @@ import (
 	"math"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -315,7 +315,7 @@ func icrsFromBarycentricVelocity(dir ICRS, distance unit.Length, velocity vector
 		angle.Rad(ra).Wrap360(), angle.Rad(dec),
 		pmRACosDec(pmr, angle.Rad(dec)), angle.Rad(pmd),
 		angle.Arcsec(px), unit.KmPerSec(rv),
-		time.J2000(),
+		epoch.J2000(),
 	), true
 }
 

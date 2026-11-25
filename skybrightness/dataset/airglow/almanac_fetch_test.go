@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // AlmanacAt's request path, against a fake SkyCalc rather than Garching.
@@ -53,7 +53,7 @@ func TestAlmanacAtPostsToSkyCalcAndDecodes(t *testing.T) {
 		"observation":{"season_flag":2,"time_flag":3},
 		"sun":{"sun_aveflux":129.5}}}`)
 
-	when := time.GoDate(2024, time.March, 21, 3, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2024, time.March, 21, 3, 0, 0, 0, time.UTC)
 
 	alm, err := airglow.AlmanacAt(t.Context(), when, airglow.Paranal)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestAlmanacAtPostsToSkyCalcAndDecodes(t *testing.T) {
 func TestAlmanacAtRefusesAnUndecodableAnswer(t *testing.T) {
 	serveAlmanac(t, http.StatusOK, `not json at all`)
 
-	when := time.GoDate(2024, time.March, 21, 3, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2024, time.March, 21, 3, 0, 0, 0, time.UTC)
 
 	if _, err := airglow.AlmanacAt(t.Context(), when, airglow.Paranal); err == nil {
 		t.Fatal("an undecodable response produced an almanac")
@@ -87,7 +87,7 @@ func TestAlmanacAtRefusesAnUndecodableAnswer(t *testing.T) {
 func TestAlmanacAtReportsAServiceFailure(t *testing.T) {
 	serveAlmanac(t, http.StatusServiceUnavailable, `<html>down for maintenance</html>`)
 
-	when := time.GoDate(2024, time.March, 21, 3, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2024, time.March, 21, 3, 0, 0, 0, time.UTC)
 
 	if _, err := airglow.AlmanacAt(t.Context(), when, airglow.Paranal); err == nil {
 		t.Fatal("a 503 produced an almanac")

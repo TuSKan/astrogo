@@ -10,7 +10,7 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +21,7 @@ func TestEventSolver_Visibility_Fixed(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(0))
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(1))
@@ -59,7 +59,7 @@ func TestEventSolver_Visibility_Circumpolar(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(80))
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(10))
@@ -85,7 +85,7 @@ func TestEventSolver_Visibility_NeverVisible(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	obj := NewStar("T", angle.Deg(0), angle.Deg(-80))
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	solver := NewEventSolver(unit.Minutes(30), unit.Seconds(10))
@@ -113,7 +113,7 @@ func TestSunEvents(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	start := time.FromJD(2451544.5, time.UTC)
+	start := epoch.FromJD(2451544.5, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	events, err := SunEvents(site, Window{Start: start, End: end}, eph)
@@ -146,7 +146,7 @@ func TestSunEvents_Polar(t *testing.T) {
 	site, _ := NewSite("Arctic", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	start := time.FromJD(2451727.5, time.UTC)
+	start := epoch.FromJD(2451727.5, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	events, err := SunEvents(site, Window{Start: start, End: end}, eph)
@@ -164,7 +164,7 @@ func TestMoonEvents(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	events, err := MoonEvents(site, Window{Start: start, End: end}, eph)
@@ -191,7 +191,7 @@ func TestSunriseSunset(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	start := time.FromJD(2451544.5, time.UTC)
+	start := epoch.FromJD(2451544.5, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	rise, set, err := SunriseSunset(site, Window{Start: start, End: end}, eph)
@@ -209,7 +209,7 @@ func TestTwilightEvents(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	start := time.FromJD(2451544.5, time.UTC)
+	start := epoch.FromJD(2451544.5, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	kinds := []TwilightKind{
@@ -254,7 +254,7 @@ func TestTwilightEventsGroupsDuskWithFollowingDawn(t *testing.T) {
 	// A window starting in daylight and running long enough to see one
 	// full dusk-to-dawn astronomical-twilight span, with margin on both
 	// ends so neither edge is truncated.
-	start := time.FromJD(2451544.5, time.UTC) // local midday-ish
+	start := epoch.FromJD(2451544.5, epoch.UTC) // local midday-ish
 	end := start.Add(unit.Hours(36))
 
 	events, err := TwilightEvents(site, Window{Start: start, End: end}, eph, AstronomicalTwilight)
@@ -294,7 +294,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 	// First find one real dusk/dawn pair, then shrink the window to start
 	// strictly between them -- guaranteeing the leading result in the
 	// narrowed window is Dawn-only (its dusk fell before the new start).
-	wide := time.FromJD(2451544.5, time.UTC)
+	wide := epoch.FromJD(2451544.5, epoch.UTC)
 	events, err := TwilightEvents(site, Window{Start: wide, End: wide.Add(unit.Hours(36))}, eph, AstronomicalTwilight)
 	testutil.AssertNoError(t, err)
 
@@ -333,7 +333,7 @@ func TestTwilightEventsEdgeEventsLeftHalfNil(t *testing.T) {
 // reachable at high latitude but which real Sun/solver geometry has no
 // convenient, reliably-reproducible fixture for.
 func TestGroupTwilightEvents(t *testing.T) {
-	t0 := time.FromJD(2451544.5, time.UTC)
+	t0 := epoch.FromJD(2451544.5, epoch.UTC)
 	dusk := func(h float64) Event {
 		return Event{Kind: EventSet, Time: t0.Add(unit.Hours(h))}
 	}
@@ -423,7 +423,7 @@ func TestTwilight_Sequence(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	noon := time.FromJD(2451545.0, time.UTC) // 2000-01-01 12:00 UTC, midday at 0° longitude
+	noon := epoch.FromJD(2451545.0, epoch.UTC) // 2000-01-01 12:00 UTC, midday at 0° longitude
 
 	nights := map[TwilightKind]Night{}
 
@@ -447,7 +447,7 @@ func TestTwilight_Sequence(t *testing.T) {
 
 	sequence := []struct {
 		name string
-		at   time.Time
+		at   epoch.Time
 	}{
 		{"sunset", set.Time},
 		{"civil dusk", nights[CivilTwilight].Dusk},
@@ -473,7 +473,7 @@ func TestTwilight_HighLat(t *testing.T) {
 	site, _ := NewSite("London", loc.Lat(), loc.Lon(), loc.Height())
 	eph := eph.Default()
 
-	noon := time.FromJD(2451728.0, time.UTC) // 2000-07-02 12:00 UTC
+	noon := epoch.FromJD(2451728.0, epoch.UTC) // 2000-07-02 12:00 UTC
 
 	if n, err := NightOf(site, noon, eph, AstronomicalTwilight); !errors.Is(err, ErrNoTwilight) {
 		t.Errorf("NightOf in a London summer = %+v, %v, want ErrNoTwilight", n, err)
@@ -493,8 +493,8 @@ type mockLinearTarget struct {
 	dec     float64
 }
 
-func (m *mockLinearTarget) Position(t time.Time) (coord.ICRS, error) {
-	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+func (m *mockLinearTarget) Position(t epoch.Time) (coord.ICRS, error) {
+	hours := float64(t.Sub(epoch.FromJD(2451545.0, epoch.UTC)).Hours())
 	ra := m.startRA + m.raRate*hours
 	// Normalize RA
 	for ra >= 360 {
@@ -527,7 +527,7 @@ func TestEventSolver_Find_UnimplementedFamily(t *testing.T) {
 	t1 := &mockLinearTarget{raRate: 1.0, startRA: 10, dec: 0.0}
 	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
@@ -548,7 +548,7 @@ func TestSolveGeometry_Conjunction(t *testing.T) {
 	t1 := &mockLinearTarget{raRate: 1.0, startRA: 10, dec: 0.0}
 	t2 := &mockLinearTarget{raRate: 0.5, startRA: 15, dec: 0.0}
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(24))
 
 	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
@@ -580,7 +580,7 @@ func TestSolveGeometry_Opposition(t *testing.T) {
 	t1 := &mockLinearTarget{raRate: 1.0, startRA: 175, dec: 0.0}
 	t2 := &mockLinearTarget{raRate: 0.0, startRA: 0, dec: 0.0}
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(10))
 
 	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
@@ -610,8 +610,8 @@ type mockParabolicTarget struct {
 	k float64
 }
 
-func (m *mockParabolicTarget) Position(t time.Time) (coord.ICRS, error) {
-	hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+func (m *mockParabolicTarget) Position(t epoch.Time) (coord.ICRS, error) {
+	hours := float64(t.Sub(epoch.FromJD(2451545.0, epoch.UTC)).Hours())
 	dec := m.a*(hours-m.h)*(hours-m.h) + m.k
 
 	return coord.NewICRS(angle.Deg(0), angle.Deg(dec)), nil
@@ -634,8 +634,8 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 		k: 15.0,
 	}
 
-	t1Pos := func(t time.Time) (coord.ICRS, error) {
-		hours := float64(t.Sub(time.FromJD(2451545.0, time.UTC)).Hours())
+	t1Pos := func(t epoch.Time) (coord.ICRS, error) {
+		hours := float64(t.Sub(epoch.FromJD(2451545.0, epoch.UTC)).Hours())
 		dec := t1.a*(hours-t1.h)*(hours-t1.h) + t1.k
 
 		return coord.NewICRS(angle.Deg(20), angle.Deg(dec)), nil
@@ -643,7 +643,7 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 
 	wrapper := &mockDynamicTarget{f: t1Pos}
 
-	start := time.FromJD(2451545.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := start.Add(unit.Hours(12))
 
 	solver := NewEventSolver(unit.Hours(1), unit.Seconds(1))
@@ -667,14 +667,14 @@ func TestSolveGeometry_GreatestElongation(t *testing.T) {
 }
 
 type mockDynamicTarget struct {
-	f func(t time.Time) (coord.ICRS, error)
+	f func(t epoch.Time) (coord.ICRS, error)
 }
 
-func (m *mockDynamicTarget) Position(t time.Time) (coord.ICRS, error) { return m.f(t) }
-func (m *mockDynamicTarget) Constraints() []Constraint                { return nil }
-func (m *mockDynamicTarget) Catalog() string                          { return "DYN" }
-func (m *mockDynamicTarget) ID() string                               { return "Dyn" }
-func (m *mockDynamicTarget) Name() string                             { return "DynName" }
+func (m *mockDynamicTarget) Position(t epoch.Time) (coord.ICRS, error) { return m.f(t) }
+func (m *mockDynamicTarget) Constraints() []Constraint                 { return nil }
+func (m *mockDynamicTarget) Catalog() string                           { return "DYN" }
+func (m *mockDynamicTarget) ID() string                                { return "Dyn" }
+func (m *mockDynamicTarget) Name() string                              { return "DynName" }
 func (m *mockDynamicTarget) GetDetails(_ *coord.Context, _ DetailOverrides) (*TargetDetails, error) {
 	return &TargetDetails{}, nil
 }

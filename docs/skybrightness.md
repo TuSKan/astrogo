@@ -86,7 +86,7 @@ module does not grow a private copy of atmospheric physics or photometry.
 | Throughput, detector QE/PDE, collecting area, pixel solid angle, photon and electron rates | `optics` | Already owns `Telescope`, `Eyepiece`, `Sensor`. One `Sensor` definition then serves both optical arithmetic and background rates. |
 | Spectral quantity types, the shared wavelength axis | `unit` | `SpectralRadiance`, `WavelengthNM`, `SpectralGrid` and friends. Must sit below both `magnitude` and `skybrightness`. |
 | Physical constants | `constants` | `PhotonEnergyJ`, `ToPhoton`/`ToEnergy`, `ArcsecondSquaredToSteradian`, `SI2019`. |
-| Geometry, Sun/Moon, time scales | `coord`, `ephemeris`, `time` | No astronomy is re-implemented here. |
+| Geometry, Sun/Moon, time scales | `coord`, `ephemeris`, `epoch` | No astronomy is re-implemented here. |
 | Dataset acquisition | `remote` | Consent-gated bucket/key layer. |
 
 **`skybrightness` therefore owns only radiance transport**: `Scene`, `Component`, `Model`,
@@ -1274,7 +1274,7 @@ dataset version and performs no acquisition. This is enforced behaviorally:
 check complements it: `TestCoreDoesNotImportIOPackages` bans `remote`, `net`, `net/http`,
 `fits`, `plan` and HDF5 from the core's whole import closure, and `os` as a direct import,
 since `fmt` brings it in (#973). The specification requires reusing `coord`, `ephemeris`
-and `time`, and none of them imports `remote`: `time` takes Earth-orientation data through a
+and `epoch`, and none of them imports `remote`: `epoch` takes Earth-orientation data through a
 loader that `remote/eop` registers, and JPL kernels live in `ephemeris/jpl`. At runtime the
 core reaches outside only through what its caller hands it, the scene's ephemeris provider
 and a registered EOP loader, both consent-gated.
@@ -1875,7 +1875,7 @@ difference is small, a fraction of a second of UT1 moving the Sun by milliarcsec
 the lock is 1e-12 relative and the measured divergence was **2.5×10⁻⁶ on zodiacal
 radiance**: six orders past it, and nowhere near the FMA rounding that tolerance was sized
 for. All four tables passed locally and all four failed on every CI platform, which means
-they had never once passed there. A `TestMain` now registers `time.ZeroModel` for the whole
+they had never once passed there. A `TestMain` now registers `epoch.ZeroModel` for the whole
 package — which also marks the choice authoritative, so the lazy load cannot silently
 replace it — and the tables are regenerated under it.
 

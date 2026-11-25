@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -45,9 +46,9 @@ func TestState(t *testing.T) {
 		t.Fatalf("NewFromTLE failed: %v", err)
 	}
 
-	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
-	state, err := sat.Locate(sat.ID(), epoch)
+	state, err := sat.Locate(sat.ID(), at)
 	if err != nil {
 		t.Fatalf("State failed: %v", err)
 	}
@@ -88,13 +89,13 @@ func TestState_RejectsUnexpectedID(t *testing.T) {
 		t.Fatalf("NewFromTLE failed: %v", err)
 	}
 
-	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
-	if _, err := sat.Locate(eph.Sun, epoch); !errors.Is(err, satellite.ErrUnexpectedID) {
+	if _, err := sat.Locate(eph.Sun, at); !errors.Is(err, satellite.ErrUnexpectedID) {
 		t.Errorf("State(eph.Sun, ...) = %v, want ErrUnexpectedID", err)
 	}
 
-	if _, err := sat.Locate(sat.ID(), epoch); err != nil {
+	if _, err := sat.Locate(sat.ID(), at); err != nil {
 		t.Errorf("State(0, ...) should still succeed, got %v", err)
 	}
 }
@@ -106,7 +107,7 @@ func TestStateForwardOrbit(t *testing.T) {
 	}
 
 	// Propagate 90 minutes forward (approximately one orbit).
-	t0 := time.Date(2026, 4, 19, 11, 45, 32, 0, time.LocationUTC)
+	t0 := epoch.Date(2026, 4, 19, 11, 45, 32, 0, time.UTC)
 	t1 := t0.Add(unit.Days(90.0 / 1440.0))
 
 	s0, err := sat.Locate(sat.ID(), t0)
@@ -137,9 +138,9 @@ func TestAltitude(t *testing.T) {
 		t.Fatalf("NewFromTLE failed: %v", err)
 	}
 
-	epoch := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
 
-	alt, err := sat.Altitude(epoch)
+	alt, err := sat.Altitude(at)
 	if err != nil {
 		t.Fatalf("Altitude failed: %v", err)
 	}

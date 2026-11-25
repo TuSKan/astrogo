@@ -4,15 +4,16 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // moonsetWholeWindow is moonsetFor as one MoonEvents call over the two days
 // around sunset, the search the chunked one replaced.
-func moonsetWholeWindow(t *testing.T, sunset time.Time, site *Site, prov eph.Provider) (time.Time, bool) {
+func moonsetWholeWindow(t *testing.T, sunset epoch.Time, site *Site, prov eph.Provider) (epoch.Time, bool) {
 	t.Helper()
 
 	evs, err := MoonEvents(site, Window{Start: sunset.Add(unit.Days(-1)), End: sunset.Add(unit.Days(1))}, prov)
@@ -43,7 +44,7 @@ func moonsetWholeWindow(t *testing.T, sunset time.Time, site *Site, prov eph.Pro
 		return lastBefore.Time, true
 	}
 
-	return time.Time{}, false
+	return epoch.Time{}, false
 }
 
 // The chunked rise and set searches and the bracketed new-moon search are
@@ -68,7 +69,7 @@ func TestCrescentSearchesMatchAWholeWindow(t *testing.T) {
 		for day := 0; day < 30; day += 4 {
 			// Local noon, every fourth day of a lunation from the new moon
 			// of 2025-03-29.
-			evening := time.Date(2025, 3, 29+day, 12, 0, 0, 0, time.LocationUTC).Add(unit.Hours(-s.lon / 15))
+			evening := epoch.Date(2025, 3, 29+day, 12, 0, 0, 0, time.UTC).Add(unit.Hours(-s.lon / 15))
 
 			sunEvent, found, err := firstEvent(SunEvents, evening, 1, site, prov, isSet)
 			if err != nil || !found {
@@ -82,7 +83,7 @@ func TestCrescentSearchesMatchAWholeWindow(t *testing.T) {
 				t.Fatalf("SunEvents: %v", err)
 			}
 
-			var want time.Time
+			var want epoch.Time
 
 			for _, e := range evs {
 				if isSet(e) {
@@ -122,7 +123,7 @@ func TestCrescentSearchesMatchAWholeWindow(t *testing.T) {
 
 // ageFromALunation is the Moon's age at t from a search over the month
 // before it, the search moonAgeHours brackets.
-func ageFromALunation(t *testing.T, at time.Time, prov eph.Provider) float64 {
+func ageFromALunation(t *testing.T, at epoch.Time, prov eph.Provider) float64 {
 	t.Helper()
 
 	phases, err := MoonPhases(Window{Start: at.Add(unit.Days(-31)), End: at}, prov)
@@ -149,7 +150,7 @@ func TestMoonAgeJustBeforeANewMoon(t *testing.T) {
 	prov := eph.Default()
 
 	// 2025-03-29 10:58 UT, minus an hour.
-	at := time.Date(2025, 3, 29, 9, 58, 0, 0, time.LocationUTC)
+	at := epoch.Date(2025, 3, 29, 9, 58, 0, 0, time.UTC)
 
 	age, err := moonAgeHours(at, prov)
 	if err != nil {

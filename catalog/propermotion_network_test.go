@@ -8,11 +8,11 @@ import (
 	"net"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/gaia"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // simbadAndGaiaControl fails when SIMBAD or Gaia rejects a request a working

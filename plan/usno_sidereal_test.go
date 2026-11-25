@@ -4,11 +4,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // usnoSiderealTolerance is two of the reference's printing steps.
@@ -58,7 +59,7 @@ func TestUSNO_SiderealTime(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.site+" "+c.date, func(t *testing.T) {
-			epoch := usnoUT1(t, c.date, c.ut1)
+			at := usnoUT1(t, c.date, c.ut1)
 
 			geodetic, err := coord.NewGeodetic(angle.LatDeg(c.lat), angle.LonDeg(c.lon), 0)
 			if err != nil {
@@ -70,12 +71,12 @@ func TestUSNO_SiderealTime(t *testing.T) {
 				t.Fatalf("NewSite: %v", err)
 			}
 
-			gast, err := epoch.GAST()
+			gast, err := at.GAST()
 			if err != nil {
 				t.Fatalf("GAST: %v", err)
 			}
 
-			last, err := site.LocalSiderealTime(epoch)
+			last, err := site.LocalSiderealTime(at)
 			if err != nil {
 				t.Fatalf("LocalSiderealTime: %v", err)
 			}
@@ -105,7 +106,7 @@ func TestUSNO_SiderealTime(t *testing.T) {
 // so the calendar reading is converted to a Julian Date and labeled UT1
 // rather than converted from UTC. None of these dates holds a leap second, so
 // the calendar arithmetic is the same on both scales.
-func usnoUT1(t *testing.T, date, clock string) time.Time {
+func usnoUT1(t *testing.T, date, clock string) epoch.Time {
 	t.Helper()
 
 	cal, err := time.Parse("2006-01-02 15:04:05", date+" "+clock)
@@ -113,9 +114,9 @@ func usnoUT1(t *testing.T, date, clock string) time.Time {
 		t.Fatalf("parse %s %s: %v", date, clock, err)
 	}
 
-	jd1, jd2 := time.FromGo(cal).JDParts()
+	jd1, jd2 := epoch.FromGo(cal).JDParts()
 
-	return time.FromJDParts(jd1, jd2, time.UT1)
+	return epoch.FromJDParts(jd1, jd2, epoch.UT1)
 }
 
 // hmsHours reads USNO's "hh:mm:ss.ssss" as hours.

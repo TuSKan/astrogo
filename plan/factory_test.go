@@ -4,14 +4,15 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -26,7 +27,7 @@ var errStubMoonProviderState = errors.New("stubMoonProvider: not implemented")
 // no real ephemeris data is needed to exercise the routing itself.
 type stubMoonProvider struct{}
 
-func (stubMoonProvider) Locate(eph.ID, time.Time) (eph.State, error) {
+func (stubMoonProvider) Locate(eph.ID, epoch.Time) (eph.State, error) {
 	return eph.State{}, errStubMoonProviderState
 }
 
@@ -85,7 +86,7 @@ func ceresLikeTarget(kind resolve.Kind) catalog.Target {
 		SPKID:         "20000001",
 		Kind:          kind,
 		HasElements:   true,
-		Epoch:         time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC),
+		Epoch:         epoch.Date(2026, time.June, 9, 0, 0, 0, 0, time.UTC),
 		SemiMajorAxis: unit.AU(2.77),
 		Eccentricity:  0.0797,
 		Inclination:   angle.Deg(10.6),
@@ -171,7 +172,7 @@ func TestFromCatalog_ElementsHyperbolicFallsThrough(t *testing.T) {
 
 // perihelionDistanceAt returns obs's heliocentric distance at t, through the
 // provider FromCatalog built for it.
-func perihelionDistanceAt(t *testing.T, obs *plan.Comet, at time.Time) float64 {
+func perihelionDistanceAt(t *testing.T, obs *plan.Comet, at epoch.Time) float64 {
 	t.Helper()
 
 	body, err := eph.At(obs.Provider(), at).Geometric(obs.EphID(), eph.Earth)
@@ -197,12 +198,12 @@ func TestFromCatalog_OpenOrbitPropagatesFromPerihelion(t *testing.T) {
 	c := catalog.Target{
 		Name: "C/2023 A3 (Tsuchinshan-ATLAS)", ID: "1004083", SPKID: "1004083",
 		Kind: resolve.KindComet, HasElements: true,
-		Epoch:              time.FromJDParts(2460448.5, 0, time.TDB),
+		Epoch:              epoch.FromJDParts(2460448.5, 0, epoch.TDB),
 		Eccentricity:       1.000095368540586,
 		SemiMajorAxis:      unit.AU(-4104.394095058612),
 		MeanAnomaly:        angle.Deg(-0.0004975480989684438),
 		PerihelionDistance: unit.AU(0.3914300748355564),
-		PerihelionTime:     time.FromJDParts(2460581.240845175775, 0, time.TDB),
+		PerihelionTime:     epoch.FromJDParts(2460581.240845175775, 0, epoch.TDB),
 		Inclination:        angle.Deg(139.112109080566),
 		AscendingNode:      angle.Deg(21.55947897244586),
 		ArgPeriapsis:       angle.Deg(308.4917649633916),
@@ -231,12 +232,12 @@ func TestFromCatalog_OpenOrbitPropagatesFromPerihelion(t *testing.T) {
 // what the two share is the comet's distance from the Sun at the epoch the
 // elements osculate at.
 func TestFromCatalog_CometFileRowPropagates(t *testing.T) {
-	tp := time.FromJDParts(2450536.5, 0.0319, time.TT)
+	tp := epoch.FromJDParts(2450536.5, 0.0319, epoch.TT)
 
 	c := catalog.Target{
 		Name: "C/1995 O1 (Hale-Bopp)", ID: "CJ95O010", Designation: "C/1995 O1",
 		Kind: resolve.KindComet, Catalog: "mpcorb", HasElements: true,
-		Epoch:              time.FromJDParts(2461305.5, 0, time.TT),
+		Epoch:              epoch.FromJDParts(2461305.5, 0, epoch.TT),
 		Eccentricity:       0.994897,
 		PerihelionDistance: unit.AU(0.925246),
 		PerihelionTime:     tp,
@@ -483,7 +484,7 @@ func TestFromCatalogKeepsACoordinateAtTheOrigin(t *testing.T) {
 		t.Fatalf("got %T, want *plan.DeepSkyObject", obs)
 	}
 
-	pos, err := dso.Position(time.J2000())
+	pos, err := dso.Position(epoch.J2000())
 	if err != nil {
 		t.Fatalf("Position: %v", err)
 	}

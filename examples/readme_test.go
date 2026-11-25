@@ -8,8 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/TuSKan/astrogo/time"
+	"time"
 )
 
 // readmeProgram matches the README's first program and the printed output

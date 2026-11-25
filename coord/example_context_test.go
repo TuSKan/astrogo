@@ -2,11 +2,12 @@ package coord_test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +34,7 @@ func quintaCalixto() *coord.Geodetic {
 // a hot path builds one Context per epoch and reuses it across targets, rather
 // than one per transform.
 func Example() {
-	when := time.Date(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 3, 0, 0, 0, time.UTC)
 
 	// AtAltitude gives a standard atmosphere for the site's elevation. Its
 	// Model field is deliberately left nil, which means "use the default"
@@ -63,7 +64,7 @@ func Example() {
 // refraction, which is the one case EffectiveModel reads as deliberate rather
 // than as "no opinion".
 func ExampleContext_AstrometricToObserved() {
-	when := time.Date(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.March, 20, 3, 0, 0, 0, time.UTC)
 	site := quintaCalixto()
 
 	withAir, err := coord.NewContext(when, site, atmosphere.AtAltitude(835.05))

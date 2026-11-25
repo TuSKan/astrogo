@@ -3,10 +3,11 @@ package magnitude_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestPlanetMagnitudesAgreeWithHorizons pins every planet but Saturn to JPL
@@ -99,7 +100,7 @@ func TestPlanetMagnitudesAgreeWithHorizons(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tm := time.Date(tc.y, time.Month(tc.m), tc.d, 0, 0, 0, 0, time.LocationUTC)
+		tm := epoch.Date(tc.y, time.Month(tc.m), tc.d, 0, 0, 0, 0, time.UTC)
 
 		got, err := magnitude.PlanetApparent(p, tc.planet, tm)
 		if err != nil {

@@ -3,14 +3,15 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -23,7 +24,7 @@ func itrsContext(t *testing.T) *coord.Context {
 	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635) // Paranal
 
 	return mustContext(t,
-		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC),
 		site,
 		atmosphere.Refraction{},
 	)
@@ -195,7 +196,7 @@ func TestTheObserverRotatesOntoItsOwnSite(t *testing.T) {
 
 func BenchmarkICRSToITRS(b *testing.B) {
 	ctx := mustContext(b,
-		time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC),
+		epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC),
 		coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635),
 		atmosphere.Refraction{},
 	)

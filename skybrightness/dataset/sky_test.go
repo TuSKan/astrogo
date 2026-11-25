@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
@@ -15,7 +16,6 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -71,7 +71,7 @@ func TestLiveAerosolRefusesAnIncompleteRequest(t *testing.T) {
 			t.Parallel()
 
 			_, err := dataset.LiveAerosol(context.Background(), c.site,
-				time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC), c.preset)
+				time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC), c.preset)
 			if !errors.Is(err, dataset.ErrSpec) {
 				t.Errorf("got %v, want ErrSpec — this must fail on the request rather "+
 					"than by reaching a service", err)
@@ -93,7 +93,7 @@ func TestLiveAerosolPassesOnARefusedFetch(t *testing.T) {
 	remote.DisableDownloads()
 
 	air, err := dataset.LiveAerosol(context.Background(), skySite(t),
-		time.GoDate(2023, 1, 1, 3, 0, 0, 0, time.LocationUTC), atmosphere.RuralAerosol)
+		time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC), atmosphere.RuralAerosol)
 	if !errors.Is(err, remote.ErrDownloadDenied) {
 		t.Errorf("got %v, want the fetch's ErrDownloadDenied", err)
 	}
@@ -138,7 +138,7 @@ func TestWithMagSystemOverridesTheVegaDefault(t *testing.T) {
 	}
 
 	// One estimate for both, so the system is the only thing that differs.
-	scene, err := byDefault.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	scene, err := byDefault.Scene(skySite(t), time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC), nil)
 	if err != nil {
 		t.Fatalf("Scene: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestASkyHandsBackWhatItEvaluates(t *testing.T) {
 		t.Errorf("Band is %q, want the inputs' %q", got.Name, in.Band.Name)
 	}
 
-	scene, err := sky.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	scene, err := sky.Scene(skySite(t), time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC), nil)
 	if err != nil {
 		t.Fatalf("Scene: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestSkyMapFeedsTheHemisphereIntegrals(t *testing.T) {
 		t.Fatalf("NewSky: %v", err)
 	}
 
-	scene, err := sky.Scene(skySite(t), time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC), nil)
+	scene, err := sky.Scene(skySite(t), time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC), nil)
 	if err != nil {
 		t.Fatalf("Scene: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestASkyRefusesWhatItCannotEvaluate(t *testing.T) {
 		t.Fatalf("NewSky: %v", err)
 	}
 
-	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC)
 
 	if _, err := sky.Scene(nil, when, nil); !errors.Is(err, dataset.ErrSpec) {
 		t.Errorf("Scene with no site returned %v, want ErrSpec", err)
@@ -523,7 +523,7 @@ func TestOneSkyServesManySites(t *testing.T) {
 		t.Fatalf("NewSky: %v", err)
 	}
 
-	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC)
 
 	// The same coordinates at two elevations, so the sky above them is
 	// identical and the air between is the only thing that differs.
@@ -591,7 +591,7 @@ func TestTheDefaultSceneCarriesOzone(t *testing.T) {
 	}
 
 	site := skySite(t)
-	when := time.GoDate(2026, 4, 2, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, 4, 2, 5, 0, 0, 0, time.UTC)
 
 	def, err := sky.Scene(site, when, nil)
 	if err != nil {

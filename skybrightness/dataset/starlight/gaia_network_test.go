@@ -8,6 +8,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // The one test that catches a malformed query.

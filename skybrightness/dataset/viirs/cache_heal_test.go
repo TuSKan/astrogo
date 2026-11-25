@@ -16,12 +16,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/viirs"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // healYear is the composite every test here opens.
@@ -186,7 +186,7 @@ func viirsCacheAndSource(t *testing.T, body []byte) (cache remote.FS, archiveKey
 			src.downloads.Add(1)
 		}
 
-		http.ServeContent(w, r, archiveFile, time.GoTime{}, bytes.NewReader(body))
+		http.ServeContent(w, r, archiveFile, time.Time{}, bytes.NewReader(body))
 	}))
 	t.Cleanup(srv.Close)
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -70,14 +70,14 @@ func TestSolveUniversalConvergesAcrossTheConics(t *testing.T) {
 // resolved in the eccentric anomaly, which does not iterate, and as a
 // universal anomaly that cannot converge.
 func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
-	epoch := time.FromJDParts(2460000.5, 0, time.TT)
+	at := epoch.FromJDParts(2460000.5, 0, epoch.TT)
 
-	classical, err := NewElements(epoch, unit.AU(2.5), 0.2, angle.Deg(10), angle.Deg(20), angle.Deg(30), angle.Deg(40))
+	classical, err := NewElements(at, unit.AU(2.5), 0.2, angle.Deg(10), angle.Deg(20), angle.Deg(30), angle.Deg(40))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
 	}
 
-	hyperbola, err := FromPerihelion(epoch, epoch, unit.AU(0.5), 1.3, angle.Deg(10), angle.Deg(20), angle.Deg(30))
+	hyperbola, err := FromPerihelion(at, at, unit.AU(0.5), 1.3, angle.Deg(10), angle.Deg(20), angle.Deg(30))
 	if err != nil {
 		t.Fatalf("FromPerihelion: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestStateAtRefusesAnInstantThatIsNotANumber(t *testing.T) {
 		{"NewElements", classical, ErrPhaseUnresolved},
 		{"FromPerihelion", hyperbola, ErrKeplerNoConverge},
 	} {
-		pos, vel, err := c.el.StateAt(time.FromJD(math.NaN(), time.TT))
+		pos, vel, err := c.el.StateAt(epoch.FromJD(math.NaN(), epoch.TT))
 		if !errors.Is(err, c.want) {
 			t.Errorf("%s: StateAt(NaN) = %v, %v, %v; want %v", c.name, pos, vel, err, c.want)
 		}

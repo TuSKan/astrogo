@@ -3,12 +3,13 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -67,7 +68,7 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 
 	sat, site := testISS(t)
 
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 
 	for _, route := range []struct {
 		name string
@@ -86,7 +87,7 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 
 		var (
 			worst, worstOver float64
-			worstAt          time.Time
+			worstAt          epoch.Time
 		)
 
 		for i := range 6 * 60 * 2 { // six hours at 30 s
@@ -151,7 +152,7 @@ func TestMovingContextStaysInsideItsStatedBound(t *testing.T) {
 func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	sat, site := testISS(t)
 
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Hours(6))
 	minEl := angle.Deg(10)
 
@@ -174,7 +175,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 	for _, p := range passes {
 		for _, ev := range []struct {
 			what string
-			at   time.Time
+			at   epoch.Time
 		}{{"rise", p.Rise.Time}, {"set", p.Set.Time}} {
 			got, err := LookAngle(sat, sat.ID(), mustContext(t, ev.at, site, defaultAtm))
 			if err != nil {
@@ -204,7 +205,7 @@ func TestSatellitePassEventsSurviveAFullRebuild(t *testing.T) {
 func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 	_, site := testISS(t)
 
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 	ctxAt := mustMoving(t, start, site, defaultAtm)
 
 	// The Crab, as an ordinary catalog position; any fixed direction does.
@@ -246,7 +247,7 @@ func TestMovingContextKeepsAFixedStarInSetTimesBound(t *testing.T) {
 func TestMovingContextHandlesBackwardsSteps(t *testing.T) {
 	_, site := testISS(t)
 
-	start := time.Date(2026, time.April, 20, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 20, 0, 0, 0, 0, time.UTC)
 	ctxAt := mustMoving(t, start, site, defaultAtm)
 
 	// Sweep forward far enough to move the base several windows on, the way a

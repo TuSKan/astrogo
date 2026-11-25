@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Capability describes what a remote catalog can do.
@@ -106,7 +106,7 @@ type BrightRequest struct {
 	// time. A comet is bright for months around its perihelion and faint for
 	// the rest of its orbit, so for comets this is the difference between
 	// the ones in the sky now and every one that ever came close.
-	At time.Time
+	At epoch.Time
 }
 
 // BrightObjectSearcher lets a provider bulk-list every object it knows about

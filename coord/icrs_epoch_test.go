@@ -2,26 +2,54 @@ package coord_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // barnardDR3 is Barnard's star as Gaia DR3 publishes it, at J2016.0, where
 // its 10.4″/yr carries it some 166″ from where it was at J2000.
-func barnardDR3(epoch time.Time) coord.ICRS {
+func barnardDR3(at epoch.Time) coord.ICRS {
 	return coord.NewICRSWithKinematics(
 		angle.Deg(269.44850252543836), angle.Deg(4.739420051112412),
 		angle.Arcsec(-0.80188), angle.Arcsec(10.36211), angle.Arcsec(0.54670), unit.KmPerSec(-110.4),
-		epoch,
+		at,
 	)
 }
 
 // j2016 is the Gaia DR3 reference epoch, J2016.0 TDB.
-func j2016() time.Time { return time.FromJD(2457389.0, time.TDB) }
+func j2016() epoch.Time { return epoch.FromJD(2457389.0, epoch.TDB) }
+
+// TestPropagateEpochToAZeroEpochIsToJ2000 holds PropagateEpoch to its doc: a
+// zero target epoch is J2000.0. The star moves 166″ getting there, so the
+// comparison is between two places that both moved.
+func TestPropagateEpochToAZeroEpochIsToJ2000(t *testing.T) {
+	t.Parallel()
+
+	star := barnardDR3(j2016())
+
+	zero, err := coord.PropagateEpoch(star, epoch.Time{})
+	if err != nil {
+		t.Fatalf("PropagateEpoch to a zero epoch: %v", err)
+	}
+
+	j2000, err := coord.PropagateEpoch(star, epoch.J2000())
+	if err != nil {
+		t.Fatalf("PropagateEpoch to J2000: %v", err)
+	}
+
+	if moved := coord.Separation(zero, star).Arcseconds(); moved < 100 {
+		t.Fatalf("propagating to a zero epoch moved the star %.3f″, want the 166″ to J2000", moved)
+	}
+
+	if off := coord.Separation(zero, j2000).Arcseconds(); off > 1e-9 {
+		t.Errorf("a zero epoch lands %.3g″ from J2000.0, want J2000.0", off)
+	}
+}
 
 // TestAStarIsPlacedFromItsOwnEpoch: a star given at J2016.0, as Gaia DR3
 // gives it, is observed where the same star moved to J2000.0 first is, and
@@ -35,12 +63,12 @@ func TestAStarIsPlacedFromItsOwnEpoch(t *testing.T) {
 		t.Fatalf("Epoch() = %v, want J2016.0", row.Epoch())
 	}
 
-	atJ2000, err := coord.PropagateEpoch(row, time.J2000())
+	atJ2000, err := coord.PropagateEpoch(row, epoch.J2000())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, err := coord.NewContext(time.Date(2026, 6, 1, 4, 0, 0, 0, time.LocationUTC),
+	ctx, err := coord.NewContext(epoch.Date(2026, 6, 1, 4, 0, 0, 0, time.UTC),
 		coord.MustGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), unit.Meters(2635)), atmosphere.Refraction{})
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +85,7 @@ func TestAStarIsPlacedFromItsOwnEpoch(t *testing.T) {
 		return aa
 	}
 
-	got, want, stale := observe(row), observe(atJ2000), observe(barnardDR3(time.J2000()))
+	got, want, stale := observe(row), observe(atJ2000), observe(barnardDR3(epoch.J2000()))
 
 	if d := angularDistance(got, want).Arcseconds(); d > 1e-6 {
 		t.Errorf("a J2016.0 row lands %.2e″ from the same star moved to J2000 first", d)
@@ -86,12 +114,12 @@ func TestPropagateEpochMovesFromTheStarsEpoch(t *testing.T) {
 
 	row := barnardDR3(j2016())
 
-	there, err := coord.PropagateEpoch(row, time.J2000())
+	there, err := coord.PropagateEpoch(row, epoch.J2000())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !there.Epoch().Equal(time.J2000()) {
+	if !there.Epoch().Equal(epoch.J2000()) {
 		t.Errorf("result Epoch() = %v, want J2000", there.Epoch())
 	}
 

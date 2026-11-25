@@ -4,13 +4,14 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // paranalMoonScene is Paranal on 2026 March 1 at hh:mm UTC, through air that
@@ -31,7 +32,7 @@ func paranalMoonScene(t *testing.T, hh, mm int) *Scene {
 
 	return &Scene{
 		Observer:   loc,
-		Time:       time.GoDate(2026, 3, 1, hh, mm, 0, 0, time.LocationUTC),
+		Time:       time.Date(2026, 3, 1, hh, mm, 0, 0, time.UTC),
 		Atmosphere: air,
 		Ephemeris:  eph.Default(),
 	}
@@ -96,7 +97,7 @@ func TestMoonJustBelowTheSitesHorizonLightsNothing(t *testing.T) {
 	scene := paranalMoonScene(t, 8, 35)
 
 	// The premise: placed as a star, from the Earth's center, it is up.
-	at := time.FromGo(scene.Time)
+	at := epoch.FromGo(scene.Time)
 
 	state, err := eph.At(scene.Ephemeris, at).Geometric(eph.Moon, eph.Earth)
 	if err != nil {

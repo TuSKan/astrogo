@@ -3,7 +3,7 @@ package plan
 import (
 	"slices"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -15,8 +15,8 @@ import (
 // act as if it were not there. Only Duration reports it, as a negative
 // length.
 type Window struct {
-	Start time.Time
-	End   time.Time
+	Start epoch.Time
+	End   epoch.Time
 }
 
 // Duration returns the length of the window, End − Start, negative for an

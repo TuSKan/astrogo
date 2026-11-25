@@ -2,13 +2,14 @@ package ephemeris_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -31,7 +32,7 @@ const scaleTolerance = 1.0 * metersInAU
 //
 // # Why this test exists
 //
-// time.Time is scale-aware by design. A provider that reads its Julian Date
+// epoch.Time is scale-aware by design. A provider that reads its Julian Date
 // parts without normalizing does not get a slightly different answer — it
 // silently reinterprets the caller's instant as a different one.
 //
@@ -66,14 +67,14 @@ const scaleTolerance = 1.0 * metersInAU
 //
 // kepler joined after the fact (#729): it was added as a fourth provider
 // without being enrolled, and passed when it was. It measures elapsed time
-// with time.Time.Sub, which takes mismatched scales through TT; the case is
+// with epoch.Time.Sub, which takes mismatched scales through TT; the case is
 // here so that reading JDParts raw, #148's defect, cannot come back unseen.
 func TestProviderStateIsScaleInvariant(t *testing.T) {
 	t.Parallel()
 
 	// A fixed epoch, not the wall clock: a test pinned to "now" drifts out of
 	// IERS coverage and fails on some future Tuesday with no code change.
-	utc := time.Date(2026, time.April, 20, 3, 0, 0, 0, time.LocationUTC)
+	utc := epoch.Date(2026, time.April, 20, 3, 0, 0, 0, time.UTC)
 
 	sofa := eph.Default()
 
@@ -88,7 +89,7 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 
 	// An asteroid-belt orbit, the element set kepler's own central-body tests
 	// use. Any valid set serves: the test compares the provider with itself.
-	belt, err := kepler.NewElements(time.J2000(), unit.AU(2.7658), 0.07839,
+	belt, err := kepler.NewElements(epoch.J2000(), unit.AU(2.7658), 0.07839,
 		angle.Deg(10.587), angle.Deg(80.393), angle.Deg(73.597), angle.Deg(77.372))
 	if err != nil {
 		t.Fatalf("NewElements: %v", err)
@@ -133,12 +134,12 @@ func TestProviderStateIsScaleInvariant(t *testing.T) {
 
 	scales := []struct {
 		label string
-		at    func(time.Time) time.Time
+		at    func(epoch.Time) epoch.Time
 	}{
-		{"UTC", func(t time.Time) time.Time { return t.UTC() }},
-		{"TAI", func(t time.Time) time.Time { return t.TAI() }},
-		{"TT", func(t time.Time) time.Time { return t.TT() }},
-		{"TDB", func(t time.Time) time.Time { return t.TDB() }},
+		{"UTC", func(t epoch.Time) epoch.Time { return t.UTC() }},
+		{"TAI", func(t epoch.Time) epoch.Time { return t.TAI() }},
+		{"TT", func(t epoch.Time) epoch.Time { return t.TT() }},
+		{"TDB", func(t epoch.Time) epoch.Time { return t.TDB() }},
 	}
 
 	for _, p := range providers {

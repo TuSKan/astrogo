@@ -14,9 +14,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // testDAFHeader builds a minimal but structurally valid DAF/SPK file
@@ -61,8 +61,8 @@ func TestApiHorizonsRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	resp, err := apiHorizonsRequest(context.Background(), "499", start, end)
 	if err != nil {
@@ -137,8 +137,8 @@ func TestCacheAPIReusesExistingFile(t *testing.T) {
 		t.Fatalf("seed kernel object: %v", err)
 	}
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	readers, err := CacheAPI(context.Background(), fsys, "", "433", start, end)
 	if err != nil {
@@ -178,8 +178,8 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 
 	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	readers, err := CacheAPI(context.Background(), fsys, "", "433", start, end)
 	if err != nil {
@@ -264,8 +264,8 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 
 	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	readers, err := CacheAPI(context.Background(), fsys, "", "20000004", start, end)
 	if err != nil {
@@ -347,8 +347,8 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 
 	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
-	start := time.FromJD(2451545.0, time.UTC)
-	end := time.FromJD(2451546.0, time.UTC)
+	start := epoch.FromJD(2451545.0, epoch.UTC)
+	end := epoch.FromJD(2451546.0, epoch.UTC)
 
 	readers, err := CacheAPI(context.Background(), fsys, "", "1000036", start, end)
 	if err != nil {

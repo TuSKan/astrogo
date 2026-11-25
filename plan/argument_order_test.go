@@ -24,7 +24,7 @@ var argumentRank = map[string]int{
 // TestEveryFunctionTakesOneArgumentOrder holds plan's exported functions and
 // methods to one argument order: subjects, then the site, then the time or
 // window, then providers, then the rest, with a context first (#1203). It
-// also refuses a start and an end as two time.Time parameters, where a Window
+// also refuses a start and an end as two epoch.Time parameters, where a Window
 // belongs. plan had three orders for the same triple, written at different
 // times, and nothing to say which was right.
 func TestEveryFunctionTakesOneArgumentOrder(t *testing.T) {

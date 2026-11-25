@@ -3,11 +3,12 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -60,9 +61,9 @@ func TestRankObservableScoresTheMoonFromTheObserver(t *testing.T) {
 
 	moon := NewMoon(eph.Default())
 
-	for _, start := range []time.Time{
-		time.Date(2026, time.March, 3, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.March, 23, 0, 0, 0, 0, time.LocationUTC),
+	for _, start := range []epoch.Time{
+		epoch.Date(2026, time.March, 3, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.March, 23, 0, 0, 0, 0, time.UTC),
 	} {
 		end := start.Add(unit.Days(1))
 
@@ -114,7 +115,7 @@ func TestRankObservableDoesNotRaiseASatelliteAboveTheHorizon(t *testing.T) {
 	}
 
 	sat := NewSatellite("ISS", prov.ID(), prov)
-	day := time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC)
+	day := epoch.Date(2026, time.April, 17, 0, 0, 0, 0, time.UTC)
 	checked := 0
 
 	for h := 0; h < 24; h += 3 {

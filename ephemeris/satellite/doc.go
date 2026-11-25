@@ -13,7 +13,7 @@
 //
 // # If your timestamp came from a receiver, say so
 //
-// [Satellite.Locate] takes an astrogo time.Time, which carries its own scale, and
+// [Satellite.Locate] takes an astrogo epoch.Time, which carries its own scale, and
 // a GNSS receiver does not hand out UTC. GPS and Galileo system time run 18
 // seconds ahead of it today, because they were synchronized once in 1980 and
 // told to ignore leap seconds since.
@@ -22,14 +22,14 @@
 // which for the ISS is 138 km. The offset is ΔAT − 19, so it is not a constant
 // a caller can subtract once and remember: it was 14 s in 2008 and stepped to 18
 // at the 2017 leap second. Build the instant with
-// [github.com/TuSKan/astrogo/time.GPST] as its scale and the arithmetic happens
+// [github.com/TuSKan/astrogo/epoch.GPST] as its scale and the arithmetic happens
 // for you, at whatever epoch:
 //
-//	t := time.FromJD(gpsJD, time.GPST)   // not time.UTC
+//	t := epoch.FromJD(gpsJD, epoch.GPST)   // not epoch.UTC
 //	state, err := sat.Locate(sat.ID(), t)
 //
 // BeiDou is a different offset again — TAI − 33 s, so BDT − UTC is 4 s today —
-// and has [github.com/TuSKan/astrogo/time.BDT]. GLONASS is UTC plus three hours
+// and has [github.com/TuSKan/astrogo/epoch.BDT]. GLONASS is UTC plus three hours
 // with leap seconds applied, so it needs no scale of its own.
 //
 // # Accuracy, and what it is a statement about

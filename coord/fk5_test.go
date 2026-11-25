@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -140,7 +140,7 @@ func TestICRSToFK5MatchesSOFAWithKinematics(t *testing.T) {
 		angle.Rad(-5.92994449e-6),
 		angle.Arcsec(0.379210),
 		unit.KmPerSec(-7.6),
-		time.J2000(),
+		epoch.J2000(),
 	)
 
 	got := coord.ICRSToFK5(src, coord.J2000Epoch)

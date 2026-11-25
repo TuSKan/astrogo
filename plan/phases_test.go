@@ -3,9 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ import (
 func TestMoonPhases_KnownYear(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(365))
 
 	events, err := MoonPhases(Window{Start: start, End: end}, prov)
@@ -138,7 +139,7 @@ func TestApsides_KnownYear(t *testing.T) {
 func TestMoonIllumination_NewAndFull(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(60))
 
 	phases, err := MoonPhases(Window{Start: start, End: end}, prov)
@@ -184,7 +185,7 @@ func TestMoonIllumination_NewAndFull(t *testing.T) {
 // share the same shape: docs/VALIDATION.md documents 2/2 detected for 2026
 // against the NASA Eclipse Catalog, each within its own Gamma/latitude limit.
 func TestEclipses_KnownYear(t *testing.T) {
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(365))
 
 	cases := []struct {
@@ -250,7 +251,7 @@ func TestEclipseType_StringUnknown(t *testing.T) {
 // not exercising the solvers' full behavior (already covered elsewhere
 // in this file).
 func TestPhasesFunctions_NilProviderDefaults(t *testing.T) {
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(35))
 
 	if _, err := MoonPhases(Window{Start: start, End: end}, nil); err != nil {

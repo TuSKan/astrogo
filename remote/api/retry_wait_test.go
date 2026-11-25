@@ -8,9 +8,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestRetryAfterSetsTheWait: a 503 saying Retry-After: 1 is retried no
@@ -20,7 +20,7 @@ func TestRetryAfterSetsTheWait(t *testing.T) {
 
 	var (
 		mu    sync.Mutex
-		times []time.GoTime
+		times []time.Time
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

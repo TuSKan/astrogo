@@ -13,9 +13,9 @@ import (
 	"github.com/TuSKan/astrogo/constellation"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/parallel"
 	"github.com/TuSKan/astrogo/logging"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -42,7 +42,7 @@ type VisibleObject struct {
 	// its components' light, so the two are never added.
 	ApparentMag float64
 	// RiseTime/TransitTime/SetTime are the real geometric event instants
-	// within [start, end] — each is zero (time.Time{}) if that event
+	// within [start, end] — each is zero (epoch.Time{}) if that event
 	// wasn't found tonight. A circumpolar object never sets; an object
 	// already up at dusk has no Rise inside the window; TransitTime in
 	// particular is zero whenever the object's true meridian crossing
@@ -50,9 +50,9 @@ type VisibleObject struct {
 	// real, common case (e.g. an object rising just before dawn), not an
 	// error. Use PeakTime for a value that's always populated whenever
 	// the object is visible at all.
-	RiseTime    time.Time
-	TransitTime time.Time
-	SetTime     time.Time
+	RiseTime    epoch.Time
+	TransitTime epoch.Time
+	SetTime     epoch.Time
 	// PeakTime/PeakAltitude/PeakAzimuth/Direction describe the best
 	// moment to actually look for this object tonight: the real maximum
 	// altitude reached within its first horizon-clearing window
@@ -65,7 +65,7 @@ type VisibleObject struct {
 	// since that's the instant they're actually meaningful for. Direction
 	// is PeakAzimuth rendered as a 16-point compass label (e.g. "SSW") —
 	// see coord.CompassDirection.
-	PeakTime     time.Time
+	PeakTime     epoch.Time
 	PeakAltitude angle.Angle
 	PeakAzimuth  angle.Angle
 	Direction    string
@@ -293,7 +293,7 @@ var planetConstructors = []func(eph.Provider) *Planet{
 func VisibleTonight(
 	ctx context.Context,
 	site *Site,
-	night time.Time,
+	night epoch.Time,
 	brightSources []resolve.BrightObjectSearcher,
 	planetProvider eph.Provider,
 	magLimit float64,
@@ -419,7 +419,7 @@ func VisibleTonight(
 // only: a star system and its components are separate objects with
 // identifiers of their own, and stay separate here. They are listed as one
 // point of light later, by observingGroups, which keeps each of them.
-func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, at time.Time, dropped *skips) []resolve.Target {
+func gatherBrightTargets(ctx context.Context, sources []resolve.BrightObjectSearcher, magLimit float64, at epoch.Time, dropped *skips) []resolve.Target {
 	// A source's own query error is handled per-item below (skipped, not
 	// propagated), so parallel.Map's own error return is never non-nil.
 	perSource, _ := parallel.Map(sources, 0, func(_ int, src resolve.BrightObjectSearcher) ([]catalog.Record, error) {
@@ -496,14 +496,14 @@ var coverageMargin = unit.Hours(24)
 //
 // start/end bound the Horizons SPK coverage window each asteroid/comet's
 // Stage-2 provider is fetched for (see candidateFromTarget) — without
-// this, eph.NewProvider defaults to a zero time.Time interval, which
+// this, eph.NewProvider defaults to a zero epoch.Time interval, which
 // Horizons interprets literally (formats to a year-1 date) and so never
 // covers the actual query night, a real bug confirmed via live testing:
 // every asteroid/comet candidate's Stage 2 silently failed
 // ("no coverage for target at requested epoch"), making the entire
 // category permanently absent from every result regardless of real
 // brightness.
-func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end time.Time, cfg visibleTonightConfig, dropped *skips) []visibleCandidate {
+func gatherCandidates(ctx context.Context, targets []resolve.Target, start, end epoch.Time, cfg visibleTonightConfig, dropped *skips) []visibleCandidate {
 	slots := make([]visibleCandidate, len(targets))
 
 	var smallBodyIdx []int
@@ -606,7 +606,7 @@ func isFixedTarget(obs Observable) bool {
 // A nil Observable with a nil error is the latter: FromCatalog produced a
 // fixed target where a small body was expected, which is a property of the
 // catalog row, not a failure.
-func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end time.Time, cfg visibleTonightConfig) (Observable, eph.Provider, error) {
+func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end epoch.Time, cfg visibleTonightConfig) (Observable, eph.Provider, error) {
 	if !needsSmallBodyEphemeris(tgt.Kind) {
 		// A target the resolver returned with no position at all is
 		// dropped rather than placed at RA 0, Dec 0. Both callers already
@@ -657,7 +657,7 @@ func candidateFromTarget(ctx context.Context, tgt resolve.Target, start, end tim
 // out as though it were too faint. Until #407 it was left out: Pluto, whose
 // magnitude was not implemented, was missing at every limit, and a provider
 // failure for any planet looked exactly like that planet being too faint.
-func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit float64, dropped *skips) []visibleCandidate {
+func gatherSolarSystemCandidates(provider eph.Provider, at epoch.Time, magLimit float64, dropped *skips) []visibleCandidate {
 	var out []visibleCandidate
 
 	moon := NewMoon(provider)
@@ -705,13 +705,13 @@ func gatherSolarSystemCandidates(provider eph.Provider, at time.Time, magLimit f
 // ISS ranked at 64° while below the horizon (#483).
 type observableObject struct{ Observable }
 
-func (o observableObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
+func (o observableObject) ICRS(t epoch.Time) (coord.ICRS, error) { return o.Position(t) }
 
 // movingBodyObject is observableObject for a MovingBody, keeping GeocentricVec
 // so observedAltAz still takes the topocentric path.
 type movingBodyObject struct{ MovingBody }
 
-func (o movingBodyObject) ICRS(t time.Time) (coord.ICRS, error) { return o.Position(t) }
+func (o movingBodyObject) ICRS(t epoch.Time) (coord.ICRS, error) { return o.Position(t) }
 
 // asObject returns obj as a coord.Object: itself if it already is one, and
 // otherwise a wrapper that keeps MovingBody when obj has it.
@@ -758,7 +758,7 @@ func asObject(obj Observable) coord.Object {
 // on purpose — see its doc comment), so this check, against the real
 // computed-and-extinguished magnitude, is the only place that bound is
 // enforced for real.
-func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end time.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (placedObject, bool, error) {
+func evaluateCandidate(ctx context.Context, c visibleCandidate, start, end epoch.Time, site *Site, planetProvider eph.Provider, magLimit float64, cfg visibleTonightConfig) (placedObject, bool, error) {
 	obj := c.obj
 
 	// skipped reports a candidate dropped because it could not be evaluated,
@@ -919,7 +919,7 @@ func defaultNightAir(site *Site) (*atmosphere.Atmosphere, error) {
 // but the photometry could not be computed — an ephemeris lookup that failed
 // under it. Returning that last case as a bare false would drop the object
 // exactly like one too faint to make the cut, which is how it read before.
-func rawMagnitude(obj Observable, t time.Time) (mag float64, ok bool, err error) {
+func rawMagnitude(obj Observable, t epoch.Time) (mag float64, ok bool, err error) {
 	if mc, isMC := obj.(MagnitudeComputer); isMC {
 		m, err := mc.ApparentMagnitude(t)
 		if err != nil {
@@ -944,7 +944,7 @@ func rawMagnitude(obj Observable, t time.Time) (mag float64, ok bool, err error)
 // heuristic capturing the single dominant real-world "will moonlight wash
 // this out" factor, not the full light-pollution-aware skybrightness model
 // (see VisibleObject.SkyNote's doc comment).
-func moonNote(provider eph.Provider, obj Observable, t time.Time, ctx *coord.Context) string {
+func moonNote(provider eph.Provider, obj Observable, t epoch.Time, ctx *coord.Context) string {
 	fraction, _, err := MoonIllumination(t, provider)
 	if err != nil || fraction < 0.5 {
 		return ""

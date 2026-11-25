@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Four more constraints, each a few lines against the existing interface and
@@ -49,7 +49,7 @@ type SunSep struct {
 }
 
 // Check evaluates Sun separation for a given target and time.
-func (c SunSep) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c SunSep) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -59,7 +59,7 @@ func (c SunSep) Check(obj Observable, site *Site, t time.Time) (Result, error) {
 }
 
 // CheckCtx evaluates Sun separation using a pre-built coord.Context.
-func (c SunSep) CheckCtx(obj Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
+func (c SunSep) CheckCtx(obj Observable, _ *Site, _ epoch.Time, ctx *coord.Context) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget
 	}
@@ -107,7 +107,7 @@ type GalacticLatitude struct {
 }
 
 // Check evaluates Galactic latitude for a given target and time.
-func (c GalacticLatitude) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c GalacticLatitude) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -123,7 +123,7 @@ func (c GalacticLatitude) Check(obj Observable, site *Site, t time.Time) (Result
 // moving target still moves, which is why the position is taken at the
 // Context's own instant rather than once.
 func (c GalacticLatitude) CheckCtx(
-	obj Observable, _ *Site, _ time.Time, ctx *coord.Context,
+	obj Observable, _ *Site, _ epoch.Time, ctx *coord.Context,
 ) (Result, error) {
 	if obj == nil {
 		return Result{}, ErrNilTarget
@@ -162,7 +162,7 @@ func (c GalacticLatitude) CheckCtx(
 type TimeWindow Window
 
 // Check evaluates the window for a given time.
-func (c TimeWindow) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c TimeWindow) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -177,7 +177,7 @@ func (c TimeWindow) Check(obj Observable, site *Site, t time.Time) (Result, erro
 // outside, so a scorer can rank "well inside" above "about to close" without a
 // second call. A window unbounded on both sides reports zero, since there is no
 // edge to measure from.
-func (c TimeWindow) CheckCtx(_ Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
+func (c TimeWindow) CheckCtx(_ Observable, _ *Site, _ epoch.Time, ctx *coord.Context) (Result, error) {
 	t := ctx.Time()
 
 	beforeStart := !c.Start.IsZero() && t.Before(c.Start)
@@ -201,7 +201,7 @@ func (c TimeWindow) CheckCtx(_ Observable, _ *Site, _ time.Time, ctx *coord.Cont
 }
 
 // hoursToNearerEdge is how much of the window is left on the tighter side.
-func hoursToNearerEdge(t, from, to time.Time) float64 {
+func hoursToNearerEdge(t, from, to epoch.Time) float64 {
 	switch {
 	case from.IsZero() && to.IsZero():
 		return 0
@@ -240,7 +240,7 @@ type Horizon struct {
 }
 
 // Check evaluates the terrain horizon for a given target and time.
-func (c Horizon) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (c Horizon) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := siteContext(t, site)
 	if err != nil {
 		return Result{}, err
@@ -255,7 +255,7 @@ func (c Horizon) Check(obj Observable, site *Site, t time.Time) (Result, error) 
 // is the one constraint in the file that uses its site parameter: two sites can
 // share a constraint set and must not share a horizon.
 func (c Horizon) CheckCtx(
-	obj Observable, site *Site, t time.Time, ctx *coord.Context,
+	obj Observable, site *Site, t epoch.Time, ctx *coord.Context,
 ) (Result, error) {
 	if site == nil {
 		return Result{}, ErrNilSite

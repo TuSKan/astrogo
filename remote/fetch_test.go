@@ -16,10 +16,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/file"
-	"github.com/TuSKan/astrogo/time"
 )
 
 var errValidateTest = errors.New("not a valid LSK kernel")
@@ -208,7 +209,7 @@ func TestGetFileWithValidateRejectsCorruptDownload(t *testing.T) {
 func TestGetFileWithCacheNameDiffersFromPath(t *testing.T) {
 	cleanRemoteState(t)
 
-	// Real production shape of this option (see time/internal/iers's own
+	// Real production shape of this option (see epoch/internal/iers's own
 	// call): the fetched name and the on-disk cache name legitimately
 	// differ. IERSFinals2000A's own real usage additionally passes name=""
 	// (its URL alone names the whole HTTP resource) — untestable against a
@@ -712,7 +713,7 @@ func TestGetFileStealsALockOlderThanTwiceItsTimeout(t *testing.T) {
 		t.Fatalf("plant lock: %v", err)
 	}
 
-	crashed := time.NowUTC().ToGo().Add(-time.Minute)
+	crashed := epoch.Now().ToGo().Add(-time.Minute)
 	if err := os.Chtimes(filepath.Join(dir, filepath.FromSlash(lockKey)), crashed, crashed); err != nil {
 		t.Fatalf("backdate lock: %v", err)
 	}

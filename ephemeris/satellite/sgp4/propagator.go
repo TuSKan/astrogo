@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -201,13 +201,13 @@ func (p *Propagator) At(tsince float64) (pos, vel vector.Vec3, err error) {
 //
 // t is converted to UTC first. SGP4 is defined against UTC, and the conversion
 // is not a formality: a TT instant taken at face value lands 69.184 s late,
-// which for a low Earth orbit is 530 km. [time.Time] is scale-aware precisely
+// which for a low Earth orbit is 530 km. [epoch.Time] is scale-aware precisely
 // so this cannot be left to the caller.
 //
 // A time whose Julian Date is NaN or infinite is refused with [ErrNotFinite].
 // Its UTC label would be the standard library's zero time, January 1st of the
 // year 1, and the model would answer for that instant instead.
-func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
+func (p *Propagator) AtTime(t epoch.Time) (pos, vel vector.Vec3, err error) {
 	if jd := t.JD(); !finite(jd) {
 		return vector.Vec3{}, vector.Vec3{}, fmt.Errorf("%w: the time's Julian Date is %g", ErrNotFinite, jd)
 	}
@@ -230,15 +230,15 @@ func (p *Propagator) AtTime(t time.Time) (pos, vel vector.Vec3, err error) {
 // SGP4 counts time the way its reference implementation does: Vallado's jday
 // turns a calendar date into a Julian Date with every day 1440 minutes long,
 // and tsince is the difference of two of those. A UTC Julian Date from
-// [time.Time.JDParts] stopped being that on the 27 days that end in a leap
+// [epoch.Time.JDParts] stopped being that on the 27 days that end in a leap
 // second, when astrogo adopted SOFA's convention and let their fraction run
 // over 86401 seconds (#144). Subtracting those across such a day was off by up
 // to a second — 7.5 km of low-Earth-orbit track — at an epoch or a query that
 // happened to fall on one.
 //
-// The standard library's count is the uniform UTC label, and [time.Time.ToGo]
+// The standard library's count is the uniform UTC label, and [epoch.Time.ToGo]
 // is the conversion to it.
-func utcLabel(t time.Time) (sec int64, nsec int) {
+func utcLabel(t epoch.Time) (sec int64, nsec int) {
 	g := t.UTC().ToGo()
 
 	return g.Unix(), g.Nanosecond()

@@ -4,9 +4,10 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -36,7 +37,7 @@ func TestScheduleRefusesABadWindow(t *testing.T) {
 		Priority: 1,
 	}}
 
-	start := time.Date(2026, 4, 6, 22, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 4, 6, 22, 0, 0, 0, time.UTC)
 
 	bad := []struct {
 		name   string
@@ -44,7 +45,7 @@ func TestScheduleRefusesABadWindow(t *testing.T) {
 		want   error
 	}{
 		{"reversed", Window{Start: start, End: start.Add(unit.Hours(-6))}, ErrReversedInterval},
-		{"end not a number", Window{Start: start, End: time.FromJD(math.NaN(), time.UTC)}, ErrNonFiniteInterval},
+		{"end not a number", Window{Start: start, End: epoch.FromJD(math.NaN(), epoch.UTC)}, ErrNonFiniteInterval},
 	}
 
 	strategies := []Strategy{

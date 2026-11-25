@@ -125,7 +125,7 @@
 // while leap seconds kept that bound, and unbounded by them from 2027-05-20.
 // Past the end of a loaded bulletin, DUT1 instead holds ΔT at its value on
 // the bulletin's last day, the forecast every time conversion uses; see
-// [time.DeltaT].
+// [epoch.DeltaT].
 //
 // # Concurrency
 //

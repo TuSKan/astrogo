@@ -5,7 +5,7 @@ import (
 	"math"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // SunApparent returns the apparent V-band magnitude of the Sun.
@@ -14,7 +14,7 @@ import (
 //	V ≈ −26.74 + 5·log₁₀(R)
 //
 // where R = Earth–Sun distance in AU.
-func SunApparent(p eph.Provider, t time.Time) (float64, error) {
+func SunApparent(p eph.Provider, t epoch.Time) (float64, error) {
 	st, err := eph.At(p, t).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return 0, fmt.Errorf("magnitude: sun state: %w", err)
@@ -36,7 +36,7 @@ func SunApparent(p eph.Provider, t time.Time) (float64, error) {
 //
 // where α is the phase angle in degrees. At new moon (α≈180°) this gives
 // approximately +2.0; at full moon (α≈0°) it gives −12.74.
-func MoonApparent(p eph.Provider, t time.Time) (float64, error) {
+func MoonApparent(p eph.Provider, t epoch.Time) (float64, error) {
 	geo, sunPos, err := geometryVectors(p, eph.Moon, t)
 	if err != nil {
 		return 0, err

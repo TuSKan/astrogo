@@ -14,8 +14,8 @@ import (
 	"github.com/TuSKan/astrogo/catalog/internal/finite"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrAPIError indicates a MAST API error response.
@@ -191,7 +191,7 @@ func (p *Provider) ResolveObject(ctx context.Context, req resolve.ObjectRequest)
 // aliases: with "SIMBAD" on every MAST result, xmatch paired M31 with M33 and
 // with Vega (#612).
 //
-// Epoch defaults to time.J2000() as a best-effort assumption: the API doesn't
+// Epoch defaults to epoch.J2000() as a best-effort assumption: the API doesn't
 // report which sub-resolver's native epoch actually answered, but
 // SIMBAD/NED name-lookup responses are conventionally J2000.
 func newMASTTarget(canonicalName string, ra, dec *float64) resolve.Target {
@@ -199,7 +199,7 @@ func newMASTTarget(canonicalName string, ra, dec *float64) resolve.Target {
 		ID:      canonicalName,
 		Name:    canonicalName,
 		Catalog: "mast",
-		Epoch:   time.J2000(),
+		Epoch:   epoch.J2000(),
 	}
 
 	// encoding/xml and encoding/json decode into a float64 through

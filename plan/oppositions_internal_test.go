@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -106,7 +107,7 @@ func TestLongitudeCurvatureBoundHolds(t *testing.T) {
 
 	prov := eph.Default()
 	sun := NewSun(prov)
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// span and step in days; d is the half-width of the central difference.
 	span := map[bool]float64{false: 4 * 365, true: 120}[testing.Short()]

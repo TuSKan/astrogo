@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // The re-exports are one line each, which is exactly why they need tests.

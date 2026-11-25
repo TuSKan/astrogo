@@ -5,11 +5,12 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // RankObservables evaluates every target at one instant from one site, so the
@@ -18,8 +19,8 @@ import (
 // tests hold the two things that change: the Context is shared, and no score
 // moves.
 
-func rcEpoch() time.Time {
-	return time.Date(2026, time.March, 20, 22, 0, 0, 0, time.LocationUTC)
+func rcEpoch() epoch.Time {
+	return epoch.Date(2026, time.March, 20, 22, 0, 0, 0, time.UTC)
 }
 
 func rcSite(tb testing.TB) *Site {
@@ -61,7 +62,7 @@ type contextRecorder struct {
 	seen map[*coord.Context]struct{}
 }
 
-func (r *contextRecorder) Check(obj Observable, site *Site, t time.Time) (Result, error) {
+func (r *contextRecorder) Check(obj Observable, site *Site, t epoch.Time) (Result, error) {
 	ctx, err := coord.NewContext(t, site.Location(), site.Refraction())
 	if err != nil {
 		return Result{}, fmt.Errorf("context: %w", err)
@@ -70,7 +71,7 @@ func (r *contextRecorder) Check(obj Observable, site *Site, t time.Time) (Result
 	return r.CheckCtx(obj, site, t, ctx)
 }
 
-func (r *contextRecorder) CheckCtx(_ Observable, _ *Site, _ time.Time, ctx *coord.Context) (Result, error) {
+func (r *contextRecorder) CheckCtx(_ Observable, _ *Site, _ epoch.Time, ctx *coord.Context) (Result, error) {
 	r.mu.Lock()
 	r.seen[ctx] = struct{}{}
 	r.mu.Unlock()

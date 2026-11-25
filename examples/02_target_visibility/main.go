@@ -4,11 +4,12 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ func main() {
 	// to 13.5 arcsec, which decides nothing against a 30° limit. For full
 	// accuracy, blank-import remote/eop and consent to the IERS bulletin, as
 	// 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -44,9 +45,9 @@ func main() {
 
 	show.Title("Is it observable?", target.Name()+" from "+site.Name()+", above 30° altitude")
 
-	for _, tm := range []time.Time{
-		time.Date(2026, 4, 6, 19, 0, 0, 0, tz),
-		time.Date(2026, 4, 6, 23, 0, 0, 0, tz),
+	for _, tm := range []epoch.Time{
+		epoch.Date(2026, 4, 6, 19, 0, 0, 0, tz),
+		epoch.Date(2026, 4, 6, 23, 0, 0, 0, tz),
 	} {
 		// 5. Check Visibility! IsObservable reports each constraint's result,
 		// so a "no" comes with its reason. (plan.Planner.Observable gives the

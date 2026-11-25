@@ -3,10 +3,11 @@ package plan
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +34,7 @@ func TestSatellitePassesTakesItsSiteAndMinimumElevation(t *testing.T) {
 
 	prov, g := testISS(t)
 	sat, site := NewSatellite("ISS", prov.ID(), prov), siteAt(t, g)
-	start := time.Date(2026, time.April, 17, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.April, 17, 0, 0, 0, 0, time.UTC)
 	w := Window{Start: start, End: start.Add(unit.Days(1))}
 
 	horizon, err := SatellitePasses(sat, site, w)

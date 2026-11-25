@@ -4,12 +4,13 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -39,7 +40,7 @@ func TestFotheringhamTableIsGeocentricAtGeometricSunset(t *testing.T) {
 		{12, 1861, 12, 3, 13.6, 16.6}, {14, 1862, 3, 31, 15.9, 0.4}, {15, 1862, 4, 29, 8.6, 0.1},
 		{17, 1864, 1, 10, 18.4, 6.5}, {18, 1864, 3, 9, 21.1, 2.3},
 	} {
-		r, err := CrescentVisibility(athens, time.Date(o.y, time.Month(o.m), o.d, 10, 0, 0, 0, time.LocationUTC), prov)
+		r, err := CrescentVisibility(athens, epoch.Date(o.y, time.Month(o.m), o.d, 10, 0, 0, 0, time.UTC), prov)
 		if err != nil {
 			t.Fatalf("No. %d: %v", o.no, err)
 		}
@@ -91,7 +92,7 @@ func TestFatoohiTableIsTopocentricAtSunset(t *testing.T) {
 			t.Fatalf("NewSite: %v", err)
 		}
 
-		r, err := CrescentVisibility(site, time.Date(o.y, time.Month(o.m), o.d, 18, 0, 0, 0, time.LocationUTC), prov)
+		r, err := CrescentVisibility(site, epoch.Date(o.y, time.Month(o.m), o.d, 18, 0, 0, 0, time.UTC), prov)
 		if err != nil {
 			t.Fatalf("row %d: %v", o.row, err)
 		}
@@ -131,7 +132,7 @@ func TestAlrefayTableIIsTopocentricAtSunset(t *testing.T) {
 	} {
 		site := crescentSite(t, o.lat, o.lon)
 
-		r, err := CrescentVisibility(site, time.Date(o.y, time.Month(o.m), o.d, 9, 0, 0, 0, time.LocationUTC), prov)
+		r, err := CrescentVisibility(site, epoch.Date(o.y, time.Month(o.m), o.d, 9, 0, 0, 0, time.UTC), prov)
 		if err != nil {
 			t.Fatalf("%d-%02d-%02d: %v", o.y, o.m, o.d, err)
 		}
@@ -191,7 +192,7 @@ func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
 	site := crescentSite(t, 78.22, 15.65)
 	prov := eph.Default()
 
-	e, found, err := firstEvent(SunEvents, time.Date(2025, 4, 17, 10, 0, 0, 0, time.LocationUTC), 1, site, prov, isSet)
+	e, found, err := firstEvent(SunEvents, epoch.Date(2025, 4, 17, 10, 0, 0, 0, time.UTC), 1, site, prov, isSet)
 	if err != nil || !found {
 		t.Fatalf("sunset: found %v, err %v", found, err)
 	}
@@ -214,7 +215,7 @@ func TestGeometricSunsetWhereTheSunSetsSlowly(t *testing.T) {
 		t.Errorf("geometric sunset %.1f min before sunset, the Sun's center at %.4f°", early, alt)
 	}
 
-	noon := time.Date(2025, 6, 21, 11, 0, 0, 0, time.LocationUTC)
+	noon := epoch.Date(2025, 6, 21, 11, 0, 0, 0, time.UTC)
 	if _, err := geometricSunset(mustContext(t, noon, site.Location(), atmosphere.Refraction{}), noon, site, prov); !errors.Is(err, errNoSunset) {
 		t.Errorf("under the midnight Sun: err = %v, want errNoSunset", err)
 	}
@@ -230,23 +231,23 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		site *Site
-		day  time.Time
+		day  epoch.Time
 		// fails picks the failing lookups, given the sunset.
-		fails func(sunset, at time.Time) bool
+		fails func(sunset, at epoch.Time) bool
 	}{
-		{"at sunset", crescentSite(t, 10.65, -61.52), time.Date(2025, 3, 29, 16, 0, 0, 0, time.LocationUTC),
-			func(sunset, at time.Time) bool { return at.Equal(sunset) }},
-		{"half a minute on", crescentSite(t, 10.65, -61.52), time.Date(2025, 3, 29, 16, 0, 0, 0, time.LocationUTC),
-			func(sunset, at time.Time) bool { return at.Equal(sunset.Add(unit.Seconds(30))) }},
-		{"in the fallback", crescentSite(t, 78.22, 15.65), time.Date(2025, 4, 17, 10, 0, 0, 0, time.LocationUTC),
-			func(sunset, at time.Time) bool { return at.Before(sunset.Add(unit.Minutes(-70))) }},
+		{"at sunset", crescentSite(t, 10.65, -61.52), epoch.Date(2025, 3, 29, 16, 0, 0, 0, time.UTC),
+			func(sunset, at epoch.Time) bool { return at.Equal(sunset) }},
+		{"half a minute on", crescentSite(t, 10.65, -61.52), epoch.Date(2025, 3, 29, 16, 0, 0, 0, time.UTC),
+			func(sunset, at epoch.Time) bool { return at.Equal(sunset.Add(unit.Seconds(30))) }},
+		{"in the fallback", crescentSite(t, 78.22, 15.65), epoch.Date(2025, 4, 17, 10, 0, 0, 0, time.UTC),
+			func(sunset, at epoch.Time) bool { return at.Before(sunset.Add(unit.Minutes(-70))) }},
 	} {
 		e, found, err := firstEvent(SunEvents, c.day, 1, c.site, prov, isSet)
 		if err != nil || !found {
 			t.Fatalf("%s: sunset: found %v, err %v", c.name, found, err)
 		}
 
-		failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at time.Time) bool {
+		failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at epoch.Time) bool {
 			return id == eph.Sun && c.fails(e.Time, at)
 		}}
 
@@ -266,7 +267,7 @@ func TestGeometricSunsetReportsAFailedLookup(t *testing.T) {
 		t.Fatalf("CrescentVisibility: %v", err)
 	}
 
-	failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at time.Time) bool {
+	failing := failingWhenProvider{Provider: prov, fails: func(id eph.ID, at epoch.Time) bool {
 		return id == eph.Sun && at.Equal(r.Sunset.Add(unit.Seconds(30)))
 	}}
 
@@ -298,11 +299,11 @@ func TestSAAOReadsTheApparentLowerLimb(t *testing.T) {
 	for _, c := range []struct {
 		name    string
 		site    *Site
-		evening time.Time
+		evening epoch.Time
 		lo, hi  float64 // refraction, degrees
 	}{
 		{"Port of Spain, 4° up", portOfSpain, portOfSpainEvening, 0.15, 0.22},
-		{"Quinta Calixto, on the horizon", calixto, time.Date(2026, 10, 10, 16, 0, 0, 0, time.LocationUTC), 0.40, 0.50},
+		{"Quinta Calixto, on the horizon", calixto, epoch.Date(2026, 10, 10, 16, 0, 0, 0, time.UTC), 0.40, 0.50},
 	} {
 		r, err := CrescentVisibility(c.site, c.evening, prov)
 		if err != nil {

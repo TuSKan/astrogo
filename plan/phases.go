@@ -3,12 +3,13 @@ package plan
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -50,7 +51,7 @@ func (p MoonPhase) targetAngle() float64 {
 
 // MoonPhaseEvent records the precise instant of a primary lunar phase.
 type MoonPhaseEvent struct {
-	Time  time.Time
+	Time  epoch.Time
 	Phase MoonPhase
 }
 
@@ -69,7 +70,7 @@ type MoonPhaseEvent struct {
 // Both come from firstOrderApparentICRS, the apparent place from one State
 // call, since the elongation is evaluated at every sample and refinement step
 // of every phase and eclipse search.
-func moonElongation(t time.Time, prov eph.Provider) (float64, error) {
+func moonElongation(t epoch.Time, prov eph.Provider) (float64, error) {
 	sunICRS, err := firstOrderApparentICRS(prov, eph.Sun, t)
 	if err != nil {
 		return 0, fmt.Errorf("phases: sun position: %w", err)
@@ -171,7 +172,7 @@ func MoonPhases(w Window, prov eph.Provider) ([]MoonPhaseEvent, error) {
 // phaseEvaluator returns an Evaluator that computes (elongation − target),
 // normalized to [-180, 180], suitable for root-finding.
 func phaseEvaluator(target float64, prov eph.Provider) Evaluator {
-	return func(t time.Time) (float64, error) {
+	return func(t epoch.Time) (float64, error) {
 		elong, err := moonElongation(t, prov)
 		if err != nil {
 			return 0, err
@@ -228,7 +229,7 @@ func (s Season) targetLongitude() float64 {
 
 // SeasonEvent records the precise instant of a seasonal event.
 type SeasonEvent struct {
-	Time   time.Time
+	Time   epoch.Time
 	Season Season
 }
 
@@ -246,7 +247,7 @@ type SeasonEvent struct {
 // precession only. Until #414 the comment here said otherwise and Δψ, up to
 // ±17.2″ over the 18.6-year nutation cycle, was missing: the seasons were up
 // to 8.5 minutes off, as the USNO's show from 1972 to 2100.
-func sunEclipticLongitude(t time.Time, prov eph.Provider) (float64, error) {
+func sunEclipticLongitude(t epoch.Time, prov eph.Provider) (float64, error) {
 	sun, err := eph.At(prov, t).Apparent(eph.Sun, eph.Geocenter())
 	if err != nil {
 		return 0, fmt.Errorf("seasons: sun position: %w", err)
@@ -283,8 +284,8 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 		prov = eph.Default()
 	}
 
-	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
-	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+	end := epoch.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	step := unit.Hours(24) // Daily sampling for ~1°/day Sun
 
@@ -334,7 +335,7 @@ func Seasons(year int, prov eph.Provider) ([]SeasonEvent, error) {
 // seasonEvaluator returns an Evaluator that computes (ecliptic longitude − target),
 // normalized to [-180, 180], suitable for root-finding.
 func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
-	return func(t time.Time) (float64, error) {
+	return func(t epoch.Time) (float64, error) {
 		lon, err := sunEclipticLongitude(t, prov)
 		if err != nil {
 			return 0, err
@@ -370,7 +371,7 @@ func seasonEvaluator(target float64, prov eph.Provider) Evaluator {
 // applied, and the phase angle is measured there. Against Skyfield's
 // almanac.phase_angle and fraction_illuminated (DE421) it agrees to 0.002° and
 // 0.00002; the geometric Moon is 0.003° off.
-func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
+func MoonIllumination(t epoch.Time, prov eph.Provider) (fraction float64, phaseAngle angle.Angle, err error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
@@ -405,7 +406,7 @@ func MoonIllumination(t time.Time, prov eph.Provider) (fraction float64, phaseAn
 // symmetric about full and so takes the same value on both the waxing and
 // waning side of a lunation). Use this — or [MoonPhaseFraction] — for
 // "is tonight's Moon waxing or waning", which phaseAngle alone can't answer.
-func MoonElongation(t time.Time, prov eph.Provider) (angle.Angle, error) {
+func MoonElongation(t epoch.Time, prov eph.Provider) (angle.Angle, error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
@@ -425,7 +426,7 @@ func MoonElongation(t time.Time, prov eph.Provider) (angle.Angle, error) {
 // number carries both cycle position and waxing/waning, which is usually
 // what a presentation layer actually wants; MoonElongation is the same
 // information in degrees, for callers who want it in that form instead.
-func MoonPhaseFraction(t time.Time, prov eph.Provider) (float64, error) {
+func MoonPhaseFraction(t epoch.Time, prov eph.Provider) (float64, error) {
 	elong, err := MoonElongation(t, prov)
 	if err != nil {
 		return 0, err
@@ -459,7 +460,7 @@ func (a Apsis) String() string {
 
 // ApsisEvent records the precise instant and distance of an orbital apsis.
 type ApsisEvent struct {
-	Time     time.Time
+	Time     epoch.Time
 	Apsis    Apsis
 	Distance unit.Length
 }
@@ -478,7 +479,7 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 	var events []ApsisEvent
 
 	// Earth-Sun distance evaluator (returns distance in AU)
-	sunDistance := func(t time.Time) (float64, error) {
+	sunDistance := func(t epoch.Time) (float64, error) {
 		pos, err := geocentric(prov, eph.Sun, t)
 		if err != nil {
 			return 0, fmt.Errorf("apsides: sun position: %w", err)
@@ -489,8 +490,8 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 
 	// Perihelion: minimum distance, typically early January
 	// Search window: Dec 15 of previous year → Feb 15
-	periStart := time.Date(year-1, time.December, 15, 0, 0, 0, 0, time.LocationUTC)
-	periEnd := time.Date(year, time.February, 15, 0, 0, 0, 0, time.LocationUTC)
+	periStart := epoch.Date(year-1, time.December, 15, 0, 0, 0, 0, time.UTC)
+	periEnd := epoch.Date(year, time.February, 15, 0, 0, 0, 0, time.UTC)
 
 	periTime, periDist, err := solver.FindExtremum(Evaluator(sunDistance), Window{Start: periStart, End: periEnd}, false)
 	if err != nil {
@@ -501,8 +502,8 @@ func Apsides(year int, prov eph.Provider) ([]ApsisEvent, error) {
 
 	// Aphelion: maximum distance, typically early July
 	// Search window: May 15 → Aug 15
-	apStart := time.Date(year, time.May, 15, 0, 0, 0, 0, time.LocationUTC)
-	apEnd := time.Date(year, time.August, 15, 0, 0, 0, 0, time.LocationUTC)
+	apStart := epoch.Date(year, time.May, 15, 0, 0, 0, 0, time.UTC)
+	apEnd := epoch.Date(year, time.August, 15, 0, 0, 0, 0, time.UTC)
 
 	apTime, apDist, err := solver.FindExtremum(Evaluator(sunDistance), Window{Start: apStart, End: apEnd}, true)
 	if err != nil {
@@ -581,7 +582,7 @@ func (k EclipseKind) String() string {
 // how deep.
 type EclipseEvent struct {
 	// Time is greatest eclipse.
-	Time time.Time
+	Time epoch.Time
 	// Type says whether the eclipse is of the Sun or of the Moon.
 	Type EclipseType
 
@@ -625,7 +626,7 @@ type EclipseEvent struct {
 }
 
 // moonEclipticLatitude returns the Moon's ecliptic latitude at time t.
-func moonEclipticLatitude(t time.Time, prov eph.Provider) (angle.Angle, error) {
+func moonEclipticLatitude(t epoch.Time, prov eph.Provider) (angle.Angle, error) {
 	moonPos, err := geocentric(prov, eph.Moon, t)
 	if err != nil {
 		return 0, fmt.Errorf("eclipse: moon position: %w", err)
@@ -680,7 +681,7 @@ func LunarEclipses(w Window, prov eph.Provider) ([]EclipseEvent, error) {
 			continue
 		}
 
-		eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
+		eclTime, _, err := solver.FindExtremum(func(t epoch.Time) (float64, error) {
 			g, err := newEclipseGeometry(t, prov)
 			if err != nil {
 				return 0, err
@@ -762,7 +763,7 @@ func SolarEclipses(w Window, prov eph.Provider) ([]EclipseEvent, error) {
 			continue
 		}
 
-		eclTime, _, err := solver.FindExtremum(func(t time.Time) (float64, error) {
+		eclTime, _, err := solver.FindExtremum(func(t epoch.Time) (float64, error) {
 			g, err := newEclipseGeometry(t, prov)
 			if err != nil {
 				return 0, err

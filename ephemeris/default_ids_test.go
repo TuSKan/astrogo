@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // Default's doc said no named ID returned ErrUnsupportedBody, which stopped
@@ -27,7 +27,7 @@ func TestDefaultAnswersWhatItsDocSays(t *testing.T) {
 		499: "Mars", 599: "Jupiter", 699: "Saturn", 799: "Uranus", 899: "Neptune", 999: "Pluto",
 	}
 
-	in := eph.At(eph.Default(), time.FromJD(2451545.0, time.TT))
+	in := eph.At(eph.Default(), epoch.FromJD(2451545.0, epoch.TT))
 
 	center := func(id eph.ID) eph.ID {
 		if id == eph.Earth {

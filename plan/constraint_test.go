@@ -9,14 +9,14 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 func TestConstraints(t *testing.T) {
 	loc, _ := coord.NewGeodetic(angle.Latitude{}, angle.Longitude{}, 0)
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 	// Equinox 2000
-	tm := time.FromJD(2451545.0, time.UTC)
+	tm := epoch.FromJD(2451545.0, epoch.UTC)
 
 	t.Run("Altitude", func(t *testing.T) {
 		c := Altitude{Threshold: angle.Deg(20)}
@@ -63,7 +63,7 @@ func TestSunMoonConstraints(t *testing.T) {
 	site, _ := NewSite("Test", loc.Lat(), loc.Lon(), loc.Height())
 
 	// Night time (Sun below horizon)
-	tmNight := time.FromJD(2451545.5, time.UTC)
+	tmNight := epoch.FromJD(2451545.5, epoch.UTC)
 
 	t.Run("Sun", func(t *testing.T) {
 		c := Sun{Threshold: angle.Deg(-12)}

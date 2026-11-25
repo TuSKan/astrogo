@@ -4,13 +4,14 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -77,7 +78,7 @@ func TestSatelliteShadowAgreesWithSkyfield(t *testing.T) {
 
 	sun := eph.Default()
 
-	eclipsed := func(tm time.Time) bool {
+	eclipsed := func(tm epoch.Time) bool {
 		satSt, err := eph.At(prov, tm).Geometric(prov.ID(), eph.Earth)
 		if err != nil {
 			t.Fatalf("satellite state at %v: %v", tm, err)
@@ -92,12 +93,12 @@ func TestSatelliteShadowAgreesWithSkyfield(t *testing.T) {
 	}
 
 	type transition struct {
-		at     time.Time
+		at     epoch.Time
 		sunlit bool
 	}
 
-	start := time.Date(2026, 4, 19, 12, 0, 0, 0, time.LocationUTC)
-	end := time.Date(2026, 4, 20, 12, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)
+	end := epoch.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
 	step := unit.Seconds(60)
 
 	var found []transition
@@ -133,8 +134,8 @@ func TestSatelliteShadowAgreesWithSkyfield(t *testing.T) {
 	worst := 0.0
 
 	for i, want := range skyfieldISSShadow {
-		wantAt := time.Date(2026, 4, want.day, want.hour, want.minute, want.second,
-			int(math.Round(want.millisecond*1e6)), time.LocationUTC)
+		wantAt := epoch.Date(2026, 4, want.day, want.hour, want.minute, want.second,
+			int(math.Round(want.millisecond*1e6)), time.UTC)
 
 		if found[i].sunlit != want.sunlit {
 			t.Errorf("transition %d at %v: entering sunlit=%v, Skyfield says %v",
@@ -187,7 +188,7 @@ func TestSatelliteEclipsedGeometry(t *testing.T) {
 
 // issOverSaoPaulo is the ISS with a standard magnitude, the observing site
 // from #562, and a context at the given instant.
-func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Context) {
+func issOverSaoPaulo(t *testing.T, tm epoch.Time) (*Satellite, *Site, *coord.Context) {
 	t.Helper()
 
 	prov, err := satellite.NewFromTLE("ISS (ZARYA)", issLine1, issLine2)
@@ -212,7 +213,7 @@ func issOverSaoPaulo(t *testing.T, tm time.Time) (*Satellite, *Site, *coord.Cont
 func TestEclipsedSatelliteHasNoMagnitude(t *testing.T) {
 	t.Parallel()
 
-	dark := time.Date(2026, 4, 20, 3, 7, 0, 0, time.LocationUTC)
+	dark := epoch.Date(2026, 4, 20, 3, 7, 0, 0, time.UTC)
 	sat, _, ctx := issOverSaoPaulo(t, dark)
 
 	m, err := sat.ApparentMagnitudeCtx(dark, ctx)
@@ -229,7 +230,7 @@ func TestEclipsedSatelliteHasNoMagnitude(t *testing.T) {
 		t.Errorf("details in Earth's shadow give magnitude %q, want none", d.Magnitude)
 	}
 
-	lit := time.Date(2026, 4, 19, 17, 17, 0, 0, time.LocationUTC)
+	lit := epoch.Date(2026, 4, 19, 17, 17, 0, 0, time.UTC)
 	sat, _, ctx = issOverSaoPaulo(t, lit)
 
 	m, err = sat.ApparentMagnitudeCtx(lit, ctx)
@@ -249,7 +250,7 @@ func TestEclipsedSatelliteHasNoMagnitude(t *testing.T) {
 func TestLimitingMagnitudeRejectsAnEclipsedSatellite(t *testing.T) {
 	t.Parallel()
 
-	dark := time.Date(2026, 4, 20, 3, 7, 0, 0, time.LocationUTC)
+	dark := epoch.Date(2026, 4, 20, 3, 7, 0, 0, time.UTC)
 	sat, site, ctx := issOverSaoPaulo(t, dark)
 
 	hard := LimitingMagnitudeConstraint{Sky: fixedDepth(30), Boolean: true}

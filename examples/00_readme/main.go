@@ -5,11 +5,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +22,7 @@ func main() {
 
 	mars := plan.NewMars(ephemeris.Default())
 
-	tonight := time.Date(2026, 4, 15, 22, 0, 0, 0, time.LocationUTC)
+	tonight := epoch.Date(2026, 4, 15, 22, 0, 0, 0, time.UTC)
 
 	eval, err := plan.IsObservable(mars, site, tonight, plan.Altitude{Threshold: angle.Deg(30)})
 	if err != nil {

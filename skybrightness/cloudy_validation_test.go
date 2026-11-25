@@ -5,12 +5,12 @@ package skybrightness_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -102,7 +102,7 @@ func zilinaScene(tb testing.TB, cover float64) *skybrightness.Scene {
 
 	return &skybrightness.Scene{
 		Observer:   observer,
-		Time:       time.GoDate(2026, 3, 20, 3, 0, 0, 0, time.LocationUTC),
+		Time:       time.Date(2026, 3, 20, 3, 0, 0, 0, time.UTC),
 		Atmosphere: air,
 	}
 }

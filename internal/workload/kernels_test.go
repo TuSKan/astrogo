@@ -15,8 +15,8 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // The cache names jpl.NewProvider gives the planetary kernel and its
@@ -223,7 +223,7 @@ type countingProvider struct {
 	calls atomic.Int64
 }
 
-func (c *countingProvider) Locate(id core.ID, t time.Time) (core.State, error) {
+func (c *countingProvider) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	c.calls.Add(1)
 
 	return c.Provider.Locate(id, t) //nolint:wrapcheck // a pass-through: the provider's own error is the one to report

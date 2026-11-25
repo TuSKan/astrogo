@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // The ISS element set Vallado and python-sgp4 both use as their worked example,
@@ -60,7 +61,7 @@ func TestParseTLEReadsEveryField(t *testing.T) {
 	// Epoch: year 08 -> 2008 (a leap year), day 264.51782528. Day 1.0 is
 	// midnight on 1 January, so day 264 is 20 September and the fraction is
 	// 0.51782528 x 86400 = 44740.104192 s = 12:25:40.104.
-	wantEpoch := time.Date(2008, time.September, 20, 12, 25, 40, 104192000, time.LocationUTC)
+	wantEpoch := epoch.Date(2008, time.September, 20, 12, 25, 40, 104192000, time.UTC)
 	if gap := math.Abs(el.Epoch.Sub(wantEpoch).Seconds()); gap > 1e-4 {
 		t.Errorf("Epoch = %s, want %s (%.6f s apart)", el.Epoch, wantEpoch, gap)
 	}
@@ -307,7 +308,7 @@ func TestTheEccentricityFieldCannotExpressAnEscapeOrbit(t *testing.T) {
 	if err := (sgp4.Elements{
 		MeanMotion:   15.0,
 		Eccentricity: 1.0,
-		Epoch:        time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
+		Epoch:        epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}).Validate(); !errors.Is(err, sgp4.ErrElements) {
 		t.Errorf("Validate accepted e = 1: %v", err)
 	}

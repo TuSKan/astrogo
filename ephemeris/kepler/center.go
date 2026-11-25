@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -169,7 +169,7 @@ func chooseCenter(el Elements) (centerChoice, error) {
 
 // barycentric locates id about the Solar System barycenter at t, following the
 // centers the base answers it about.
-func barycentric(base core.Provider, id core.ID, t time.Time) (pos, vel vector.Vec3, err error) {
+func barycentric(base core.Provider, id core.ID, t epoch.Time) (pos, vel vector.Vec3, err error) {
 	// The SOFA chains are at most three deep: the Earth-Moon barycenter
 	// about the Earth, the Earth about the Sun, the Sun about the barycenter.
 	for range 8 {

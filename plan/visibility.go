@@ -2,17 +2,18 @@ package plan
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // IsVisible returns true if the object is currently above the specified
 // altitude threshold at the given site and time.
-func IsVisible(obj coord.Object, site *Site, t time.Time, minAlt angle.Angle) (bool, error) {
+func IsVisible(obj coord.Object, site *Site, t epoch.Time, minAlt angle.Angle) (bool, error) {
 	pos, err := obj.ICRS(t)
 	if err != nil {
 		return false, fmt.Errorf("visibility: ICRS: %w", err)
@@ -40,11 +41,11 @@ func IsVisible(obj coord.Object, site *Site, t time.Time, minAlt angle.Angle) (b
 // Falls back to the grid point b if refinement fails.
 func refineVisibility(
 	obj coord.Object,
-	ctxAt func(time.Time) *coord.Context,
-	a, b time.Time,
+	ctxAt func(epoch.Time) *coord.Context,
+	a, b epoch.Time,
 	threshold angle.Angle,
-) time.Time {
-	altEval := func(t time.Time) (float64, error) {
+) epoch.Time {
+	altEval := func(t epoch.Time) (float64, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return 0, fmt.Errorf("visibility: ICRS: %w", err)
@@ -76,7 +77,7 @@ func refineVisibility(
 // This is used for constraint-based observability where the underlying
 // function may be discontinuous (unlike altitude, which is continuous
 // and uses Chandrupatla root-finding via refineVisibility).
-func refineBisect(a, b time.Time, aState bool, check func(time.Time) (bool, error)) (time.Time, error) {
+func refineBisect(a, b epoch.Time, aState bool, check func(epoch.Time) (bool, error)) (epoch.Time, error) {
 	const maxBisect = 20
 
 	for range maxBisect {
@@ -84,7 +85,7 @@ func refineBisect(a, b time.Time, aState bool, check func(time.Time) (bool, erro
 
 		state, err := check(mid)
 		if err != nil {
-			return time.Time{}, err
+			return epoch.Time{}, err
 		}
 
 		if state == aState {
@@ -134,7 +135,7 @@ func VisibleIntervals(
 // unless the steps happen to land on it. A target setting after the last
 // sample was then reported up until end, and one rising after it was missed
 // altogether (#550).
-func nextSample(t, end time.Time, step unit.Duration) (next time.Time, more bool) {
+func nextSample(t, end epoch.Time, step unit.Duration) (next epoch.Time, more bool) {
 	if !t.Before(end) {
 		return t, false
 	}
@@ -157,8 +158,8 @@ func nextSample(t, end time.Time, step unit.Duration) (next time.Time, more bool
 // reference.
 func visibleIntervals(
 	obj coord.Object,
-	ctxAt func(time.Time) *coord.Context,
-	start, end time.Time,
+	ctxAt func(epoch.Time) *coord.Context,
+	start, end epoch.Time,
 	step unit.Duration,
 	minAlt angle.Angle,
 ) ([]Window, error) {
@@ -184,8 +185,8 @@ func visibleIntervals(
 	inWindow := false
 
 	var (
-		winStart time.Time
-		prevT    time.Time
+		winStart epoch.Time
+		prevT    epoch.Time
 	)
 
 	hasPrev := false
@@ -236,12 +237,12 @@ func visibleIntervals(
 // It uses a two-stage approach:
 //  1. Coarse 10-min grid scan to bracket the maximum.
 //  2. Brent's minimization (via Solver) within the bracket for sub-second precision.
-func TransitEstimate(obj coord.Object, site *Site, w Window) (time.Time, angle.Angle, error) {
+func TransitEstimate(obj coord.Object, site *Site, w Window) (epoch.Time, angle.Angle, error) {
 	start, end := w.Start, w.End
 
 	ctxAt, err := siteContexts(start, end, site)
 	if err != nil {
-		return time.Time{}, angle.Deg(0), err
+		return epoch.Time{}, angle.Deg(0), err
 	}
 
 	return transitEstimate(obj, site, ctxAt, start, end)
@@ -254,24 +255,24 @@ func TransitEstimate(obj coord.Object, site *Site, w Window) (time.Time, angle.A
 func transitEstimate(
 	obj coord.Object,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
-	start, end time.Time,
-) (time.Time, angle.Angle, error) {
+	ctxAt func(epoch.Time) *coord.Context,
+	start, end epoch.Time,
+) (epoch.Time, angle.Angle, error) {
 	if err := checkInterval(start, end); err != nil {
-		return time.Time{}, angle.Deg(0), err
+		return epoch.Time{}, angle.Deg(0), err
 	}
 
 	coarseStep := unit.Minutes(10)
 
 	// Stage 1: coarse scan to locate the bracket [tLeft, tRight] around the peak.
 	type sample struct {
-		t   time.Time
+		t   epoch.Time
 		alt float64
 	}
 
 	samples := make([]sample, 0, int(end.Sub(start)/coarseStep)+2)
 
-	sampleAt := func(t time.Time) error {
+	sampleAt := func(t epoch.Time) error {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return fmt.Errorf("visibility: transit ICRS: %w", err)
@@ -289,7 +290,7 @@ func transitEstimate(
 
 	for t := start; !t.After(end); t = t.Add(coarseStep) {
 		if err := sampleAt(t); err != nil {
-			return time.Time{}, angle.Deg(0), err
+			return epoch.Time{}, angle.Deg(0), err
 		}
 	}
 
@@ -300,7 +301,7 @@ func transitEstimate(
 	// early and 2.3° low. A window shorter than one step sampled only start.
 	if samples[len(samples)-1].t.Before(end) {
 		if err := sampleAt(end); err != nil {
-			return time.Time{}, angle.Deg(0), err
+			return epoch.Time{}, angle.Deg(0), err
 		}
 	}
 
@@ -316,7 +317,7 @@ func transitEstimate(
 	a := samples[max(0, maxIdx-1)].t
 	b := samples[min(len(samples)-1, maxIdx+1)].t
 
-	altAt := func(t time.Time) (float64, error) {
+	altAt := func(t epoch.Time) (float64, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return 0, fmt.Errorf("visibility: transit ICRS: %w", err)
@@ -334,10 +335,10 @@ func transitEstimate(
 
 	resTime, _, err := solver.FindExtremum(Evaluator(altAt), Window{Start: a, End: b}, true)
 	if err != nil {
-		return time.Time{}, angle.Deg(0), err
+		return epoch.Time{}, angle.Deg(0), err
 	}
 
-	fullAlt := func(t time.Time) (angle.Angle, error) {
+	fullAlt := func(t epoch.Time) (angle.Angle, error) {
 		pos, err := obj.ICRS(t)
 		if err != nil {
 			return angle.Deg(0), err
@@ -358,7 +359,7 @@ func transitEstimate(
 
 	resAlt, err := fullAlt(resTime)
 	if err != nil {
-		return time.Time{}, angle.Deg(0), err
+		return epoch.Time{}, angle.Deg(0), err
 	}
 
 	// Brent's method never evaluates the ends of its bracket, so when the
@@ -367,7 +368,7 @@ func transitEstimate(
 	// and Brent only approaches it to within its tolerance. The edge is
 	// read through the same full Context as the refined instant, so the
 	// two altitudes compare like for like.
-	var edges []time.Time
+	var edges []epoch.Time
 	if maxIdx == 0 {
 		edges = append(edges, start)
 	}
@@ -379,7 +380,7 @@ func transitEstimate(
 	for _, edge := range edges {
 		edgeAlt, err := fullAlt(edge)
 		if err != nil {
-			return time.Time{}, angle.Deg(0), err
+			return epoch.Time{}, angle.Deg(0), err
 		}
 
 		if edgeAlt > resAlt {
@@ -434,9 +435,9 @@ func Find(
 func find(
 	obj coord.Object,
 	site *Site,
-	ctxAt func(time.Time) *coord.Context,
+	ctxAt func(epoch.Time) *coord.Context,
 	constraints []Constraint,
-	start, end time.Time,
+	start, end epoch.Time,
 	step unit.Duration,
 ) ([]Window, error) {
 	if err := checkInterval(start, end); err != nil {
@@ -461,7 +462,7 @@ func find(
 	}
 
 	// Constraint check function for bisection refinement.
-	checkObs := func(t time.Time) (bool, error) {
+	checkObs := func(t epoch.Time) (bool, error) {
 		ctx := ctxAt(t)
 
 		for _, c := range constraints {
@@ -492,8 +493,8 @@ func find(
 	inWindow := false
 
 	var (
-		winStart time.Time
-		prevT    time.Time
+		winStart epoch.Time
+		prevT    epoch.Time
 	)
 
 	hasPrev := false

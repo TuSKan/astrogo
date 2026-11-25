@@ -6,12 +6,13 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/mpcorb"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // fixture is five verbatim rows of the MPC's Distant.txt and NEA.txt, fetched
@@ -209,17 +210,17 @@ func TestParseEpochDecodesThePackedDate(t *testing.T) {
 		}
 
 		// Compared as a Julian Date against the same calendar date built
-		// through time's own constructor, rather than by reading fields back:
+		// through epoch's own constructor, rather than by reading fields back:
 		// the epoch is on the TT scale and a field-by-field comparison would
 		// pass for a value labeled with the wrong scale.
-		want := time.Date(tc.y, tc.m, tc.d, 0, 0, 0, 0, time.LocationUTC).JD()
+		want := epoch.Date(tc.y, tc.m, tc.d, 0, 0, 0, 0, time.UTC).JD()
 
 		if got.JD() != want {
 			t.Errorf("ParseEpoch(%q).JD() = %.6f, want %.6f (%d-%02d-%02d)",
 				tc.packed, got.JD(), want, tc.y, tc.m, tc.d)
 		}
 
-		if got.Scale() != time.TT {
+		if got.Scale() != epoch.TT {
 			t.Errorf("ParseEpoch(%q) scale = %v, want TT — MPCORB epochs are TT and "+
 				"reading them as UTC is wrong by delta-T", tc.packed, got.Scale())
 		}

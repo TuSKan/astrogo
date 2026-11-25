@@ -11,9 +11,9 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/spk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -158,8 +158,8 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 		marginDays = 5
 	)
 
-	start := time.FromJD(startJD-marginDays, time.TDB)
-	stop := time.FromJD(startJD+days+marginDays, time.TDB)
+	start := epoch.FromJD(startJD-marginDays, epoch.TDB)
+	stop := epoch.FromJD(startJD+days+marginDays, epoch.TDB)
 
 	for _, body := range smallBodies() {
 		t.Run(body.name, func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestSmallBodySPKAgainstHorizons(t *testing.T) {
 			for _, ref := range refs {
 				// ET is seconds past J2000.0 TDB, the same convention
 				// TestJPLStateAgainstHorizons reads.
-				when := time.FromJD(2451545.0+ref.ET/86400.0, time.TDB)
+				when := epoch.FromJD(2451545.0+ref.ET/86400.0, epoch.TDB)
 
 				state, serr := eph.At(p, when).Geometric(sbID, core.Earth)
 				if serr != nil {

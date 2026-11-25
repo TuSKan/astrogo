@@ -7,9 +7,9 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
 	"github.com/TuSKan/astrogo/internal/refraction"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -37,7 +37,7 @@ import (
 // A Context is a value: c := *ctx is an independent copy, for a caller that
 // needs two instants at once.
 type Context struct {
-	t time.Time
+	t epoch.Time
 
 	// nodes are the instants the slow state has been evaluated at, in time
 	// order, and what was evaluated there: one after a build, and two, a
@@ -53,7 +53,7 @@ type Context struct {
 	site   *Geodetic
 	atm    atmosphere.Refraction
 	astrom gofaext.ASTROM
-	eop    time.EOP // cached for AltAzToICRS reuse
+	eop    epoch.EOP // cached for AltAzToICRS reuse
 
 	// eopSource and eopCovered are what the current instant was placed with,
 	// for [Context.EOPSource]: where the Earth orientation model came from,
@@ -115,7 +115,7 @@ type Context struct {
 // A nil site is [ErrNilGeodetic], a time that is not finite is
 // [ErrNotFinite], and air that fails [atmosphere.Refraction.Validate] is that
 // error, rather than the clamp SOFA's Refco would apply to it.
-func NewContext(t time.Time, site *Geodetic, atm atmosphere.Refraction) (*Context, error) {
+func NewContext(t epoch.Time, site *Geodetic, atm atmosphere.Refraction) (*Context, error) {
 	if site == nil {
 		return nil, fmt.Errorf("coord: NewContext: %w", ErrNilGeodetic)
 	}
@@ -232,7 +232,7 @@ var (
 // NewContext does, at the cost of one interpolation. An earlier instant's
 // would put every instant after the leap a second early in Earth rotation,
 // 13″ for a star at −30°.
-func (ctx *Context) SetTime(t time.Time) {
+func (ctx *Context) SetTime(t epoch.Time) {
 	t = t.UTC()
 	lo, hi := &ctx.nodes[0], &ctx.nodes[1]
 	fromLo, fromHi := utcDays(t, lo.at), utcDays(t, hi.at)
@@ -275,7 +275,7 @@ func (ctx *Context) SetTime(t time.Time) {
 // and to carry TT for proper motion — because Time.Sub, which does count
 // the second, looks both instants up in the leap-second table, and that was
 // most of a move.
-func utcDays(a, b time.Time) float64 {
+func utcDays(a, b epoch.Time) float64 {
 	a1, a2 := a.JDParts()
 	b1, b2 := b.JDParts()
 
@@ -285,14 +285,14 @@ func utcDays(a, b time.Time) float64 {
 // node is the series' state at one instant: what [gofaext.CelestialAt]
 // evaluates there, that instant's polar motion and its matrix, and its TT.
 type node struct {
-	at       time.Time
+	at       epoch.Time
 	tt1, tt2 float64
 	cel      gofaext.Celestial
 	xp, yp   float64
 	rpom     [3][3]float64
 }
 
-func nodeAt(t time.Time) node {
+func nodeAt(t epoch.Time) node {
 	tt1, tt2 := t.TT().JDParts()
 	eop := t.EOP()
 
@@ -332,21 +332,21 @@ func between(a, b *node, f float64) node {
 }
 
 // Time returns the encapsulated observation time.
-func (ctx *Context) Time() time.Time { return ctx.t }
+func (ctx *Context) Time() epoch.Time { return ctx.t }
 
 // Site returns the encapsulated observation geodetic location.
 func (ctx *Context) Site() *Geodetic { return ctx.site }
 
 // EOPSource reports the Earth orientation this Context's current instant was
-// placed with: where the model came from, as [time.EOPSource] names it
+// placed with: where the model came from, as [epoch.EOPSource] names it
 // ("network", "cache", "explicit" or "zero"), and whether the instant lies
 // inside the loaded bulletin's coverage.
 //
 // "zero" and false is a Context built with no bulletin loaded. Its places
 // carry no DUT1 or polar motion, which can put a topocentric place 13.5″ off;
-// [time.LoadEOP] loads a bulletin, and says when it cannot. A source of
+// [epoch.LoadEOP] loads a bulletin, and says when it cannot. A source of
 // "network" or "cache" with covered false is an instant past the bulletin's
-// end, where DUT1 is held as [time.DeltaT] describes.
+// end, where DUT1 is held as [epoch.DeltaT] describes.
 func (ctx *Context) EOPSource() (source string, covered bool) { return ctx.eopSource, ctx.eopCovered }
 
 // Refraction returns the encapsulated refraction configuration. Renamed
@@ -625,7 +625,7 @@ func (ctx *Context) BarycentricVelocity() vector.Vec3 {
 // series' state n: the astrometry, with the observer's position and velocity
 // at t's Earth rotation angle, and the celestial-to-terrestrial matrix and
 // observer vector.
-func (ctx *Context) place(t time.Time, n *node) {
+func (ctx *Context) place(t epoch.Time, n *node) {
 	// UT1 through time rather than by adding DUT1 to the UTC Julian Date: on
 	// a day that ends in a leap second that date's fraction is of 86401
 	// seconds, and the sum would misplace Earth's rotation by up to a second.
@@ -633,8 +633,8 @@ func (ctx *Context) place(t time.Time, n *node) {
 
 	// What the lookup above was answered from, read after it, since the lookup
 	// may have loaded the bulletin.
-	ctx.eopSource = time.EOPSource()
-	lo, hi, loaded := time.Coverage()
+	ctx.eopSource = epoch.EOPSource()
+	lo, hi, loaded := epoch.Coverage()
 	mjd := t.MJD()
 	ctx.eopCovered = loaded && mjd >= lo && mjd <= hi
 	era := gofaext.Era00(ut1, ut2)
@@ -667,7 +667,7 @@ func (ctx *Context) place(t time.Time, n *node) {
 // build computes, in place, everything in ctx for instant t, evaluating the
 // series there: what NewContext does once the site is set, and what SetTime
 // does again when t is beyond the bracket next to the one it has.
-func (ctx *Context) build(t time.Time) {
+func (ctx *Context) build(t epoch.Time) {
 	t = t.UTC()
 	site := ctx.site
 

@@ -3,12 +3,13 @@ package plan
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/unit"
@@ -52,7 +53,7 @@ func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
 	remote.DisableDownloads(remote.NAIFSPK)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	candidates, providers := gatherPlanetaryMoons(context.Background(), time.Date(2026, time.August, 1, 0, 0, 0, 0, time.LocationUTC), 30, &skips{})
+	candidates, providers := gatherPlanetaryMoons(context.Background(), epoch.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC), 30, &skips{})
 
 	if len(candidates) != 0 {
 		t.Errorf("expected no candidates without download consent, got %d", len(candidates))
@@ -122,7 +123,7 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 		HasH:          true,
 		H:             3.34,
 		G:             0.12,
-		Epoch:         time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC),
+		Epoch:         epoch.Date(2026, time.June, 9, 0, 0, 0, 0, time.UTC),
 		SemiMajorAxis: 2.77,
 		Eccentricity:  0.0797,
 		Inclination:   angle.Deg(10.6),
@@ -180,7 +181,7 @@ func TestCandidateFromTarget_ElementsBearingTargetIsOffline(t *testing.T) {
 // the star target takes the inline fast path. Both must survive into the
 // final candidate slice, in their original order.
 func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
-	epoch := time.Date(2026, time.June, 9, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 9, 0, 0, 0, 0, time.UTC)
 
 	targets := []resolve.Target{
 		{
@@ -198,7 +199,7 @@ func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
 			HasH:          true,
 			H:             3.34,
 			G:             0.12,
-			Epoch:         epoch,
+			Epoch:         at,
 			SemiMajorAxis: unit.AU(2.77),
 			Eccentricity:  0.0797,
 			Inclination:   angle.Deg(10.6),
@@ -208,7 +209,7 @@ func TestGatherCandidates_SmallBodyPathOffline(t *testing.T) {
 		},
 	}
 
-	start := epoch
+	start := at
 	end := start.Add(unit.Days(1))
 
 	candidates := gatherCandidates(context.Background(), targets, start, end, visibleTonightConfig{}, &skips{})

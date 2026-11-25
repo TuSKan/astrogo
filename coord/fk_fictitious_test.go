@@ -5,8 +5,8 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -41,18 +41,18 @@ func TestTheRoundTripClosesAtEveryEpoch(t *testing.T) {
 	// above a milliarcsecond is this defect returning.
 	const tol = 1e-3
 
-	for _, epoch := range []float64{1900, coord.B1950, 1975, 2000, 2050} {
-		back := coord.FK4ToICRS(coord.ICRSToFK4(star, epoch))
+	for _, year := range []float64{1900, coord.B1950, 1975, 2000, 2050} {
+		back := coord.FK4ToICRS(coord.ICRSToFK4(star, year))
 		if sep := coord.Separation(star, back).Arcseconds(); sep > tol {
-			t.Errorf("ICRS -> FK4 -> ICRS at bepoch %g: moved %.6f arcsec", epoch, sep)
+			t.Errorf("ICRS -> FK4 -> ICRS at bepoch %g: moved %.6f arcsec", year, sep)
 		}
 	}
 
 	// The FK5 route has no E-terms and closes exactly.
-	for _, epoch := range []float64{1950, coord.J2000Epoch, 2050, 2100} {
-		back := coord.FK5ToICRS(coord.ICRSToFK5(star, epoch))
+	for _, year := range []float64{1950, coord.J2000Epoch, 2050, 2100} {
+		back := coord.FK5ToICRS(coord.ICRSToFK5(star, year))
 		if sep := coord.Separation(star, back).Arcseconds(); sep > 1e-9 {
-			t.Errorf("ICRS -> FK5 -> ICRS at jepoch %g: moved %.9f arcsec", epoch, sep)
+			t.Errorf("ICRS -> FK5 -> ICRS at jepoch %g: moved %.9f arcsec", year, sep)
 		}
 	}
 
@@ -60,15 +60,15 @@ func TestTheRoundTripClosesAtEveryEpoch(t *testing.T) {
 	// first localized.
 	fk5 := coord.NewFK5(angle.Deg(123.4), angle.Deg(-35.6), coord.J2000Epoch)
 
-	for _, epoch := range []float64{1900, coord.B1950, 2000, 2050} {
-		back := coord.FK4ToFK5(coord.FK5ToFK4(fk5, epoch))
+	for _, year := range []float64{1900, coord.B1950, 2000, 2050} {
+		back := coord.FK4ToFK5(coord.FK5ToFK4(fk5, year))
 
 		sep := coord.Separation(
 			coord.NewICRS(fk5.RA(), fk5.Dec()),
 			coord.NewICRS(back.RA(), back.Dec()),
 		).Arcseconds()
 		if sep > tol {
-			t.Errorf("FK5 -> FK4 -> FK5 at bepoch %g: moved %.6f arcsec", epoch, sep)
+			t.Errorf("FK5 -> FK4 -> FK5 at bepoch %g: moved %.6f arcsec", year, sep)
 		}
 	}
 }
@@ -87,14 +87,14 @@ func TestAstrogoMatchesRawSOFAAtEveryEpoch(t *testing.T) {
 	ra := angle.Deg(123.4)
 	dec := angle.Deg(-35.6)
 
-	for _, epoch := range []float64{1900, coord.B1950, 1975, 2000, 2050} {
+	for _, year := range []float64{1900, coord.B1950, 1975, 2000, 2050} {
 		// Raw SOFA, with no astrogo types in the way.
-		r1950, d1950, _, _ := gofaext.Fk54z(ra.Radians(), dec.Radians(), epoch)
-		wantRA, wantDec := gofaext.Fk45z(r1950, d1950, epoch)
+		r1950, d1950, _, _ := gofaext.Fk54z(ra.Radians(), dec.Radians(), year)
+		wantRA, wantDec := gofaext.Fk45z(r1950, d1950, year)
 
 		// The same trip through astrogo.
 		fk5 := coord.NewFK5(ra, dec, coord.J2000Epoch)
-		got := coord.FK4ToFK5(coord.FK5ToFK4(fk5, epoch))
+		got := coord.FK4ToFK5(coord.FK5ToFK4(fk5, year))
 
 		sep := coord.Separation(
 			coord.NewICRS(angle.Rad(wantRA), angle.Rad(wantDec)),
@@ -105,7 +105,7 @@ func TestAstrogoMatchesRawSOFAAtEveryEpoch(t *testing.T) {
 		// not merely a comparably accurate one.
 		if sep > 1e-9 {
 			t.Errorf("bepoch %g: astrogo is %.9f arcsec from the raw SOFA pair, "+
-				"which means it is no longer calling the same routines", epoch, sep)
+				"which means it is no longer calling the same routines", year, sep)
 		}
 	}
 }
@@ -130,7 +130,7 @@ func TestARecordedMotionStillTakesTheSixElementRoute(t *testing.T) {
 		angle.Deg(123.4), angle.Deg(-35.6),
 		angle.Arcsec(pmRAIn/1000), angle.Arcsec(pmDecIn/1000),
 		angle.Arcsec(pxIn), unit.KmPerSec(rvIn),
-		time.J2000(),
+		epoch.J2000(),
 	)
 
 	back := coord.FK4ToICRS(coord.ICRSToFK4(star, coord.B1950))

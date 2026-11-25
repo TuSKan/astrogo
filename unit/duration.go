@@ -16,7 +16,7 @@ import (
 //
 // Because it cannot hold an astronomical interval. time.Duration is an int64
 // nanosecond count, so it saturates just past ±292 years, and astrogo's own
-// epochs routinely run past that — [github.com/TuSKan/astrogo/time.ZeroTime]
+// epochs routinely run past that — [github.com/TuSKan/astrogo/epoch.ZeroTime]
 // is JD 0, in 4713 BC.
 //
 // So astrogo already had two ways to hold an interval before this type

@@ -25,7 +25,7 @@ const (
 // Each is a registration and nothing else — it exports no symbol at all, so
 // importing one for a name is already impossible and importing it blank is the
 // only thing it is for. The storage ones register a URL scheme with gocloud's
-// opener registry; remote/eop registers the IERS loader with astrogo/time.
+// opener registry; remote/eop registers the IERS loader with astrogo/epoch.
 //
 // They are opt-in rather than always-on for the same reason in both cases: what
 // they pull in should not be in a build that never asked. An s3:// scheme costs

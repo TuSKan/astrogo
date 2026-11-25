@@ -30,9 +30,8 @@ var wallClockAllowed = map[string]string{
 	"skybrightness/dataset/airglow/almanac_network_test.go": "queries a live service for the current sky",
 	"skybrightness/dataset/starlight/gaia_network_test.go":  "measures elapsed time to show the cache works",
 	"skybrightness/gambons_allsky_test.go":                  "measures elapsed time for its own report",
-	"time/internal/iers/fetch_test.go":                      "the fetch cooldown is defined relative to now",
-	"time/time_test.go":                                     "TestNowUTC tests NowUTC",
-	"time/reexport_test.go":                                 "Since, Until and Sleep are defined relative to now; the present is the subject",
+	"epoch/internal/iers/fetch_test.go":                     "the fetch cooldown is defined relative to now",
+	"epoch/time_test.go":                                    "TestNow tests Now",
 }
 
 // TestNoUndeclaredWallClockTests keeps tests from quietly depending on when
@@ -57,7 +56,7 @@ var wallClockAllowed = map[string]string{
 //
 // # Comments are exempt
 //
-// A doc comment saying a test "previously used time.NowUTC()" is a record of
+// A doc comment saying a test "previously used epoch.Now()" is a record of
 // what changed, not a live dependency. sofa_compare_test.go is exactly that
 // case: it carries three such mentions and no call, which is why it does not
 // appear above.
@@ -116,7 +115,7 @@ func TestNoUndeclaredWallClockTests(t *testing.T) {
 				code = code[:idx]
 			}
 
-			if !strings.Contains(code, "time.Now()") && !strings.Contains(code, "time.NowUTC()") {
+			if !strings.Contains(code, "time.Now()") && !strings.Contains(code, "epoch.Now()") {
 				continue
 			}
 

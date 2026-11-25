@@ -2,10 +2,11 @@ package plan
 
 import (
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -27,7 +28,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	type pair struct {
 		name        string
 		first, last *Event
-		want        [2]time.Time
+		want        [2]epoch.Time
 		tol         unit.Duration
 	}
 
@@ -44,20 +45,20 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 
 	// Mawson in midwinter: the Sun is up for 14 minutes, a hundredth of a
 	// degree above the rise/set threshold at its highest.
-	start := time.Date(2026, 6, 28, 19, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 6, 28, 19, 0, 0, 0, time.UTC)
 
 	rise, set, err := SunriseSunset(site("Mawson", -67.6027, 62.8738), Window{Start: start, End: start.Add(unit.Days(1))}, prov)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cases = append(cases, pair{"Mawson sunrise and sunset", rise, set, [2]time.Time{
-		time.Date(2026, 6, 29, 7, 45, 6, 0, time.LocationUTC),
-		time.Date(2026, 6, 29, 7, 59, 6, 0, time.LocationUTC),
+	cases = append(cases, pair{"Mawson sunrise and sunset", rise, set, [2]epoch.Time{
+		epoch.Date(2026, 6, 29, 7, 45, 6, 0, time.UTC),
+		epoch.Date(2026, 6, 29, 7, 59, 6, 0, time.UTC),
 	}, unit.Seconds(12)})
 
 	// Paris in June: ten minutes of astronomical night, 0.009° deep.
-	start = time.Date(2026, 6, 11, 10, 0, 0, 0, time.LocationUTC)
+	start = epoch.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
 
 	nights, err := TwilightEvents(site("Paris", 48.8566, 2.3522), Window{Start: start, End: start.Add(unit.Days(1))}, prov, AstronomicalTwilight)
 	if err != nil {
@@ -69,9 +70,9 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 		dusk, dawn = nights[0].Dusk, nights[0].Dawn
 	}
 
-	cases = append(cases, pair{"Paris astronomical dusk and dawn", dusk, dawn, [2]time.Time{
-		time.Date(2026, 6, 11, 23, 45, 20, 0, time.LocationUTC),
-		time.Date(2026, 6, 11, 23, 55, 18, 0, time.LocationUTC),
+	cases = append(cases, pair{"Paris astronomical dusk and dawn", dusk, dawn, [2]epoch.Time{
+		epoch.Date(2026, 6, 11, 23, 45, 20, 0, time.UTC),
+		epoch.Date(2026, 6, 11, 23, 55, 18, 0, time.UTC),
 	}, unit.Seconds(12)})
 
 	// Alta: the Moon's center dips 0.006° below the fixed mean-semi-diameter
@@ -81,7 +82,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 	// night: near perigee the semi-diameter is 16.33′, and the upper limb
 	// stays at least 0.009° above the horizon. MoonriseMoonset used to report
 	// the twelve minutes as a set and a rise (#693).
-	start = time.Date(2026, 6, 17, 22, 0, 0, 0, time.LocationUTC)
+	start = epoch.Date(2026, 6, 17, 22, 0, 0, 0, time.UTC)
 	alta := site("Alta", 69.9689, 23.2716)
 
 	if r, s, err := MoonriseMoonset(alta, Window{Start: start, End: start.Add(unit.Days(1))}, prov); err != nil || r != nil || s != nil {
@@ -104,9 +105,9 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 		}
 	}
 
-	cases = append(cases, pair{"Alta moonset and moonrise", mset, mrise, [2]time.Time{
-		time.Date(2026, 6, 18, 1, 30, 45, 0, time.LocationUTC),
-		time.Date(2026, 6, 18, 1, 42, 28, 0, time.LocationUTC),
+	cases = append(cases, pair{"Alta moonset and moonrise", mset, mrise, [2]epoch.Time{
+		epoch.Date(2026, 6, 18, 1, 30, 45, 0, time.UTC),
+		epoch.Date(2026, 6, 18, 1, 42, 28, 0, time.UTC),
 	}, unit.Seconds(20)})
 
 	for _, c := range cases {
@@ -116,7 +117,7 @@ func TestCrossingPairsBetweenSamples(t *testing.T) {
 			continue
 		}
 
-		for k, got := range []time.Time{c.first.Time, c.last.Time} {
+		for k, got := range []epoch.Time{c.first.Time, c.last.Time} {
 			if d := got.Sub(c.want[k]).Abs(); d > c.tol {
 				t.Errorf("%s: %v, Skyfield gives %v (off by %v)", c.name, got, c.want[k], d)
 			}
@@ -139,16 +140,16 @@ func TestTheStepDoesNotDecideWhichCrossingsExist(t *testing.T) {
 		name       string
 		lat, lon   float64
 		threshold  angle.Angle
-		start, end time.Time
+		start, end epoch.Time
 	}{
 		{"Mawson in June, sunrise and sunset", -67.6027, 62.8738, angle.Deg(-0.8334),
-			time.Date(2026, 6, 8, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 6, 16, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC)},
 		{"Mawson in July, sunrise and sunset", -67.6027, 62.8738, angle.Deg(-0.8334),
-			time.Date(2026, 6, 26, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 7, 4, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 7, 4, 0, 0, 0, 0, time.UTC)},
 		{"Paris in June, astronomical twilight", 48.8566, 2.3522, angle.Deg(-18),
-			time.Date(2026, 6, 5, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 6, 13, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 6, 5, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 6, 13, 0, 0, 0, 0, time.UTC)},
 		{"Paris in July, astronomical twilight", 48.8566, 2.3522, angle.Deg(-18),
-			time.Date(2026, 6, 28, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 7, 6, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 6, 28, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 7, 6, 0, 0, 0, 0, time.UTC)},
 	} {
 		site, err := NewSite(c.name, angle.LatDeg(c.lat), angle.LonDeg(c.lon), unit.Meters(0))
 		if err != nil {

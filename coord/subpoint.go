@@ -6,8 +6,8 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -46,8 +46,8 @@ import (
 // from where the Sun is overhead in October 2026.
 //
 // Returns [ErrZeroVector] for a zero vector, and an error when UT1 cannot be
-// had for t, as [time.Time.UT1] reports it.
-func SubPoint(geocentric vector.Vec3, t time.Time) (*Geodetic, error) {
+// had for t, as [epoch.Time.UT1] reports it.
+func SubPoint(geocentric vector.Vec3, t epoch.Time) (*Geodetic, error) {
 	if geocentric.Norm() == 0 {
 		return nil, fmt.Errorf("coord: subpoint: %w", ErrZeroVector)
 	}

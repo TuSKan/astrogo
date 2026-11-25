@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -45,7 +45,7 @@ func ExampleScheduler_BuildSchedule() {
 	}
 
 	// Generate a 6-hour schedule
-	start := time.FromJD(2451545.0, time.UTC) // J2000 Noon
+	start := epoch.FromJD(2451545.0, epoch.UTC) // J2000 Noon
 	window := Window{Start: start, End: start.Add(unit.Hours(6))}
 
 	schedule, _ := scheduler.BuildSchedule(window, blocks)

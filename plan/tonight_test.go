@@ -4,17 +4,18 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // near reports whether a and b are within the event solver's 1 s tolerance,
 // with a second of slack for two searches that sampled differently.
-func near(a, b time.Time) bool { return a.Sub(b).Abs() <= unit.Seconds(2) }
+func near(a, b epoch.Time) bool { return a.Sub(b).Abs() <= unit.Seconds(2) }
 
 // TestTonightIsOneNightFromAnyInstantInIt: at Madrid, noon, 23:00, and 06:30
 // the next morning, after astronomical dawn but before sunrise, all give one
@@ -33,7 +34,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noon := time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC)
+	noon := epoch.Date(2026, time.November, 17, 12, 0, 0, 0, time.UTC)
 
 	want, err := plan.TonightAt(site, noon, prov)
 	if err != nil {
@@ -46,7 +47,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 
 	order := []struct {
 		name string
-		at   time.Time
+		at   epoch.Time
 	}{
 		{"sunset", want.Sunset},
 		{"civil dusk", want.Civil.Dusk},
@@ -78,7 +79,7 @@ func TestTonightIsOneNightFromAnyInstantInIt(t *testing.T) {
 		t.Errorf("Tonight's astronomical night %+v, NightOf's %+v (%v)", *want.Astronomical, astro, err)
 	}
 
-	for _, at := range []time.Time{
+	for _, at := range []epoch.Time{
 		noon.Add(unit.Hours(11)),                     // 23:00
 		want.Astronomical.Dawn.Add(unit.Minutes(30)), // after astronomical dawn, before sunrise
 	} {
@@ -110,7 +111,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tonight, err := plan.TonightAt(london, time.Date(2026, time.July, 2, 12, 0, 0, 0, time.LocationUTC), prov)
+	tonight, err := plan.TonightAt(london, epoch.Date(2026, time.July, 2, 12, 0, 0, 0, time.UTC), prov)
 	if err != nil {
 		t.Fatalf("TonightAt London: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 	var before, first plan.Tonight
 
 	for day := 10; day <= 40; day++ {
-		got, err := plan.TonightAt(london, time.Date(2026, time.July, day, 12, 0, 0, 0, time.LocationUTC), prov)
+		got, err := plan.TonightAt(london, epoch.Date(2026, time.July, day, 12, 0, 0, 0, time.UTC), prov)
 		if err != nil {
 			t.Fatalf("TonightAt London, July %d: %v", day, err)
 		}
@@ -154,7 +155,7 @@ func TestTonightLeavesOutTheTwilightTheSunDoesNotReach(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := plan.TonightAt(longyearbyen, time.Date(2026, time.June, 21, 11, 0, 0, 0, time.LocationUTC), prov); !errors.Is(err, plan.ErrNoTwilight) {
+	if got, err := plan.TonightAt(longyearbyen, epoch.Date(2026, time.June, 21, 11, 0, 0, 0, time.UTC), prov); !errors.Is(err, plan.ErrNoTwilight) {
 		t.Errorf("TonightAt under the midnight Sun = %+v, %v, want ErrNoTwilight", got, err)
 	}
 }
@@ -175,9 +176,9 @@ func TestTonightPlacesTheMoon(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, noon := range []time.Time{
-		time.Date(2026, time.November, 17, 12, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.December, 1, 12, 0, 0, 0, time.LocationUTC),
+	for _, noon := range []epoch.Time{
+		epoch.Date(2026, time.November, 17, 12, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.December, 1, 12, 0, 0, 0, time.UTC),
 	} {
 		tonight, err := plan.TonightAt(site, noon, prov)
 		if err != nil {
@@ -191,7 +192,7 @@ func TestTonightPlacesTheMoon(t *testing.T) {
 
 		for _, c := range []struct {
 			name      string
-			got, want *time.Time
+			got, want *epoch.Time
 		}{
 			{"moonrise", tonight.Moonrise, eventTime(rise)},
 			{"moonset", tonight.Moonset, eventTime(set)},
@@ -228,7 +229,7 @@ func TestTonightPlacesTheMoon(t *testing.T) {
 }
 
 // eventTime is e's time, or nil for no event.
-func eventTime(e *plan.Event) *time.Time {
+func eventTime(e *plan.Event) *epoch.Time {
 	if e == nil {
 		return nil
 	}

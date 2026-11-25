@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -39,7 +40,7 @@ func TestPlanetApparent_AllPlanets(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Expected ranges from Astronomical Almanac / JPL Horizons.
 	cases := []struct {
@@ -82,7 +83,7 @@ func TestSunApparent(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	mag, err := magnitude.SunApparent(p, tm)
 	if err != nil {
@@ -103,7 +104,7 @@ func TestMoonApparent(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	mag, err := magnitude.MoonApparent(p, tm)
 	if err != nil {
@@ -127,7 +128,7 @@ func TestPlanetApparent_Sun(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 6, 15, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 
 	mag, err := magnitude.PlanetApparent(p, eph.Sun, tm)
 	if err != nil {
@@ -147,7 +148,7 @@ func TestPlanetApparent_Earth_ReturnsError(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	_, err := magnitude.PlanetApparent(p, eph.Earth, tm)
 	if err == nil {
@@ -165,7 +166,7 @@ func TestPhaseAngle_Venus(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	alpha, err := magnitude.PhaseAngle(p, eph.Venus, tm)
 	if err != nil {
@@ -190,7 +191,7 @@ func TestPhaseAngle_Jupiter_Small(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	alpha, err := magnitude.PhaseAngle(p, eph.JupiterBarycenter, tm)
 	if err != nil {
@@ -215,7 +216,7 @@ func TestIlluminatedFraction_Moon(t *testing.T) {
 		}
 	})
 
-	tm := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	frac, err := magnitude.IlluminatedFraction(p, eph.Moon, tm)
 	if err != nil {
@@ -239,8 +240,8 @@ func TestNeptune_SecularBrightening(t *testing.T) {
 		}
 	})
 
-	t1980 := time.Date(1980, 1, 1, 0, 0, 0, 0, time.LocationUTC)
-	t2026 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	t1980 := epoch.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2026 := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	m1980, err := magnitude.PlanetApparent(p, eph.NeptuneBarycenter, t1980)
 	if err != nil {

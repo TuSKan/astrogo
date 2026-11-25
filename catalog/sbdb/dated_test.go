@@ -11,11 +11,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/constants"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -47,7 +48,7 @@ func TestSunDistanceAroundMatchesBarkersEquation(t *testing.T) {
 
 	const q = 1.2
 
-	tp := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tp := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	window := datedWindow.Days()
 
 	for _, tt := range []struct {
@@ -76,7 +77,7 @@ func TestSunDistanceAroundMatchesBarkersEquation(t *testing.T) {
 func TestSunDistanceAroundKeepsWhatItCannotPropagate(t *testing.T) {
 	t.Parallel()
 
-	tp := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	tp := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	if got := sunDistanceAround(1.2, -0.5, tp, tp.Add(unit.Days(4000))); got != 1.2 {
 		t.Errorf("a negative eccentricity gave %g AU, want the perihelion distance back", got)
@@ -155,7 +156,7 @@ func searchNames(req resolve.BrightRequest) (names []string, cut bool, err error
 }
 
 func TestSearchBrightDatedKeepsTheCometsNearPerihelion(t *testing.T) {
-	at := time.Date(2026, 10, 15, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
 	jd := at.TT().JD()
 
 	// Both reach perihelion at 1.2 AU, where M1 6 and K1 10 make them about
@@ -188,7 +189,7 @@ func TestSearchBrightDatedKeepsTheCometsNearPerihelion(t *testing.T) {
 // whether more than the limit passed the date, and a caller's own limit is
 // not a cut.
 func TestSearchBrightDatedCutsAtTheLimit(t *testing.T) {
-	at := time.Date(2026, 10, 15, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)
 	tp := strconv.FormatFloat(at.TT().JD(), 'f', 3, 64)
 
 	comets := make([][3]string, 60)

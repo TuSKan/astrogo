@@ -5,7 +5,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -80,7 +80,7 @@ type Reducer struct {
 
 // NewReducer creates a new apparent-place reduction pipeline, building its
 // [Context]: what [NewContext] refuses, it refuses.
-func NewReducer(site *Geodetic, t time.Time, atmos atmosphere.Refraction) (*Reducer, error) {
+func NewReducer(site *Geodetic, t epoch.Time, atmos atmosphere.Refraction) (*Reducer, error) {
 	ctx, err := NewContext(t, site, atmos)
 	if err != nil {
 		return nil, err

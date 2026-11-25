@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -22,7 +23,7 @@ func main() {
 	// to 13.5 arcsec, well below the 0.01° printed here. For full accuracy,
 	// blank-import remote/eop and consent to the IERS bulletin, as
 	// 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Define the observer's location (Quinta Calixto, Brazil)
 	loc, err := coord.NewGeodetic(angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -32,13 +33,13 @@ func main() {
 
 	// 2. Set the time: 10 PM local time (UTC-3) on 2027-02-19, the night of
 	// Mars's opposition, when it is up all night. A fixed instant keeps the
-	// output the same on every run; time.NowUTC() asks about right now.
+	// output the same on every run; epoch.Now() asks about right now.
 	tz, err := time.LoadLocation("America/Sao_Paulo")
 	if err != nil {
 		log.Fatalf("tz: %v", err)
 	}
 
-	tm := time.Date(2027, 2, 19, 22, 0, 0, 0, tz)
+	tm := epoch.Date(2027, 2, 19, 22, 0, 0, 0, tz)
 
 	// 3. Create a moving target for Mars using the built-in default ephemeris
 	mars := plan.NewMars(eph.Default())

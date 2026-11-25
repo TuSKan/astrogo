@@ -3,12 +3,13 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -21,7 +22,7 @@ import (
 // TestHd2paAgainstSOFAsOwnVector checks against SOFA's own vector.
 func TestParallacticAngleIsSOFAs(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(time.ResetEOP)
+	t.Cleanup(epoch.ResetEOP)
 
 	const (
 		dut1Seconds = 0.1237
@@ -31,15 +32,15 @@ func TestParallacticAngleIsSOFAs(t *testing.T) {
 		toleranceArcsec = 1e-3
 	)
 
-	time.RegisterModel(fixedEOP{
+	epoch.RegisterModel(fixedEOP{
 		dut1: dut1Seconds,
 		xp:   angle.Arcsec(xpArcsec).Radians(),
 		yp:   angle.Arcsec(ypArcsec).Radians(),
 	})
 
 	atm := atmosphere.StandardRefraction()
-	epoch := time.Date(2026, time.March, 20, 3, 0, 0, 0, time.LocationUTC)
-	utc1, utc2 := epoch.UTC().JDParts()
+	at := epoch.Date(2026, time.March, 20, 3, 0, 0, 0, time.UTC)
+	utc1, utc2 := at.UTC().JDParts()
 
 	sites := []struct {
 		name              string
@@ -72,7 +73,7 @@ func TestParallacticAngleIsSOFAs(t *testing.T) {
 			t.Fatalf("%s: NewGeodetic: %v", s.name, err)
 		}
 
-		ctx := mustContext(t, epoch, site, atm)
+		ctx := mustContext(t, at, site, atm)
 
 		for _, st := range stars {
 			ra, dec := angle.Deg(st.raDeg), angle.Deg(st.decDeg)
@@ -147,7 +148,7 @@ func TestParallacticAngleOnTheMeridian(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := mustContext(t, time.Date(2026, time.March, 20, 0, 0, 0, 0, time.LocationUTC), site, atmosphere.Refraction{})
+	ctx := mustContext(t, epoch.Date(2026, time.March, 20, 0, 0, 0, 0, time.UTC), site, atmosphere.Refraction{})
 
 	for _, c := range []struct {
 		name    string

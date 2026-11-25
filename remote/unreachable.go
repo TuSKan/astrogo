@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote/api"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // ErrUnreachable marks a request to a host that gave no answer: it could not
@@ -34,7 +34,7 @@ const defaultUnreachableCooldown = 5 * time.Minute
 // noAnswer is what a Client remembers about a host that gave no answer: when,
 // and the failure.
 type noAnswer struct {
-	at  time.GoTime
+	at  time.Time
 	err error
 }
 

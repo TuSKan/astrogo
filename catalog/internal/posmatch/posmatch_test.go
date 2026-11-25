@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -16,7 +16,7 @@ import (
 // 2026-10-08 (#627).
 var barnard = resolve.Target{
 	ID: "NAME Barnard's star", Coord: coord.NewICRS(angle.Deg(269.4520769586), angle.Deg(4.6933649666)),
-	HasCoord: true, Epoch: time.J2000(),
+	HasCoord: true, Epoch: epoch.J2000(),
 	PmRA: angle.Arcsec(-0.8015510), PmDec: angle.Arcsec(10.3623940),
 	Parallax: angle.Arcsec(0.5469759), RadialVelocity: unit.KmPerSec(-110.11),
 }
@@ -66,7 +66,7 @@ func TestCoordCarriesEachKinematicFieldOnItsOwn(t *testing.T) {
 		{"parallax", func(tg *resolve.Target) { tg.Parallax = barnard.Parallax }, func(c coord.ICRS) bool { return c.Parallax() == barnard.Parallax }},
 		{"radial velocity", func(tg *resolve.Target) { tg.RadialVelocity = barnard.RadialVelocity }, func(c coord.ICRS) bool { return c.RV() == barnard.RadialVelocity }},
 	} {
-		tgt := resolve.Target{Coord: barnard.Coord, HasCoord: true, Epoch: time.J2000()}
+		tgt := resolve.Target{Coord: barnard.Coord, HasCoord: true, Epoch: epoch.J2000()}
 		c.set(&tgt)
 
 		if !c.got(Coord(tgt)) {
@@ -90,7 +90,7 @@ func TestCoordCarriesEachKinematicFieldOnItsOwn(t *testing.T) {
 func TestSeparationReportsAPositionItCannotMove(t *testing.T) {
 	t.Parallel()
 
-	gaiaEpoch := time.FromJD(time.J2000().JD()+16*365.25, time.TT)
+	gaiaEpoch := epoch.FromJD(epoch.J2000().JD()+16*365.25, epoch.TT)
 	unmovable := coord.NewICRSWithKinematics(angle.Deg(150), angle.Deg(20),
 		angle.Arcsec(0.1), angle.Arcsec(0.1), angle.Arcsec(1e300), unit.KmPerSec(0), gaiaEpoch)
 	moving := Coord(barnard)
@@ -99,14 +99,14 @@ func TestSeparationReportsAPositionItCannotMove(t *testing.T) {
 	for _, c := range []struct {
 		name   string
 		a      coord.ICRS
-		aEpoch time.Time
+		aEpoch epoch.Time
 		b      coord.ICRS
-		bEpoch time.Time
+		bEpoch epoch.Time
 	}{
-		{"both moving, the first cannot be", unmovable, gaiaEpoch, moving, time.J2000()},
-		{"both moving, the second cannot be", moving, time.J2000(), unmovable, gaiaEpoch},
-		{"only the first moving", unmovable, gaiaEpoch, still, time.J2000()},
-		{"only the second moving", still, time.J2000(), unmovable, gaiaEpoch},
+		{"both moving, the first cannot be", unmovable, gaiaEpoch, moving, epoch.J2000()},
+		{"both moving, the second cannot be", moving, epoch.J2000(), unmovable, gaiaEpoch},
+		{"only the first moving", unmovable, gaiaEpoch, still, epoch.J2000()},
+		{"only the second moving", still, epoch.J2000(), unmovable, gaiaEpoch},
 	} {
 		sep, err := Separation(c.a, c.aEpoch, c.b, c.bEpoch)
 		if !errors.Is(err, coord.ErrPropagationFailed) {
@@ -122,7 +122,7 @@ func TestSeparationMovesTheStarThatMoves(t *testing.T) {
 	t.Parallel()
 
 	c := Coord(barnard)
-	laterEpoch := time.FromJD(time.J2000().JD()+3652.5, time.TT)
+	laterEpoch := epoch.FromJD(epoch.J2000().JD()+3652.5, epoch.TT)
 
 	later, err := coord.PropagateEpoch(c, laterEpoch)
 	if err != nil {

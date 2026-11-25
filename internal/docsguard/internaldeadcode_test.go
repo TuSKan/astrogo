@@ -267,7 +267,7 @@ func isInternalDir(dir string) bool {
 // what it excuses.
 var unusedInternalAllowed = map[string]string{
 	"internal/metrology.KindIERS": "ReferenceKind is a closed taxonomy of what astrogo " +
-		"validates against, and time's EOP handling is one of the things it validates. " +
+		"validates against, and epoch's EOP handling is one of the things it validates. " +
 		"The member exists so the suite naming it does not have to widen the type first.",
 	"internal/metrology.KindNASA": "Same: plan/nasa_eclipse_test.go already compares " +
 		"against NASA's Five Millennium canon and is a retrofit target for metrology.",

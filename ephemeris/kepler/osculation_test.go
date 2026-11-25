@@ -6,7 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,8 +19,8 @@ import (
 func TestFromPerihelionOsculatesAtItsEpoch(t *testing.T) {
 	t.Parallel()
 
-	tp := time.FromJDParts(2460581.240845175775, 0, time.TDB)
-	epoch := time.FromJDParts(2461305.5, 0, time.TDB) // 724 days after perihelion
+	tp := epoch.FromJDParts(2460581.240845175775, 0, epoch.TDB)
+	at := epoch.FromJDParts(2461305.5, 0, epoch.TDB) // 724 days after perihelion
 
 	const (
 		q = 1.3
@@ -34,14 +34,14 @@ func TestFromPerihelionOsculatesAtItsEpoch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	osculating, err := kepler.FromPerihelion(epoch, tp, unit.AU(q), e, incl, node, argp)
+	osculating, err := kepler.FromPerihelion(at, tp, unit.AU(q), e, incl, node, argp)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !osculating.Epoch().Equal(epoch) || !atPerihelion.Epoch().Equal(tp) {
+	if !osculating.Epoch().Equal(at) || !atPerihelion.Epoch().Equal(tp) {
 		t.Errorf("Epoch = %v and %v, want the osculation epochs %v and %v",
-			osculating.Epoch(), atPerihelion.Epoch(), epoch, tp)
+			osculating.Epoch(), atPerihelion.Epoch(), at, tp)
 	}
 
 	if m := atPerihelion.MeanAnomaly(); m != 0 {
@@ -51,19 +51,19 @@ func TestFromPerihelionOsculatesAtItsEpoch(t *testing.T) {
 	// n·(epoch − T), reduced to (−π, π].
 	a := q / (1 - e)
 	n := math.Sqrt(muAUDay() / (a * a * a))
-	wantM := math.Remainder(n*epoch.Sub(tp).Days(), 2*math.Pi)
+	wantM := math.Remainder(n*at.Sub(tp).Days(), 2*math.Pi)
 
 	if d := math.Remainder(osculating.MeanAnomaly().Radians()-wantM, 2*math.Pi); math.Abs(d) > 1e-12 {
 		t.Errorf("MeanAnomaly = %v rad, want n·(epoch − T) = %v", osculating.MeanAnomaly().Radians(), wantM)
 	}
 
-	asteroid, err := kepler.NewElements(epoch, unit.AU(a), e, incl, node, argp, osculating.MeanAnomaly())
+	asteroid, err := kepler.NewElements(at, unit.AU(a), e, incl, node, argp, osculating.MeanAnomaly())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, days := range []float64{-3000, -1, 0, 1, 365, 3000} {
-		when := epoch.Add(unit.Days(days))
+		when := at.Add(unit.Days(days))
 
 		got, gotVel, err := osculating.StateAt(when)
 		if err != nil {
@@ -96,15 +96,15 @@ func TestFromPerihelionOsculatesAtItsEpoch(t *testing.T) {
 func TestFromPerihelionReportsTheHyperbolicMeanAnomaly(t *testing.T) {
 	t.Parallel()
 
-	tp := time.FromJDParts(2460581.240845175775, 0, time.TDB)
-	epoch := tp.Add(unit.Days(-133))
+	tp := epoch.FromJDParts(2460581.240845175775, 0, epoch.TDB)
+	at := tp.Add(unit.Days(-133))
 
 	const (
 		q = 0.39143
 		e = 1.000095
 	)
 
-	el, err := kepler.FromPerihelion(epoch, tp, unit.AU(q), e, angle.Deg(139.1), angle.Deg(21.6), angle.Deg(308.5))
+	el, err := kepler.FromPerihelion(at, tp, unit.AU(q), e, angle.Deg(139.1), angle.Deg(21.6), angle.Deg(308.5))
 	if err != nil {
 		t.Fatal(err)
 	}

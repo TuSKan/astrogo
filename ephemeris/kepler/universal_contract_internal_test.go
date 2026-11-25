@@ -4,9 +4,10 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/oracle"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -33,7 +34,7 @@ const (
 // either side of perihelion, within half a period on an ellipse — thinned, not
 // dropped, under -short.
 func TestUniversalContract(t *testing.T) {
-	epoch := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	perDecade := 8
 	if testing.Short() {
@@ -43,7 +44,7 @@ func TestUniversalContract(t *testing.T) {
 	const eps = 0x1p-52
 
 	for _, e := range []float64{0, 0.5, 0.9, 0.99, 0.999, 0.99999, 1 - 1e-8, 1, 1 + 1e-8, 1.00001, 1.001, 1.2, 2, 5} {
-		el, err := FromPerihelion(epoch, epoch, unit.AU(1), e, 0, 0, 0)
+		el, err := FromPerihelion(at, at, unit.AU(1), e, 0, 0, 0)
 		if err != nil {
 			t.Fatalf("e = %v: %v", e, err)
 		}

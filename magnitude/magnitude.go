@@ -7,7 +7,7 @@ import (
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // ErrUnsupportedBody is returned when magnitude cannot be computed for a body.
@@ -21,7 +21,7 @@ var ErrUnsupportedBody = errors.New("magnitude: unsupported body")
 //	cos(α) = (r² + Δ² − R²) / (2·r·Δ)
 //
 // where r = heliocentric distance, Δ = geocentric distance, R = Earth-Sun distance.
-func PhaseAngle(p eph.Provider, target eph.ID, t time.Time) (angle.Angle, error) {
+func PhaseAngle(p eph.Provider, target eph.ID, t epoch.Time) (angle.Angle, error) {
 	geo, sun, err := geometryVectors(p, target, t)
 	if err != nil {
 		return 0, err
@@ -39,7 +39,7 @@ func PhaseAngle(p eph.Provider, target eph.ID, t time.Time) (angle.Angle, error)
 
 // IlluminatedFraction returns the fraction of the target's disk that is
 // illuminated as seen from the geocenter (0 = new, 1 = full).
-func IlluminatedFraction(p eph.Provider, target eph.ID, t time.Time) (float64, error) {
+func IlluminatedFraction(p eph.Provider, target eph.ID, t epoch.Time) (float64, error) {
 	alpha, err := PhaseAngle(p, target, t)
 	if err != nil {
 		return 0, err
@@ -58,7 +58,7 @@ type bodyGeometry struct {
 
 // geometryVectors computes the geocentric and heliocentric distances for a body.
 // Returns (bodyGeom, sunGeocentricPos, error).
-func geometryVectors(p eph.Provider, target eph.ID, t time.Time) (bodyGeometry, [3]float64, error) {
+func geometryVectors(p eph.Provider, target eph.ID, t epoch.Time) (bodyGeometry, [3]float64, error) {
 	in := eph.At(p, t)
 
 	planetSt, err := in.Geometric(target, eph.Earth)

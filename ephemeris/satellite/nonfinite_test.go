@@ -8,7 +8,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
 	"github.com/TuSKan/astrogo/ephemeris/satellite/sgp4"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestLocateRefusesANonFiniteTime is #1052 at the level most callers reach it.
@@ -38,7 +38,7 @@ func TestLocateRefusesANonFiniteTime(t *testing.T) {
 	}
 
 	for _, jd := range []float64{math.NaN(), math.Inf(1), math.Inf(-1)} {
-		st, err := s.Locate(s.ID(), time.FromJD(jd, time.UTC))
+		st, err := s.Locate(s.ID(), epoch.FromJD(jd, epoch.UTC))
 		if !errors.Is(err, sgp4.ErrNotFinite) {
 			t.Errorf("Locate at JD %g returned %v, want one wrapping sgp4.ErrNotFinite", jd, err)
 		}

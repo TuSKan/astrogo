@@ -7,7 +7,7 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 func star(id, name string, aliases []string, ra, dec float64, hasCoord bool) resolve.Target {
@@ -15,7 +15,7 @@ func star(id, name string, aliases []string, ra, dec float64, hasCoord bool) res
 	if hasCoord {
 		t.Coord = coord.NewICRS(angle.Deg(ra), angle.Deg(dec))
 		t.HasCoord = true
-		t.Epoch = time.J2000()
+		t.Epoch = epoch.J2000()
 	}
 
 	return t

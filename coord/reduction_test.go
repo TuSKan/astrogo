@@ -3,17 +3,18 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // Helper to provide a target at a specific geometric altitude
-func getTargetAtAltitude(tb testing.TB, site *coord.Geodetic, obsTime time.Time, minAlt, maxAlt float64) vector.Vec3 {
+func getTargetAtAltitude(tb testing.TB, site *coord.Geodetic, obsTime epoch.Time, minAlt, maxAlt float64) vector.Vec3 {
 	tb.Helper()
 
 	reducer := mustReducer(tb, site, obsTime, atmosphere.Refraction{Pressure: 0})
@@ -289,7 +290,7 @@ func TestReducer_Group5_FixturesAndSafety(t *testing.T) {
 		{"Nadir", 45, -80, vector.Vec3{X: 0, Y: 0, Z: -1}.Unit(), -90, -10}, // Straight down
 	}
 
-	obsTime := time.Date(2026, 4, 6, 12, 0, 0, 0, time.LocationUTC)
+	obsTime := epoch.Date(2026, 4, 6, 12, 0, 0, 0, time.UTC)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

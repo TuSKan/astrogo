@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -49,7 +49,7 @@ func DefaultSolver() Solver {
 
 // Evaluator is a function that computes a real-valued metric at a given time.
 // It returns the metric value and an error if the computation fails.
-type Evaluator func(t time.Time) (float64, error)
+type Evaluator func(t epoch.Time) (float64, error)
 
 // finite reports whether v is neither NaN nor ±Inf. FindRoot and
 // FindExtremum both guard every evaluator result (and every internal step
@@ -91,17 +91,17 @@ func sameSign(a, b float64) bool {
 // determines whether inverse quadratic interpolation (IQI) through all three
 // points would produce a well-conditioned step. If not, bisection is used.
 // The bracket is guaranteed to shrink on every iteration.
-func (s Solver) FindRoot(eval Evaluator, bracket Window) (time.Time, float64, error) {
+func (s Solver) FindRoot(eval Evaluator, bracket Window) (epoch.Time, float64, error) {
 	t1, t2 := bracket.Start, bracket.End
 
 	fa, err := eval(t1)
 	if err != nil {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
+		return epoch.Time{}, 0, fmt.Errorf("solver: eval at a: %w", err)
 	}
 
 	fb, err := eval(t1.Add(t2.Sub(t1)))
 	if err != nil {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", err)
+		return epoch.Time{}, 0, fmt.Errorf("solver: eval at b: %w", err)
 	}
 
 	return s.findRootFrom(eval, t1, t2, fa, fb)
@@ -117,7 +117,7 @@ func (s Solver) FindRoot(eval Evaluator, bracket Window) (time.Time, float64, er
 // (the actual value, not negated even for maximization).
 //
 // Reference: Brent, R. P. (1973). Algorithms for Minimization Without Derivatives, Ch. 5.
-func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.Time, float64, error) {
+func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (epoch.Time, float64, error) {
 	t1, t3 := bracket.Start, bracket.End
 
 	const goldenRatio = 0.3819660112501051 // (3 - sqrt(5)) / 2
@@ -127,11 +127,11 @@ func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.T
 
 	fx, err := eval(x)
 	if err != nil {
-		return time.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", err)
+		return epoch.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", err)
 	}
 
 	if !finite(fx) {
-		return time.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", ErrNonFiniteEvaluation)
+		return epoch.Time{}, 0, fmt.Errorf("solver: extremum eval at x: %w", ErrNonFiniteEvaluation)
 	}
 
 	if isMax {
@@ -199,12 +199,12 @@ func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.T
 
 			d = e * goldenRatio
 			if !finite(d.Seconds()) {
-				return time.Time{}, 0, fmt.Errorf("solver: extremum non-finite step at iter %d: %w", i, ErrNonFiniteEvaluation)
+				return epoch.Time{}, 0, fmt.Errorf("solver: extremum non-finite step at iter %d: %w", i, ErrNonFiniteEvaluation)
 			}
 		}
 
 		// Evaluate at the new trial point
-		var u time.Time
+		var u epoch.Time
 
 		switch {
 		case math.Abs(d.Seconds()) >= tol1:
@@ -217,11 +217,11 @@ func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.T
 
 		fu, err := eval(u)
 		if err != nil {
-			return time.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, err)
+			return epoch.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, err)
 		}
 
 		if !finite(fu) {
-			return time.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, ErrNonFiniteEvaluation)
+			return epoch.Time{}, 0, fmt.Errorf("solver: extremum eval at iter %d: %w", i, ErrNonFiniteEvaluation)
 		}
 
 		if isMax {
@@ -258,11 +258,11 @@ func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.T
 	// Return the actual (non-negated) function value
 	finalVal, err := eval(x)
 	if err != nil {
-		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", err)
+		return epoch.Time{}, 0, fmt.Errorf("solver: final eval: %w", err)
 	}
 
 	if !finite(finalVal) {
-		return time.Time{}, 0, fmt.Errorf("solver: final eval: %w", ErrNonFiniteEvaluation)
+		return epoch.Time{}, 0, fmt.Errorf("solver: final eval: %w", ErrNonFiniteEvaluation)
 	}
 
 	// As in FindRoot: the estimate comes back either way, and only the error
@@ -288,14 +288,14 @@ func (s Solver) FindExtremum(eval Evaluator, bracket Window, isMax bool) (time.T
 // search then failed with ErrBracketingViolated where the sweep had found an
 // ordinary crossing (#425). Starting from the samples, the bracket is the one
 // the sweep saw.
-func (s Solver) findRootFrom(eval Evaluator, t1, t2 time.Time, fa, fb float64) (time.Time, float64, error) {
+func (s Solver) findRootFrom(eval Evaluator, t1, t2 epoch.Time, fa, fb float64) (epoch.Time, float64, error) {
 	// Work in seconds offset from origin. This used to be a workaround for
 	// time.Duration's int64 nanoseconds; unit.Duration is float64 seconds, so
 	// the offset is now just the algorithm's own variable.
 	origin := t1
 	tolSec := s.Tolerance.Seconds()
 
-	timeAt := func(sec float64) time.Time {
+	timeAt := func(sec float64) epoch.Time {
 		return origin.Add(unit.Seconds(sec))
 	}
 
@@ -303,16 +303,16 @@ func (s Solver) findRootFrom(eval Evaluator, t1, t2 time.Time, fa, fb float64) (
 	xb := t2.Sub(t1).Seconds()
 
 	if !finite(fa) {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at a: %w", ErrNonFiniteEvaluation)
+		return epoch.Time{}, 0, fmt.Errorf("solver: eval at a: %w", ErrNonFiniteEvaluation)
 	}
 
 	if !finite(fb) {
-		return time.Time{}, 0, fmt.Errorf("solver: eval at b: %w", ErrNonFiniteEvaluation)
+		return epoch.Time{}, 0, fmt.Errorf("solver: eval at b: %w", ErrNonFiniteEvaluation)
 	}
 
 	// Verify bracketing condition
 	if sameSign(fa, fb) {
-		return time.Time{}, 0, fmt.Errorf(
+		return epoch.Time{}, 0, fmt.Errorf(
 			"%w: f(a)=%g, f(b)=%g", ErrBracketingViolated, fa, fb)
 	}
 
@@ -386,16 +386,16 @@ func (s Solver) findRootFrom(eval Evaluator, t1, t2 time.Time, fa, fb float64) (
 		// ── Evaluate at new trial point ────────────────────────────────
 		xt := xa + t*(xb-xa)
 		if !finite(xt) {
-			return time.Time{}, 0, fmt.Errorf("solver: non-finite trial point at iter %d: %w", i, ErrNonFiniteEvaluation)
+			return epoch.Time{}, 0, fmt.Errorf("solver: non-finite trial point at iter %d: %w", i, ErrNonFiniteEvaluation)
 		}
 
 		ft, err := eval(timeAt(xt))
 		if err != nil {
-			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
+			return epoch.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, err)
 		}
 
 		if !finite(ft) {
-			return time.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, ErrNonFiniteEvaluation)
+			return epoch.Time{}, 0, fmt.Errorf("solver: eval at iter %d: %w", i, ErrNonFiniteEvaluation)
 		}
 
 		// ── Update bracket and third point ─────────────────────────────

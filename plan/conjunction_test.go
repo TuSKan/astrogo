@@ -3,11 +3,12 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -30,7 +31,7 @@ func TestConjunctionsAreInRightAscensionOfDate(t *testing.T) {
 
 	prov := eph.Default()
 
-	raOfDate := func(p coord.ICRS, tm time.Time) float64 {
+	raOfDate := func(p coord.ICRS, tm epoch.Time) float64 {
 		tt1, tt2 := tm.TT().JDParts()
 		bpn := gofaext.Pnm06a(tt1, tt2)
 		v := p.ToUnitVector()
@@ -44,14 +45,14 @@ func TestConjunctionsAreInRightAscensionOfDate(t *testing.T) {
 	for _, c := range []struct {
 		name       string
 		a, b       eph.ID
-		start, end time.Time
+		start, end epoch.Time
 	}{
 		{"Venus-Jupiter 2023", eph.Venus, eph.JupiterBarycenter,
-			time.Date(2023, 2, 25, 0, 0, 0, 0, time.LocationUTC), time.Date(2023, 3, 8, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2023, 2, 25, 0, 0, 0, 0, time.UTC), epoch.Date(2023, 3, 8, 0, 0, 0, 0, time.UTC)},
 		{"Jupiter-Saturn 2020", eph.JupiterBarycenter, eph.SaturnBarycenter,
-			time.Date(2020, 12, 15, 0, 0, 0, 0, time.LocationUTC), time.Date(2020, 12, 28, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2020, 12, 15, 0, 0, 0, 0, time.UTC), epoch.Date(2020, 12, 28, 0, 0, 0, 0, time.UTC)},
 		{"Moon-Venus 2026", eph.Moon, eph.Venus,
-			time.Date(2026, 1, 10, 0, 0, 0, 0, time.LocationUTC), time.Date(2026, 1, 25, 0, 0, 0, 0, time.LocationUTC)},
+			epoch.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC), epoch.Date(2026, 1, 25, 0, 0, 0, 0, time.UTC)},
 	} {
 		a := NewPlanet(c.name, c.a, prov)
 		b := NewPlanet(c.name, c.b, prov)
@@ -77,7 +78,7 @@ func TestConjunctionsAreInRightAscensionOfDate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffAt := func(tm time.Time) float64 {
+		diffAt := func(tm epoch.Time) float64 {
 			pa, err := a.Position(tm)
 			if err != nil {
 				t.Fatal(err)

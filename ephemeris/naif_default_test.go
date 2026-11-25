@@ -4,10 +4,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ func TestDefaultAnswersTheCodesItHolds(t *testing.T) {
 	t.Parallel()
 
 	p := eph.Default()
-	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC)
 
 	const kmPerAU = 149597870.7
 
@@ -87,7 +88,7 @@ func TestDefaultPlacesTheEarthMoonBarycenterFromTheMoon(t *testing.T) {
 
 	const kmPerAU = 149597870.7
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for d := 0; d < 730; d += 7 {
 		at := start.Add(unit.Days(float64(d)))

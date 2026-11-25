@@ -14,13 +14,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 
 	// The kernel-backed sources register their backend rather than being
@@ -52,7 +53,7 @@ func main() {
 	}()
 
 	// Jerusalem: 31°46'N, 35°14'E, altitude ~780m (Temple Mount)
-	site, err := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.LocationUTC))
+	site, err := plan.NewSite("Jerusalem", angle.LatDeg(31.7683), angle.LonDeg(35.2137), unit.Meters(780.0), plan.WithTimeZone(time.UTC))
 	if err != nil {
 		panic(err)
 	}
@@ -65,8 +66,8 @@ func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
 
 	// Search window: afternoon/evening of April 3, AD 33
-	tStart := time.DateJulianCal(33, 4, 3, 12, 0, 0)
-	tEnd := time.DateJulianCal(33, 4, 4, 0, 0, 0)
+	tStart := epoch.DateJulianCal(33, 4, 3, 12, 0, 0)
+	tEnd := epoch.DateJulianCal(33, 4, 4, 0, 0, 0)
 
 	// ── Sunset ──
 	_, sunSet, err := plan.SunriseSunset(site, plan.Window{Start: tStart, End: tEnd}, prov)
@@ -91,8 +92,8 @@ func main() {
 	}
 
 	// ── Lunar Eclipse ──
-	eStart := time.DateJulianCal(33, 3, 1, 0, 0, 0)
-	eEnd := time.DateJulianCal(33, 5, 1, 0, 0, 0)
+	eStart := epoch.DateJulianCal(33, 3, 1, 0, 0, 0)
+	eEnd := epoch.DateJulianCal(33, 5, 1, 0, 0, 0)
 
 	eclipses, err := plan.LunarEclipses(plan.Window{Start: eStart, End: eEnd}, prov)
 	if err != nil {
@@ -126,7 +127,7 @@ func main() {
 	// end of the umbral phase is NASA's, from the Five Millennium Canon as
 	// EclipseWise publishes it: U4 at 16:12:52.2 UT1, with ΔT = 10191.3 s.
 	// What follows from it is computed against this program's moonrise.
-	umbraEnds := time.DateJulianCal(33, 4, 3, 16, 12, 52)
+	umbraEnds := epoch.DateJulianCal(33, 4, 3, 16, 12, 52)
 
 	if sunSet != nil && moonRise != nil && len(eclipses) > 0 {
 		fmt.Println()
@@ -155,8 +156,8 @@ func main() {
 	fmt.Println("══════════════════════════════════════════════════════════════")
 	fmt.Println()
 
-	pilateStart := time.DateJulianCal(26, 1, 1, 0, 0, 0)
-	pilateEnd := time.DateJulianCal(37, 1, 1, 0, 0, 0)
+	pilateStart := epoch.DateJulianCal(26, 1, 1, 0, 0, 0)
+	pilateEnd := epoch.DateJulianCal(37, 1, 1, 0, 0, 0)
 
 	allEclipses, err := plan.LunarEclipses(plan.Window{Start: pilateStart, End: pilateEnd}, prov)
 	if err != nil {

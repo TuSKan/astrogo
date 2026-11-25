@@ -6,17 +6,18 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/starlight"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -288,30 +289,30 @@ func table2Epochs(
 	site *coord.Geodetic,
 	provider eph.Provider,
 	atm *atmosphere.Atmosphere,
-) []time.GoTime {
+) []time.Time {
 	t.Helper()
 
-	var out []time.GoTime
+	var out []time.Time
 
 	for month := range table2Months {
 		// The fifteenth of each month, which is close enough to the middle for
 		// a yearly mean of something that varies smoothly with solar longitude.
-		day := time.GoDate(2026, time.Month(month+1), 15, 0, 0, 0, 0, time.LocationUTC)
+		day := time.Date(2026, time.Month(month+1), 15, 0, 0, 0, 0, time.UTC)
 
 		var found int
 
 		// Walk the night in half-hour steps and keep the hours that are dark,
 		// spread across the window rather than clustered at its start.
-		var dark []time.GoTime
+		var dark []time.Time
 
 		for step := range 48 {
 			// step*30 is a count of minutes, not a duration, so the
 			// multiplication is a scaling and not a duration times a duration.
 			when := day.Add(time.Duration(step*30) * time.Minute)
 
-			cc := mustContext(t, time.FromGo(when), site, atm.Refraction())
+			cc := mustContext(t, epoch.FromGo(when), site, atm.Refraction())
 
-			sunSt, err := eph.At(provider, time.FromGo(when)).Geometric(eph.Sun, eph.Earth)
+			sunSt, err := eph.At(provider, epoch.FromGo(when)).Geometric(eph.Sun, eph.Earth)
 			if err != nil {
 				t.Fatalf("Sun at %v: %v", when, err)
 			}

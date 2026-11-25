@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // Importing this package is the whole contract under a blank import, so the
@@ -69,8 +69,8 @@ func TestBackendCarriesTheTimeInterval(t *testing.T) {
 	_, err := core.KernelProvider(context.Background(), core.KernelRequest{
 		Source: core.SmallBody,
 		Kernel: "433",
-		Start:  time.FromJD(2461000.5, time.TT),
-		End:    time.FromJD(2461100.5, time.TT),
+		Start:  epoch.FromJD(2461000.5, epoch.TT),
+		End:    epoch.FromJD(2461100.5, epoch.TT),
 	})
 	if err == nil {
 		t.Fatal("an offline small-body fetch returned no error")

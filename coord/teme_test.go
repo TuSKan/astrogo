@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/TuSKan/astrogo/coord"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -21,7 +21,7 @@ var temeVectors = []vector.Vec3{
 // equinoxRoute is TEME → GCRS the way ephemeris/satellite does it without a
 // Context: R3(−EqEq) to the true equinox of date, then the transpose of the
 // IAU 2006/2000A bias-precession-nutation matrix, both evaluated at t.
-func equinoxRoute(t time.Time, v vector.Vec3) vector.Vec3 {
+func equinoxRoute(t epoch.Time, v vector.Vec3) vector.Vec3 {
 	tt1, tt2 := t.TT().JDParts()
 	bpn := gofaext.Pnm06a(tt1, tt2)
 	s, c := math.Sincos(gofaext.Ee06aFromBPN(tt1, tt2, bpn))
@@ -54,7 +54,7 @@ func TestTEMEToGCRSIsTheEquinoxRoute(t *testing.T) {
 	const tol = 1e-12
 
 	for _, jd := range []float64{2447892.5, 2461000.0, 2470000.25} { // 1990, 2025, 2050
-		at := time.FromJD(jd, time.UTC)
+		at := epoch.FromJD(jd, epoch.UTC)
 
 		ctx, err := coord.NewContext(at, site, atm)
 		if err != nil {

@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -109,8 +110,8 @@ func TestTwilightAgreesWithSkyfield(t *testing.T) {
 				t.Fatalf("NewSite: %v", err)
 			}
 
-			start := time.Date(2026, time.Month(c.from[0]), c.from[1], 0, 0, 0, 0, time.LocationUTC)
-			end := time.Date(2026, time.Month(c.to[0]), c.to[1], 0, 0, 0, 0, time.LocationUTC)
+			start := epoch.Date(2026, time.Month(c.from[0]), c.from[1], 0, 0, 0, 0, time.UTC)
+			end := epoch.Date(2026, time.Month(c.to[0]), c.to[1], 0, 0, 0, 0, time.UTC)
 
 			groups, err := TwilightEvents(site, Window{Start: start, End: end}, eph.Default(), c.kind)
 			if err != nil {
@@ -138,8 +139,8 @@ func TestTwilightAgreesWithSkyfield(t *testing.T) {
 			worst := 0.0
 
 			for i, w := range c.want {
-				wantAt := time.Date(2026, time.Month(w.month), w.day, w.hour, w.minute, w.second,
-					int(math.Round(w.millisecond*1e6)), time.LocationUTC)
+				wantAt := epoch.Date(2026, time.Month(w.month), w.day, w.hour, w.minute, w.second,
+					int(math.Round(w.millisecond*1e6)), time.UTC)
 
 				if dusk := got[i].Kind == EventSet; dusk != w.dusk {
 					t.Errorf("crossing %d at %v: dusk=%v, Skyfield says %v", i, wantAt, dusk, w.dusk)

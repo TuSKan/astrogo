@@ -3,15 +3,16 @@ package plan_test
 import (
 	"math/rand/v2"
 	"testing"
+	"time"
 
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // base is an arbitrary fixed epoch; the algebra does not care which.
-func base() time.Time {
-	return time.FromGo(time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC))
+func base() epoch.Time {
+	return epoch.FromGo(time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC))
 }
 
 // win builds a window from two hour offsets.

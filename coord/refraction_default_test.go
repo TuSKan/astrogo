@@ -4,11 +4,12 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -52,7 +53,7 @@ func seaLevelAir() atmosphere.Refraction {
 // 3 degrees both are inside SOFA's own sin(altitude) clamp, where refraction is
 // not a trustworthy quantity in any case.
 func TestNilModelMatchesExplicitSOFAModel(t *testing.T) {
-	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 	site := paranalSite(t)
 
 	nilEnv := seaLevelAir()
@@ -144,7 +145,7 @@ func TestNilModelMatchesExplicitSOFAModel(t *testing.T) {
 func TestContextRefractsAZeroWavelengthAtTheVisualDefault(t *testing.T) {
 	t.Parallel()
 
-	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 	site := paranalSite(t)
 
 	air := seaLevelAir()
@@ -194,7 +195,7 @@ func TestContextRefractsAZeroWavelengthAtTheVisualDefault(t *testing.T) {
 // a nil model with a pressure means. One reduction, two answers about whether
 // there is an atmosphere.
 func TestDisperseReportsDispersionWhereReduceAppliedRefraction(t *testing.T) {
-	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 	site := paranalSite(t)
 
 	env := seaLevelAir()
@@ -261,7 +262,7 @@ func TestDisperseReportsDispersionWhereReduceAppliedRefraction(t *testing.T) {
 // resolution: with no pressure there is no atmosphere, so every wavelength
 // lands on the geometric position and agrees with what Reduce observed.
 func TestDisperseStillReportsNoDispersionInAVacuum(t *testing.T) {
-	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 	site := paranalSite(t)
 
 	r := mustReducer(t, site, when, atmosphere.Refraction{})
@@ -289,7 +290,7 @@ func TestDisperseStillReportsNoDispersionInAVacuum(t *testing.T) {
 func TestContextRefusesAirThatIsNot(t *testing.T) {
 	t.Parallel()
 
-	when := time.Date(2026, time.June, 15, 22, 0, 0, 0, time.LocationUTC)
+	when := epoch.Date(2026, time.June, 15, 22, 0, 0, 0, time.UTC)
 	site := paranalSite(t)
 
 	good := seaLevelAir()

@@ -6,12 +6,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/constants"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestKernelAnswersTheNAIFCodeAskedFor is #809 against de440s: an ID is the
@@ -29,7 +30,7 @@ func TestKernelAnswersTheNAIFCodeAskedFor(t *testing.T) {
 
 	t.Cleanup(func() { _ = p.Close() })
 
-	at := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC)
 
 	// #809's measurement: 34.93 AU.
 	pluto, err := eph.At(p, at).Geometric(core.PlutoBarycenter, core.Earth)
@@ -84,10 +85,10 @@ func TestKernelEarthMoonBarycenterIsTheMoonsShare(t *testing.T) {
 
 	const kmPerAU = 149597870.7
 
-	for _, at := range []time.Time{
-		time.Date(1950, time.January, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2026, time.June, 1, 0, 0, 0, 0, time.LocationUTC),
-		time.Date(2100, time.March, 3, 0, 0, 0, 0, time.LocationUTC),
+	for _, at := range []epoch.Time{
+		epoch.Date(1950, time.January, 1, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC),
+		epoch.Date(2100, time.March, 3, 0, 0, 0, 0, time.UTC),
 	} {
 		emb, err := eph.At(p, at).Geometric(core.EarthMoonBarycenter, core.Earth)
 		if err != nil {

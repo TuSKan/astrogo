@@ -6,13 +6,13 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -27,7 +27,7 @@ func (u uniformDust) IntensityAt(_ angle.Latitude, _ angle.Longitude) (float64, 
 // assembleSky builds a Model holding every component the module has, over a
 // scene at Paranal. It is the thing the engine exists to do, and until this
 // existed the components had never been run together.
-func assembleSky(t *testing.T, when time.GoTime) (*skybrightness.Model, *skybrightness.Scene, unit.SpectralGrid) {
+func assembleSky(t *testing.T, when time.Time) (*skybrightness.Model, *skybrightness.Scene, unit.SpectralGrid) {
 	t.Helper()
 
 	grid := skybrightness.DefaultOpticalGrid()
@@ -415,7 +415,7 @@ func TestFullSkyProvenance(t *testing.T) {
 func BenchmarkFullSkyEstimate(b *testing.B) {
 	t := &testing.T{}
 
-	when := time.GoDate(2026, 3, 3, 5, 0, 0, 0, time.LocationUTC)
+	when := time.Date(2026, 3, 3, 5, 0, 0, 0, time.UTC)
 	model, scene, grid := assembleSky(t, when)
 
 	if t.Failed() {

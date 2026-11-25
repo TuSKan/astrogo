@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/kepler"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/metrology"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/vector"
 )
 
@@ -139,16 +140,16 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 
 	for y := firstYear; y <= lastYear; y++ {
 		for _, mo := range []time.Month{time.January, time.April, time.July, time.October} {
-			at := time.Date(y, mo, 1, 0, 0, 0, 0, time.LocationUTC)
+			at := epoch.Date(y, mo, 1, 0, 0, 0, 0, time.UTC)
 
 			want, werr := eph.At(p, at).Geometric(core.PlutoBarycenter, core.Earth)
 			if werr != nil {
-				t.Fatalf("DE440 State(Pluto) at %s: %v", at.Format(isoDate), werr)
+				t.Fatalf("DE440 State(Pluto) at %s: %v", at.Format(time.DateOnly), werr)
 			}
 
 			got, gerr := eph.At(def, at).Geometric(core.PlutoBarycenter, core.Earth)
 			if gerr != nil {
-				t.Fatalf("Kepler State(Pluto) at %s: %v", at.Format(isoDate), gerr)
+				t.Fatalf("Kepler State(Pluto) at %s: %v", at.Format(time.DateOnly), gerr)
 			}
 
 			diff := got.Pos.Sub(want.Pos).Norm()
@@ -157,7 +158,7 @@ func TestKeplerPlutoAgainstDE440(t *testing.T) {
 				Error: diff,
 				Label: "Pluto",
 				Context: fmt.Sprintf("%s, |r| = %.1f AU, |DE440 - Kepler| = %.4f AU",
-					at.Format(isoDate), want.Pos.Norm(), diff),
+					at.Format(time.DateOnly), want.Pos.Norm(), diff),
 			})
 		}
 	}
@@ -188,7 +189,7 @@ func TestPlutoElementsCarryTheObliquityRotation(t *testing.T) {
 	smallest := math.Inf(1)
 
 	for y := 1800; y <= 2050; y++ {
-		at := time.Date(y, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+		at := epoch.Date(y, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 		pos, _, err := kepler.PlutoElements().StateAt(at)
 		if err != nil {

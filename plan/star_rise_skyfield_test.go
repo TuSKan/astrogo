@@ -3,9 +3,10 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -53,8 +54,8 @@ func TestStarRiseAndSetAgreeWithSkyfield(t *testing.T) {
 		radec := stars[c.star]
 		star := NewStar(c.star, angle.Deg(radec[0]), angle.Deg(radec[1]))
 
-		start := time.Date(2026, 3, 20, 0, 0, 0, 0, time.LocationUTC)
-		end := time.Date(2026, 3, 21, 0, 0, 0, 0, time.LocationUTC)
+		start := epoch.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)
+		end := epoch.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)
 
 		events, err := VisibilityEvents(star, site, Window{Start: start, End: end})
 		if err != nil {
@@ -66,9 +67,9 @@ func TestStarRiseAndSetAgreeWithSkyfield(t *testing.T) {
 			kind = EventSet
 		}
 
-		want := time.Date(2026, 3, 20, c.hour, c.minute, c.second, int(math.Round(c.millisecond*1e6)), time.LocationUTC)
+		want := epoch.Date(2026, 3, 20, c.hour, c.minute, c.second, int(math.Round(c.millisecond*1e6)), time.UTC)
 
-		var found []time.Time
+		var found []epoch.Time
 
 		for _, e := range events {
 			if e.Kind == kind {

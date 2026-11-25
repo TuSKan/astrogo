@@ -3,9 +3,9 @@ package atmosphere
 import (
 	"errors"
 	"math"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -172,7 +172,7 @@ type VerticalProfile struct{}
 // Provenance records where an Atmosphere came from and how current it is.
 type Provenance struct {
 	Source   SourceRef
-	IssueAt  time.GoTime // when the state was issued (nowcast/forecast)
+	IssueAt  time.Time // when the state was issued (nowcast/forecast)
 	LeadTime time.Duration
 }
 
@@ -204,7 +204,7 @@ type Atmosphere struct {
 	groundOptical SurfaceOptical
 	horizon       HorizonProfile
 	provenance    Provenance
-	issuedAt      time.GoTime
+	issuedAt      time.Time
 
 	// diffuseKappa scales the optical depth an extended source is attenuated
 	// by; see DiffuseKappa. Zero means unset and reads as DefaultDiffuseKappa.
@@ -290,7 +290,7 @@ func (s *Atmosphere) Provenance() Provenance { return s.provenance }
 
 // Age returns now minus the state's issue time (zero if it was never
 // set, e.g. a climatology default).
-func (s *Atmosphere) Age(now time.GoTime) time.Duration {
+func (s *Atmosphere) Age(now time.Time) time.Duration {
 	if s.issuedAt.IsZero() {
 		return 0
 	}
@@ -533,7 +533,7 @@ func (b *Builder) Source(ref SourceRef) *Builder {
 }
 
 // IssuedAt sets the state's issue time (for nowcast/forecast use).
-func (b *Builder) IssuedAt(t time.GoTime) *Builder {
+func (b *Builder) IssuedAt(t time.Time) *Builder {
 	b.s.issuedAt = t
 	b.s.provenance.IssueAt = t
 

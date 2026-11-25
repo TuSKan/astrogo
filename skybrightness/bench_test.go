@@ -3,6 +3,7 @@ package skybrightness_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/atmosphere"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/TuSKan/astrogo/magnitude"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/skybrightness"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -205,7 +205,7 @@ func BenchmarkInstrumentProjection(b *testing.B) {
 
 // benchTime and benchAtmosphere keep the benchmark scene fixed, so the
 // numbers compare across runs.
-var benchTime = time.GoDate(2026, 8, 14, 3, 0, 0, 0, time.LocationUTC)
+var benchTime = time.Date(2026, 8, 14, 3, 0, 0, 0, time.UTC)
 
 func benchAtmosphere(heightM float64) *atmosphere.Atmosphere {
 	return atmosphere.StandardDefault(unit.Meters(heightM))

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/gofaext"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -168,7 +168,7 @@ func FK5ToICRS(c FK5) ICRS {
 		angle.Rad(rh).Wrap360(), angle.Rad(dh),
 		pmRACosDec(drh, angle.Rad(dh)), angle.Rad(ddh),
 		angle.Arcsec(pxh), unit.KmPerSec(rvh),
-		time.J2000(),
+		epoch.J2000(),
 	)
 }
 
@@ -242,12 +242,12 @@ func ICRSToFK5(c ICRS, jepoch float64) FK5 {
 // the first keeps the magnitude and the second keeps the precision, which is
 // the whole reason SOFA takes a two-part date at all.
 //
-// The origin comes from [time.J2000()] rather than a written-out 2451545.0, so
+// The origin comes from [epoch.J2000()] rather than a written-out 2451545.0, so
 // the two cannot drift apart.
 func ttAtJulianEpoch(jepoch float64) (jd1, jd2 float64) {
 	const daysPerJYear = 365.25
 
-	jd1, jd2 = time.J2000().JDParts()
+	jd1, jd2 = epoch.J2000().JDParts()
 
 	return jd1, jd2 + (jepoch-J2000Epoch)*daysPerJYear
 }

@@ -9,8 +9,8 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
@@ -150,10 +150,10 @@ func TestKernelLifecycle(t *testing.T) {
 	}
 }
 
-func seedEpoch(t *testing.T) (epoch time.Time) {
+func seedEpoch(t *testing.T) (at epoch.Time) {
 	t.Helper()
 
-	return time.FromJD(2460000.5, time.UTC)
+	return epoch.FromJD(2460000.5, epoch.UTC)
 }
 
 // TestPreSeededKernelLoadsOffline is the README's air-gapped recipe end to

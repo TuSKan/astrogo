@@ -11,7 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -83,7 +83,7 @@ const (
 //
 // It fails when the Sun does not set within a day of evening, or the Moon
 // neither sets within a day after sunset nor set within a day before it.
-func CrescentVisibility(site *Site, evening time.Time, prov eph.Provider) (CrescentResult, error) {
+func CrescentVisibility(site *Site, evening epoch.Time, prov eph.Provider) (CrescentResult, error) {
 	if prov == nil {
 		prov = eph.Default()
 	}
@@ -134,7 +134,7 @@ func CrescentVisibility(site *Site, evening time.Time, prov eph.Provider) (Cresc
 
 	for _, at := range []struct {
 		g *crescentGeometry
-		t time.Time
+		t epoch.Time
 	}{{&gGeometric, geometric}, {&gSunset, sunset}, {&gBest, best}, {&gQureshi, qureshiBest}} {
 		ctx.SetTime(at.t)
 
@@ -143,7 +143,7 @@ func CrescentVisibility(site *Site, evening time.Time, prov eph.Provider) (Cresc
 		}
 	}
 
-	ageAt := func(t time.Time) float64 { return age + t.Sub(sunset).Hours() }
+	ageAt := func(t epoch.Time) float64 { return age + t.Sub(sunset).Hours() }
 
 	atGeometric := gGeometric.geocentric(lag, ageAt(geometric))
 	topocentric := gSunset.topocentric(lag, age)
@@ -205,8 +205,8 @@ func CrescentVisibility(site *Site, evening time.Time, prov eph.Provider) (Cresc
 // slowly for it, near the pole, the event solver searches the day before
 // sunset instead; it reads the Sun's topocentric altitude, off the geocentric
 // by the solar parallax, 8.8″.
-func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.Provider) (time.Time, error) {
-	alt := func(t time.Time) (float64, error) {
+func geometricSunset(ctx *coord.Context, sunset epoch.Time, site *Site, prov eph.Provider) (epoch.Time, error) {
+	alt := func(t epoch.Time) (float64, error) {
 		sun, err := geocentric(prov, eph.Sun, t)
 		if err != nil {
 			return 0, fmt.Errorf("crescent: sun position: %w", err)
@@ -222,12 +222,12 @@ func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.
 	for range 8 {
 		h, err := alt(t)
 		if err != nil {
-			return time.Time{}, err
+			return epoch.Time{}, err
 		}
 
 		later, err := alt(t.Add(unit.Seconds(30)))
 		if err != nil {
-			return time.Time{}, err
+			return epoch.Time{}, err
 		}
 
 		rate := (later - h) / 30 // degrees a second
@@ -256,11 +256,11 @@ func geometricSunset(ctx *coord.Context, sunset time.Time, site *Site, prov eph.
 
 	e, found, err := lastEvent(sets, sunset, 1, site, prov, isSet)
 	if err != nil {
-		return time.Time{}, err
+		return epoch.Time{}, err
 	}
 
 	if !found {
-		return time.Time{}, errNoSunset
+		return epoch.Time{}, errNoSunset
 	}
 
 	return e.Time, nil
@@ -296,7 +296,7 @@ func isRiseOrSet(e Event) bool { return e.Kind == EventRise || e.Kind == EventSe
 
 // firstEvent is the first event matching match in the days after start,
 // searched forward eventChunkHours at a time.
-func firstEvent(events eventsFunc, start time.Time, days float64, site *Site, prov eph.Provider, match func(Event) bool) (Event, bool, error) {
+func firstEvent(events eventsFunc, start epoch.Time, days float64, site *Site, prov eph.Provider, match func(Event) bool) (Event, bool, error) {
 	end := start.Add(unit.Days(days))
 	chunk := unit.Hours(eventChunkHours)
 
@@ -323,7 +323,7 @@ func firstEvent(events eventsFunc, start time.Time, days float64, site *Site, pr
 
 // lastEvent is the last event matching match in the days before end,
 // searched backward eventChunkHours at a time.
-func lastEvent(events eventsFunc, end time.Time, days float64, site *Site, prov eph.Provider, match func(Event) bool) (Event, bool, error) {
+func lastEvent(events eventsFunc, end epoch.Time, days float64, site *Site, prov eph.Provider, match func(Event) bool) (Event, bool, error) {
 	start := end.Add(unit.Days(-days))
 	chunk := unit.Hours(eventChunkHours)
 
@@ -355,10 +355,10 @@ func lastEvent(events eventsFunc, end time.Time, days float64, site *Site, prov 
 // horizon the moonset does: the Moon was up if the first rise or set after
 // sunset is a set, and down if it is a rise, or if there is none and the last
 // one before sunset is a set. Only a Moon that was down looks back.
-func moonsetFor(sunset time.Time, site *Site, prov eph.Provider) (time.Time, error) {
+func moonsetFor(sunset epoch.Time, site *Site, prov eph.Provider) (epoch.Time, error) {
 	next, found, err := firstEvent(MoonEvents, sunset, 1, site, prov, isRiseOrSet)
 	if err != nil {
-		return time.Time{}, err
+		return epoch.Time{}, err
 	}
 
 	if found && next.Kind == EventSet {
@@ -367,14 +367,14 @@ func moonsetFor(sunset time.Time, site *Site, prov eph.Provider) (time.Time, err
 
 	prev, found, err := lastEvent(MoonEvents, sunset, 1, site, prov, isRiseOrSet)
 	if err != nil {
-		return time.Time{}, err
+		return epoch.Time{}, err
 	}
 
 	if found && prev.Kind == EventSet {
 		return prev.Time, nil
 	}
 
-	return time.Time{}, errNoMoonset
+	return epoch.Time{}, errNoMoonset
 }
 
 // moonAgeHours is the time since the last new moon before t, in hours.
@@ -382,7 +382,7 @@ func moonsetFor(sunset time.Time, site *Site, prov eph.Provider) (time.Time, err
 // The elongation at t brackets that new moon to a window E/30 + 0.5 days
 // wide, where a lunation's search would sample the whole month: a day and a
 // half for a two-day crescent.
-func moonAgeHours(t time.Time, prov eph.Provider) (float64, error) {
+func moonAgeHours(t epoch.Time, prov eph.Provider) (float64, error) {
 	elong, err := moonElongation(t, prov)
 	if err != nil {
 		return 0, fmt.Errorf("crescent: %w", err)

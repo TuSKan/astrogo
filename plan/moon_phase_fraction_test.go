@@ -4,9 +4,10 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ import (
 func TestMoonElongationAgainstRealPhaseEvents(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	end := start.Add(unit.Days(365))
 
 	events, err := MoonPhases(Window{Start: start, End: end}, prov)
@@ -74,7 +75,7 @@ func TestMoonElongationAgainstRealPhaseEvents(t *testing.T) {
 func TestMoonPhaseFractionRange(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	for i := range 60 {
 		tm := start.Add(unit.Days(float64(i)))
@@ -97,14 +98,14 @@ func TestMoonPhaseFractionRange(t *testing.T) {
 func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 	prov := eph.Default()
 
-	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	events, err := MoonPhases(Window{Start: start, End: start.Add(unit.Days(35))}, prov)
 	if err != nil {
 		t.Fatalf("MoonPhases: %v", err)
 	}
 
-	var fullMoon time.Time
+	var fullMoon epoch.Time
 
 	for _, ev := range events {
 		if ev.Phase == PhaseFullMoon {
@@ -180,7 +181,7 @@ func TestMoonElongationDistinguishesWaxingFromWaning(t *testing.T) {
 // nil-provider guard: a nil eph.Provider produces the exact same result as
 // passing eph.Default() explicitly, not a panic or a distinct code path.
 func TestMoonElongationNilProviderDefaultsToDefault(t *testing.T) {
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	withNil, err := MoonElongation(tm, nil)
 	if err != nil {
@@ -204,7 +205,7 @@ var errMoonPhaseTestProvider = errors.New("moon_phase_fraction_test: provider al
 // propagate a provider error rather than swallowing it.
 type errStateProvider struct{}
 
-func (errStateProvider) Locate(eph.ID, time.Time) (eph.State, error) {
+func (errStateProvider) Locate(eph.ID, epoch.Time) (eph.State, error) {
 	return eph.State{}, errMoonPhaseTestProvider
 }
 
@@ -215,7 +216,7 @@ func (errStateProvider) Close() error { return nil }
 // and MoonPhaseFraction (built on MoonElongation) inherits the same
 // failure rather than silently producing a zero fraction.
 func TestMoonElongationAndMoonPhaseFractionPropagateProviderError(t *testing.T) {
-	tm := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.LocationUTC)
+	tm := epoch.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	if _, err := MoonElongation(tm, errStateProvider{}); !errors.Is(err, errMoonPhaseTestProvider) {
 		t.Errorf("MoonElongation: expected errMoonPhaseTestProvider, got %v", err)

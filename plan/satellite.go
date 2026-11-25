@@ -10,8 +10,8 @@ import (
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
+	"github.com/TuSKan/astrogo/epoch"
 	mag "github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
@@ -64,7 +64,7 @@ func (s *Satellite) Provider() eph.Provider { return s.provider }
 func (s *Satellite) EphID() eph.ID { return s.id }
 
 // Position computes the ICRS position of the satellite at time t.
-func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
+func (s *Satellite) Position(t epoch.Time) (coord.ICRS, error) {
 	pos, err := geocentric(s.provider, s.id, t)
 	if err != nil {
 		return coord.ICRS{}, fmt.Errorf("satellite: ephemeris error for %s: %w", s.name, err)
@@ -79,7 +79,7 @@ func (s *Satellite) Position(t time.Time) (coord.ICRS, error) {
 }
 
 // GeocentricVec returns the geocentric position vector of the satellite.
-func (s *Satellite) GeocentricVec(t time.Time) (vector.Vec3, error) {
+func (s *Satellite) GeocentricVec(t epoch.Time) (vector.Vec3, error) {
 	v, err := geocentric(s.provider, s.id, t)
 	if err != nil {
 		return vector.Vec3{}, fmt.Errorf("satellite: geocentric: %w", err)
@@ -104,14 +104,14 @@ var errDegenerateGeometry = errors.New("satellite magnitude: degenerate geometry
 
 // ApparentMagnitude cannot be computed for a satellite without observer context.
 // Use [Satellite.ApparentMagnitudeCtx] instead.
-func (s *Satellite) ApparentMagnitude(_ time.Time) (float64, error) {
+func (s *Satellite) ApparentMagnitude(_ epoch.Time) (float64, error) {
 	return 0, errNoObserverCtx
 }
 
 // ApparentMagnitudeCtx computes the satellite's apparent visual magnitude
 // using the topocentric range from [LookAngle] and the Sun–Satellite–Observer
 // phase angle. Requires that [WithStdMag] was set at construction.
-func (s *Satellite) ApparentMagnitudeCtx(t time.Time, ctx *coord.Context) (float64, error) {
+func (s *Satellite) ApparentMagnitudeCtx(t epoch.Time, ctx *coord.Context) (float64, error) {
 	if !s.hasStdMag {
 		return 0, fmt.Errorf("%w: %s", errNoStdMag, s.name)
 	}
@@ -296,7 +296,7 @@ type SatellitePass struct {
 // visible at one event and not another, entering Earth's shadow before it
 // sets.
 type PassEvent struct {
-	Time      time.Time
+	Time      epoch.Time
 	Azimuth   angle.Angle
 	Elevation angle.Angle
 	Range     unit.Length
@@ -393,12 +393,12 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 		return nil, err
 	}
 
-	lookAt := func(t time.Time) (coord.AltAz, error) {
+	lookAt := func(t epoch.Time) (coord.AltAz, error) {
 		return LookAngle(prov, id, ctxAt(t))
 	}
 
 	// Elevation evaluation function.
-	evalEl := func(t time.Time) (float64, error) {
+	evalEl := func(t epoch.Time) (float64, error) {
 		altaz, err := lookAt(t)
 		if err != nil {
 			return 0, err
@@ -408,7 +408,7 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 	}
 
 	// passEvent builds a PassEvent from a LookAngle call.
-	passEvent := func(t time.Time) (PassEvent, error) {
+	passEvent := func(t epoch.Time) (PassEvent, error) {
 		altaz, err := lookAt(t)
 		if err != nil {
 			return PassEvent{}, err
@@ -431,7 +431,7 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 
 	// Sample elevation over the window.
 	n := int(end.Sub(start)/step) + 2
-	times := make([]time.Time, 0, n)
+	times := make([]epoch.Time, 0, n)
 	vals := make([]float64, 0, n)
 
 	for t := start; !t.After(end); t = t.Add(step) {
@@ -460,7 +460,7 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 	// between two samples that are both below it. Until #897 it was not
 	// found at all, or was, depending on where the window started. Its peak
 	// now joins the samples.
-	times, vals, err = withSteppedOverPeaks(times, vals, evalEl, func(from, to time.Time) (time.Time, error) {
+	times, vals, err = withSteppedOverPeaks(times, vals, evalEl, func(from, to epoch.Time) (epoch.Time, error) {
 		return peakTime(prov, id, ctxAt, from, to)
 	})
 	if err != nil {
@@ -477,7 +477,7 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 
 	// closePass ends the pass in progress at setTime, a set crossing or the
 	// window's end, and finds its culmination between its two ends.
-	closePass := func(setTime time.Time) error {
+	closePass := func(setTime epoch.Time) error {
 		var err error
 
 		if currentPass.Set, err = passEvent(setTime); err != nil {
@@ -568,7 +568,7 @@ func SatellitePasses(sat *Satellite, site *Site, w Window, opts ...PassOption) (
 // chosen instant, as rise and set are, so the moving Context decides only
 // which sample wins.
 func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
-	ctxAt func(time.Time) *coord.Context, start, end time.Time,
+	ctxAt func(epoch.Time) *coord.Context, start, end epoch.Time,
 ) (PassEvent, error) {
 	bestTime, err := peakTime(prov, id, ctxAt, start, end)
 	if err != nil {
@@ -605,7 +605,7 @@ func findCulmination(prov eph.Provider, id eph.ID, observer *coord.Geodetic,
 // ctx must be at t. The Sun comes from the analytic SOFA provider rather than
 // prov, for the reason ApparentMagnitudeCtx gives: a satellite provider
 // tracks one body and answers every ID with it.
-func sunlight(prov eph.Provider, id eph.ID, t time.Time, ctx *coord.Context) (sunlit bool, sunAlt angle.Angle, err error) {
+func sunlight(prov eph.Provider, id eph.ID, t epoch.Time, ctx *coord.Context) (sunlit bool, sunAlt angle.Angle, err error) {
 	sunSt, err := eph.At(eph.Default(), t).Geometric(eph.Sun, eph.Earth)
 	if err != nil {
 		return false, 0, fmt.Errorf("satellite pass: sun state: %w", err)
@@ -624,8 +624,8 @@ func sunlight(prov eph.Provider, id eph.ID, t time.Time, ctx *coord.Context) (su
 // through ctxAt. It is findCulmination without the full Context its reported
 // event is computed from, which is all withSteppedOverPeaks needs.
 func peakTime(prov eph.Provider, id eph.ID,
-	ctxAt func(time.Time) *coord.Context, start, end time.Time,
-) (time.Time, error) {
+	ctxAt func(epoch.Time) *coord.Context, start, end epoch.Time,
+) (epoch.Time, error) {
 	step := unit.Seconds(5)
 	bestTime := start
 	bestEl := -90.0
@@ -633,7 +633,7 @@ func peakTime(prov eph.Provider, id eph.ID,
 	for t := start; !t.After(end); t = t.Add(step) {
 		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
-			return time.Time{}, err
+			return epoch.Time{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
@@ -656,7 +656,7 @@ func peakTime(prov eph.Provider, id eph.ID,
 	for t := refineStart; !t.After(refineEnd); t = t.Add(unit.Seconds(1)) {
 		altaz, err := LookAngle(prov, id, ctxAt(t))
 		if err != nil {
-			return time.Time{}, err
+			return epoch.Time{}, err
 		}
 
 		if altaz.Alt().Degrees() > bestEl {
@@ -678,16 +678,16 @@ func peakTime(prov eph.Provider, id eph.ID,
 // nothing reached the threshold there. A maximum already above zero has a
 // sign change on each side and needs nothing.
 func withSteppedOverPeaks(
-	times []time.Time, vals []float64,
-	eval func(time.Time) (float64, error),
-	peakAt func(from, to time.Time) (time.Time, error),
-) ([]time.Time, []float64, error) {
+	times []epoch.Time, vals []float64,
+	eval func(epoch.Time) (float64, error),
+	peakAt func(from, to epoch.Time) (epoch.Time, error),
+) ([]epoch.Time, []float64, error) {
 	// The peaks found, each beside the sample it was found around. The
 	// samples are copied only when there is one to insert, which a window
 	// with no grazing pass never has.
 	type steppedOver struct {
 		i int
-		t time.Time
+		t epoch.Time
 		v float64
 	}
 
@@ -724,7 +724,7 @@ func withSteppedOverPeaks(
 		return times, vals, nil
 	}
 
-	outT := make([]time.Time, 0, len(times)+len(found))
+	outT := make([]epoch.Time, 0, len(times)+len(found))
 	outV := make([]float64, 0, len(vals)+len(found))
 
 	k := 0

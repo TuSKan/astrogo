@@ -6,10 +6,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 var (
@@ -134,11 +135,11 @@ var _ MagnitudeComputer = photometryFailure{}
 
 type photometryFailure struct{ unreachableTarget }
 
-func (photometryFailure) ApparentMagnitude(_ time.Time) (float64, error) {
+func (photometryFailure) ApparentMagnitude(_ epoch.Time) (float64, error) {
 	return 0, errKernelUnreachable
 }
 
-func (photometryFailure) ApparentMagnitudeCtx(_ time.Time, _ *coord.Context) (float64, error) {
+func (photometryFailure) ApparentMagnitudeCtx(_ epoch.Time, _ *coord.Context) (float64, error) {
 	return 0, errKernelUnreachable
 }
 
@@ -157,10 +158,10 @@ type noPublishedMagnitude struct{ unreachableTarget }
 func TestRawMagnitudeSeparatesFailureFromAbsence(t *testing.T) {
 	t.Parallel()
 
-	epoch := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
 
 	// Photometry that failed: not a magnitude, and not an absence either.
-	_, ok, err := rawMagnitude(photometryFailure{}, epoch)
+	_, ok, err := rawMagnitude(photometryFailure{}, at)
 	if ok {
 		t.Error("a failed photometry call reported a usable magnitude")
 	}
@@ -173,7 +174,7 @@ func TestRawMagnitudeSeparatesFailureFromAbsence(t *testing.T) {
 	// No published magnitude: a legitimate negative, and must stay one. If
 	// this returned an error, every catalog row without photometry would
 	// make the night read as incomplete.
-	_, ok, err = rawMagnitude(noPublishedMagnitude{}, epoch)
+	_, ok, err = rawMagnitude(noPublishedMagnitude{}, at)
 	if ok {
 		t.Error("an object with no published magnitude reported one")
 	}

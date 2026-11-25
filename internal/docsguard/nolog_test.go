@@ -15,7 +15,7 @@ import (
 // The global log package writes wherever log.SetOutput last pointed, which is
 // the host program's decision and not a library's to make. Three production
 // call sites did it anyway — remote's download line, iers' "loaded EOP data",
-// and time's warning that Earth Orientation Parameters were unavailable — and
+// and epoch's warning that Earth Orientation Parameters were unavailable — and
 // the third mattered most, because it is the only notice a caller gets that
 // accuracy silently degraded and it was going somewhere the caller may never
 // have looked.

@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestOppositionsAreInEclipticLongitude finds the issue's three oppositions
@@ -29,13 +30,13 @@ func TestOppositionsAreInEclipticLongitude(t *testing.T) {
 	for _, c := range []struct {
 		body    *Planet
 		year    int
-		horizon time.Time
+		horizon epoch.Time
 	}{
-		{NewMars(prov), 2003, time.Date(2003, 8, 28, 17, 58, 0, 0, time.LocationUTC)},
-		{NewMars(prov), 2027, time.Date(2027, 2, 19, 15, 50, 0, 0, time.LocationUTC)},
-		{NewSaturn(prov), 2026, time.Date(2026, 10, 4, 12, 29, 0, 0, time.LocationUTC)},
+		{NewMars(prov), 2003, epoch.Date(2003, 8, 28, 17, 58, 0, 0, time.UTC)},
+		{NewMars(prov), 2027, epoch.Date(2027, 2, 19, 15, 50, 0, 0, time.UTC)},
+		{NewSaturn(prov), 2026, epoch.Date(2026, 10, 4, 12, 29, 0, 0, time.UTC)},
 	} {
-		start := time.Date(c.year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+		start := epoch.Date(c.year, 1, 1, 0, 0, 0, 0, time.UTC)
 
 		events, err := Oppositions(c.body, sun, Window{Start: start, End: start.AddDate(1, 0, 0)})
 		if err != nil {
@@ -75,13 +76,13 @@ func TestOppositionsAreInEclipticLongitude(t *testing.T) {
 // and came out up to 3.25 hours off in 2026; the Full Moon of 2026-09-26 is
 // 16:49:02 UTC by Skyfield (DE421).
 func TestFullMoonOppositionsAreFullMoons(t *testing.T) {
-	events, err := FullMoonOppositions(Window{Start: time.Date(2026, 9, 26, 0, 0, 0, 0, time.LocationUTC), End: time.Date(2026, 9, 27, 0, 0, 0, 0, time.LocationUTC)},
+	events, err := FullMoonOppositions(Window{Start: epoch.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC), End: epoch.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC)},
 		eph.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	skyfield := time.Date(2026, 9, 26, 16, 49, 2, 0, time.LocationUTC)
+	skyfield := epoch.Date(2026, 9, 26, 16, 49, 2, 0, time.UTC)
 	if len(events) != 1 || math.Abs(events[0].Time.Sub(skyfield).Minutes()) > 2 {
 		t.Errorf("FullMoonOppositions on 2026-09-26: %v, want the Full Moon at %v", events, skyfield)
 	}

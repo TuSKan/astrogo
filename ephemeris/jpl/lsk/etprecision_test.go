@@ -4,13 +4,14 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -71,7 +72,7 @@ func openKernel(t *testing.T) *lsk.Reader {
 // sits at the level of the 33 mm this library claims against Horizons.
 //
 // It also made a comparison impossible. Measuring the kernel's Moyer model
-// against time's Fairhead & Bretagnon series produced readings of exactly 0.0
+// against epoch's Fairhead & Bretagnon series produced readings of exactly 0.0
 // or exactly one ULP at every epoch, because the two models differ by about
 // 30 µs and the API could not represent the difference. Any future work
 // choosing between them has to keep this precision or it is measuring the
@@ -86,7 +87,7 @@ func openKernel(t *testing.T) *lsk.Reader {
 func TestUTCToETResolvesSubMicrosecondSteps(t *testing.T) {
 	r := openKernel(t)
 
-	base := time.Date(2026, time.June, 15, 12, 0, 0, 0, time.LocationUTC)
+	base := epoch.Date(2026, time.June, 15, 12, 0, 0, 0, time.UTC)
 	baseET := lsk.UTCToET(base, r)
 
 	wantResolvable := unit.Seconds(1e-6) // one microsecond
@@ -105,12 +106,12 @@ func TestUTCToETResolvesSubMicrosecondSteps(t *testing.T) {
 }
 
 // TestUTCToETDelegatesOutsideTheKernelsEra pins that an epoch the DELTA_AT
-// table cannot speak for still reaches time's historical Delta-T rather than
+// table cannot speak for still reaches epoch's historical Delta-T rather than
 // being answered with no offset at all.
 //
 // The table begins at 1972-01-01, because that is when UTC began accumulating
 // whole leap seconds. Before it the offset is Delta-T — the Espenak & Meeus
-// (2006) polynomials time.DeltaT implements — which is about 10,500 s at year
+// (2006) polynomials epoch.DeltaT implements — which is about 10,500 s at year
 // 1. Driving the conversion from the kernel without checking its era applied
 // no offset at all, and surfaced as ~180 minute errors across the AstroPixels
 // year-0001 lunar phases.
@@ -120,13 +121,13 @@ func TestUTCToETDelegatesOutsideTheKernelsEra(t *testing.T) {
 	const toleranceSeconds = 1e-3
 
 	for _, year := range []int{1, 1000, 1900, 1971} {
-		when := time.Date(year, time.January, 5, 12, 0, 0, 0, time.LocationUTC)
+		when := epoch.Date(year, time.January, 5, 12, 0, 0, 0, time.UTC)
 
 		d1, d2 := when.TDB().JDParts()
 		fromTime := ((d1 - 2451545.0) + d2) * 86400.0
 
 		if d := math.Abs(lsk.UTCToET(when, r) - fromTime); d > toleranceSeconds {
-			t.Errorf("year %d: UTCToET and time.TDB differ by %.1f s (%.1f min).\n"+
+			t.Errorf("year %d: UTCToET and epoch.TDB differ by %.1f s (%.1f min).\n"+
 				"  This epoch predates the DELTA_AT table, so the kernel must not be "+
 				"consulted.", year, d, d/60)
 		}
@@ -139,7 +140,7 @@ func TestUTCToETDelegatesOutsideTheKernelsEra(t *testing.T) {
 // difference of two numbers near 2.46e6, so catastrophic cancellation on top
 // of the 40 microsecond quantization that motivated UTCToET in the first
 // place. Subtracting in seconds past J2000 avoids both.
-func tdbMinusUTC(t time.Time, r *lsk.Reader) float64 {
+func tdbMinusUTC(t epoch.Time, r *lsk.Reader) float64 {
 	d1, d2 := t.UTC().JDParts()
 	secUTC := ((d1 - 2451545.0) + d2) * 86400.0
 

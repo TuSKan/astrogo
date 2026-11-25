@@ -5,7 +5,7 @@ import (
 	"math"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // PlanetApparent computes the V-band apparent magnitude of a Solar System body
@@ -17,7 +17,7 @@ import (
 // Uranus, Neptune, Pluto.
 //
 // Returns ErrUnsupportedBody for Earth, satellites, or unknown IDs.
-func PlanetApparent(p eph.Provider, target eph.ID, t time.Time) (float64, error) {
+func PlanetApparent(p eph.Provider, target eph.ID, t epoch.Time) (float64, error) {
 	if target == eph.Sun {
 		return SunApparent(p, t)
 	}
@@ -263,7 +263,7 @@ func uranusMag(sunToPlanet, observerToPlanet [3]float64, r, delta, phAng float64
 // ── Neptune — Mallama & Hilton 2018, Eq. 16–17 ──────────────────────────────
 // Secular brightening + phase correction for year ≥ 2000, matching Skyfield.
 
-func neptuneMag(r, delta, phAng float64, t time.Time) float64 {
+func neptuneMag(r, delta, phAng float64, t epoch.Time) float64 {
 	rMag := 2.5 * math.Log10(r*r)
 	deltaMag := 2.5 * math.Log10(delta*delta)
 	distMod := rMag + deltaMag

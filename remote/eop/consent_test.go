@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // TestEOPFetchWithoutConsentAsksNoSource: the lazy load's network step is

@@ -5,11 +5,12 @@ package jpl_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestLocateAnswersAboutTheSegmentCenter: a kernel locates a body about the
@@ -28,7 +29,7 @@ func TestLocateAnswersAboutTheSegmentCenter(t *testing.T) {
 
 	t.Cleanup(func() { _ = p.Close() })
 
-	at := time.Date(2026, time.March, 20, 12, 0, 0, 0, time.LocationUTC)
+	at := epoch.Date(2026, time.March, 20, 12, 0, 0, 0, time.UTC)
 
 	for _, c := range []struct {
 		id, center core.ID

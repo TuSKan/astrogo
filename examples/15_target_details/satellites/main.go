@@ -5,16 +5,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -62,7 +63,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	t := time.NowUTC().In(tz)
+	t := epoch.Now().In(tz)
 
 	ctx, err := coord.NewContext(t, loc, atmosphere.StandardRefraction())
 	if err != nil {

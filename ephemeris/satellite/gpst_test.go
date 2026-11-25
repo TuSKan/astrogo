@@ -3,21 +3,22 @@ package satellite_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/satellite"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // TestGPSTimestampProducesTheSameStateAsItsUTC is the contract #145 asks for,
 // and the one that makes the new scale worth its API surface.
 //
 // A GNSS receiver hands out GPS system time, which is 18 seconds ahead of UTC
-// today. Before time.GPST existed a caller had no way to say so, and the only
+// today. Before epoch.GPST existed a caller had no way to say so, and the only
 // expressible option — call it UTC — put the satellite 18 seconds along its
 // track. This asserts both halves: labeling it correctly gives the right
 // state, and labeling it UTC gives a measurably wrong one.
 //
-// It lives here rather than in time/ because the arithmetic is only half the
+// It lives here rather than in epoch/ because the arithmetic is only half the
 // point. State converts to UTC internally, so this also proves the conversion
 // survives the trip through timeToComponents rather than falling through a
 // switch that never learned about the scale.
@@ -30,10 +31,10 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 	}
 
 	// One physical instant, expressed two ways.
-	utc := time.Date(2008, time.September, 20, 12, 0, 0, 0, time.LocationUTC)
+	utc := epoch.Date(2008, time.September, 20, 12, 0, 0, 0, time.UTC)
 	gps := utc.GPST()
 
-	if gps.Scale() != time.GPST {
+	if gps.Scale() != epoch.GPST {
 		t.Fatalf("precondition: converted instant is on scale %v", gps.Scale())
 	}
 
@@ -59,7 +60,7 @@ func TestGPSTimestampProducesTheSameStateAsItsUTC(t *testing.T) {
 
 	// Now the trap. Take the GPS label and assert it is UTC -- the only thing
 	// a caller could do before this scale existed.
-	misread := time.FromJD(gps.JD(), time.UTC)
+	misread := epoch.FromJD(gps.JD(), epoch.UTC)
 
 	// The offset is NOT a constant, and this epoch shows why the scale has to
 	// do the arithmetic rather than the caller. Vallado's element set is from

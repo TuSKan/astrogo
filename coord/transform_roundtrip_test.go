@@ -3,11 +3,12 @@ package coord_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 )
 
 // separation is the great-circle distance between two directions, in degrees,
@@ -70,14 +71,14 @@ func TestICRSGalacticRoundTrip(t *testing.T) {
 func TestICRSEclipticRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	epochs := []time.GoTime{
-		time.GoDate(2000, 1, 1, 12, 0, 0, 0, time.LocationUTC),
-		time.GoDate(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC),
-		time.GoDate(2050, 6, 1, 18, 30, 0, 0, time.LocationUTC),
+	epochs := []time.Time{
+		time.Date(2000, 1, 1, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC),
+		time.Date(2050, 6, 1, 18, 30, 0, 0, time.UTC),
 	}
 
 	for _, when := range epochs {
-		at := time.FromGo(when)
+		at := epoch.FromGo(when)
 
 		for _, c := range sweep() {
 			start := coord.NewICRS(c.lon, c.lat)
@@ -168,7 +169,7 @@ func TestGalacticAnchors(t *testing.T) {
 func TestEclipticAnchors(t *testing.T) {
 	t.Parallel()
 
-	at := time.J2000()
+	at := epoch.J2000()
 
 	const (
 		obliquity = 84381.406 / 3600
@@ -228,7 +229,7 @@ func TestEclipticAnchors(t *testing.T) {
 func TestEclipticTakesTheInstantNotItsScale(t *testing.T) {
 	t.Parallel()
 
-	utc := time.Date(2026, 8, 21, 0, 0, 0, 0, time.LocationUTC)
+	utc := epoch.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)
 	tt := utc.TT()
 
 	icrs := coord.NewICRS(angle.Deg(123.4), angle.Deg(-45.6))
@@ -265,7 +266,7 @@ func TestAltAzICRSRoundTrip(t *testing.T) {
 		t.Fatalf("NewGeodetic: %v", err)
 	}
 
-	at := time.FromGo(time.GoDate(2026, 8, 21, 3, 0, 0, 0, time.LocationUTC))
+	at := epoch.FromGo(time.Date(2026, 8, 21, 3, 0, 0, 0, time.UTC))
 
 	// No refraction, so the transform is a pure geometric inverse.
 	ctx, err := coord.NewContext(at, site, atmosphere.Refraction{})

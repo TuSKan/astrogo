@@ -4,10 +4,11 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/ephemeris/jpl/lsk"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/time"
 )
 
 // NAIF writes the closing parenthesis of DELTET/DELTA_AT on the same line as
@@ -98,7 +99,7 @@ func TestFinalLeapSecondIsParsed(t *testing.T) {
 				{"2016 (36 leap seconds)", 2016, 36 + 32.184},
 				{"2020 (37 leap seconds)", 2020, 37 + 32.184},
 			} {
-				utc := time.Date(want.year, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+				utc := epoch.Date(want.year, 1, 1, 0, 0, 0, 0, time.UTC)
 				got := tdbMinusUTC(utc, r)
 
 				// 3 ms, not the 1 ms this once asserted. The old bound

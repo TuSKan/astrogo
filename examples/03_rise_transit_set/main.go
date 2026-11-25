@@ -4,11 +4,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/TuSKan/astrogo/angle"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/time"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -18,7 +19,7 @@ func main() {
 	// about a second, below the minute these times are read to. For full
 	// accuracy, blank-import remote/eop and consent to the IERS bulletin, as
 	// 09_geometry_events does.
-	time.RegisterModel(time.ZeroModel{})
+	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)
 	site, err := plan.NewSite("Quinta Calixto", angle.LatDeg(-22.528478), angle.LonDeg(-46.473002), unit.Meters(835.05))
@@ -42,7 +43,7 @@ func main() {
 		log.Fatalf("tz: %v", err)
 	}
 
-	start := time.Date(2026, 4, 6, 18, 0, 0, 0, tz)
+	start := epoch.Date(2026, 4, 6, 18, 0, 0, 0, tz)
 	end := start.Add(unit.Hours(24))
 
 	// 4. Find Rise/Set/Transit events.

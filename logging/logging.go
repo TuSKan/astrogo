@@ -19,7 +19,7 @@
 //   - [slog.LevelWarn] — a result has silently degraded. Today there is one: no
 //     Earth Orientation Parameters could be found for the epoch, so DUT1 and
 //     polar motion are zero and topocentric accuracy has dropped to about an
-//     arcsecond. [github.com/TuSKan/astrogo/time.Time.EOP] has no error return,
+//     arcsecond. [github.com/TuSKan/astrogo/epoch.Time.EOP] has no error return,
 //     so that line is the only notice a caller gets. Emitted by default.
 //
 // So the default is quiet about progress and not quiet about accuracy:

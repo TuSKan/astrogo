@@ -131,3 +131,8 @@ func TestExternalTestsReportWhyTheyFailed(t *testing.T) {
 
 	t.Logf("%d externally-tagged test files checked, %d offenders", checked, offenders)
 }
+
+// lineOf returns the 1-indexed line containing the byte at off.
+func lineOf(s string, off int) int {
+	return 1 + strings.Count(s[:off], "\n")
+}

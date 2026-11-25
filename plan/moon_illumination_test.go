@@ -3,10 +3,11 @@ package plan
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/TuSKan/astrogo/coord"
 	eph "github.com/TuSKan/astrogo/ephemeris"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 )
 
@@ -19,13 +20,13 @@ import (
 // theory.
 func TestMoonIlluminationMatchesSkyfield(t *testing.T) {
 	for _, c := range []struct {
-		at        time.Time
+		at        epoch.Time
 		i, k, psi float64
 	}{
 		// 1992-04-12 0h TD.
-		{time.Date(1992, 4, 11, 23, 59, 1, 700000000, time.LocationUTC), 69.084, 0.67850, 110.792},
-		{time.Date(2026, 1, 26, 4, 48, 0, 0, time.LocationUTC), 89.856, 0.50126, 90.006},
-		{time.Date(2026, 9, 18, 7, 0, 0, 0, time.LocationUTC), 96.068, 0.44714, 83.784},
+		{epoch.Date(1992, 4, 11, 23, 59, 1, 700000000, time.UTC), 69.084, 0.67850, 110.792},
+		{epoch.Date(2026, 1, 26, 4, 48, 0, 0, time.UTC), 89.856, 0.50126, 90.006},
+		{epoch.Date(2026, 9, 18, 7, 0, 0, 0, time.UTC), 96.068, 0.44714, 83.784},
 	} {
 		k, i, err := MoonIllumination(c.at, eph.Default())
 		if err != nil {
@@ -49,7 +50,7 @@ func TestMoonIlluminationMatchesSkyfield(t *testing.T) {
 // ψ as i, as before #416, puts it anywhere from −180° to 180°.
 func TestMoonPhaseAngleIsNotTheElongation(t *testing.T) {
 	prov := eph.Default()
-	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 
 	largest := 0.0
 
@@ -86,7 +87,7 @@ func TestMoonPhaseAngleIsNotTheElongation(t *testing.T) {
 // set to 90°, and so exactly 0.5.
 func TestQuarterMoonsAreNotExactlyHalfLit(t *testing.T) {
 	prov := eph.Default()
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.LocationUTC)
+	start := epoch.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for _, kind := range []EventKind{EventFirstQuarter, EventLastQuarter} {
 		events, err := NewEventSolver(unit.Hours(6), unit.Seconds(1)).Find(EventSpec{
@@ -115,7 +116,7 @@ func TestQuarterMoonsAreNotExactlyHalfLit(t *testing.T) {
 
 // geocentricSeparation is the angle between two bodies' geometric geocentric
 // directions, in degrees.
-func geocentricSeparation(t *testing.T, prov eph.Provider, a, b eph.ID, at time.Time) float64 {
+func geocentricSeparation(t *testing.T, prov eph.Provider, a, b eph.ID, at epoch.Time) float64 {
 	t.Helper()
 
 	var dirs [2]coord.ICRS

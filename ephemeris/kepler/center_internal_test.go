@@ -7,13 +7,13 @@ import (
 	"github.com/TuSKan/astrogo/angle"
 	"github.com/TuSKan/astrogo/constants"
 	"github.com/TuSKan/astrogo/ephemeris/core"
-	"github.com/TuSKan/astrogo/time"
+	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/unit"
 	"github.com/TuSKan/astrogo/vector"
 )
 
 // centerEpoch is the osculation epoch of the orbits the center tests build.
-var centerEpoch = time.FromJDParts(2460676.5, 0, time.TDB) // 2025-01-01
+var centerEpoch = epoch.FromJDParts(2460676.5, 0, epoch.TDB) // 2025-01-01
 
 // registered returns what p stores for el.
 func registered(t *testing.T, el Elements) Elements {
@@ -125,7 +125,7 @@ type sunBase struct {
 	asked  int
 }
 
-func (b *sunBase) Locate(id core.ID, t time.Time) (core.State, error) {
+func (b *sunBase) Locate(id core.ID, t epoch.Time) (core.State, error) {
 	if id != core.Sun {
 		return b.sofaBase.Locate(id, t)
 	}
