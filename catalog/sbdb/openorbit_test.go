@@ -83,7 +83,7 @@ func serveJSON(t *testing.T, endpoint remote.EndpointID, body func(q map[string]
 		}
 	}))
 	t.Cleanup(server.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(endpoint, server.URL); err != nil {
 		t.Fatal(err)

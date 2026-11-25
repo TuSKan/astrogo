@@ -91,8 +91,8 @@ func TestDayOfYearIsInTheYearYearReads(t *testing.T) {
 func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently overwrite errorEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.RegisterModel(errorEOP{})
 
@@ -113,8 +113,8 @@ func TestTimeGASTFallsBackToUTCOnUT1Error(t *testing.T) {
 func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently overwrite errorEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.RegisterModel(errorEOP{})
 
@@ -131,8 +131,8 @@ func TestTimeEOPDegradesToZeroWithWarning(t *testing.T) {
 func TestTimeUTCFromUT1FallsBackOnEOPError(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently overwrite errorEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.RegisterModel(errorEOP{})
 

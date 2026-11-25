@@ -19,8 +19,8 @@ func TestOzoneReplacesADamagedCachedCopy(t *testing.T) {
 
 	ctx := context.Background()
 
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	srcURL := testutil.FileURL(t, t.TempDir())
 	if err := remote.SetURL(remote.MPIMainzCrossSections, srcURL); err != nil {

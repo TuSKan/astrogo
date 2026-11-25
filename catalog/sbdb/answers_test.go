@@ -38,7 +38,7 @@ type sbdbAnswer struct {
 // written from the server's goroutines, so they are guarded.
 func serveSBDB(t *testing.T, answers map[string]sbdbAnswer) (asked func() []string) {
 	t.Helper()
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	var (
 		mu   sync.Mutex
@@ -143,7 +143,7 @@ func TestDesignationAmongMatchesIsSelected(t *testing.T) {
 // TestAnswerWithNothingIsAnError: a payload with no object, list or message
 // used to come back as a zero Target with a nil error.
 func TestAnswerWithNothingIsAnError(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

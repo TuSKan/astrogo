@@ -24,8 +24,8 @@ func TestNonFiniteTimeDoesNotSpendTheEOPWarning(t *testing.T) {
 
 	// Nothing loaded and nothing to load, as TestNothingLoadedWarnsAndChosenZeroDoesNot
 	// sets it up, so a finite time degrades and must warn.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.ResetEOP()
 	t.Cleanup(epoch.ResetEOP)

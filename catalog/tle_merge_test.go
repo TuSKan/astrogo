@@ -40,7 +40,7 @@ const issGP = `[{
 // drop it while keeping the TLE lines, so a resolved satellite came back with
 // the zero Time and SGP4 propagated it from JD 0 without an error (#1130).
 func TestResolverKeepsTheTLEEpoch(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

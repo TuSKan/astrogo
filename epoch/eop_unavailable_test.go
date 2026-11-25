@@ -31,8 +31,8 @@ func TestNothingLoadedWarnsAndChosenZeroDoesNot(t *testing.T) {
 	// An empty cache, so the lazy load finds no bulletin to read, and a policy
 	// refusing the download, so it fetches none.
 	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.ResetEOP()
 	t.Cleanup(epoch.ResetEOP)

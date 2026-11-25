@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewFetchSearchResolve(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("FORMAT") != "JSON" {
@@ -81,7 +81,7 @@ func TestNewFetchSearchResolve(t *testing.T) {
 // status, content type and body.
 func serveCelesTrak(t *testing.T, status int, contentType, body string) {
 	t.Helper()
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", contentType)

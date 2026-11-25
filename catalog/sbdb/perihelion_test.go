@@ -261,7 +261,7 @@ func perihelionArchive(t *testing.T, rows [][3]string, cdata *testutil.Recorded[
 			strings.Join(data, ","), len(rows))
 	}))
 	t.Cleanup(srv.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, srv.URL); err != nil {
 		t.Fatal(err)

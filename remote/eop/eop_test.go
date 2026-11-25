@@ -56,13 +56,10 @@ func fakeIERSSource(t *testing.T, content string) {
 func scratchCache(t *testing.T) {
 	t.Helper()
 
-	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	t.Cleanup(remote.Capture().Restore)
+	t.Cleanup(epoch.ResetEOP)
 
-	t.Cleanup(func() {
-		remote.SetDataDir("")
-		remote.Reset()
-		epoch.ResetEOP()
-	})
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 }
 
 func TestEOPLoaderFetchesAndParses(t *testing.T) {

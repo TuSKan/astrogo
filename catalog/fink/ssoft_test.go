@@ -163,7 +163,7 @@ func ssoftParquet(tb testing.TB, rows []ssoftRow) []byte {
 func serveSSOFT(t *testing.T, status int, body []byte) *atomic.Int32 {
 	t.Helper()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	var calls atomic.Int32
 
@@ -407,7 +407,7 @@ func TestFailedLoadIsNotRetried(t *testing.T) {
 // first, and the bulk index is what answers when that has nothing. Without
 // this, the whole SSOFT path is unreachable from the public API in tests.
 func TestResolveFallsBackToTheBulkTable(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	body := ssoftParquet(t, []ssoftRow{{name: "Benoitcarry", number: 8467, h1: 15.0, status: 1}})
 
@@ -582,7 +582,7 @@ func TestSearchAndResolveObjectSeparateAbsenceFromFailure(t *testing.T) {
 			_, _ = w.Write([]byte(`{"RemoteException": "sso_number not found"}`))
 		}))
 		t.Cleanup(srv.Close)
-		t.Cleanup(remote.Reset)
+		t.Cleanup(remote.Capture().Restore)
 
 		if err := remote.SetURL(remote.FINK, srv.URL); err != nil {
 			t.Fatal(err)
@@ -673,7 +673,7 @@ func TestResolveJoinsWhatEachRouteSaid(t *testing.T) {
 // has to survive — the same discipline #203 applied to the tests, here in the
 // library.
 func TestRemoteExceptionCarriesItsMessage(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"RemoteException": "sso_number not found"}`))
@@ -699,7 +699,7 @@ func TestRemoteExceptionCarriesItsMessage(t *testing.T) {
 // asked the complete catalog, so "not found" is an assertion the provider is
 // not entitled to make.
 func TestAbsenceNeedsTheBulkTableToHaveAnswered(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	// The single-object endpoint says "not found"; the bulk download fails.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

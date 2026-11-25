@@ -94,9 +94,9 @@ func TestParseFinals2000AGateway(t *testing.T) {
 // never fetched via remote.GetFile) is found and used by a bare EOP query —
 // no explicit loader call, and with downloads refused, no fetch.
 func TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
 	t.Cleanup(func() {
 		epoch.ResetEOP()
-		remote.Reset()
 	})
 
 	// A lazy load happens only with no model loaded, so start from none. A test
@@ -109,7 +109,6 @@ func TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy(t *testing.T) {
 	// pre-seeded cache satisfied the query without a fetch.
 	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	bucket, prefix, err := remote.CacheDir(context.Background(), remote.IERSFinals2000A)
 	if err != nil {
@@ -142,9 +141,9 @@ func TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy(t *testing.T) {
 // default, a bare EOP query fetches over the network automatically — no
 // explicit Fetch/FetchIfStale call needed.
 func TestEOPLazyLoadFetchesWhenAllowed(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
 	t.Cleanup(func() {
 		epoch.ResetEOP()
-		remote.Reset()
 		epoch.SetRetryCooldown(5 * time.Minute)
 	})
 
@@ -159,7 +158,6 @@ func TestEOPLazyLoadFetchesWhenAllowed(t *testing.T) {
 	fakeIERSSourceForGateway(t, sampleFinals2000AForGateway)
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	tm := epoch.FromJD(2441684.5, epoch.UTC) // MJD 41684
 
@@ -177,9 +175,9 @@ func TestEOPLazyLoadFetchesWhenAllowed(t *testing.T) {
 // fallback: no pre-seeded cache and a policy refusing the download still
 // degrades gracefully to a zero EOP rather than blocking or erroring.
 func TestEOPLazyLoadDegradesToZeroWithNoCacheAndARefusingPolicy(t *testing.T) {
+	t.Cleanup(remote.Capture().Restore)
 	t.Cleanup(func() {
 		epoch.ResetEOP()
-		remote.Reset()
 	})
 
 	// From no model, as TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy
@@ -188,7 +186,6 @@ func TestEOPLazyLoadDegradesToZeroWithNoCacheAndARefusingPolicy(t *testing.T) {
 
 	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	tm := epoch.FromJD(2441684.5, epoch.UTC) // MJD 41684
 

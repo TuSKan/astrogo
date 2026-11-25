@@ -210,7 +210,7 @@ func TestSearchKeepsPartialResultsAndReportsTotalFailure(t *testing.T) {
 // found". Both used to arrive here as failures, so a Resolver with either
 // registered could not report ErrNotFound for anything (#620).
 func TestResolveHearsNoFromSBDBAndNORAD(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	serve := func(id remote.EndpointID, status int, contentType, body string) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
