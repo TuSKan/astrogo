@@ -368,7 +368,7 @@ flowchart TD
     %% Primitive Foundation
     subgraph Primitives
         direction LR
-        time[time]
+        epoch[epoch]
         angle[angle]
         vector[vector]
         unit[unit]
@@ -385,12 +385,12 @@ flowchart TD
     fitsplan --> plan
 
     catalog --> coord
-    catalog --> time
+    catalog --> epoch
     catalog --> angle
 
     fits --> coord
 
-    ephemeris --> time
+    ephemeris --> epoch
     ephemeris --> vector
     ephemeris --> coord
     satellite["ephemeris/satellite"] --> ephemeris
@@ -409,7 +409,7 @@ flowchart TD
     sbdata --> remote
 
     coord --> atmosphere
-    coord --> time
+    coord --> epoch
     coord --> vector
     coord --> angle
 
