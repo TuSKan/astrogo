@@ -3,12 +3,6 @@
 // computed from first principles using JPL DE442 ephemerides.
 //
 // This showcase demonstrates:
-//   - Season prediction via ecliptic longitude root-finding
-//   - Chandrupatla/Brent sub-second refinement
-//   - Season duration asymmetry from Earth's orbital eccentricity
-//   - Moon phase detection via elongation crossing
-//   - Lunar/solar eclipse detection via ecliptic latitude filtering
-//   - Topocentric Moon position (diurnal parallax correction)
 //
 // Run: go run ./examples/17_equinox_prediction/
 package main
@@ -26,7 +20,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -35,10 +28,10 @@ import (
 )
 
 func main() {
-	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
-	// download on first run and are cached.
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both download on
+	// first run and are cached. Earth orientation, for where the site is on the
+	// turning Earth: the IERS bulletin, which downloads on first need and is
+	// cached.
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {
 		log.Fatalf("ephemeris: %v", err)

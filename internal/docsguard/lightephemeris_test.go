@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+// eopImport is the one edge from epoch to remote: epoch loads Earth
+// orientation through remote (#1264).
+var eopImport = [2]string{"github.com/TuSKan/astrogo/epoch/internal/iers", "github.com/TuSKan/astrogo/remote"}
+
 // TestEphemerisDoesNotLinkTheStorageClient keeps the split #112 made.
 //
 // # What it is guarding
@@ -36,24 +40,61 @@ import (
 // a check for them could never fail again. A test that cannot fail is worse
 // than no test, because it reads as cover.
 //
-// What survives the library change is the structural rule: ephemeris must not
-// reach astrogo/remote at all. That is what #112 was about — the heavy packages
-// were the symptom, the import was the cause — and it stays true whatever
-// remote is built on next. The former four are kept alongside it as named
-// regressions, so a future dependency that reintroduces them is caught by name
-// rather than only by the import that brought them.
+// What survives is the structural rule: ephemeris must not reach
+// astrogo/remote, but by one edge. epoch loads Earth orientation through
+// remote (#1264), so every program converting a time scale links it, at a
+// measured 2.98 MB and 96 packages without it against 6.08 MB and 217 with it,
+// nearly all of the difference Go's own HTTP stack. That edge is a decision.
+// Any other path from ephemeris to remote is the import #112 removed, and
+// stays a defect whatever remote is built on next. The former four are kept
+// alongside it as named regressions, so a future dependency that reintroduces
+// them is caught by name rather than only by the import that brought them.
 //
 // A regression here is one accidental import away and would be invisible:
 // everything keeps working, the binary is simply megabytes bigger.
 func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
+	const root = "github.com/TuSKan/astrogo/ephemeris"
+
 	// The whole transitive graph of the root package, as the toolchain sees it.
-	out, err := exec.CommandContext(t.Context(),
-		"go", "list", "-deps", "github.com/TuSKan/astrogo/ephemeris").Output()
+	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps",
+		"-f", "{{.ImportPath}}\t{{join .Imports \",\"}}", root).Output()
 	if err != nil {
 		t.Fatalf("go list -deps: %v", err)
 	}
 
-	deps := strings.Split(string(out), "\n")
+	imports := map[string][]string{}
+
+	for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+		path, list, _ := strings.Cut(strings.TrimSpace(line), "\t")
+		if list != "" {
+			imports[path] = strings.Split(list, ",")
+		} else {
+			imports[path] = nil
+		}
+	}
+
+	if len(imports) < 50 {
+		t.Fatalf("go list reported only %d packages; the command is not doing what this "+
+			"test assumes", len(imports))
+	}
+
+	// Everything ephemeris reaches without following eopImport.
+	reached := map[string]bool{root: true}
+	queue := []string{root}
+
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+
+		for _, imp := range imports[next] {
+			if reached[imp] || [2]string{next, imp} == eopImport {
+				continue
+			}
+
+			reached[imp] = true
+			queue = append(queue, imp)
+		}
+	}
 
 	// The first entry is the rule; the rest are the heavyweights that used to
 	// arrive through it, kept so a reintroduction is named rather than merely
@@ -68,9 +109,9 @@ func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
 
 	counts := map[string]int{}
 
-	for _, d := range deps {
+	for d := range reached {
 		for prefix := range forbidden {
-			if strings.HasPrefix(strings.TrimSpace(d), prefix) {
+			if strings.HasPrefix(d, prefix) {
 				counts[prefix]++
 			}
 		}
@@ -78,7 +119,8 @@ func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
 
 	for prefix, why := range forbidden {
 		if counts[prefix] > 0 {
-			t.Errorf("ephemeris reaches %d packages under %s — %s.\n"+
+			t.Errorf("ephemeris reaches %d packages under %s other than through epoch's "+
+				"Earth-orientation loader — %s.\n"+
 				"  Something in the ephemeris tree imported remote again. The kernel-backed\n"+
 				"  sources reach it through the backend ephemeris/jpl registers, so nothing\n"+
 				"  in the root package should name that package. See #112.",
@@ -86,10 +128,6 @@ func TestEphemerisDoesNotLinkTheStorageClient(t *testing.T) {
 		}
 	}
 
-	if len(deps) < 50 {
-		t.Fatalf("go list reported only %d dependencies; the command is not doing what this "+
-			"test assumes", len(deps))
-	}
-
-	t.Logf("%d transitive packages, none under %d forbidden prefixes", len(deps)-1, len(forbidden))
+	t.Logf("%d packages reached without epoch's loader, checked against %d forbidden prefixes",
+		len(reached), len(forbidden))
 }

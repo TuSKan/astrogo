@@ -15,12 +15,15 @@ import (
 //
 // If ephemeris imported ephemeris/jpl, asking where Mars is would cost a
 // network stack the answer never touches: jpl imports remote, which imports
-// net/http and crypto/tls. Measured with go1.27 on windows/amd64 that is
-// 11.0 MB and 231 packages against 4.6 MB and 107 for the pure-SOFA build.
+// net/http and crypto/tls. Measured with go1.27 on windows/amd64 when the
+// split was made, that was 11.0 MB and 231 packages against 4.6 MB and 107
+// for the pure-SOFA build. epoch now loads Earth orientation through remote
+// (#1264), so every build links that stack and the split saves 0.4 MB and
+// four packages, the SPK reader and its kin.
 // A pure-SOFA call — no kernel, no network, no file — would pay for all of it
 // because one branch of one factory mentioned the type.
 //
-// The same pattern remote/eop uses: a subpackage that is nothing but a
+// The same pattern remote/file's backends use: a subpackage that is nothing but a
 // registration, blank-imported by a build that needs the capability. See #112.
 //
 // # What it costs

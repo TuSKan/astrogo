@@ -6,6 +6,7 @@ import (
 
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/leakcheck"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 )
 
 // TestMain pins Earth orientation to zero for every test in this package.
@@ -46,8 +47,14 @@ import (
 // It waits for the group before returning, and leakcheck is what keeps that
 // true: a worker started and not waited for fails the package rather than
 // growing a caller's process (#1099).
+//
+// # And offline, against an empty cache
+//
+// remotetest.Run, as in every package whose untagged tests link remote: a
+// test that needs the network or a cached file fails instead of downloading
+// or reading what this machine holds.
 func TestMain(m *testing.M) {
 	epoch.RegisterModel(epoch.ZeroModel{})
 
-	os.Exit(leakcheck.RunWithLeakCheck(m))
+	os.Exit(remotetest.Run(func() int { return leakcheck.RunWithLeakCheck(m) }))
 }

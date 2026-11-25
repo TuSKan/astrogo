@@ -50,7 +50,7 @@ func TestNewAndNewWithVersion(t *testing.T) {
 }
 
 func TestQuerySingleByNumberAndName(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -88,7 +88,7 @@ func TestQuerySingleByNumberAndName(t *testing.T) {
 }
 
 func TestQuerySingleRemoteException(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"RemoteException": "sso_number not found"}`))
@@ -107,7 +107,7 @@ func TestQuerySingleRemoteException(t *testing.T) {
 }
 
 func TestResolveViaSingleObjectAPI(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(ssoftSingleFixture))

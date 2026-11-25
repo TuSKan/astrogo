@@ -13,7 +13,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/unit"
 
 	// The kernel-backed sources register their backend rather than being
@@ -22,10 +21,10 @@ import (
 )
 
 func main() {
-	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
-	// download on first run and are cached.
-	// Earth orientation, for where the site is on the turning Earth:
-	// the IERS bulletin, which the remote/eop import above fetches.
+	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both download on
+	// first run and are cached. Earth orientation, for where the site is on the
+	// turning Earth: the IERS bulletin, which downloads on first need and is
+	// cached.
 	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760.0))
 	if err != nil {
 		log.Fatalf("failed to create location: %v", err)

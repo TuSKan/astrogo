@@ -1,4 +1,4 @@
-package eop
+package iers
 
 import (
 	"bytes"
@@ -10,23 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
-	"github.com/TuSKan/astrogo/remote/file"
 )
 
-// sampleFinals2000A mimics finals2000A.all format for two consecutive
-// days, covering MJD 41684-41685.
-const sampleFinals2000A = `73 1 2 41684.00 I  0.120733 0.009786  0.136966 0.015902  I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300   .143000   .137000   .8075000   -18.637    -3.667
-73 1 3 41685.00 I  0.118980 0.011039  0.135656 0.013616  I 0.8056163 0.0002710  3.5563 0.1916  P    -0.751    0.199    -0.701    0.300   .141000   .134000   .8044000   -18.636    -3.571  `
-
-// These tests moved here from epoch/internal/iers when the EOP dependency
-// was inverted. They were always testing this package's behavior —
-// the download policy, ETag revalidation, cache layout — through a package that had
-// no business knowing about any of it. They now sit next to the code they
-// exercise, and iers keeps only the tests about its own logic.
+// These are the remote-backed loader's tests. They lived in remote/eop with
+// the loader while epoch could not import remote, and came back with it.
 
 // fakeIERSSource opens a fresh temp directory as a fsys, points
 // remote.IERSFinals2000A's URL at it, and writes content at the source object
@@ -41,7 +31,7 @@ func fakeIERSSource(t *testing.T, content string) {
 		t.Fatal(err)
 	}
 
-	fsys, err := file.OpenFS(url)
+	fsys, err := remote.OpenFS(context.Background(), url)
 	if err != nil {
 		t.Fatalf("open fake source: %v", err)
 	}
@@ -56,25 +46,22 @@ func fakeIERSSource(t *testing.T, content string) {
 func scratchCache(t *testing.T) {
 	t.Helper()
 
-	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	t.Cleanup(remote.Capture().Restore)
+	t.Cleanup(Reset)
 
-	t.Cleanup(func() {
-		remote.SetDataDir("")
-		remote.Reset()
-		epoch.ResetEOP()
-	})
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 }
 
 func TestEOPLoaderFetchesAndParses(t *testing.T) {
 	scratchCache(t)
 	fakeIERSSource(t, sampleFinals2000A)
 
-	data, err := eopLoader{}.Fetch(context.Background())
+	data, err := remoteLoader{}.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
 
-	if _, err := epoch.ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
+	if _, err := ParseFinals2000A(bytes.NewReader(data.Raw)); err != nil {
 		t.Fatalf("fetched bytes do not parse as finals2000A: %v", err)
 	}
 }
@@ -86,7 +73,7 @@ func TestEOPLoaderUnderARefusingPolicyWritesNoCache(t *testing.T) {
 	fakeIERSSource(t, sampleFinals2000A)
 	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 
-	_, err := eopLoader{}.Fetch(context.Background())
+	_, err := remoteLoader{}.Fetch(context.Background())
 	if !errors.Is(err, remote.ErrDownloadDenied) {
 		t.Fatalf("Fetch under a refusing policy = %v, want remote.ErrDownloadDenied", err)
 	}
@@ -96,7 +83,7 @@ func TestEOPLoaderUnderARefusingPolicyWritesNoCache(t *testing.T) {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
+	if _, err := fs.Stat(fsys, prefix+cacheName); err == nil {
 		t.Error("a denied fetch must not write a cache file")
 	}
 }
@@ -110,7 +97,7 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 
 	ctx := context.Background()
 
-	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+	if _, err := (remoteLoader{}).Fetch(ctx); err != nil {
 		t.Fatalf("first Fetch: %v", err)
 	}
 
@@ -119,16 +106,16 @@ func TestEOPLoaderSkipsBodyWhenETagUnchanged(t *testing.T) {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	before, err := fs.Stat(fsys, prefix+eopCacheName)
+	before, err := fs.Stat(fsys, prefix+cacheName)
 	if err != nil {
 		t.Fatalf("Attributes: %v", err)
 	}
 
-	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+	if _, err := (remoteLoader{}).Fetch(ctx); err != nil {
 		t.Fatalf("second Fetch: %v", err)
 	}
 
-	after, err := fs.Stat(fsys, prefix+eopCacheName)
+	after, err := fs.Stat(fsys, prefix+cacheName)
 	if err != nil {
 		t.Fatalf("Attributes (after): %v", err)
 	}
@@ -157,7 +144,7 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 			scratchCache(t)
 			fakeIERSSource(t, c.body)
 
-			if _, err := (eopLoader{}).Fetch(context.Background()); err == nil {
+			if _, err := (remoteLoader{}).Fetch(context.Background()); err == nil {
 				t.Fatal("Fetch accepted a corrupt download")
 			}
 
@@ -166,12 +153,12 @@ func TestEOPLoaderRejectsCorruptDownload(t *testing.T) {
 				t.Fatalf("remote.CacheDir: %v", err)
 			}
 
-			if _, err := fs.Stat(fsys, prefix+eopCacheName); err == nil {
+			if _, err := fs.Stat(fsys, prefix+cacheName); err == nil {
 				t.Error("a corrupt download must not be cached")
 			}
 
-			if _, ok := epoch.GetModel().(epoch.ZeroModel); !ok {
-				t.Errorf("model must be unchanged after a rejected download, got %T", epoch.GetModel())
+			if _, ok := GetModel().(ZeroModel); !ok {
+				t.Errorf("model must be unchanged after a rejected download, got %T", GetModel())
 			}
 		})
 	}
@@ -189,13 +176,13 @@ func TestEOPLoaderKeepsAGoodBulletinOverAnErrorPage(t *testing.T) {
 
 	ctx := context.Background()
 
-	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+	if _, err := (remoteLoader{}).Fetch(ctx); err != nil {
 		t.Fatalf("first Fetch: %v", err)
 	}
 
 	fakeIERSSource(t, errorPage)
 
-	if data, err := (eopLoader{}).Fetch(ctx); err == nil {
+	if data, err := (remoteLoader{}).Fetch(ctx); err == nil {
 		t.Errorf("Fetch of an error page: %d bytes and no error", len(data.Raw))
 	}
 
@@ -204,7 +191,7 @@ func TestEOPLoaderKeepsAGoodBulletinOverAnErrorPage(t *testing.T) {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	cached, err := fs.ReadFile(fsys, prefix+eopCacheName)
+	cached, err := fs.ReadFile(fsys, prefix+cacheName)
 	if err != nil {
 		t.Fatalf("read the cached bulletin: %v", err)
 	}
@@ -227,7 +214,7 @@ func TestEOPLoaderReplacesADamagedCachedBulletin(t *testing.T) {
 
 	ctx := context.Background()
 
-	if _, err := (eopLoader{}).Fetch(ctx); err != nil {
+	if _, err := (remoteLoader{}).Fetch(ctx); err != nil {
 		t.Fatalf("first Fetch: %v", err)
 	}
 
@@ -241,11 +228,11 @@ func TestEOPLoaderReplacesADamagedCachedBulletin(t *testing.T) {
 		t.Fatal("the damage did not apply")
 	}
 
-	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(damaged)); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName, strings.NewReader(damaged)); err != nil {
 		t.Fatalf("damage the cached copy: %v", err)
 	}
 
-	data, err := (eopLoader{}).Fetch(ctx)
+	data, err := (remoteLoader{}).Fetch(ctx)
 	if err != nil {
 		t.Fatalf("Fetch over a damaged cached copy: %v", err)
 	}
@@ -254,7 +241,7 @@ func TestEOPLoaderReplacesADamagedCachedBulletin(t *testing.T) {
 		t.Errorf("Fetch returned %q, want the source's bulletin", data.Raw[:min(len(data.Raw), 60)])
 	}
 
-	cached, err := fs.ReadFile(fsys, prefix+eopCacheName)
+	cached, err := fs.ReadFile(fsys, prefix+cacheName)
 	if err != nil || string(cached) != sampleFinals2000A {
 		t.Errorf("the cached copy is not the source's after the heal (err %v)", err)
 	}
@@ -273,11 +260,11 @@ func TestEOPLoaderCachedReadsAPreSeededFile(t *testing.T) {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(sampleFinals2000A)); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName, strings.NewReader(sampleFinals2000A)); err != nil {
 		t.Fatalf("pre-seed: %v", err)
 	}
 
-	data, err := eopLoader{}.Cached(ctx)
+	data, err := remoteLoader{}.Cached(ctx)
 	if err != nil {
 		t.Fatalf("Cached: %v", err)
 	}
@@ -294,9 +281,35 @@ func TestEOPLoaderCachedReadsAPreSeededFile(t *testing.T) {
 func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 	scratchCache(t)
 
-	_, err := eopLoader{}.Cached(context.Background())
-	if !errors.Is(err, epoch.ErrNoEOPData) {
+	_, err := remoteLoader{}.Cached(context.Background())
+	if !errors.Is(err, ErrNoEOPData) {
 		t.Fatalf("Cached with an empty cache = %v, want ErrNoEOPData", err)
+	}
+}
+
+// TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin holds #509's
+// distinction at the remote loader: a bulletin that is there and cannot be
+// read is not one never seeded, since only the second is fixed by seeding it.
+// The loader that drew the distinction, FSLoader, went with epoch's loader
+// API, and this one answered ErrNoEOPData for both. A directory where the
+// bulletin goes is the unreadable one here: it stats, and does not read.
+func TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin(t *testing.T) {
+	scratchCache(t)
+
+	ctx := context.Background()
+
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatalf("remote.CacheDir: %v", err)
+	}
+
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName+"/inside", strings.NewReader("x")); err != nil {
+		t.Fatalf("make a directory where the bulletin goes: %v", err)
+	}
+
+	_, err = remoteLoader{}.Cached(ctx)
+	if err == nil || errors.Is(err, ErrNoEOPData) {
+		t.Errorf("Cached with an unreadable bulletin = %v, want its own error, not ErrNoEOPData", err)
 	}
 }
 
@@ -307,7 +320,7 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 	fakeIERSSource(t, sampleFinals2000A)
 
 	for range 3 {
-		if _, err := (eopLoader{}).Fetch(context.Background()); err != nil {
+		if _, err := (remoteLoader{}).Fetch(context.Background()); err != nil {
 			t.Fatalf("Fetch: %v", err)
 		}
 	}
@@ -321,7 +334,7 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 	// bulletin was fetched under is kept beside it — that is what lets the next
 	// process reuse the cache rather than re-download. Two objects, and it stays
 	// two however many times Fetch runs, which is the accumulation this guards.
-	want := []string{eopCacheName, eopCacheName + ".etag"}
+	want := []string{cacheName, cacheName + ".etag"}
 
 	got := testutil.BucketKeys(t, fsys, prefix)
 	if !slices.Equal(got, want) {
@@ -329,10 +342,11 @@ func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
 	}
 }
 
-// TestInitRegistersTheLoader is the whole point of the inversion: merely
-// importing this package must wire astrogo/epoch up, because that is what
-// keeps the change invisible to every existing caller.
-func TestInitRegistersTheLoader(t *testing.T) {
+// TestTheRemoteLoaderIsTheDefault: with no loader registered, the lazy load
+// reads the bulletin through remote, so a file pre-seeded in remote's cache is
+// what an EOP lookup finds.
+func TestTheRemoteLoaderIsTheDefault(t *testing.T) {
+	installLoader(t, nil)
 	scratchCache(t)
 
 	ctx := context.Background()
@@ -342,16 +356,14 @@ func TestInitRegistersTheLoader(t *testing.T) {
 		t.Fatalf("remote.CacheDir: %v", err)
 	}
 
-	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(sampleFinals2000A)); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName, strings.NewReader(sampleFinals2000A)); err != nil {
 		t.Fatalf("pre-seed: %v", err)
 	}
 
-	// Nothing here registers a loader: if init did not, this reports
-	// ErrNoEOPLoader instead of finding the file above.
 	// MJD 41684 as a JD, on the UTC scale.
-	epoch.FromJD(41684+2400000.5, epoch.UTC).EOP()
+	_ = EnsureLoaded(41684)
 
-	if got := epoch.EOPSource(); got != "cache" {
+	if got := EOPSource(); got != "cache" {
 		t.Errorf("EOPSource = %q, want %q", got, "cache")
 	}
 }
@@ -371,7 +383,7 @@ func TestCachedDegradesWhenTheCacheCannotBeOpened(t *testing.T) {
 	// A scheme no driver registers, so opening the cache fsys fails.
 	remote.SetDataDir("no-such-scheme://example.invalid/cache")
 
-	if _, err := (eopLoader{}).Cached(t.Context()); !errors.Is(err, epoch.ErrNoEOPData) {
+	if _, err := (remoteLoader{}).Cached(t.Context()); !errors.Is(err, ErrNoEOPData) {
 		t.Errorf("Cached with an unopenable cache = %v, want ErrNoEOPData", err)
 	}
 }
@@ -391,14 +403,14 @@ func TestEOPFetchUnderARefusingPolicyIgnoresAForeignLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := remote.WriteFile(context.Background(), fsys, prefix+eopCacheName+".lock", strings.NewReader("")); err != nil {
+	if err := remote.WriteFile(context.Background(), fsys, prefix+cacheName+".lock", strings.NewReader("")); err != nil {
 		t.Fatalf("plant lock: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if _, err := (eopLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
+	if _, err := (remoteLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
 		t.Fatalf("Fetch with a foreign lock under a refusing policy: %v, want ErrDownloadDenied at once", err)
 	}
 }

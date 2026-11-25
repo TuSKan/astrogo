@@ -30,7 +30,7 @@ func liveFile(t *testing.T, name string) []resolve.Target {
 
 	testutil.RequireReachable(t, "www.minorplanetcenter.net:443")
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	seq, err := mpcorb.Open(context.Background(), name)
 	if err != nil {

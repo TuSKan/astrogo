@@ -8,19 +8,6 @@
 // target in this library uses.
 //
 // This showcase demonstrates:
-//   - catalog/sbdb decoding a resolve.Target's real osculating elements
-//     (HasElements/SemiMajorAxis/Eccentricity/.../Epoch) directly from
-//     SBDB's own orbit.elements payload — no manual Horizons ELEMENTS
-//     query or unit conversion needed
-//   - plan.FromCatalog(target, nil) building a Kepler-propagated
-//     *plan.Asteroid automatically whenever HasElements is true and no
-//     provider is supplied — "Kepler as the default" for a small body
-//     with published elements, the same call any other FromCatalog user
-//     already makes
-//   - Position/magnitude drifting away from a kernel-backed ephemeris as
-//     |t - Epoch| grows, since planetary perturbations aren't modeled
-//   - plan.VisibilityEvents working on a Kepler-propagated body exactly
-//     like it would on any SPK-kernel-backed or catalog-resolved target
 //
 // Run: go run ./examples/22_kepler_propagator/
 package main
@@ -45,7 +32,8 @@ func main() {
 	// Past the SBDB query this example downloads nothing, so it uses no
 	// Earth-orientation data either (UT1 = UTC, no polar motion). That can move
 	// a rise or set by up to about a second, below the minute printed. For full
-	// accuracy, blank-import remote/eop, as 09_geometry_events does.
+	// accuracy, drop the RegisterModel line below: Earth orientation then loads
+	// on first need.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Resolve 1 Ceres's real, current osculating elements live from JPL

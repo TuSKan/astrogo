@@ -27,9 +27,9 @@ const (
 // benchEOPModes are the two states a benchmark pins: "zero" is zero
 // orientation chosen explicitly, and "table" is Earth orientation present.
 // Neither is the untouched library, which goes through the lazy load an
-// explicit model skips. This package's tests import remote/eop, so here the
-// untouched library is whatever this machine has cached; coord's binary links
-// no loader, and its benchmarks time the untouched library (#953).
+// explicit model skips. Untagged, that load runs offline against an empty
+// cache, finds nothing and settles (#931); in a tagged build it is whatever
+// this machine has cached or can download.
 var benchEOPModes = []string{"zero", "table"}
 
 // pinEOP makes the process-wide Earth orientation mode for the benchmark, and

@@ -41,7 +41,7 @@ import (
 // whatever Geometric has, the documented pipeline has too.
 func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	const (
 		dut1Seconds = 0.1237
@@ -157,7 +157,7 @@ func TestGeometricLeadsTopocentricByTheAberration(t *testing.T) {
 // property of light rather than of where the body is.
 func TestReductionTopocentricIsParallaxOnly(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	epoch.RegisterModel(fixedEOP{
 		dut1: 0.1237,

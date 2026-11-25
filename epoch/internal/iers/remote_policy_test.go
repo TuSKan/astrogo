@@ -1,4 +1,4 @@
-package eop
+package iers
 
 import (
 	"context"
@@ -42,11 +42,11 @@ func TestEOPFetchUnderARefusingPolicyAsksNoSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := remote.WriteFile(ctx, fsys, prefix+eopCacheName, strings.NewReader(sampleFinals2000A)); err != nil {
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName, strings.NewReader(sampleFinals2000A)); err != nil {
 		t.Fatalf("seed the cache: %v", err)
 	}
 
-	if _, err := (eopLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
+	if _, err := (remoteLoader{}).Fetch(ctx); !errors.Is(err, remote.ErrDownloadDenied) {
 		t.Errorf("Fetch under a refusing policy, a bulletin cached = %v, want ErrDownloadDenied", err)
 	}
 
@@ -54,7 +54,7 @@ func TestEOPFetchUnderARefusingPolicyAsksNoSource(t *testing.T) {
 		t.Errorf("the IERS source was sent %d requests under a refusing policy, want 0", n)
 	}
 
-	data, err := (eopLoader{}).Cached(ctx)
+	data, err := (remoteLoader{}).Cached(ctx)
 	if err != nil || len(data.Raw) == 0 {
 		t.Errorf("Cached under a refusing policy = %d bytes, %v: want the cached bulletin", len(data.Raw), err)
 	}

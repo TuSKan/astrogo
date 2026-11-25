@@ -17,23 +17,17 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 // This example demonstrates astrogo's unified Provider API for satellite tracking:
 //
-//  1. Resolve satellite from catalog (NORAD → CelestTrak)
-//  2. SGP4 orbit propagation via Provider.Locate — same as JPL planets
-//  3. Height above the WGS84 ellipsoid
-//  4. Topocentric look angle via coord.Context (same API for ISS (Zarya) and Mars)
-//  5. Pass prediction
 //
 // CelestTrak API: https://celestrak.org/NORAD/elements/gp.php
 
 func main() {
-	// Earth orientation, for where the site is on the turning Earth: the
-	// IERS bulletin, which the remote/eop import above fetches.
+	// Earth orientation, for where the site is on the turning Earth: the IERS
+	// bulletin, which downloads on first need and is cached.
 
 	// ═══════════════════════════════════════════════════════════════════════
 	// 1. Resolve ISS (Zarya) from NORAD Catalog

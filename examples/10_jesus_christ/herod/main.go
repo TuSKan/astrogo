@@ -18,7 +18,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
 	// imported by the root package, so a build that wants them says so (#112).
@@ -28,12 +27,11 @@ import (
 
 func main() {
 	// de441 parts are multi-GB each and download on first run, which is the
-	// point of this example. See README "Data downloads & offline usage".
-	// Earth orientation: like every online example, this one imports
-	// remote/eop. No bulletin covers the first century, though (it begins
-	// in 1973), so astrogo uses zero EOP here and says so once. What sets
-	// the accuracy is Delta T, the drift of the Earth's rotation, from the
-	// Espenak & Meeus (2006) model.
+	// point of this example. See README "Data downloads & offline usage". Earth
+	// orientation loads on first need, a download the first time. No bulletin
+	// covers the first century, though (it begins in 1973), so astrogo uses
+	// zero EOP here and says so once. What sets the accuracy is Delta T, the
+	// drift of the Earth's rotation, from the Espenak & Meeus (2006) model.
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)

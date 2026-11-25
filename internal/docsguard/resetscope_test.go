@@ -10,7 +10,9 @@ import (
 
 // remoteSetter matches a call that changes remote's process-wide state: what a
 // TestMain sets for its whole binary and remote.Reset would undo.
-var remoteSetter = regexp.MustCompile(`\bremote\.(Set\w*|Disable|Enable)\(`)
+// remotetest.Run is one, turning offline mode on and the cache to an empty
+// directory for a package's untagged tests.
+var remoteSetter = regexp.MustCompile(`\bremote\.(Set\w*|Disable|Enable)\(|\bremotetest\.Run\(`)
 
 // TestPackagesWhoseTestMainSetsRemoteDoNotResetIt stops one test in a package
 // from undoing what its TestMain set for every other test.

@@ -7,7 +7,7 @@ import (
 )
 
 // A bulletin with no rows is refused, whatever it is instead. Each of these
-// parsed into an empty table with no error, and as remote/eop's validator that
+// parsed into an empty table with no error, and as the loader's validator that
 // let an error page served with a 200 replace a good bulletin in the cache
 // (#1042).
 func TestParseRefusesABulletinWithNoRows(t *testing.T) {

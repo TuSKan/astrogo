@@ -131,19 +131,6 @@ func TestEnsureLoadedFetchesWhenUncovered(t *testing.T) {
 	}
 }
 
-// TestEnsureLoadedWithoutLoaderReportsErrNoLoader is the degradation path
-// the whole seam rests on: with no loader registered — a program that
-// imports astrogo/epoch but not astrogo/remote — this must fail cleanly so
-// the caller falls back to zero EOP, rather than panicking or blocking.
-func TestEnsureLoadedWithoutLoaderReportsErrNoLoader(t *testing.T) {
-	installLoader(t, nil)
-
-	err := EnsureLoaded(41684)
-	if !errors.Is(err, ErrNoLoader) {
-		t.Fatalf("EnsureLoaded with no loader = %v, want ErrNoLoader", err)
-	}
-}
-
 func TestEnsureLoadedPropagatesFetchError(t *testing.T) {
 	installLoader(t, noCache(Data{}, errUpstream))
 

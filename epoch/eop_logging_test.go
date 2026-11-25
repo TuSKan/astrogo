@@ -63,9 +63,11 @@ func TestEOPWarningIsAWarningNotProgress(t *testing.T) {
 		// only in a year when |DUT1| happens to be small.
 		`topocentric_error="up to 13.5 arcsec`,
 		"remedy=",
-		// The remedy has to name the import: without remote/eop no loader is
-		// registered, and no fetch is made however the network is set.
-		"github.com/TuSKan/astrogo/remote/eop",
+		// The remedy names both ways to a bulletin: the network, which
+		// offline mode or the download policy may have stopped, and a file
+		// pre-seeded in the cache for a machine that has none.
+		"network access",
+		"finals2000A.data",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the message does not carry %q:\n%s", want, out)

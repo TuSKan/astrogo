@@ -37,57 +37,10 @@ var (
 	ErrNoRecords  = iers.ErrNoRecords
 )
 
-// EOPData is raw finals2000A content together with when that copy was
-// written. See [EOPLoader].
-type EOPData = iers.Data
-
-// EOPLoader supplies raw EOP data to the lazy load that a
-// [Time.EOP]/[Time.UTC]/[Time.UT1] query triggers.
-//
-// It exists so this package needs no knowledge of caches, HTTP or download
-// policy, and links none of it. Blank-importing
-// [github.com/TuSKan/astrogo/remote/eop] registers the loader that fetches
-// through remote; importing remote alone does not.
-//
-// [FSEOPLoader] serves the pre-seeded, no-dependencies case.
-type EOPLoader = iers.Loader
-
-// FSEOPLoader is an [EOPLoader] that reads one finals2000A object from a
-// filesystem using nothing but the standard library — for a deployment that
-// pre-seeds EOP data and wants no network dependency. It downloads nothing.
-//
-//	epoch.RegisterEOPLoader(epoch.FSEOPLoader{FS: os.DirFS(dir), Name: "finals2000A.data"})
-//
-// The filesystem is the caller's: os.DirFS for a directory on disk, or a
-// remote.FS, which is an fs.FS. A missing object is [ErrNoEOPData], an
-// ordinary state; any other read failure is returned as itself.
-type FSEOPLoader = iers.FSLoader
-
-// Sentinel errors for the EOP loader path.
-var (
-	// ErrNoEOPLoader is returned when EOP data is needed and no
-	// [EOPLoader] has been registered. The query degrades to zero EOP,
-	// exactly as it does when the download policy refuses the bulletin.
-	ErrNoEOPLoader = iers.ErrNoLoader
-
-	// ErrNoEOPData is what an [EOPLoader] returns when it found nothing:
-	// no pre-seeded file, or a download the policy refused. It is an
-	// ordinary state, not a failure worth propagating.
-	ErrNoEOPData = iers.ErrNoEOPData
-)
-
-// RegisterEOPLoader sets the process-wide [EOPLoader]. Passing nil
-// unregisters. Blank-importing [github.com/TuSKan/astrogo/remote/eop] calls
-// this for you.
-func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
-
-// LoadEOP loads Earth orientation now, under ctx, through the registered
-// [EOPLoader], and says whether it could: the network step first, which
-// remote/eop's loader asks the download policy about, then a cached bulletin.
-// Blank-importing [github.com/TuSKan/astrogo/remote/eop] registers that
-// loader.
-//
-//	import _ "github.com/TuSKan/astrogo/remote/eop"
+// LoadEOP loads Earth orientation now, under ctx, and says whether it could:
+// the IERS bulletin from the network first, which offline mode and the
+// download policy set in [github.com/TuSKan/astrogo/remote] decide, then a
+// bulletin already in remote's cache.
 //
 //	if err := epoch.LoadEOP(ctx); err != nil {
 //		return err
@@ -95,8 +48,12 @@ func RegisterEOPLoader(l EOPLoader) { iers.RegisterLoader(l) }
 //
 // The bulletin it loads is the model from then on, as RegisterModel would make
 // it: the lazy load does not replace it, and [EOPSource] reports "network" or
-// "cache". With no loader registered it returns [ErrNoEOPLoader]; when neither
-// step gives a bulletin, both steps' errors, and the model is left as it was.
+// "cache". When neither step gives a bulletin it returns both steps' errors,
+// and the model is left as it was.
+//
+// A bulletin from somewhere else is a URL for remote.IERSFinals2000A, set with
+// remote.SetURL, or a file the program reads itself, parsed with
+// [ParseFinals2000A] and installed with [RegisterModel].
 //
 // The lazy load is still there for a program that does not call this: the
 // first [Time.EOP], [Time.UTC] or [Time.UT1] that needs a bulletin tries the
@@ -201,8 +158,7 @@ func logDeltaTHeld(mjd float64, held *deltaTHeldError) {
 		"delta_t", fmt.Sprintf("%.3f s, TT − UT1 on the bulletin's last day", held.deltaT),
 		"delta_t_sigma", fmt.Sprintf("%.1f s here, Huber (2000) from the bulletin's end", held.sigma),
 		"polar_motion", "zero",
-		"remedy", `a newer bulletin: import _ "github.com/TuSKan/astrogo/remote/eop", `+
-			"and run with network access")
+		"remedy", "a newer bulletin: run with network access, or pre-seed a newer finals2000A.data")
 }
 
 // logEOPUnavailable writes the warning, separately from the [sync.Once] that
@@ -224,18 +180,19 @@ func logEOPUnavailable(mjd float64, cause error) {
 	// sentences of prose: that is what slog is for, it keeps the line greppable
 	// when a caller ships JSON, and the default text handler still prints every
 	// attribute.
-	// The remedy leads with the import because nothing else works without it:
-	// since #294 no loader is registered until remote/eop is imported, and
-	// without one there is no fetch for the network to serve.
+	// The remedy leads with network access: the bulletin is fetched on first
+	// need, so what stopped it is offline mode, the download policy or the
+	// network itself.
 	//
 	// The 0.9 s is not a property of this code. It is the bound leap seconds
 	// kept |UT1-UTC| inside, and they end on [continuousUTC]: from that date
 	// UT1-UTC drifts with the Earth's rotation, limited only to an hour, so the
 	// error this warning states depends on the epoch it is about (#147, #879).
 	//
-	// The cause says which step failed: no loader registered, no cached
-	// bulletin and a policy refusing to fetch one, or a bulletin that does not reach
-	// this epoch. It is what lets a caller tell the remedy apart from the rest.
+	// The cause says which step failed: no cached bulletin and a fetch that
+	// offline mode or the policy refused or the network failed, or a bulletin
+	// that does not reach this epoch. It is what lets a caller tell the remedy
+	// apart from the rest.
 	//
 	// Before the bulletin begins no download can help, and the remedy says
 	// so; before 1960 there was no UTC to differ from UT1 at all, and the
@@ -253,8 +210,8 @@ func logEOPUnavailable(mjd float64, cause error) {
 
 	topocentric, ut1 := "up to 13.5 arcsec, the Earth's rotation in 0.9 s",
 		"up to 0.9 s, the bound leap seconds kept |UT1-UTC| inside"
-	remedy := `import _ "github.com/TuSKan/astrogo/remote/eop" and run with network access ` +
-		"or pre-seed finals2000A.data, or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
+	remedy := "run with network access or pre-seed finals2000A.data, " +
+		"or RegisterModel(ZeroModel{}) to choose zero EOP deliberately"
 
 	switch {
 	case mjd >= continuousUTC:
@@ -459,8 +416,8 @@ func (e *deltaTHeldError) Error() string {
 // themselves propagate a lookup failure.
 //
 // "Doesn't help" includes nothing having been loaded at all, the case of a
-// program that never imported remote/eop. RegisterModel(ZeroModel{}) chooses
-// zero EOP deliberately and stays silent.
+// program offline with no bulletin pre-seeded. RegisterModel(ZeroModel{})
+// chooses zero EOP deliberately and stays silent.
 //
 // Past the end of a loaded bulletin, the answer is not zero: DUT1 is what
 // holds ΔT = TT − UT1 at its value on the bulletin's last day, with zero

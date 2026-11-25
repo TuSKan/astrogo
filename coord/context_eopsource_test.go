@@ -1,7 +1,6 @@
 package coord_test
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -10,6 +9,8 @@ import (
 	"github.com/TuSKan/astrogo/atmosphere"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/epoch"
+	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // eopRecordTail is a real finals2000A record's columns after its date and
@@ -17,24 +18,17 @@ import (
 const eopRecordTail = " I  0.120733 0.009786  0.136966 0.015902  " +
 	"I 0.8084178 0.0002710  0.0000 0.1916  P    -0.766    0.199    -0.720    0.300"
 
-// fetchedBulletin is an EOP loader whose network step answers n consecutive
-// records from MJD start, and whose cache holds nothing.
-type fetchedBulletin struct{ start, n int }
-
-func (b fetchedBulletin) Fetch(context.Context) (epoch.EOPData, error) {
+// bulletinFrom is n consecutive finals2000A records from MJD start.
+func bulletinFrom(start, n int) string {
 	var s strings.Builder
 
-	for i := range b.n {
-		mjd := b.start + i
+	for i := range n {
+		mjd := start + i
 		t := epoch.FromJD(float64(mjd)+2400000.5, epoch.UTC)
 		fmt.Fprintf(&s, "%2d%2d%2d %8.2f%s\n", t.Year()%100, int(t.Month()), t.Day(), float64(mjd), eopRecordTail)
 	}
 
-	return epoch.EOPData{Raw: []byte(s.String())}, nil
-}
-
-func (fetchedBulletin) Cached(context.Context) (epoch.EOPData, error) {
-	return epoch.EOPData{}, epoch.ErrNoEOPData
+	return s.String()
 }
 
 // TestContextReportsTheEOPItWasPlacedWith: a Context says which Earth
@@ -45,14 +39,19 @@ func (fetchedBulletin) Cached(context.Context) (epoch.EOPData, error) {
 // SetTime moves past its end; with a model chosen by RegisterModel it is
 // "explicit".
 func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
-	// Not parallel: the EOP model and loader are process-wide.
-	epoch.RegisterEOPLoader(nil)
-	epoch.ResetEOP()
+	// Not parallel: the EOP model and remote's configuration are process-wide.
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	t.Cleanup(func() {
-		epoch.RegisterEOPLoader(nil)
-		epoch.ResetEOP()
-	})
+	// The bulletin's source is a local directory, empty until the bulletin
+	// is written below, so the lazy load first finds nothing.
+	src := testutil.FileURL(t, t.TempDir())
+	if err := remote.SetURL(remote.IERSFinals2000A, src); err != nil {
+		t.Fatal(err)
+	}
+
+	keepEOP(t)
+	epoch.ResetEOP()
 
 	site := coord.MustGeodetic(angle.LatDeg(-24.62722), angle.LonDeg(-70.40417), 2635)
 	inside := epoch.FromJD(61050.5+2400000.5, epoch.UTC) // 2026-01-10
@@ -68,7 +67,14 @@ func TestContextReportsTheEOPItWasPlacedWith(t *testing.T) {
 
 	check("nothing loaded", mustContext(t, inside, site, atmosphere.Refraction{}), "zero", false)
 
-	epoch.RegisterEOPLoader(fetchedBulletin{start: 61041, n: 30})
+	fsys, err := remote.OpenFS(t.Context(), src)
+	if err != nil {
+		t.Fatalf("open the source: %v", err)
+	}
+
+	if err := remote.WriteFile(t.Context(), fsys, "finals2000A.all", strings.NewReader(bulletinFrom(61041, 30))); err != nil {
+		t.Fatalf("seed the source: %v", err)
+	}
 
 	if err := epoch.LoadEOP(t.Context()); err != nil {
 		t.Fatalf("LoadEOP: %v", err)

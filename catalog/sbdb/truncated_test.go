@@ -54,7 +54,7 @@ func manyBodies(t *testing.T, asteroids, comets int, lastLimit *atomic.Int64, re
 			field, strings.Join(rows, ","), len(rows))
 	}))
 	t.Cleanup(server.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, server.URL); err != nil {
 		t.Fatal(err)

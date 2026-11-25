@@ -239,8 +239,8 @@ func (mockEOP) EOP(_ float64) (iers.EOP, error) {
 func TestTime_UT1(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently overwrite mockEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	// Register the mock model
 	iers.RegisterModel(mockEOP{})
@@ -330,8 +330,8 @@ func TestTime_In(t *testing.T) {
 func TestTime_LocationPropagation(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently swap out mockEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 	t.Cleanup(iers.Reset)
 
 	brt := time.FixedZone("BRT", -3*3600)
@@ -436,8 +436,8 @@ func TestUTC_Inverse(t *testing.T) {
 func TestConversionRoundTrips(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently swap out mockEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 	t.Cleanup(iers.Reset)
 
 	// Full chain: UTC → TAI → TT → TDB → TT → TAI → UTC
@@ -597,8 +597,8 @@ func (e *eopUnavailableError) Error() string { return "EOP data unavailable" }
 func TestUT1_Error(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently overwrite errorEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	// Register a model that always fails
 	iers.RegisterModel(errorEOP{})
@@ -618,8 +618,8 @@ func TestUT1_Error(t *testing.T) {
 func TestTT_FromAllScales(t *testing.T) {
 	// The automatic lazy load's disk-read step must not find a real cache
 	// file left by another test/run and silently swap out mockEOP{}.
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	iers.RegisterModel(mockEOP{})
 

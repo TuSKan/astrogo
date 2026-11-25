@@ -11,18 +11,16 @@ import (
 
 	"github.com/TuSKan/astrogo/catalog"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	_ "github.com/TuSKan/astrogo/remote/eop"
 )
 
 func main() {
 	// OpenNGC fetches its catalog data over the network, like every other
 	// astrogo catalog provider: catalog.NewResolver's first use of
-	// catalog.OpenNGC below fetches it (content-checked, so a re-run only
-	// costs a HEAD probe once cached). No need to import catalog/openngc
-	// directly.
-	// Earth orientation: like every online example, this one imports
-	// remote/eop. Resolving a name involves no site and no instant, so
-	// nothing here reads it.
+	// catalog.OpenNGC below fetches it (content-checked, so a re-run only costs
+	// a HEAD probe once cached). No need to import catalog/openngc directly.
+	// Earth orientation loads on first need, a download the first time.
+	// Resolving a name involves no site and no instant, so nothing here reads
+	// it.
 	ctx := context.Background()
 
 	resolver := catalog.NewResolver(catalog.OpenNGC, catalog.SIMBAD, catalog.MAST)

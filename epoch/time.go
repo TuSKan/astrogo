@@ -1322,10 +1322,10 @@ func (t Time) TCB() Time {
 // UT1 returns a new Time converted to the Universal Time (UT1) scale.
 //
 // This conversion requires IERS Earth Orientation Parameters for DUT1,
-// which are loaded automatically and lazily on first need once
-// [github.com/TuSKan/astrogo/remote/eop] is imported: a pre-seeded on-disk
-// cache file, then a network fetch unless the download policy set with
-// [github.com/TuSKan/astrogo/remote.SetPolicy] refuses it.
+// which are loaded automatically and lazily on first need: a pre-seeded
+// on-disk cache file, then a network fetch unless offline mode or the
+// download policy set with [github.com/TuSKan/astrogo/remote.SetPolicy]
+// refuses it.
 //
 // Past the bulletin's end it answers with ΔT held at its value on the
 // bulletin's last day, the forecast every conversion uses there, and the
@@ -1334,7 +1334,7 @@ func (t Time) TCB() Time {
 // Returns an error when a loaded bulletin starts after the epoch: unlike
 // [Time.EOP] and [Time.UTC]'s UT1 branch, this method propagates that
 // failure rather than degrading to DUT1=0. When nothing was loaded at all,
-// as in a program that never imported remote/eop, it degrades like them,
+// as in a program offline with no bulletin pre-seeded, it degrades like them,
 // to DUT1=0 with the one-time EOP warning, and returns no error; so does a
 // caller that registered ZeroModel deliberately, without the warning.
 func (t Time) UT1() (Time, error) {

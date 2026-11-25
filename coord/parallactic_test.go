@@ -22,7 +22,7 @@ import (
 // TestHd2paAgainstSOFAsOwnVector checks against SOFA's own vector.
 func TestParallacticAngleIsSOFAs(t *testing.T) {
 	// Not parallel: the EOP model is process-wide.
-	t.Cleanup(epoch.ResetEOP)
+	keepEOP(t)
 
 	const (
 		dut1Seconds = 0.1237

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TuSKan/astrogo/remote"
 )
 
 // offlineRow matches a row of the README's examples table whose Network
@@ -134,10 +136,9 @@ func TestOfflineExamplesMakeNoNetworkCall(t *testing.T) {
 // was all CI did before, and 14 panicked on every run for as long as anyone
 // can tell.
 //
-// One that chooses zero Earth orientation must also print no warning. One
-// that imports remote/eop instead, as 19_offline_setup does to show the
-// loader at work, warns once with an empty cache: that is the loader saying
-// what it found, not a fault.
+// None may print a warning but one: an example that needs Earth orientation
+// downloads the IERS bulletin into its empty cache, and every download is
+// logged at Warn. Any other warning is the example's own.
 func TestOfflineExamplesRun(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode: running every offline example takes a few minutes")
@@ -170,14 +171,18 @@ func TestOfflineExamplesRun(t *testing.T) {
 				t.Fatalf("%s failed: %v\n%s", name, err, out)
 			}
 
-			src, err := os.ReadFile(filepath.Join(name, "main.go"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			// Earth orientation loads on first need, so an example computing a
+			// topocentric place downloads the IERS bulletin into its empty
+			// cache, and every download is logged at Warn. Any other warning
+			// is the example's own.
+			iers := "endpoint=" + string(remote.IERSFinals2000A) + " "
 
-			loadsEOP := strings.Contains(string(src), `_ "github.com/TuSKan/astrogo/remote/eop"`)
-			if !loadsEOP && strings.Contains(string(out), "level=WARN") {
-				t.Errorf("%s warned:\n%s", name, out)
+			for line := range strings.SplitSeq(string(out), "\n") {
+				if strings.Contains(line, "level=WARN") && !strings.Contains(line, iers) {
+					t.Errorf("%s warned:\n%s", name, out)
+
+					break
+				}
 			}
 		})
 	}

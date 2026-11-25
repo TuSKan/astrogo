@@ -32,10 +32,16 @@ import (
 // # How it works
 //
 // A test function that calls remote.SetDataDir with anything but "" must put
-// the directory back: by capturing it first, remote.Capture(...).Restore, or by
-// restoring the default with remote.SetDataDir(""), as epoch's EOP tests do. A
-// helper in the same package that does either counts for every function that
-// calls it, so serveProfile-style fixtures need no second capture in each test.
+// the directory back by capturing it first, remote.Capture(...).Restore. A
+// helper in the same package that does counts for every function that calls
+// it, so serveProfile-style fixtures need no second capture in each test.
+//
+// Restoring the default with remote.SetDataDir("") used to count, and epoch's
+// EOP tests did it. It puts back the default cache, which is not what was
+// there: a package whose untagged tests run under remotetest.Run starts from
+// an empty directory, and every test after that cleanup read this machine's
+// own cache instead, so a file cached here could again decide a result CI
+// computes without it.
 //
 // remote's own tests are exempt, being the package under test, and so is this
 // package, which names both calls in its messages.
@@ -166,8 +172,8 @@ func setsDataDir(body ast.Node) *ast.CallExpr {
 	return found
 }
 
-// restoresDataDir reports whether body captures remote's state, restores the
-// default data directory, or calls one of the named helpers that does.
+// restoresDataDir reports whether body captures remote's state or calls one
+// of the named helpers that does.
 func restoresDataDir(body ast.Node, restorers map[string]bool) bool {
 	restores := false
 
@@ -183,8 +189,6 @@ func restoresDataDir(body ast.Node, restorers map[string]bool) bool {
 
 		switch {
 		case isRemoteCall(call, "Capture"):
-			restores = true
-		case isRemoteCall(call, "SetDataDir") && isEmptyStringArg(call):
 			restores = true
 		default:
 			if id, ok := call.Fun.(*ast.Ident); ok && restorers[id.Name] {

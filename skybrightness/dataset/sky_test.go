@@ -93,6 +93,11 @@ func TestLiveAerosolPassesOnARefusedFetch(t *testing.T) {
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remotetest.RefuseDownloads(t)
 
+	// The refusal under test is the policy's. Offline mode, which this
+	// package's TestMain turns on, would refuse first at the gate, so it is
+	// off here; the policy and the empty cache still keep every source unasked.
+	remote.SetOffline(false)
+
 	air, err := dataset.LiveAerosol(context.Background(), skySite(t),
 		time.Date(2023, 1, 1, 3, 0, 0, 0, time.UTC), atmosphere.RuralAerosol)
 	if !errors.Is(err, remote.ErrDownloadDenied) {

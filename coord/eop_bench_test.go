@@ -38,6 +38,7 @@ var benchEOPModes = []string{"untouched", "zero", "table"}
 // authoritative, so a cache on disk can not replace it.
 func pinEOP(b *testing.B, mode string) {
 	b.Helper()
+	keepEOP(b)
 
 	want := "explicit"
 
@@ -58,8 +59,6 @@ func pinEOP(b *testing.B, mode string) {
 	default:
 		b.Fatalf("unknown EOP mode %q", mode)
 	}
-
-	b.Cleanup(epoch.ResetEOP)
 
 	// After a lookup: one that found a bulletin to load would leave the source
 	// "cache", and "untouched" would time a table.

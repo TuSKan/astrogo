@@ -1274,10 +1274,11 @@ dataset version and performs no acquisition. This is enforced behaviorally:
 check complements it: `TestCoreDoesNotImportIOPackages` bans `remote`, `net`, `net/http`,
 `fits`, `plan` and HDF5 from the core's whole import closure, and `os` as a direct import,
 since `fmt` brings it in (#973). The specification requires reusing `coord`, `ephemeris`
-and `epoch`, and none of them imports `remote`: `epoch` takes Earth-orientation data through a
-loader that `remote/eop` registers, and JPL kernels live in `ephemeris/jpl`. At runtime the
-core reaches outside only through what its caller hands it, the scene's ephemeris provider
-and a registered EOP loader, both going through `remote`.
+and `epoch`, and the one way any of them reaches `remote` is `epoch` loading Earth
+orientation (#1264), the single edge the check does not follow. JPL kernels live in
+`ephemeris/jpl`, which the core does not import. At runtime the core reaches outside only
+through what its caller hands it, the scene's ephemeris provider, and through `epoch`'s
+Earth-orientation load, both going through `remote`.
 
 ---
 

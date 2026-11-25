@@ -20,10 +20,8 @@ var allowedEpochVars = map[string]string{
 	// Sentinel errors re-exported from the unexported epoch/internal/iers, so
 	// callers can errors.Is against them. An error value cannot be const, and
 	// the sentinel-plus-%w idiom is what CLAUDE.md asks for.
-	"ErrOutOfRange":  "sentinel error; error values cannot be const",
-	"ErrNoRecords":   "sentinel error; error values cannot be const",
-	"ErrNoEOPLoader": "sentinel error; error values cannot be const",
-	"ErrNoEOPData":   "sentinel error; error values cannot be const",
+	"ErrOutOfRange": "sentinel error; error values cannot be const",
+	"ErrNoRecords":  "sentinel error; error values cannot be const",
 
 	// Sentinels the leap-second registry raises when a caller registers a
 	// table that contradicts the built-in one. Same reason.

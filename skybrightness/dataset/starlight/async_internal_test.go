@@ -141,7 +141,7 @@ func TestAwaitPhaseRefusesAnUnknownPhase(t *testing.T) {
 		_, _ = w.Write([]byte("weird\n"))
 	}))
 	t.Cleanup(server.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.GaiaTAP, server.URL); err != nil {
 		t.Fatal(err)

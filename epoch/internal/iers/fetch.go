@@ -56,12 +56,10 @@ type settledAnswer struct {
 //  3. If still uncovered and the retry cooldown has elapsed:
 //     [Loader.Fetch], which the download policy decides.
 //
-// Both steps go through the registered [Loader] rather than reaching for
-// a cache directory or an HTTP client directly. That is what lets this
-// package, and astrogo/epoch above it, link neither — see [Loader]. With
-// no loader registered the result is [ErrNoLoader], given without taking
-// fetchMu, and the caller degrades to zero EOP exactly as it does when
-// the download policy refuses the bulletin.
+// Both steps go through [GetLoader], which reads and downloads the bulletin
+// through remote, so offline mode, the download policy and an endpoint
+// override decide them as they decide every other file. When neither gives a
+// bulletin the caller degrades to zero EOP.
 //
 // Safe for concurrent use: a mutex serializes attempts, and the coverage
 // check is repeated inside the lock so a successful concurrent load is
@@ -82,15 +80,6 @@ func EnsureLoaded(mjd float64) error {
 		return a.err
 	}
 
-	// No loader is an answer only RegisterLoader changes. Given under
-	// fetchMu, it queued every lookup of a program that links none behind
-	// every other, so sixteen goroutines together looked up fewer epochs a
-	// second than one alone (#953). The check inside the lock stays for a
-	// loader removed meanwhile.
-	if GetLoader() == nil {
-		return ErrNoLoader
-	}
-
 	fetchMu.Lock()
 	defer fetchMu.Unlock()
 
@@ -102,10 +91,6 @@ func EnsureLoaded(mjd float64) error {
 	}
 
 	l := GetLoader()
-	if l == nil {
-		return ErrNoLoader
-	}
-
 	ctx := context.Background()
 
 	// Reading the cache is throttled by the same window as fetching it.
@@ -181,13 +166,10 @@ func EnsureLoaded(mjd float64) error {
 // SourceNetwork or SourceCache. A model registered before, ZeroModel
 // included, is replaced.
 //
-// With no loader it returns [ErrNoLoader]. When neither step gives a bulletin
-// that parses, it returns both steps' errors and leaves the model as it was.
+// When neither step gives a bulletin that parses, it returns both steps'
+// errors and leaves the model as it was.
 func Load(ctx context.Context) error {
 	l := GetLoader()
-	if l == nil {
-		return ErrNoLoader
-	}
 
 	fetchMu.Lock()
 	defer fetchMu.Unlock()

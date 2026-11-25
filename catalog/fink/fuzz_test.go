@@ -60,7 +60,7 @@ func FuzzResolve(f *testing.F) {
 		}
 	}))
 	f.Cleanup(server.Close)
-	f.Cleanup(remote.Reset)
+	f.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.FINK, server.URL); err != nil {
 		f.Fatal(err)

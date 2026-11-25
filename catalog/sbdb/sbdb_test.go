@@ -34,7 +34,7 @@ func TestSBDBResolver(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestSBDBResolver_CometKind(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -160,7 +160,7 @@ func TestSBDBResolver_OrbitalElements(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -222,7 +222,7 @@ func TestSBDBResolver_IncompleteElements(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func TestSBDBResolver_PhysicalDiameterAlbedo(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -325,7 +325,7 @@ func TestSBDBResolver_CometNuclearPhaseCoefficient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDB, server.URL); err != nil {
 		t.Fatal(err)
@@ -426,7 +426,7 @@ func TestSearchBrightMock(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, server.URL); err != nil {
 		t.Fatal(err)
@@ -527,7 +527,7 @@ func TestSearchBrightMock_OrbitalElements(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, server.URL); err != nil {
 		t.Fatal(err)

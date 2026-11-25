@@ -26,7 +26,6 @@ func lskCacheAndSource(t *testing.T) (cache remote.FS, key string, source remote
 
 	scope := remote.Capture(remote.NAIFLSK)
 	t.Cleanup(scope.Restore)
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	ctx := context.Background()
 

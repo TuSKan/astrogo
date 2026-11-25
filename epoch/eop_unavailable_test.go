@@ -18,7 +18,7 @@ import (
 // and none chosen, EOP degrades to zero, and before #518 it did so in
 // silence. The zero model answers every epoch without error, and every
 // caller warned only on an error, so the warning fired only when a loaded
-// bulletin missed the epoch. A program without remote/eop lost an arcsecond
+// bulletin missed the epoch. A program with no bulletin lost an arcsecond
 // of topocentric accuracy and up to 0.9 s of UT1 with no notice at all.
 //
 // Now each degrading path warns, and Time.UT1 still returns no error there;
@@ -31,8 +31,8 @@ func TestNothingLoadedWarnsAndChosenZeroDoesNot(t *testing.T) {
 	// An empty cache, so the lazy load finds no bulletin to read, and a policy
 	// refusing the download, so it fetches none.
 	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.ResetEOP()
 	t.Cleanup(epoch.ResetEOP)

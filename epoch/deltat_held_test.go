@@ -41,8 +41,8 @@ var bulletin2023 = fakeBulletin{first: 60000, last: 60400}
 func withBulletin(t *testing.T, b epoch.Model) {
 	t.Helper()
 
+	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	t.Cleanup(func() { remote.SetDataDir("") })
 
 	epoch.RegisterModel(b)
 	t.Cleanup(epoch.ResetEOP)

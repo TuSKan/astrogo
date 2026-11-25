@@ -15,7 +15,7 @@ import (
 // used to return that answer as a target with no ID and no error, and never
 // asked the table (#1061).
 func TestResolvePassesOverAnAnswerThatNamesNoBody(t *testing.T) {
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	table := ssoftParquet(t, []ssoftRow{{name: "Benoitcarry", number: 8467, h1: 15.0, status: 1}})
 

@@ -20,7 +20,7 @@ func serveQuery(t *testing.T, body string) {
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, server.URL); err != nil {
 		t.Fatal(err)

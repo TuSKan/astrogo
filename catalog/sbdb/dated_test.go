@@ -129,7 +129,7 @@ func cometArchive(t *testing.T, comets [][3]string) map[string]string {
 			strings.Join(data, ","), len(comets))
 	}))
 	t.Cleanup(srv.Close)
-	t.Cleanup(remote.Reset)
+	t.Cleanup(remote.Capture().Restore)
 
 	if err := remote.SetURL(remote.JPLSBDBQuery, srv.URL); err != nil {
 		t.Fatal(err)

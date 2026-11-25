@@ -5,14 +5,6 @@
 // measured line-of-sight velocity.
 //
 // This showcase demonstrates:
-//   - coord.Context.BarycentricVelocity: the observer's own barycentric
-//     velocity vector, already computed by the SOFA astrometry this
-//     library builds per epoch — nothing new to derive
-//   - coord.Context.BarycentricRVCorrection / HeliocentricRVCorrection:
-//     project that velocity onto a target's direction and report the
-//     value to ADD to a measured RV
-//   - The correction's annual sinusoid, driven by Earth's own orbital
-//     motion, sampled month by month across a year
 //
 // Run: go run ./examples/23_radial_velocity_correction/
 package main
@@ -35,8 +27,8 @@ func main() {
 	// This example runs offline, so it uses no Earth-orientation data (UT1 =
 	// UTC, no polar motion). That changes the observatory's rotational velocity
 	// toward the star by a few centimeters per second, far below the meters per
-	// second printed. For full accuracy, blank-import remote/eop, as
-	// 09_geometry_events does.
+	// second printed. For full accuracy, drop the RegisterModel line below:
+	// Earth orientation then loads on first need.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Sirius (α CMa): a well-known bright star with a real published
