@@ -54,8 +54,8 @@ var (
 	// failure mode a guard must not have.
 	//
 	// Comment-only lines and the block delimiters do not match, which is what
-	// keeps the gocloud pin's explanatory comment from being read as a
-	// requirement.
+	// keeps an explanatory comment inside a require block from being read as
+	// a requirement.
 	requireLine = regexp.MustCompile(`(?m)^(?:\t|require +)([^\s/][^\s]*) +(v[^\s]+)(?: +//.*)?$`)
 )
 

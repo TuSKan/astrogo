@@ -56,16 +56,6 @@ var ErrNoExclusiveCreate = errors.New("remote/file: filesystem cannot create exc
 // waiting. A goroutine blocked on a lock held by another goroutine in the same
 // process would otherwise have to discover the release by polling, and the
 // thing being waited for is a download that may legitimately run for minutes.
-//
-// It also used to be load-bearing for correctness rather than only efficiency.
-// Both this function and the old file.Open documented that fileblob "guards it
-// with a per-Bucket mutex", which was why one Bucket was shared per URL for the
-// life of the process. That was not true of the pinned driver and may never
-// have been: fileblob's bucket struct held no mutex, and the one that existed
-// was built per writer inside NewTypedWriter, so contenders each locked their
-// own. Measured — 8 goroutines sharing one Bucket, 200 rounds — 51 rounds had
-// two or more contenders each believing they held the lock, and 2 had three
-// (#245).
 var inProcess = keyedSemaphore{held: make(map[string]chan struct{})}
 
 // keyedSemaphore hands out exclusive access per key, honoring a context
@@ -164,9 +154,9 @@ func AcquireLock(ctx context.Context, fsys fs.FS, cacheKey string, staleAfter ti
 		// [localFS.WithContext] — but a lock handed to a caller who has gone is
 		// bad enough to be worth one comparison per attempt.
 		//
-		// The gocloud implementation got this for free, since every write took a
-		// ctx, which is exactly why it is easy to lose in the move and why the
-		// test for it exists.
+		// An io/fs write takes no context, so nothing on the write path asks
+		// for the caller; this check is the one place that does, and its test
+		// keeps it from being dropped.
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("remote: wait for lock %s: %w", lockKey, err)
 		}

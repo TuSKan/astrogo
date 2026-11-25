@@ -15,8 +15,7 @@ import (
 // # What goes wrong without the lock
 //
 // StageAndPromote writes through a staging object named from the cache key, so
-// every concurrent writer of one key aims at the same staging name, and
-// fileblob aims each of them at the same temporary file underneath. The loser
+// every concurrent writer of one key aims at the same staging name. The loser
 // finds the file already renamed away.
 //
 // Measured here, twelve goroutines writing one key:

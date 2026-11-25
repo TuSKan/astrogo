@@ -122,7 +122,7 @@ func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 	}
 
 	// Second load: the source is untouched (same mtime/size, so the same
-	// fileblob-derived ETag), so both cache files must be reused untouched —
+	// file.ETag validator), so both cache files must be reused untouched —
 	// proved by their own ModTime staying identical, which only happens if
 	// fetchInto's promote step never ran a second time.
 	loadNow(t)

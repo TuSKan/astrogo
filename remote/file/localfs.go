@@ -436,18 +436,14 @@ func (l *localFS) Remove(name string) error {
 // # The staging name, which is issue #315
 //
 // The write goes to a temporary file in the same directory and is renamed into
-// place on Close. That much is ordinary. What is not ordinary is how the
-// temporary is named, and it is the whole of a defect astrogo worked around
-// twice without being able to fix.
+// place on Close. That much is ordinary; how the temporary is named is not.
 //
-// fileblob named it from time.Now().UnixNano(), reasoning that "nanosecond
-// changes enough between each iteration to make a conflict unlikely". On
-// Windows it does not change at all: the system clock ticks about every 15.6 ms
-// and, measured on Windows 11, time.Now().UnixNano() returned ONE DISTINCT
-// VALUE across 2000 consecutive reads. Every concurrent writer of a key
-// therefore picked the same staging path, and its O_EXCL retry re-read the same
-// frozen clock and retried into the same name. One writer's file was renamed
-// out from under another — reported as "Access is denied", or as a file that
+// A name built from the clock collides on Windows. The system clock ticks about
+// every 15.6 ms and, measured on Windows 11, time.Now().UnixNano() returned ONE
+// DISTINCT VALUE across 2000 consecutive reads. Every concurrent writer of a
+// key would pick the same staging path, and an O_EXCL retry that re-reads the
+// frozen clock retries into the same name. One writer's file is renamed out
+// from under another, reported as "Access is denied" or as a file that
 // vanished, depending on who lost (#241, #307, #315).
 //
 // The name here contains the process id and a per-process counter, so it is
@@ -506,8 +502,7 @@ func (l *localFS) Create(name string) (io.WriteCloser, error) {
 //
 // The atomicity is the kernel's. O_CREATE|O_EXCL either creates the file or
 // reports EEXIST, with no gap a second process can enter, on every platform
-// astrogo supports — which is the guarantee gocloud's fileblob could not give
-// and #241 exists because of.
+// astrogo supports (#241).
 func (l *localFS) CreateExcl(name string) (io.WriteCloser, error) {
 	if err := l.check("createexcl", name); err != nil {
 		return nil, err

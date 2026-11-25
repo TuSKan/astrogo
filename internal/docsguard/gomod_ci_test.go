@@ -29,15 +29,14 @@ var (
 // # Why these are hand-written at all
 //
 // The obvious spelling is `go-version-file: go.mod`, and this repository used
-// it until it caused an outage. go.mod declares a *patch-level* minimum —
-// `go 1.25.8`, inherited from gocloud.dev via gocloud-ext and not something
-// astrogo asks for — so setup-go demanded that exact patch, could not use the
-// runner's preinstalled toolchain, and downloaded one before every job on
-// every run. On PR #151 that download hung for 25 minutes without a single
-// test running. A minor-version spec resolves to whatever 1.25.x the runner
-// already has. See #109 for why the patch level cannot simply be lowered: the
-// API gocloud-ext's drivers implement only exists after gocloud.dev's newest
-// tag, so the pseudo-version that carries the directive is load-bearing.
+// it until it caused an outage. go.mod then declared a *patch-level* minimum,
+// `go 1.25.8`, inherited from a dependency rather than asked for, so setup-go
+// demanded that exact patch, could not use the runner's preinstalled
+// toolchain, and downloaded one before every job on every run. On PR #151
+// that download hung for 25 minutes without a single test running (#109). A
+// minor-version spec resolves to whatever patch of that minor the runner
+// already has, and a hand-written one keeps that true whatever go.mod's
+// directive says.
 //
 // # What this guards
 //

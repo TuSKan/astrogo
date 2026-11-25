@@ -423,7 +423,7 @@ const horizonsURL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
 // copernicusEODATAURL addresses the Copernicus eodata bucket. Everything
 // past "?" is the connection configuration an s3:// backend parses
-// (url.Values-encoded; these are the parameters gocloud.dev's s3blob took):
+// (url.Values-encoded):
 // the service is not AWS, so it needs its real HTTPS host, an immutable
 // hostname, path-style addressing, and a placeholder region the SDK will not
 // reject. Expressing it here rather than in Go keeps remote free of
