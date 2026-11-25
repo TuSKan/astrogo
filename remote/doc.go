@@ -44,7 +44,8 @@
 //
 // Every service astrogo can contact is an [EndpointID] — there are no
 // hidden hosts. Inspect them with [Endpoints], block one with [Disable],
-// point one at a mirror with [SetURL], cut all access with [SetOffline].
+// point one at a mirror with [SetURL], cut all network access with
+// [SetOffline], which leaves an endpoint on this machine reachable.
 // [URL] is the single gate every call site passes through, so those three
 // controls apply uniformly to files and APIs alike.
 //

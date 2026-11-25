@@ -522,7 +522,13 @@ func TestWithReadKeepsTheCachedCopyOverARefusedUpdate(t *testing.T) {
 		t.Errorf("%d downloads, want 2: the good version and the refused one, once", n)
 	}
 
-	// And an offline caller is served the copy that worked.
+	// And an offline caller is served the copy that worked. Offline mode
+	// leaves a loopback source reachable, so the source moves to a host that
+	// is not this machine, as it is in production.
+	if err := SetURL(OpenNGC, offlineHost); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
+
 	SetOffline(true)
 	t.Cleanup(func() { SetOffline(false) })
 

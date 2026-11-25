@@ -204,9 +204,14 @@ func TestAPIClientAnswersToTheClientThatBuiltIt(t *testing.T) {
 
 	_ = body.Close()
 
-	// Offline on the owner stops it; the default is untouched and cannot be
-	// what answered above.
+	// Offline on the owner stops it from reaching the network; the default is
+	// untouched and cannot be what answered above. The loopback server is not
+	// the network, so the endpoint moves to a host that is.
 	c.SetOffline(true)
+
+	if err := c.SetURL(SIMBAD, offlineHost); err != nil {
+		t.Fatalf("SetURL: %v", err)
+	}
 
 	if _, err := api.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrOffline) {
 		t.Errorf("Get after the owning client went offline = %v, want ErrOffline.\n"+
