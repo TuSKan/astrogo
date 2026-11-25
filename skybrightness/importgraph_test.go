@@ -35,12 +35,11 @@ var directOnly = map[string]bool{"os": true}
 // these imports.
 //
 // This checks the whole import closure, not only direct imports (#973), but
-// one edge: epoch/internal/iers to remote. epoch loads Earth orientation
-// through remote (#1264), so every package that converts a time scale links
-// remote by that edge, and it is a decision rather than a leak. Any other path
-// from the core to remote, or to a package that fetches, is caught however
-// deep it sits. JPL kernels live in ephemeris/jpl, which the core does not
-// import.
+// two edges, each a decision rather than a leak: epoch/internal/iers to
+// remote, since epoch loads Earth orientation through remote (#1264), and
+// ephemeris to ephemeris/jpl, since ephemeris reads JPL kernels through it.
+// Any other path from the core to remote, or to a package that fetches, is
+// caught however deep it sits.
 //
 // Evaluation still performs no I/O: Earth orientation is loaded before an
 // estimate needs it or not at all, and the Scene's ephemeris provider is the
@@ -69,13 +68,18 @@ func TestCoreDoesNotImportIOPackages(t *testing.T) {
 	}
 }
 
-// eopEdge is the one import the closure does not follow: epoch's loader
-// reaching remote for the IERS bulletin (#1264).
-var eopEdge = [2]string{modulePath + "/epoch/internal/iers", modulePath + "/remote"}
+// unfollowed are the imports the closure does not follow: epoch's loader
+// reaching remote for the IERS bulletin, and ephemeris reaching its kernel
+// reader. Through them remote is a dependency the core inherits, not one it
+// chose.
+var unfollowed = map[[2]string]bool{
+	{modulePath + "/epoch/internal/iers", modulePath + "/remote"}: true,
+	{modulePath + "/ephemeris", modulePath + "/ephemeris/jpl"}:    true,
+}
 
 // importClosure returns every package that root links, directly or not, each
 // with the shortest import chain from root that reaches it, without following
-// [eopEdge]. It asks the toolchain, as internal/docsguard's closure guards do,
+// [unfollowed]. It asks the toolchain, as internal/docsguard's closure guards do,
 // so build constraints and the standard library's vendored packages resolve
 // exactly as a build resolves them. Test files are not followed, only what a
 // build of root links.
@@ -107,7 +111,7 @@ func importClosure(t *testing.T, root string) map[string][]string {
 		queue = queue[1:]
 
 		for _, imp := range imports[next] {
-			if _, seen := chains[imp]; seen || [2]string{next, imp} == eopEdge {
+			if _, seen := chains[imp]; seen || unfollowed[[2]string{next, imp}] {
 				continue
 			}
 

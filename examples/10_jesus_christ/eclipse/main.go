@@ -17,10 +17,6 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
 	"github.com/TuSKan/astrogo/unit"
-
-	// The kernel-backed sources register their backend rather than being
-	// imported by the root package, so a build that wants them says so (#112).
-	_ "github.com/TuSKan/astrogo/ephemeris/jpl"
 )
 
 func main() {

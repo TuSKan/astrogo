@@ -123,7 +123,7 @@ The best way to see whether a library's numbers are trustworthy is to point it a
 | [**Equinox & Solstice Almanac**](docs/EQUINOX.md) | A decade of seasons, eclipses, and apsides computed from first principles — no lookup tables, no curve fits, just JPL DE442 and root-finding. | [`examples/17_equinox_prediction/`](examples/17_equinox_prediction/) |
 | **Satellite Tracking** | Predict ISS passes over your location from live NORAD/CelestTrak data — AOS, max elevation, LOS, ground track. | [`examples/12_satellite_tracking/`](examples/12_satellite_tracking/) |
 | **What's Visible Tonight** | What can I actually see in the sky tonight brighter than magnitude X — stars, deep-sky objects, planets, the Moon, even asteroids and comets, all in one query? | [`examples/20_whats_visible_tonight/`](examples/20_whats_visible_tonight/) |
-| **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. Measured against a Horizons kernel it holds **1–4″ over a month** either side of the elements' epoch ([what you give up](#what-you-give-up-by-staying-offline)). | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
+| **Kepler Propagation, No Kernel** | Six orbital elements and an epoch — no SPK kernel, no network — is enough to place 1 Ceres in the sky and feed it straight into rise/transit/set, exactly like any catalog-resolved target. Measured against a Horizons kernel it holds **1–4″ over a month** either side of the elements' epoch ([what you give up](docs/ephemeris.md#11-without-a-kernel)). | [`examples/22_kepler_propagator/`](examples/22_kepler_propagator/) |
 | **Radial-Velocity Correction** | Sirius's measured RV swings by ~±25 km/s across the year purely from Earth's own orbital motion — barycentric/heliocentric correction removes it. | [`examples/23_radial_velocity_correction/`](examples/23_radial_velocity_correction/) |
 | **Telescope & Eyepiece Optics** | An 8" f/10 SCT with a wide-field and a planetary eyepiece, a 2x Barlow, and a CMOS sensor — magnification, true field of view, exit pupil, and plate scale, no astrometry involved at all. | [`examples/24_optics/`](examples/24_optics/) |
 
@@ -468,11 +468,10 @@ See [`skybrightness.md`](docs/skybrightness.md) for the sky-brightness engine �
 ## Data downloads & offline usage
 
 `astrogo` downloads the data a call needs the first time it needs it — a JPL kernel, the
-IERS bulletin, a catalog — and caches it, so a second run reads the cache. Every download
-is logged at `Warn`, which the default logger shows, naming the endpoint, the file and its
-size; a cache hit logs nothing. Every external connection the library can make is
-enumerated in the [`remote`](remote/doc.go) package's endpoint registry; nothing else
-happens.
+IERS bulletin, a catalog — and caches it, so the next run reads the cache. Every download
+is logged at `Warn`, naming the endpoint, the file and its size; a cache hit logs nothing.
+The [`remote`](remote/doc.go) package's endpoint registry lists every connection the library
+can make.
 
 ### What can be downloaded, and how big
 
@@ -492,52 +491,8 @@ happens.
 | VIIRS annual nighttime-lights composite (2012-2025, no API key) | `remote.VIIRSAnnual` | ~700 MB-1 GB per year | `viirs.Open(ctx, year)`, for the spatial distribution of artificial emission — CC0, credit lightpollutionmap.info + NASA Black Marble |
 | CAMS global reanalysis NetCDF files (Copernicus EODATA S3) | `remote.CopernicusEODATA` | 1.3 MB (lnsp) – ~180 MB (a 137-level aerosol tracer) | `atmosphere/dataset/cams.Open` — **not currently reachable**: this endpoint is an `s3://` URL and astrogo registers no `s3://` backend (see `docs/storage.md`). The reader works against a cached or caller-supplied file. |
 
-### What you give up by staying offline
-
-`ephemeris.Default()` needs no kernel and no network, and it is a **planning-grade**
-provider — not an astrometric one. Measured against DE440, quarterly over 1972–2100
-(516 samples per body), worst case:
-
-| | Sun | Mercury | Venus | Moon | Neptune | Mars | Jupiter | Uranus | Saturn | Pluto |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| worst | 0.013″ | 1.5″ | 10.2″ | 10.2″ | 10.7″ | 53.8″ | 52.7″ | 71.9″ | 88.6″ | **197″** |
-| its disc | 1920″ | 5–13″ | 10–66″ | 1865″ | 2.3″ | 4–25″ | 40″ | 3.5″ | 18″ | 0.1″ |
-
-Compare the two rows. Saturn's worst case is five times its own apparent diameter and
-Uranus's is twenty times, so `Default()` will not reliably put a planet inside a narrow
-field. For visibility and scheduling — rise/set, altitude, airmass, twilight, Moon
-separation — it makes no difference at all: 90″ shifts a rise time by about six seconds.
-
-Reach for a JPL kernel (33 mm against Horizons) for astrometry, occultation timing,
-photometric aperture placement, or anything that must land inside a slit.
-
-**Pluto is the outlier**, ~30× worse than the worst planet: SOFA has no Pluto model, so
-it is two-body propagation of Standish elements. At 3′ it gives you the constellation,
-not the object.
-
-**The offline path for asteroids and comets is `ephemeris/kepler`** — `NewMovingBodyProvider`
-plus six elements from `catalog/sbdb`, which is what `plan.NewAsteroid` uses when no kernel is
-available. Measured against Horizons-generated SPK kernels, it holds roughly **1–4″ over a
-month** either side of the elements' epoch of osculation, degrading as t² beyond that. That is
-good enough to find the object in a finder and not good enough to measure it.
-
-Every figure above is generated from the `ephemeris.sofa.*` and `ephemeris.kepler.*`
-suites — see [docs/VALIDATION.md](docs/VALIDATION.md) for the full distributions, the
-contract each is held to, and the commit each was last verified at. The
-[`ephemeris` package doc](ephemeris/doc.go) carries the same table with the reasoning.
-
-Both IERS and OpenNGC skip the download entirely when the upstream content hasn't
-changed since the last fetch — the source ETag recorded at cache time is compared
-against the source's current one (a metadata-only probe, no body transferred), not a
-wall-clock expiration window, since the two sources mutate on their own schedules
-rather than yours.
-
-Catalog resolvers (`catalog/simbad`, `catalog/gaia`, `catalog/vizier`, `catalog/mast`,
-`catalog/sbdb`, `catalog/norad`, `catalog/fink`) and
-`plan.NewSiteFromAddress` (`remote.Nominatim`/`remote.OpenElevation`, for geocoding a
-site by address) make small request/response API calls, not downloads — endpoint
-enable/disable and offline mode govern those, and the download policy is never asked (the
-network call itself is the explicit purpose of the method you're calling).
+Catalog resolvers and geocoding make small API calls rather than downloads; offline mode
+stops those too.
 
 ### Controlling downloads
 
@@ -553,137 +508,35 @@ remote.SetPolicy(func(ep remote.Endpoint, size int64) error {
 })
 ```
 
-A refused download is `remote.ErrDownloadDenied`, naming the file, its size and the policy's
-reason. `remote.SetOffline(true)` stops all network access instead, downloads and API calls
-alike. The [`remote`](remote/doc.go) package documentation covers the rest: a policy per
-component with `remote.Client`, per-endpoint control, and mirrors.
+A refused download is `remote.ErrDownloadDenied`. `remote.SetOffline(true)` stops all
+network access instead, downloads and API calls alike. The [`remote`](remote/doc.go)
+documentation covers the rest: a policy per component, mirrors and endpoint overrides,
+and scoped changes for tests.
 
-### Where data lives, and pointing it elsewhere
+### Where data lives
 
-All downloaded/cached data — JPL kernels, the IERS runtime cache — lives under one
-configurable base location, default `os.UserCacheDir()/astrogo` (`~/.cache/astrogo` on
-Linux, `%LocalAppData%\astrogo` on Windows, `~/Library/Caches/astrogo` on macOS).
+The cache is `os.UserCacheDir()/astrogo`: `~/.cache/astrogo` on Linux,
+`%LocalAppData%\astrogo` on Windows, `~/Library/Caches/astrogo` on macOS.
+`remote.SetDataDir` or the `ASTROGO_CACHE_DIR` environment variable moves it. Both take a
+URL, `file:///data/astrogo?create_dir=true` for a directory, so the cache need not be on
+local disk.
 
-It is a **bucket URL, not a filesystem path** — nothing in astrogo assumes the cache is
-local disk:
+### Offline and air-gapped machines
 
-```go
-remote.SetDataDir("file:///data/astrogo-cache?create_dir=true")
-remote.SetDataDir("mem://scratch")       // in-memory, for tests
-```
-
-The `ASTROGO_CACHE_DIR` environment variable sets the same thing, and also takes a URL.
-`remote.CacheDir(ctx, id)` reports the bucket and key prefix an endpoint caches under, and
-`remote.GetFile` returns a bucket and a key. No API takes an OS path and there is no
-local-only fast path, so a deployment whose cache is object storage behaves identically to
-one on disk.
-
-### Offline / air-gapped deployments
-
-Pre-seed the cache with the objects you need (e.g. put a kernel at key
-`jpl/planets/de442.bsp` — `remote.DataDirURL()` reports the bucket, and
-`remote.CacheDir(ctx, remote.NAIFSPK)` the key prefix), then cut network access entirely:
+Put the files in the cache first, a kernel at key `jpl/planets/de442.bsp` and the IERS
+bulletin at `iers/finals2000A.data` (`remote.CacheDir(ctx, id)` reports each endpoint's
+prefix), then:
 
 ```go
 remote.SetOffline(true)
 
-p, err := eph.NewProvider(ctx, eph.Planets, "de442") // finds the pre-seeded kernel, zero network
+p, err := eph.NewProvider(ctx, eph.Planets, "de442") // the pre-seeded kernel, no network
 ```
 
-Every downloader checks the cache before the network, and offline it goes no further,
-so a pre-seeded deployment never dials out — `remote` is the only thing that resolves or
-opens these files, there is no separate local-only constructor to bypass it with. IERS EOP data
-follows the same rule: put `finals2000A.data` at key
-`iers/finals2000A.data`, and the first
-`Time.EOP()`/`.UTC()`/`.UT1()` call finds it automatically — no explicit loader call
-needed.
-
-If a mirror serves a file under some other layout, point the endpoint at it rather than
-renaming anything. `remote.SetURL` accepts any filesystem URL `remote.OpenFS` understands,
-including its two portable wrappers: `?prefix=` to scope into a subdirectory and `?key=`
-to serve one exact object under whatever name astrogo asks for:
-
-```go
-remote.SetURL(remote.IERSFinals2000A, "https://mirror.example/archive?key=2026-08/eop-dump.dat")
-```
-
-### Endpoint control
-
-```go
-remote.Endpoints()                          // inspect every endpoint astrogo can reach
-remote.Disable(remote.SIMBAD)                // block one endpoint (ErrEndpointDisabled)
-remote.SetURL(remote.SIMBAD, "https://mirror.example/tap") // point at a mirror/proxy
-remote.SetOffline(true)                      // global kill switch, all network access
-```
-
-An endpoint can carry mirrors (`Endpoint.Mirrors`), asked in turn when its own host is not
-serving: no answer, a 404, or a 5xx after its retries. Any other answer, a query refused as
-malformed among them, is the answer. SIMBAD has two, the Harvard CfA and IDIA copies, so the
-CDS outage of November 2026 needs no `SetURL` from a caller. `SetURL` clears an endpoint's
-mirrors, since a URL you chose is the one you want.
-
-`remote.Capture(ids...)` snapshots endpoint config, the download policy, offline mode, and
-the data directory; `(Scope).Restore()` (or `WithScope`) puts it all back — useful in
-tests (`t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)`) without undoing, as
-`remote.Reset()` does, what a wider scope set.
-
-### Building from source
-
-No package in astrogo embeds data at build time. IERS EOP data is obtained exclusively
-at runtime, lazily the first time it's needed: a pre-seeded
-finals2000A file on disk, then a network
-fetch — there is no `iers/data/` directory or `go:embed` to populate before building.
-
-That fetch goes through `remote` like every other download, so offline mode, the
-download policy and a pre-seeded cache apply to it as they do to a kernel.
-
-The lazy load cannot report a failure, since `Time.EOP` returns no error: no
-network at the first lookup, with nothing pre-seeded, costs every result up to 13.5″
-with only a log line to say so. To load the bulletin when you choose,
-under your context, and learn whether it worked, call `epoch.LoadEOP`:
-
-```go
-if err := epoch.LoadEOP(ctx); err != nil {
-    log.Fatal(err) // offline or refused with nothing cached, or the IERS unreachable
-}
-```
-
-It takes the network step unless offline mode or the download policy refuses it
-and falls back to a cached bulletin, and what it loads stays the model. A `coord.Context` then reports what
-its places were built with: `ctx.EOPSource()` gives `"network"` or `"cache"`, and
-whether the instant is inside the bulletin, or `"zero"` when nothing was loaded.
-
-A program that wants no Earth orientation calls `epoch.RegisterModel(epoch.ZeroModel{})`
-first: no download and no warning, at about an arcsecond of topocentric position.
-A bulletin from elsewhere is a URL for `remote.IERSFinals2000A` set with
-`remote.SetURL`, or a file parsed with `epoch.ParseFinals2000A` and installed with
-`epoch.RegisterModel`.
-
-Because `epoch` loads through `remote`, every program using it links Go's HTTP and
-TLS stack. Measured with go1.27.4 on windows/amd64, a binary computing a Julian date
-is **6.1 MB and 216 packages**, against 3.0 MB and 96 before `epoch` imported
-`remote`.
-
-`ephemeris`'s kernel-backed sources (`Planets`, `SmallBody`, `Asteroids`, `Comets`,
-`Moons`) read SPK files, and the SOFA path does not, so the kernel half registers
-itself:
-
-```go
-import _ "github.com/TuSKan/astrogo/ephemeris/jpl"
-```
-
-Measured the same way, a program asking `eph.Default()` where Mars is comes to
-**11.1 MB and 227 packages without the import, and 11.5 MB and 231 with it**:
-`remote` is linked through `epoch` either way. (When #112 introduced the registration
-the storage layer was `gocloud.dev`, and the import cost 13.9 MB and 424 packages, 64
-of them gRPC.) Without the import those five sources return an error naming it;
-everything on SOFA is unaffected.
-
-OpenNGC works the same way — like every other catalog provider, it fetches over the
-network on first use (see "Controlling downloads" above).
+With no kernel at all, `ephemeris.Default()` answers from SOFA: planning-grade, to 90″
+for Saturn and 3′ for Pluto ([what you give up](docs/ephemeris.md#11-without-a-kernel)).
 
 ---
-
 ## Scientific Backend
 
 `astrogo` uses [github.com/hebl/gofa](https://github.com/hebl/gofa) as a backend for standards-based astronomical algorithms (derived from SOFA).
@@ -772,7 +625,15 @@ The 0.9 s is the bound leap seconds kept |UT1−UTC| inside. Resolution 5 of the
 
 The bulletin begins on 1973-01-02, so no download covers an earlier epoch. Before 1960 there was no UTC at all: a UTC label is read as UT1, and the accuracy is that of the ΔT model (Espenak & Meeus 2006), not of any Earth-orientation data.
 
-The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). EOP loads lazily the first time it's needed — a pre-seeded snapshot on disk, then a network fetch — see [Data downloads & offline usage](#data-downloads--offline-usage).
+The library logs a one-time warning when EOP data is unavailable (users who redirect or suppress logs won't see it — call `epoch.Coverage()` to check proactively). EOP loads lazily the first time it's needed — a bulletin pre-seeded at `iers/finals2000A.data`, then a download — and that lazy load cannot report a failure. To load it when you choose, under your context, and learn whether it worked:
+
+```go
+if err := epoch.LoadEOP(ctx); err != nil {
+    log.Fatal(err) // offline or refused with nothing cached, or the IERS unreachable
+}
+```
+
+`ctx.EOPSource()` then reports what a `coord.Context` was placed with. `epoch.RegisterModel(epoch.ZeroModel{})` chooses zero EOP instead, with no download and no warning. A bulletin from elsewhere is `remote.SetURL(remote.IERSFinals2000A, url)`, or a file parsed with `epoch.ParseFinals2000A` and installed with `epoch.RegisterModel`.
 
 ### TDB Precision
 
