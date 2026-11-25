@@ -158,9 +158,9 @@ not reintroduce either. Every data source is obtained at runtime through
 `remote.GetFile`: `catalog/openngc` fetches explicitly on `New()`; `epoch`'s
 Earth Orientation Parameters load lazily and automatically on first
 `Time.EOP()`/`Time.UTC()`/`Time.UT1()` query (pre-seeded disk cache, then a
-`remote.EnableDownloads`-gated network fetch). Populate data by pre-seeding
-the file or granting `remote.EnableDownloads`/`EnableAllDownloads` — never
-by adding a generation/download tool.
+network fetch the download policy can refuse). Populate data by pre-seeding
+the file or letting a run with network access fetch it — never by adding a
+generation/download tool.
 
 ## Completion contract
 

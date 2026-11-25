@@ -15,7 +15,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/magnitude"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/airglow"
 	"github.com/TuSKan/astrogo/skybrightness/dataset/dust"
@@ -35,25 +34,6 @@ const (
 	gambonsZenithWithAirglow = 21.13
 	gambonsZenithNoAirglow   = 21.74
 )
-
-// enableStarMapDownload grants consent for the published star map.
-//
-// The budget comes from the registry rather than from a literal here. Consent
-// is checked against the endpoint's own ApproxSize before any request is made,
-// so a number written into a test is a second copy of that one, and the copies
-// drift: when the published map went from one band to four the registered size
-// grew past the literal these tests carried, and they passed only because the
-// headroom happened to be enough. Reading it leaves one number in the module.
-func enableStarMapDownload(tb testing.TB) {
-	tb.Helper()
-
-	endpoint, ok := remote.Lookup(remote.GaiaStarMap)
-	if !ok {
-		tb.Fatal("GaiaStarMap is not registered")
-	}
-
-	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
-}
 
 // sfdHost serves the Schlegel, Finkbeiner & Davis (1998) 100 µm map the GAMBONS
 // comparisons read dust from. Named so the reachability probes and the NOT
@@ -78,9 +58,8 @@ func gambonsDust(t *testing.T) *dust.SFD {
 	t.Helper()
 
 	gambonsSFD.once.Do(func() {
-		// Two hemispheres of 64 MB, consent-gated like every other bulk fetch.
-		remote.EnableDownloads(160<<20, remote.SFDDustMap)
-
+		// Two hemispheres of 64 MB, downloaded on first use like every other
+		// bulk fetch.
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 
@@ -178,8 +157,6 @@ func TestAgainstGAMBONS(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-
-	enableStarMapDownload(t)
 
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVTophat()

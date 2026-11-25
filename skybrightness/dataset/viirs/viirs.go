@@ -184,10 +184,9 @@ func (r *Raster) RadianceAt(lat angle.Latitude, lon angle.Longitude) (float64, e
 // Open downloads (if permitted) and decodes the annual composite for a year,
 // returning a Raster and the closer for its backing store.
 //
-// The download is gated like every other bulk fetch in this library: call
-// [remote.EnableDownloads] with [remote.VIIRSAnnual] first, or this fails
-// with [remote.ErrDownloadDenied]. The archives run from roughly 700 MB to
-// over a gigabyte.
+// It downloads the year's archive on first use, asking the download policy
+// like every other bulk fetch; a refusal is [remote.ErrDownloadDenied]. The
+// archives run from roughly 700 MB to over a gigabyte.
 func Open(ctx context.Context, year int) (*Raster, io.Closer, error) {
 	if year < EarliestYear {
 		return nil, nil, fmt.Errorf("%w: %d (the record starts at %d)",

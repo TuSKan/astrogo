@@ -64,9 +64,9 @@ type hemisphere struct {
 
 // Open reads the all-sky map, downloading it once if it is not cached.
 //
-// Two files of 64 MB, one per galactic hemisphere, so the download is gated by
-// [github.com/TuSKan/astrogo/remote.EnableDownloads] like every other bulk
-// fetch. Held in memory afterwards: 4096 squared float64 per hemisphere is
+// Two files of 64 MB, one per galactic hemisphere, downloaded on first use
+// and logged like every other bulk fetch; the policy set with
+// [github.com/TuSKan/astrogo/remote.SetPolicy] can refuse them. Held in memory afterwards: 4096 squared float64 per hemisphere is
 // 268 MB, which is the cost of not asking a shared service twenty thousand
 // questions.
 func Open(ctx context.Context) (*SFD, error) {

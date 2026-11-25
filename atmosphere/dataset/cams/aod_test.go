@@ -29,7 +29,6 @@ func TestRegistrationAdviceNamesWhatIsNeeded(t *testing.T) {
 		"https://dataspace.copernicus.eu",
 		"AWS_ACCESS_KEY_ID",
 		"no s3:// backend",
-		"EnableDownloads",
 	} {
 		if !strings.Contains(advice, want) {
 			t.Errorf("the advice does not mention %q, so a caller is told they cannot "+

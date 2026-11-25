@@ -146,9 +146,9 @@ func WithStep(d unit.Duration) VisibleTonightOption {
 // VisibleTonight downloads — from ~64 MB (Mars) to ~1.1 GB (Jupiter's
 // Galilean moons), since NAIF's only kernels covering these bright, named
 // moons also carry very long high-precision integration spans; there is no
-// smaller official alternative. Each kernel still requires the same
-// remote.EnableDownloads(maxSize, remote.NAIFSPK) consent as any other —
-// this option only controls whether VisibleTonight asks for them at all.
+// smaller official alternative. Each kernel asks the same download policy
+// as any other — this option only controls whether VisibleTonight asks for
+// them at all.
 func WithPlanetaryMoons() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.includeMoons = true }
 }
@@ -179,8 +179,7 @@ func WithAtmosphere(air *atmosphere.Atmosphere) VisibleTonightOption {
 // SBDB provided them (resolve.Target.HasElements).
 //
 // The default is Kepler because it is free — no network round trip, no
-// remote.EnableDownloads(..., remote.JPLHorizonsSPK) consent, no file
-// handle — and, for a single night's visibility-window search, accurate
+// kernel download, no file handle — and, for a single night's visibility-window search, accurate
 // well beyond what that search itself resolves (under a milliarcsecond at
 // the elements' own epoch and ~0.58″ at 30 days out, for 433 Eros against
 // Horizons). An open orbit — every KindInterstellar
@@ -190,7 +189,7 @@ func WithAtmosphere(air *atmosphere.Atmosphere) VisibleTonightOption {
 // still takes the kernel path regardless of this option.
 //
 // Use this when real, perturbed, kernel-backed positions matter more
-// than the network/consent cost: astrometry, occultation prediction,
+// than the network and download cost: astrometry, occultation prediction,
 // close-approach work, or any epoch far from the elements' own.
 func WithSmallBodyKernels() VisibleTonightOption {
 	return func(c *visibleTonightConfig) { c.forceSmallBodyKernels = true }
@@ -251,8 +250,8 @@ var planetConstructors = []func(eph.Provider) *Planet{
 // physics, not a special case in this function. Each such candidate is
 // resolved via two-body Keplerian propagation of its own published
 // elements by default (ephemeris/kepler) — free, no network round trip,
-// no download consent — falling back to a real JPL-Horizons-generated
-// SPK kernel (gated by remote.EnableDownloads(..., remote.JPLHorizonsSPK))
+// no download — falling back to a real JPL-Horizons-generated SPK kernel
+// (a download, asked of the download policy like any other)
 // only when the candidate has no published elements or an orbit two-body
 // propagation can't represent; see WithSmallBodyKernels to force the
 // kernel path unconditionally. A candidate whose ephemeris (either path)

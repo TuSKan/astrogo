@@ -10,19 +10,20 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/epoch"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
-// TestNewProvider_ColdCacheDownloadsDisabled confirms astrogo never
-// auto-downloads a kernel: a fresh, empty DataDir with NAIFSPK downloads
-// explicitly disabled (overriding this package's TestMain-granted consent)
-// must fail with an actionable ErrDownloadDenied, not a silent download.
-func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
+// TestNewProvider_ColdCacheDownloadsRefused confirms a download policy that
+// refuses kernels is obeyed: a fresh, empty DataDir with NAIFSPK refused must
+// fail with an actionable ErrDownloadDenied naming the kernel and SetPolicy,
+// not download anyway.
+func TestNewProvider_ColdCacheDownloadsRefused(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
 
-	remote.DisableDownloads(remote.NAIFSPK)
+	remotetest.RefuseDownloads(t, remote.NAIFSPK)
 	// A fresh, empty data dir isolates this cold-cache scenario from the
 	// shared cache other tests in this package populate. remote.SetDataDir
 	// is the only control for that: a provider has no data-dir option.
@@ -34,7 +35,7 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 	}
 
 	msg := err.Error()
-	for _, want := range []string{"de440s", "EnableDownloads", "NAIFSPK"} {
+	for _, want := range []string{"de440s", "SetPolicy"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("denial message missing %q: %s", want, msg)
 		}
@@ -43,7 +44,7 @@ func TestNewProvider_ColdCacheDownloadsDisabled(t *testing.T) {
 
 // TestKernelLifecycle exercises Open/AddKernelFrom/RemoveKernel/UnloadAll/
 // LoadedKernels against real cached kernels — obtained via NewProvider
-// (this package's TestMain grants NAIFSPK/NAIFLSK consent, so this reuses
+// (downloads are allowed by default, so this reuses
 // the shared cache like every other test here) and then reopened straight
 // from the cache bucket with zero network involvement, proving the offline
 // path works independently of NewProvider.

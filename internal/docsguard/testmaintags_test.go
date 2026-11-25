@@ -17,13 +17,12 @@ var tiers = []string{"integration", "network", "validation"}
 //
 // # Why
 //
-// A TestMain does the setup a package's tests cannot do for themselves:
-// registering the kernel backend with a blank import, granting download
-// consent for the whole binary, installing the goroutine-leak guard. It is
-// also an ordinary file with an ordinary build constraint, so a TestMain
-// gated to one tag simply is not compiled under another — and the tests that
-// needed it then run with none of it, reporting a missing capability rather
-// than a missing file.
+// A package's setup file does what its tests cannot do for themselves:
+// registering the kernel backend with a blank import, installing the
+// goroutine-leak guard in a TestMain. It is also an ordinary file with an
+// ordinary build constraint, so a setup file gated to one tag simply is not
+// compiled under another — and the tests that needed it then run with none of
+// it, reporting a missing capability rather than a missing file.
 //
 // plan's TestMain was gated to "integration" while the tests depending on it
 // were tagged "network" and "validation". Under `go test -tags=network
@@ -38,9 +37,11 @@ var tiers = []string{"integration", "network", "validation"}
 //
 // # What this checks
 //
-// For each package holding a constrained TestMain, every tier that any of
-// that package's other test files is gated to must also appear in TestMain's
-// own constraint. An unconstrained TestMain is compiled into every build and
+// A setup file is one declaring TestMain, or one named main_test.go, which is
+// where this repository puts a package's blank imports for its tests. For
+// each package holding a constrained one, every tier that any of that
+// package's other test files is gated to must also appear in the setup file's
+// own constraint. An unconstrained setup file is compiled into every build and
 // is always fine.
 //
 // This does not evaluate build expressions in general — it asks whether a
@@ -81,28 +82,28 @@ func TestTestMainCoversEveryTierItsPackageTests(t *testing.T) {
 
 				rel, _ := filepath.Rel(root, filepath.Join(dir, f))
 
-				t.Errorf("%s is tagged %q, but this package's TestMain (%s) is not.\n"+
-					"  Under `go test -tags=%s` that TestMain is not compiled, so this "+
+				t.Errorf("%s is tagged %q, but this package's setup file (%s) is not.\n"+
+					"  Under `go test -tags=%s` that file is not compiled, so this "+
 					"file's tests run without whatever it sets up — a registered backend, "+
-					"download consent, a leak guard. Widen the TestMain's constraint to "+
-					"cover every tier the package has tests in. See #238.",
+					"a leak guard. Widen its constraint to cover every tier the package "+
+					"has tests in. See #238.",
 					filepath.ToSlash(rel), tier, mainFile, tier)
 			}
 		}
 	}
 
 	if checked == 0 {
-		t.Fatal("no package with a constrained TestMain was examined; the check is " +
+		t.Fatal("no package with a constrained setup file was examined; the check is " +
 			"not looking at anything")
 	}
 
-	t.Logf("%d packages with a constrained TestMain checked", checked)
+	t.Logf("%d packages with a constrained setup file checked", checked)
 }
 
-// testMainConstraint reports the file declaring the package's TestMain and
-// the tiers its build constraint names.
+// testMainConstraint reports the package's setup file — the one declaring
+// TestMain, or main_test.go — and the tiers its build constraint names.
 //
-// The third result is false when there is no TestMain, or when it carries no
+// The third result is false when there is no setup file, or when it carries no
 // constraint at all — that one is compiled into every build and so covers
 // every tier by construction.
 func testMainConstraint(t *testing.T, dir string, files []string) (string, []string, bool) {
@@ -117,7 +118,7 @@ func testMainConstraint(t *testing.T, dir string, files []string) (string, []str
 		}
 
 		src := string(data)
-		if !strings.HasPrefix(src, "func TestMain(") && !strings.Contains(src, "\nfunc TestMain(") {
+		if f != "main_test.go" && !strings.HasPrefix(src, "func TestMain(") && !strings.Contains(src, "\nfunc TestMain(") {
 			continue
 		}
 

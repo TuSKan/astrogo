@@ -23,17 +23,17 @@ func TestTwoClientsHoldOppositePolicies(t *testing.T) {
 	t.Parallel()
 
 	prefetch := NewClient()
-	prefetch.EnableDownloads(200<<20, NAIFSPK)
 
 	serve := NewClient()
 	serve.SetOffline(true)
+	serve.SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
-	if ok, maxSize := prefetch.DownloadsEnabled(NAIFSPK); !ok || maxSize != 200<<20 {
-		t.Errorf("prefetcher: DownloadsEnabled = (%v, %d), want (true, %d)", ok, maxSize, 200<<20)
+	if err := prefetch.CheckDownload(NAIFSPK, "de442.bsp", 115<<20); err != nil {
+		t.Errorf("prefetcher: CheckDownload = %v, want nil", err)
 	}
 
-	if ok, _ := serve.DownloadsEnabled(NAIFSPK); ok {
-		t.Error("the handler inherited the prefetcher's download consent")
+	if err := serve.CheckDownload(NAIFSPK, "de442.bsp", 115<<20); !errors.Is(err, ErrDownloadDenied) {
+		t.Errorf("handler: CheckDownload = %v, want its own policy's refusal", err)
 	}
 
 	if _, err := prefetch.URL(NAIFSPK); err != nil {
@@ -55,7 +55,7 @@ func TestADedicatedClientDoesNotDisturbTheDefault(t *testing.T) {
 	own := NewClient()
 	own.SetOffline(true)
 	own.Disable(SIMBAD)
-	own.EnableDownloads(0, NAIFSPK)
+	own.SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	if err := own.SetURL(SIMBAD, "https://mirror.invalid/simbad"); err != nil {
 		t.Fatalf("SetURL: %v", err)
@@ -75,8 +75,8 @@ func TestADedicatedClientDoesNotDisturbTheDefault(t *testing.T) {
 		t.Errorf("default: URL(SIMBAD) = %q, want the built-in URL — another client's override leaked", got)
 	}
 
-	if ok, _ := DownloadsEnabled(NAIFSPK); ok {
-		t.Error("the default gained download consent another client granted")
+	if err := CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
+		t.Errorf("the default took the download policy another client set: %v", err)
 	}
 
 	if strings.Contains(DataDirURL(), "somewhere/else") {
@@ -107,14 +107,14 @@ func TestPackageFunctionsOperateOnDefault(t *testing.T) {
 	}
 }
 
-// TestClientGetFileUsesItsOwnCacheAndConsent walks the whole fetch path on a
-// dedicated client: its consent gate, its cache location, its endpoint URL.
+// TestClientGetFileUsesItsOwnCacheAndPolicy walks the whole fetch path on a
+// dedicated client: its download policy, its cache location, its endpoint URL.
 //
 // Cache location is the part worth having a test for. A GetFile that consulted
-// the client for consent but the process default for the cache directory would
-// pass every consent assertion and quietly write into the wrong bucket, which
+// the client for its policy but the process default for the cache directory
+// would pass every policy assertion and quietly write into the wrong bucket, which
 // is the failure this whole change would otherwise introduce.
-func TestClientGetFileUsesItsOwnCacheAndConsent(t *testing.T) {
+func TestClientGetFileUsesItsOwnCacheAndPolicy(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -136,13 +136,14 @@ func TestClientGetFileUsesItsOwnCacheAndConsent(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
-	// Consent first: without it this client must refuse, whatever the process
-	// default has been told.
+	// This client's policy decides, whatever the process default has been told.
+	c.SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
+
 	if _, _, err := c.GetFile(t.Context(), NAIFSPK, name); !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("GetFile without consent = %v, want ErrDownloadDenied", err)
+		t.Fatalf("GetFile under a refusing policy = %v, want ErrDownloadDenied", err)
 	}
 
-	c.EnableDownloads(0, NAIFSPK)
+	c.SetPolicy(nil)
 
 	bucket, key, err := c.GetFile(t.Context(), NAIFSPK, name)
 	if err != nil {
@@ -227,15 +228,15 @@ func TestNewClientStartsFromTheDefaultPolicyNotTheDefaultClient(t *testing.T) {
 	scope := Capture(NAIFSPK)
 	t.Cleanup(scope.Restore)
 
-	EnableDownloads(0, NAIFSPK)
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 	SetOffline(true)
 
 	t.Cleanup(func() { SetOffline(false) })
 
 	fresh := NewClient()
 
-	if ok, _ := fresh.DownloadsEnabled(NAIFSPK); ok {
-		t.Error("a new client inherited the default's download consent")
+	if err := fresh.CheckDownload(NAIFSPK, "de440s.bsp", 32<<20); err != nil {
+		t.Errorf("a new client inherited the default's download policy: %v", err)
 	}
 
 	if fresh.Offline() {

@@ -110,8 +110,8 @@ func (v Vision) file() (name, doi string, err error) {
 // counted photons would tilt the result across the band by a factor of
 // lambda and leave a luminance that is smooth, positive and wrong.
 //
-// It is a download, so it is gated: grant [remote.EnableDownloads] for
-// [remote.CIELuminosity] first. Both curves together are about 17 KB, and
+// It is a download, made on first use and asked of the download policy like
+// any other. Both curves together are about 17 KB, and
 // they never change — CIE 1924 and 1951 are fixed tabulations.
 func Open(ctx context.Context, v Vision) (magnitude.Passband, error) {
 	name, doi, err := v.file()

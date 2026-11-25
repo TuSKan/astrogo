@@ -25,7 +25,7 @@ const (
 )
 
 // cieCacheAndSource points remote.CIELuminosity's cache and source at fresh
-// directories and consents to its downloads, for the rest of t. It returns the
+// directories, for the rest of t. It returns the
 // cache with the key the photopic curve caches under, and the source.
 func cieCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS) {
 	t.Helper()
@@ -50,8 +50,6 @@ func cieCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.CIELuminosity)
 
 	return cache, prefix + photopicFile, src
 }

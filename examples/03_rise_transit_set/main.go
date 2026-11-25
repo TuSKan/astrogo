@@ -14,11 +14,10 @@ import (
 )
 
 func main() {
-	// This example runs offline, so it uses no Earth-orientation data
-	// (UT1 = UTC, no polar motion). That can move a rise or set by up to
-	// about a second, below the minute these times are read to. For full
-	// accuracy, blank-import remote/eop and consent to the IERS bulletin, as
-	// 09_geometry_events does.
+	// This example runs offline, so it uses no Earth-orientation data (UT1 =
+	// UTC, no polar motion). That can move a rise or set by up to about a
+	// second, below the minute these times are read to. For full accuracy,
+	// blank-import remote/eop, as 09_geometry_events does.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// 1. Setup Observatory (Quinta Calixto, Brazil)

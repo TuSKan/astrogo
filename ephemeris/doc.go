@@ -69,10 +69,10 @@
 //
 // # Choosing a Provider
 //
-// [Default] needs no download and no consent step, at the cost of accuracy. A
-// JPL kernel via [NewProvider] agrees with JPL Horizons to 2e-13 AU — 33 mm —
-// but requires a one-time, consent-gated download (see the remote package doc
-// for the consent gate). de440s/de440/de442/de441 do not differ from each
+// [Default] needs no download, at the cost of accuracy. A JPL kernel via
+// [NewProvider] agrees with JPL Horizons to 2e-13 AU — 33 mm — but requires a
+// one-time download, made on first use and logged (see the remote package doc
+// for how to cap or refuse it). de440s/de440/de442/de441 do not differ from each
 // other in accuracy, only in time-span coverage and file size:
 //
 //	Provider                     Accuracy                     Size          Download
@@ -154,8 +154,8 @@
 // # Failure and degradation
 //
 // A missing kernel is an error rather than a silent gap: constructing a JPL
-// provider fails with remote.ErrDownloadDenied unless the caller has granted
-// download consent, and asking for a body or an epoch that a loaded kernel
+// provider downloads its kernel or fails, with remote.ErrDownloadDenied when
+// the download policy refuses it, and asking for a body or an epoch that a loaded kernel
 // does not cover fails with jpl.ErrNoSegment. Nothing here substitutes an
 // approximation for data it does not have.
 package ephemeris

@@ -22,7 +22,8 @@ import (
 //
 // remote/file and remote/api are implementation. They move bytes; this package
 // decides whether bytes may move at all — which endpoint, whether the process
-// is offline, whether a download was consented to, where the result is cached.
+// is offline, whether the download policy allows a download, where the result
+// is cached.
 // A caller who imported either directly would be reaching past the only place
 // those questions are answered.
 //

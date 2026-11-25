@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/epoch"
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/remote"
 
 	"github.com/TuSKan/astrogo/internal/testutil"
@@ -31,36 +32,32 @@ func TestPlanetConstructorsIncludesPluto(t *testing.T) {
 	t.Error("expected planetConstructors to include a Pluto constructor")
 }
 
-// TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent verifies
+// TestGatherPlanetaryMoonsSkipsWhenDownloadsAreRefused verifies
 // gatherPlanetaryMoons degrades gracefully — an empty candidate/provider
 // result, not an error or panic — when none of its kernels can actually be
-// fetched (no download consent granted, no pre-seeded cache), matching
-// this package's established "skip an unavailable candidate rather than
-// fail the whole query" convention (candidateFromTarget, gatherCandidates).
+// fetched (the download policy refuses them, nothing is pre-seeded),
+// matching this package's established "skip an unavailable candidate rather
+// than fail the whole query" convention (candidateFromTarget,
+// gatherCandidates).
 //
-// This captures and restores only remote.NAIFSPK's own consent state (via
-// remote.Capture/Restore), rather than the blanket remote.Reset() the
-// sibling network tests in this package use — under the "integration"
-// build tag, plan/main_test.go's TestMain grants unlimited
-// NAIFSPK consent for this package's entire test binary run (real
-// de441/de442 fetches need it); a plain remote.Reset() here would revoke
-// that for every test running afterward in the same binary, not just this
-// one (confirmed: it did, breaking three otherwise unrelated eclipse/
-// moon-phase tests when this test ran under `-tags=integration` before
-// this fix).
-func TestGatherPlanetaryMoonsSkipsWithoutDownloadConsent(t *testing.T) {
+// This captures and restores only remote.NAIFSPK's own state (via
+// remote.Capture/Restore) rather than calling remote.Reset(), which leaves
+// the data directory pointed at this test's temporary bucket. When a
+// TestMain also granted download consent, that broke three otherwise
+// unrelated eclipse/moon-phase tests under `-tags=integration`.
+func TestGatherPlanetaryMoonsSkipsWhenDownloadsAreRefused(t *testing.T) {
 	t.Cleanup(remote.Capture(remote.NAIFSPK).Restore)
-	remote.DisableDownloads(remote.NAIFSPK)
+	remotetest.RefuseDownloads(t, remote.NAIFSPK)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	candidates, providers := gatherPlanetaryMoons(context.Background(), epoch.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC), 30, &skips{})
 
 	if len(candidates) != 0 {
-		t.Errorf("expected no candidates without download consent, got %d", len(candidates))
+		t.Errorf("expected no candidates with downloads refused, got %d", len(candidates))
 	}
 
 	if len(providers) != 0 {
-		t.Errorf("expected no opened providers without download consent, got %d", len(providers))
+		t.Errorf("expected no opened providers with downloads refused, got %d", len(providers))
 	}
 }
 

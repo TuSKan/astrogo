@@ -21,7 +21,7 @@ func TestLoadTakesTheFetchThenTheCache(t *testing.T) {
 		wantErrs   []error
 	}{
 		{"the network answers", &fakeLoader{fetched: Data{Raw: []byte(sampleFinals2000A)}}, SourceNetwork, nil},
-		{"no consent, a bulletin cached",
+		{"the download refused, a bulletin cached",
 			&fakeLoader{fetchErr: ErrNoEOPData, cached: Data{Raw: []byte(sampleFinals2000A)}}, SourceCache, nil},
 		{"the network sends junk",
 			&fakeLoader{fetched: Data{Raw: []byte("<html>not a bulletin</html>")}, cached: Data{Raw: []byte(sampleFinals2000A)}},

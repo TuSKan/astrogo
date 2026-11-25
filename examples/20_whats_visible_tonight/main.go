@@ -24,9 +24,8 @@
 // because their SPK kernels are far larger than everything else this
 // example downloads — from ~64 MB (Mars) up to ~1.1 GB (Jupiter's
 // Galilean moons), ~2.4 GB total for every kernel. To try it: pass
-// plan.WithPlanetaryMoons() to the VisibleTonight call below, raise this
-// example's remote.EnableDownloads(..., remote.NAIFSPK) cap accordingly,
-// and loosen magLimit — every one of these moons is fainter than mag 4 in
+// plan.WithPlanetaryMoons() to the VisibleTonight call below and loosen
+// magLimit — every one of these moons is fainter than mag 4 in
 // real apparent brightness (Titan/Triton, the brightest, are ~+8.4/+13.5),
 // so magLimit=2 (this example's default) will never surface any of them
 // even with the kernels present.
@@ -50,7 +49,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/unit"
 
@@ -92,18 +90,13 @@ func main() {
 
 	ctx := context.Background()
 
-	// ── Consent-gated downloads ────────────────────────────────────────
-	// See README "Data downloads & offline usage" — nothing downloads
-	// without this. IERS EOP (~4 MB) improves rise/set precision; OpenNGC's
-	// two source CSVs (~7 MB) back the deep-sky category; de440s.bsp
+	// ── Downloads, on first run ────────────────────────────────────────
+	// See README "Data downloads & offline usage". IERS EOP (~4 MB)
+	// improves rise/set precision; OpenNGC's two source CSVs (~7 MB)
+	// back the deep-sky category; de440s.bsp
 	// (~32 MB) backs the Moon/planets and, via VisibleTonight's Stage 2,
 	// any asteroid/comet candidate SIMBAD/OpenNGC/SBDB's bulk prefilter
 	// surfaces; naif0012.tls (~6 KB) provides leap seconds for all of them.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-	remote.EnableDownloads(0, remote.OpenNGC)
-	remote.EnableDownloads(200<<20, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	planetProvider, err := eph.NewProvider(ctx, eph.Planets, "de440s")
 	if err != nil {

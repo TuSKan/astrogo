@@ -18,7 +18,7 @@ import (
 //
 // Both are reached through remote in ordinary use, which means a failure here
 // would otherwise arrive as "the fetch went wrong" with the endpoint registry,
-// the consent gate and a live source between the assertion and the defect.
+// the download policy and a live source between the assertion and the defect.
 // These take a URL and nothing else, so they can be asked what they do.
 
 // seedDir writes a small tree and returns its file:// URL.

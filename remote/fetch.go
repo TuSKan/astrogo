@@ -101,8 +101,9 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 //
 // An immutable endpoint's cache entry is reused on existence alone; a
 // Mutable one is revalidated against the source's current ETag first. A
-// miss downloads, which requires consent (ErrDownloadDenied otherwise) and
-// is serialized against other processes doing the same.
+// miss downloads, which asks the download policy (ErrDownloadDenied when it
+// refuses), is logged, and is serialized against other processes doing the
+// same.
 //
 // In offline mode ([SetOffline]) a cached entry is served without contacting
 // the source, Mutable or not, and only a miss fails, with ErrOffline.
@@ -112,8 +113,8 @@ func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption
 
 // GetFile ensures endpoint id's object named name is present and current in
 // this client's cache, returning that cache [FS] and the key within it. See
-// the package-level [GetFile]; the consent, offline and URL decisions it makes
-// are this client's, and the cache it fills is this client's.
+// the package-level [GetFile]; the download policy, offline and URL decisions
+// it makes are this client's, and the cache it fills is this client's.
 func (c *Client) GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
 	var cfg readConfig
 	for _, opt := range opts {
@@ -251,19 +252,18 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 		return nil, "", fetched{}, gateErr
 	}
 
-	// Consent first, before any request, routed through CheckDownload so a
-	// custom Policy still decides.
+	// The download policy first, before any request, through CheckDownload.
 	//
-	// A caller who may not download can only be given what is already here.
+	// A caller whose policy refuses can only be given what is already here.
 	// Asking a mutable source whether its cached copy is current gives such
-	// a caller nothing it could act on: a request it never agreed to and,
+	// a caller nothing it could act on: a request its policy refused and,
 	// against a source that does not answer, the whole of the endpoint's
 	// timeout. The lazy EOP load sat out 17 s of it with every uncovered
 	// lookup in the process queued behind it, to be handed the bulletin its
 	// own cached read had just found (#964). So it is served what is cached,
 	// as offline mode serves it, and refused only when nothing is.
 	//
-	// Refused before the source is even opened, so the error is consent's
+	// Refused before the source is even opened, so the error is the policy's
 	// whether or not the source is reachable, the actionable blocker from
 	// the caller's side. And before the lock, which another process can hold
 	// for as long as its download takes, or a crashed one until the lock goes
@@ -345,9 +345,9 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 }
 
 // Exists reports whether endpoint id currently serves an object at name.
-// It is a metadata-only probe that transfers no body and so never triggers
-// the consent gate — a caller may use it to discover what is available
-// before deciding whether to ask for consent.
+// It is a metadata-only probe that transfers no body and so never asks the
+// download policy — a caller may use it to discover what is available before
+// deciding whether to download it.
 //
 // A missing object is (false, nil): the source answered and it is not
 // there. Any other failure returns an error, so "missing" is never
@@ -434,13 +434,14 @@ func unchanged(ctx context.Context, srcFS, cacheFS FS, name, cacheKey string) bo
 }
 
 // fetchInto performs the transfer from srcFS/name into cacheFS/cacheKey. It
-// owns all policy — consent, timeout, progress, resume, validation — for every
+// owns all policy — the download policy, timeout, progress, resume,
+// validation — for every
 // backend uniformly; a filesystem only moves bytes. It returns the source
 // version it fetched, the ETag the source reported for it.
 func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcFS, cacheFS FS,
 	name, cacheKey string, timeout time.Duration, cfg readConfig,
 ) (sourceETag string, err error) {
-	// Consent is checked twice: once on the registered estimate before any
+	// The policy is asked twice: once on the registered estimate before any
 	// request, and again below on the size the source actually reports.
 	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
 		return "", err
@@ -479,7 +480,11 @@ func (c *Client) fetchInto(ctx context.Context, id EndpointID, ep Endpoint, srcF
 		return "", fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, err)
 	}
 
-	logging.InfoContext(ctx, "downloading", "cache_key", cacheKey, "endpoint", id, "bytes", info.Size())
+	// At Warn, which the default logger shows: a download is a choice the
+	// caller can see and refuse with SetPolicy, and a multi-gigabyte one
+	// otherwise looks like a hang. A cache hit logs nothing.
+	logging.WarnContext(ctx, "downloading", "endpoint", id, "cache_key", cacheKey,
+		"size", sizeLabel(info.Size()), "bytes", info.Size())
 
 	f, err := bound.Open(name)
 	if err != nil {

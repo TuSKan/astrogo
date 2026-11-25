@@ -14,7 +14,6 @@ import (
 	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/optics"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	"github.com/TuSKan/astrogo/skybrightness"
 	"github.com/TuSKan/astrogo/skybrightness/dataset"
 	"github.com/TuSKan/astrogo/skybrightness/skyplan"
@@ -36,9 +35,6 @@ import (
 // seven tenths of a magnitude brighter than at the zenith, and an instrument
 // that could not see the difference would make this entire wiring pointless.
 func TestImagingDepthAgainstARealSky(t *testing.T) {
-	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
-	remote.EnableDownloads(size, ids...)
-
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)
@@ -125,9 +121,6 @@ func TestImagingDepthAgainstARealSky(t *testing.T) {
 // The point of the interface being one method wide: nothing in plan knows
 // what produced the number, and nothing here knows what plan does with it.
 func TestImagingSatisfiesThePlanningConstraint(t *testing.T) {
-	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
-	remote.EnableDownloads(size, ids...)
-
 	site, err := coord.NewGeodetic(angle.LatDeg(-24.6272), angle.LonDeg(-70.4045), 2635)
 	if err != nil {
 		t.Fatalf("NewGeodetic: %v", err)

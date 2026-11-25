@@ -13,21 +13,16 @@ import (
 	"github.com/TuSKan/astrogo/coord"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/unit"
 )
 
 func main() {
-	// OpenNGC is listed alongside SIMBAD below. Enabling downloads here is
-	// enough — catalog.NewResolver's first use of catalog.OpenNGC fetches
-	// it automatically (content-checked, so a re-run only costs a HEAD
-	// probe once cached).
-	remote.EnableDownloads(5<<20, remote.OpenNGC) // ~2 MB combined source CSVs
+	// OpenNGC is listed alongside SIMBAD below: catalog.NewResolver's first
+	// use of catalog.OpenNGC fetches it (content-checked, so a re-run only
+	// costs a HEAD probe once cached).
 	// Earth orientation, for where the site is on the turning Earth:
 	// the IERS bulletin, which the remote/eop import above fetches.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-
 	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760.0))
 	if err != nil {
 		log.Fatalf("failed to create location: %v", err)

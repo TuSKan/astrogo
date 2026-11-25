@@ -66,7 +66,7 @@ func tinyMap(t *testing.T) []byte {
 	return gz.Bytes()
 }
 
-// The published path, end to end: consent, fetch, decompress, parse.
+// The published path, end to end: fetch, decompress, parse.
 //
 // The asset is served from a local server rather than GitHub, because what is
 // under test is this package's handling of it — that it gunzips, that it reads
@@ -94,19 +94,6 @@ func TestOpenFetchesAndParses(t *testing.T) {
 	if err := remote.SetURL(remote.GaiaStarMap, srv.URL+"/"); err != nil {
 		t.Fatalf("SetURL: %v", err)
 	}
-
-	// The budget comes from the registry rather than a literal. Consent is
-	// checked against the registered ApproxSize before any request, so a
-	// literal here is a second copy of that number that has to be kept in step
-	// with it — and when the published map grew from one band to four, it was
-	// not: this test failed on a budget it had no opinion about.
-	endpoint, ok := remote.Lookup(remote.GaiaStarMap)
-	if !ok {
-		t.Fatal("GaiaStarMap is not registered")
-	}
-
-	remote.EnableDownloads(endpoint.ApproxSize, remote.GaiaStarMap)
-	defer remote.DisableDownloads(remote.GaiaStarMap)
 
 	m, err := starlight.Open(context.Background())
 	if err != nil {

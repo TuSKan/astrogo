@@ -367,7 +367,7 @@ func TestEnsureLoadedRejectsWhatIsNotTheTable(t *testing.T) {
 // TestFailedLoadIsNotRetried pins behavior rather than endorsing it.
 //
 // A failed load is recorded and replayed for the life of the provider, so a
-// transient outage or a consent gate granted a moment later disables this
+// transient outage or a download allowed a moment later disables this
 // provider permanently. catalog/openngc had the same shape and #191 called it
 // worse than a per-query failure, precisely because it is invisible and cannot
 // recover; epoch/internal/iers takes the middle path with a retry cooldown.

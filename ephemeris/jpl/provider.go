@@ -323,7 +323,7 @@ func (p *Provider) AddKernel(k *spk.Reader) error {
 
 // AddKernelFrom opens the SPK object at bucket/key and adds it to the
 // provider index, recording key for LoadedKernels/RemoveKernel. No network
-// access and no download consent: the object must already be there.
+// access and no download: the object must already be there.
 func (p *Provider) AddKernelFrom(ctx context.Context, fsys remote.FS, key string) error {
 	ra, err := remote.Open(ctx, fsys, key)
 	if err != nil {
@@ -429,9 +429,9 @@ func (p *Provider) LoadedKernels() []KernelInfo {
 }
 
 // Open constructs a Provider from kernels already present in fsys — no
-// network access, no download consent. This is the offline path: pre-seed
-// the objects yourself (files a prior consented run cached, or copied into
-// a deployment image) and open them by key. fsys may be backed by
+// network access, no download. This is the offline path: pre-seed the
+// objects yourself (files a prior run with network access cached, or copied
+// into a deployment image) and open them by key. fsys may be backed by
 // anything remote/file can open, not just local disk.
 func Open(ctx context.Context, fsys remote.FS, lskKey string, spkKeys ...string) (*Provider, error) {
 	p := &Provider{

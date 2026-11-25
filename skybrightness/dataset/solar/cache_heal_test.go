@@ -17,7 +17,7 @@ import (
 const errorPage = "<html>503 Service Unavailable</html>"
 
 // calspecCacheAndSource points remote.CALSPEC's cache and source at fresh
-// directories and consents to its downloads, for the rest of t. It returns the
+// directories, for the rest of t. It returns the
 // cache with the key the reference spectrum caches under, and the source.
 func calspecCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS) {
 	t.Helper()
@@ -42,8 +42,6 @@ func calspecCacheAndSource(t *testing.T) (cache remote.FS, key string, src remot
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.CALSPEC)
 
 	return cache, prefix + solar.CALSPECSolarReference, src
 }

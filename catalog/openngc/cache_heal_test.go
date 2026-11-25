@@ -17,8 +17,7 @@ import (
 const errorPage = "<html>503 Service Unavailable</html>"
 
 // ngcCacheAndSource points remote.OpenNGC's cache and source at fresh
-// directories, the source holding the sample CSVs, and consents to its
-// downloads, for the rest of t. It returns the cache with the key NGC.csv
+// directories, the source holding the sample CSVs, for the rest of t. It returns the cache with the key NGC.csv
 // caches under, and the source.
 func ngcCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS) {
 	t.Helper()
@@ -27,7 +26,6 @@ func ngcCacheAndSource(t *testing.T) (cache remote.FS, key string, src remote.FS
 
 	src = fakeSources(t)
 
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	cache, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)

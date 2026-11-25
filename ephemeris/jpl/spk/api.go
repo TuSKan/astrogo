@@ -15,6 +15,7 @@ import (
 
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/horizonsfault"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -80,8 +81,8 @@ func commandCandidates(kernel string) []string {
 // CacheAPI returns readers for kernel, generating it through JPL Horizons
 // and storing it under prefix in fsys when it is not already there.
 // Horizons delivers a small-body kernel base64-encoded inside its JSON
-// response, so this is a real download and is gated by
-// remote.JPLHorizonsSPK's consent exactly like any other.
+// response, so this is a real download, asked of the download policy and
+// logged exactly like any other.
 //
 // Storage is a fsys and key prefix, never a directory path: a generated
 // kernel lands wherever remote's cache lives, which need not be local
@@ -104,11 +105,12 @@ func CacheAPI(ctx context.Context, fsys remote.FS, prefix, kernel string, startT
 
 	// Generating and storing a small-body SPK kernel via Horizons is a file
 	// download in effect (KB–MB delivered base64-encoded inside the JSON
-	// response), so it requires the same explicit consent as any other
-	// kernel download: remote.EnableDownloads(maxSize, remote.JPLHorizonsSPK).
+	// response), so it asks the download policy and is logged like any other.
 	if err := remote.CheckDownload(remote.JPLHorizonsSPK, spkFile, remote.SizeVaries); err != nil {
 		return nil, fmt.Errorf("jpl: SPK kernel %s: %w", kernel, err)
 	}
+
+	logging.WarnContext(ctx, "downloading", "endpoint", remote.JPLHorizonsSPK, "cache_key", spkFile)
 
 	// Horizons' COMMAND field resolves differently depending on exactly
 	// how the designation is written — confirmed live against the real

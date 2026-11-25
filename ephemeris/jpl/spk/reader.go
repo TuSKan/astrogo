@@ -69,11 +69,10 @@ type Reader struct {
 
 // CacheDownload opens the SPK file named kernel, downloading it first when
 // it is absent, into remote's registered cache directory for
-// remote.NAIFSPK. Downloads are gated by remote's consent configuration —
-// planetary kernels are large (de440s ≈ 32 MB, de440/de442 ≈ 115 MB,
-// de441 parts multi-GB), and astrogo never downloads them without an
-// explicit remote.EnableDownloads(maxSize, remote.NAIFSPK) call or a
-// pre-seeded file.
+// remote.NAIFSPK. The download asks remote's download policy and is logged:
+// planetary kernels are large (de440s ≈ 32 MB, de440/de442 ≈ 115 MB, de441
+// parts multi-GB), so a caller that should not fetch them sets a policy or
+// pre-seeds the file.
 //
 // It provides an auto-healing mechanism for CI environments by automatically
 // removing corrupt or truncated files. Integrity is checked three ways: a

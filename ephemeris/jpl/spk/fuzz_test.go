@@ -10,7 +10,7 @@ import (
 )
 
 // This file fuzzes the SPK/DAF binary parser against corrupted, truncated,
-// and adversarial input — none of it goes through remote's consent gate or
+// and adversarial input — none of it goes through remote's download policy or
 // touches the network; every seed here is a hand-built byte literal (no
 // checked-in binary fixture) or the reserialized word array from
 // TestEvaluateType21 in reader_test.go. Any crasher Go writes to

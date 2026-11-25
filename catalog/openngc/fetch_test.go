@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/remote"
 
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -26,7 +27,7 @@ NGC0224;G;00:42:44.3;+41:16:09;31;Andromeda Galaxy;;3.4;4.4
 // source files (NGC.csv/addendum.csv) into it — a local stand-in for an
 // HTTP source now that GetFile can't reach an http:// URL at all (no
 // httpblob driver registered yet; see remote/file's package doc).
-// fetchSource/New's own consent/caching policy is fully generic over any
+// fetchSource/New's own download/caching policy is fully generic over any
 // Bucket, so exercising it here tests the exact same code path an
 // HTTP-backed endpoint will take once that driver exists.
 func fakeSources(t *testing.T) remote.FS {
@@ -74,7 +75,6 @@ func TestNewFetchesFromNetworkWhenDownloadsEnabled(t *testing.T) {
 
 	fakeSources(t)
 
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	p := New()
@@ -101,7 +101,6 @@ func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 
 	fakeSources(t)
 
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	loadNow(t)
@@ -146,17 +145,17 @@ func TestLoadSkipsBodyWhenUnchanged(t *testing.T) {
 	}
 }
 
-func TestNewDefaultDenyIssuesNoRequest(t *testing.T) {
+func TestNewUnderARefusingPolicyIssuesNoRequest(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	fakeSources(t)
+	remotetest.RefuseDownloads(t, remote.OpenNGC)
 
-	// Downloads intentionally left disabled (the default).
 	p := New()
 
 	if _, err := p.Resolve(context.Background(), "M42"); err == nil {
-		t.Error("expected an empty provider when downloads are disabled")
+		t.Error("expected an empty provider when the policy refuses downloads")
 	}
 
 	fsys, prefix, err := remote.CacheDir(context.Background(), remote.OpenNGC)
@@ -178,7 +177,6 @@ func TestLoadDoesNotAccumulateCacheFiles(t *testing.T) {
 
 	fakeSources(t)
 
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	// Three separate providers, each loading for itself: the guard against

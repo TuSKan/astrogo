@@ -11,6 +11,7 @@ import (
 	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop" // registers the IERS EOP loader this file exercises
 
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -87,13 +88,12 @@ func TestParseFinals2000AGateway(t *testing.T) {
 	}
 }
 
-// TestEOPLazyLoadFindsPreSeededCacheWithoutConsent proves the core of the
-// automatic lazy-load contract: a finals2000A file already sitting at the
+// TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy proves the core of
+// the automatic lazy-load contract: a finals2000A file already sitting at the
 // standard cache path (as if hand-copied there for an offline deployment,
-// never fetched via remote.GetFile) is found and used by a bare EOP query
-// — no remote.EnableDownloads call, no explicit loader call, and (via the
-// httptest server below) zero network access.
-func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
+// never fetched via remote.GetFile) is found and used by a bare EOP query —
+// no explicit loader call, and with downloads refused, no fetch.
+func TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy(t *testing.T) {
 	t.Cleanup(func() {
 		epoch.ResetEOP()
 		remote.Reset()
@@ -105,11 +105,9 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 	// (#990).
 	epoch.ResetEOP()
 
-	// No source is configured at all (remote.SetURL is never called, so
-	// the endpoint keeps its default https:// URL, which has no
-	// registered blob driver in this build — see remote/file's package
-	// doc) — a non-zero EOP below is therefore proof the pre-seeded
-	// cache satisfied the query without ever reaching a fetch attempt.
+	// The policy refuses the download, so a non-zero EOP below is proof the
+	// pre-seeded cache satisfied the query without a fetch.
+	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
@@ -139,11 +137,11 @@ func TestEOPLazyLoadFindsPreSeededCacheWithoutConsent(t *testing.T) {
 	}
 }
 
-// TestEOPLazyLoadFetchesWithConsent proves the other half of the lazy-load
-// contract: with no pre-seeded cache but download consent granted, a bare
-// EOP query fetches over the network automatically — no explicit Fetch/
-// FetchIfStale call needed.
-func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
+// TestEOPLazyLoadFetchesWhenAllowed proves the other half of the lazy-load
+// contract: with no pre-seeded cache and downloads allowed, as they are by
+// default, a bare EOP query fetches over the network automatically — no
+// explicit Fetch/FetchIfStale call needed.
+func TestEOPLazyLoadFetchesWhenAllowed(t *testing.T) {
 	t.Cleanup(func() {
 		epoch.ResetEOP()
 		remote.Reset()
@@ -160,7 +158,6 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 
 	fakeIERSSourceForGateway(t, sampleFinals2000AForGateway)
 
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
@@ -176,27 +173,27 @@ func TestEOPLazyLoadFetchesWithConsent(t *testing.T) {
 	}
 }
 
-// TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent proves the final
-// fallback: no pre-seeded cache and no download consent still degrades
-// gracefully to a zero EOP, exactly like today, rather than blocking or
-// erroring.
-func TestEOPLazyLoadDegradesToZeroWithoutCacheOrConsent(t *testing.T) {
+// TestEOPLazyLoadDegradesToZeroWithNoCacheAndARefusingPolicy proves the final
+// fallback: no pre-seeded cache and a policy refusing the download still
+// degrades gracefully to a zero EOP rather than blocking or erroring.
+func TestEOPLazyLoadDegradesToZeroWithNoCacheAndARefusingPolicy(t *testing.T) {
 	t.Cleanup(func() {
 		epoch.ResetEOP()
 		remote.Reset()
 	})
 
-	// From no model, as TestEOPLazyLoadFindsPreSeededCacheWithoutConsent
+	// From no model, as TestEOPLazyLoadFindsPreSeededCacheUnderARefusingPolicy
 	// explains (#990).
 	epoch.ResetEOP()
 
+	remotetest.RefuseDownloads(t, remote.IERSFinals2000A)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	t.Cleanup(func() { remote.SetDataDir("") })
 
 	tm := epoch.FromJD(2441684.5, epoch.UTC) // MJD 41684
 
 	if eop := tm.EOP(); eop != (epoch.EOP{}) {
-		t.Errorf("expected zero EOP with no cache and no consent, got %+v", eop)
+		t.Errorf("expected zero EOP with no cache and a refusing policy, got %+v", eop)
 	}
 }
 

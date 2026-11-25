@@ -43,10 +43,9 @@ import (
 
 func main() {
 	// Past the SBDB query this example downloads nothing, so it uses no
-	// Earth-orientation data either (UT1 = UTC, no polar motion). That can
-	// move a rise or set by up to about a second, below the minute printed.
-	// For full accuracy, blank-import remote/eop and consent to the IERS
-	// bulletin, as 09_geometry_events does.
+	// Earth-orientation data either (UT1 = UTC, no polar motion). That can move
+	// a rise or set by up to about a second, below the minute printed. For full
+	// accuracy, blank-import remote/eop, as 09_geometry_events does.
 	epoch.RegisterModel(epoch.ZeroModel{})
 
 	// Resolve 1 Ceres's real, current osculating elements live from JPL
@@ -79,8 +78,8 @@ func main() {
 		show.KV("Mean anomaly", "%s at the epoch", target.MeanAnomaly.DMSString(1)),
 	)
 
-	// Note what does NOT happen here: no remote.EnableDownloads for a
-	// kernel, no de440s (~32 MB) download, no manual eph.NewElements/
+	// Note what does NOT happen here: no kernel, no de440s (~32 MB)
+	// download, no manual eph.NewElements/
 	// eph.NewFromElements call — FromCatalog(target, nil) sees
 	// target.HasElements, builds the Kepler-propagated provider itself,
 	// and returns a fully-formed *plan.Asteroid. Everything from here

@@ -59,8 +59,6 @@ func TestGetFileThroughQueryWrappers(t *testing.T) {
 			t.Fatalf("%s: SetURL: %v", c.name, err)
 		}
 
-		cl.EnableDownloads(0, NAIFSPK)
-
 		fsys, key, err := cl.GetFile(context.Background(), NAIFSPK, c.get)
 		if err != nil {
 			t.Errorf("%s: GetFile: %v", c.name, err)

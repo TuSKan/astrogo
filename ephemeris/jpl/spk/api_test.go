@@ -38,11 +38,10 @@ func testDAFHeader() []byte {
 }
 
 func TestApiHorizonsRequest(t *testing.T) {
-	// This package's TestMain grants NAIFSPK/NAIFLSK download consent once
-	// for the whole test binary — remote.Reset() would revoke that for
-	// every test that runs afterward (e.g. reader_test.go's TestSPKReader),
-	// so restore only the specific override this test makes instead of
-	// resetting the whole registry.
+	// Restore only the specific override this test makes instead of
+	// resetting the whole registry, which would also undo whatever else a
+	// test running afterward depends on (e.g. reader_test.go's
+	// TestSPKReader).
 	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
 	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
@@ -156,8 +155,7 @@ func TestCacheAPIReusesExistingFile(t *testing.T) {
 
 func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 	// See TestApiHorizonsRequest: restore only the URL override, never
-	// call remote.Reset() (it would revoke TestMain's download consent
-	// for the rest of this package's test binary).
+	// call remote.Reset().
 	origEndpoint, _ := remote.Lookup(remote.JPLHorizonsSPK)
 
 	t.Cleanup(func() { _ = remote.SetURL(remote.JPLHorizonsSPK, origEndpoint.URL) })
@@ -175,8 +173,6 @@ func TestCacheAPIGeneratesFromHorizons(t *testing.T) {
 	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
-
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := epoch.FromJD(2451546.0, epoch.UTC)
@@ -262,8 +258,6 @@ func TestCacheAPIEscalatesToDESForOutOfRangeIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
-
 	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := epoch.FromJD(2451546.0, epoch.UTC)
 
@@ -344,8 +338,6 @@ func TestCacheAPIRetriesWithCAPForComets(t *testing.T) {
 	if err := remote.SetURL(remote.JPLHorizonsSPK, srv.URL); err != nil {
 		t.Fatal(err)
 	}
-
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
 
 	start := epoch.FromJD(2451545.0, epoch.UTC)
 	end := epoch.FromJD(2451546.0, epoch.UTC)

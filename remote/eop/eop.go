@@ -18,23 +18,20 @@
 // remote.CacheDir, and a package cannot import the package that imports
 // it. So it is here, one import below, and naming it is what turns it on.
 //
-// Which also makes it honest. IERS bulletins are somebody else's bandwidth
-// on somebody else's schedule, and the rest of this module is built around
-// never reaching for them unasked. A program that wants observatory-grade
-// UT1 says so in one line, the same way it says remote.EnableDownloads.
+// A program that wants observatory-grade UT1 says so in one line, and a
+// program that never computes it links no network stack.
 //
 // # What it does once imported
 //
 // time loads EOP data lazily, on the first Time.EOP, .UTC or .UT1 that
 // needs it: a pre-seeded cache object is read unconditionally, and only
-// the network step is gated behind
-// remote.EnableDownloads(0, remote.IERSFinals2000A). Pre-seeding
-// finals2000A.data into the cache is therefore the whole configuration an
-// air-gapped deployment needs.
+// the network step asks the download policy. Pre-seeding finals2000A.data
+// into the cache and calling remote.SetOffline(true) is therefore the whole
+// configuration an air-gapped deployment needs.
 //
 // The lazy load cannot say it failed. A program that needs to know calls
-// epoch.LoadEOP(ctx) after granting consent: the same two steps, fetch then
-// cache, under its context, with an error when neither gives a bulletin.
+// epoch.LoadEOP(ctx): the same two steps, fetch then cache, under its
+// context, with an error when neither gives a bulletin.
 package eop
 
 import (
@@ -78,11 +75,11 @@ func (eopLoader) Cached(ctx context.Context) (epoch.EOPData, error) {
 	return epoch.EOPData{Raw: raw, ModTime: info.ModTime()}, nil
 }
 
-// Fetch downloads finals2000A.all, subject to download consent.
+// Fetch downloads finals2000A.all, subject to the download policy.
 func (eopLoader) Fetch(ctx context.Context) (epoch.EOPData, error) {
-	// The network step, and consent gates it before anything else does.
-	// Without consent remote.GetFile serves a cached bulletin as offline mode
-	// does (#964), which is the one Cached has just read and found wanting,
+	// The network step, and the policy decides it before anything else does.
+	// Under a refusing policy remote.GetFile serves a cached bulletin as
+	// offline mode does (#964), which is the one Cached has just read and found wanting,
 	// and the lazy load would record it as fetched from the network.
 	ep, _ := remote.Lookup(remote.IERSFinals2000A)
 	if err := remote.CheckDownload(remote.IERSFinals2000A, "finals2000A.all", ep.ApproxSize); err != nil {

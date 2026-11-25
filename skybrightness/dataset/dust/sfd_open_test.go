@@ -116,7 +116,7 @@ func hemisphereFITS(t *testing.T, nsgp string, px [4]float64) []byte {
 }
 
 // serveSFD points remote.SFDDustMap at a bucket holding the two hemisphere
-// files, and grants the download consent Open needs.
+// files.
 func serveSFD(t *testing.T, north, south []byte) {
 	t.Helper()
 
@@ -140,7 +140,6 @@ func serveSFD(t *testing.T, north, south []byte) {
 		}
 	}
 
-	remote.EnableDownloads(0, remote.SFDDustMap)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 }
 
@@ -270,8 +269,8 @@ func TestSFDOpenRefusesAMisdescribedFile(t *testing.T) {
 	}
 }
 
-// TestSFDOpenReportsAMissingFile: without download consent nothing can be
-// fetched, and Open has to say so rather than come back with an empty map that
+// TestSFDOpenReportsAMissingFile: with neither hemisphere at the source
+// nothing can be fetched, and Open has to say so rather than come back with an empty map that
 // answers every direction with zero dust.
 func TestSFDOpenReportsAMissingFile(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
@@ -282,7 +281,7 @@ func TestSFDOpenReportsAMissingFile(t *testing.T) {
 
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	// Downloads deliberately not enabled.
+	// The source holds neither hemisphere file.
 	if _, err := Open(context.Background()); !errors.Is(err, ErrSFD) {
 		t.Errorf("err = %v, want ErrSFD", err)
 	}

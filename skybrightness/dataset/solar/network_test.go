@@ -36,9 +36,8 @@ func TestNewScatteredMoonlightFromCALSPEC(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	// The file is a few megabytes; consent is still required.
+	// The file is a few megabytes.
 	t.Cleanup(remote.Capture(remote.CALSPEC).Restore)
-	remote.EnableDownloads(64<<20, remote.CALSPEC)
 
 	m, err := solar.NewScatteredMoonlight(ctx)
 	if err != nil {
@@ -65,7 +64,6 @@ func TestSolarSpectrumCoversTheROLOBands(t *testing.T) {
 	defer cancel()
 
 	t.Cleanup(remote.Capture(remote.CALSPEC).Restore)
-	remote.EnableDownloads(64<<20, remote.CALSPEC)
 
 	spectrum, err := solar.Open(ctx)
 	if err != nil {

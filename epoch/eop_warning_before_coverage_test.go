@@ -36,21 +36,21 @@ func TestEOPWarningBeforeTheBulletin(t *testing.T) {
 				"nothing to fetch",
 				"RegisterModel(ZeroModel{})",
 			},
-			[]string{"remote/eop", "EnableDownloads", "0.9 s", "leap seconds"},
+			[]string{"remote/eop", "network access", "0.9 s", "leap seconds"},
 		},
 		{
 			"1965, steered UTC", Date(1965, time.June, 1, 0, 0, 0, 0, time.UTC).MJD(),
 			[]string{"EOP unavailable", "steered toward UT2", "begins on 1973-01-02"},
-			[]string{"EnableDownloads", "0.9 s"},
+			[]string{"network access", "0.9 s"},
 		},
 		{
 			"1972, leap seconds but no bulletin yet", Date(1972, time.June, 1, 0, 0, 0, 0, time.UTC).MJD(),
 			[]string{"EOP unavailable", "up to 0.9 s", "begins on 1973-01-02"},
-			[]string{"EnableDownloads"},
+			[]string{"network access"},
 		},
 		{
 			"2020, inside the bulletin's years", Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC).MJD(),
-			[]string{"EOP unavailable", "up to 0.9 s", "github.com/TuSKan/astrogo/remote/eop", "EnableDownloads"},
+			[]string{"EOP unavailable", "up to 0.9 s", "github.com/TuSKan/astrogo/remote/eop", "network access"},
 			[]string{"begins on 1973-01-02", "before 1960"},
 		},
 	} {

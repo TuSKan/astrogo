@@ -21,7 +21,7 @@ import (
 //
 // # What it removes
 //
-// Getting a sky brightness by hand means granting consent, gathering five
+// Getting a sky brightness by hand means gathering five
 // datasets, building a model, building an atmosphere that carries the
 // preset's own kappa and scattering order, asking at the preset's own
 // fidelity, and keeping the grid and passband to hand for every later call.
@@ -77,13 +77,13 @@ func WithMagSystem(sys magnitude.System) Option {
 // Five services on a cold cache and none on a warm one, so an application
 // pays this once at start-up.
 //
-// Consent is not granted here — see this package's own documentation for why,
-// and [Endpoints] for what to grant. When it is missing this says so and
-// names the call.
+// A download the policy set with [remote.SetPolicy] refuses is an error that
+// names the preset and how much reference data it needs; [Endpoints] says
+// which endpoints it fetches from.
 func Open(ctx context.Context, spec Spec, opts ...Option) (*Sky, error) {
 	in, err := Inputs(ctx, spec)
 	if err != nil {
-		return nil, consentAdvice(spec.Preset, err)
+		return nil, refusalContext(spec.Preset, err)
 	}
 
 	return newSky(spec.Preset, in, opts...)
@@ -124,24 +124,18 @@ func newSky(
 	return s, nil
 }
 
-// consentAdvice turns a refused download into the two lines that grant it.
-//
-// The friction was never typing them; it was not knowing they were needed.
-// A caller who has just been told what to paste is in a better position than
-// one handed a policy error, and this keeps the grant at their call site
-// where the design requires it to be.
-func consentAdvice(p skybrightness.Preset, err error) error {
+// refusalContext adds to a refused download what the policy refused: the
+// preset and how much reference data it needs, so a policy capping the size
+// can be set to allow it.
+func refusalContext(p skybrightness.Preset, err error) error {
 	if !errors.Is(err, remote.ErrDownloadDenied) {
 		return err
 	}
 
 	_, size := Endpoints(p)
 
-	return fmt.Errorf("%w\n\npreset %q needs up to %d MB of reference data and downloads "+
-		"are not enabled. Grant it with:\n\n"+
-		"\tids, size := dataset.Endpoints(%q)\n"+
-		"\tremote.EnableDownloads(size, ids...)",
-		err, p, size>>20, p)
+	return fmt.Errorf("%w\n\npreset %q needs reference data of up to %d MB a file, "+
+		"which the download policy refused", err, p, size>>20)
 }
 
 // Scene builds the physical state to evaluate under, with the preset's

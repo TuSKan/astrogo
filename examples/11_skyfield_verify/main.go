@@ -17,7 +17,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
@@ -68,10 +67,8 @@ var metersPerAU = constants.IAU.AstronomicalUnit.Value
 
 func main() {
 	// Earth orientation: like every online example, this one imports
-	// remote/eop and consents to the IERS bulletin. A geocentric astrometric
-	// place does not use it, having no site and no Earth rotation in it.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-
+	// remote/eop. A geocentric astrometric place does not use it, having no
+	// site and no Earth rotation in it.
 	t := epoch.Date(2025, 7, 3, 12, 0, 0, 0, time.UTC)
 
 	show.Title("Mars, geocentric astrometric place", "astrogo against JPL Horizons and Skyfield")
@@ -98,11 +95,8 @@ func main() {
 	// 17.7 arcsec at this distance.
 	builtIn := place(eph.Default(), t, "astrogo, built-in Plan94", 17.7)
 
-	// 2. The JPL DE440 kernel. Downloads are opt-in, see README "Data
-	// downloads & offline usage": de440 is ~114 MB; naif0012.tls (leap
-	// seconds) ~5 KB.
-	remote.EnableDownloads(200<<20, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
+	// 2. The JPL DE440 kernel: de440 is ~114 MB and naif0012.tls (leap
+	// seconds) ~5 KB, both downloaded on first run.
 
 	var kernel *result
 

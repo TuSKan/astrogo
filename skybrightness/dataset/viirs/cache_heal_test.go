@@ -157,8 +157,7 @@ func (a *archiveSource) serve(body []byte, etag string) {
 }
 
 // viirsCacheAndSource points remote.VIIRSAnnual at an archiveSource serving
-// body and its cache at a fresh directory, and consents to its downloads, for
-// the rest of t. It returns the data directory, the archive's cache key, and
+// body and its cache at a fresh directory, for the rest of t. It returns the data directory, the archive's cache key, and
 // the source.
 func viirsCacheAndSource(t *testing.T, body []byte) (cache remote.FS, archiveKey string, src *archiveSource) {
 	t.Helper()
@@ -202,8 +201,6 @@ func viirsCacheAndSource(t *testing.T, body []byte) (cache remote.FS, archiveKey
 	if err != nil {
 		t.Fatalf("CacheDir: %v", err)
 	}
-
-	remote.EnableDownloads(0, remote.VIIRSAnnual)
 
 	return cache, prefix + archiveFile, src
 }

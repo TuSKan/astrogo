@@ -5,14 +5,14 @@ import (
 )
 
 // Scope is an immutable snapshot of a [Client]'s configuration — every
-// captured endpoint's URL/Enabled/DownloadsOK/MaxDownloadSize, plus the
-// client's offline flag, download Policy, and data directory — taken by
-// [Capture] and put back by [Scope.Restore].
+// captured endpoint's URL and Enabled, plus the client's offline flag,
+// download Policy, and data directory — taken by [Capture] and put back by
+// [Scope.Restore].
 //
 // This exists because Reset is both too broad and too narrow for scoped
-// test use: it wipes every endpoint's consent (including consent a
-// package-level TestMain granted for the whole test binary run — a real
-// regression this caused once), and it never touches the data directory
+// test use: it wipes the offline mode and download policy a package-level
+// TestMain set for the whole test binary run (wiping what a TestMain set was
+// a real regression once), and it never touches the data directory
 // at all, so a test that only calls Reset can still leak its own
 // SetDataDir(t.TempDir()) forward into every test that runs afterward.
 // Capture/Restore snapshot exactly what was asked for and put exactly that
@@ -33,9 +33,9 @@ func Capture(ids ...EndpointID) Scope { return Default().Capture(ids...) }
 
 // Capture snapshots this client's current configuration. With no arguments it
 // captures every registered endpoint; with ids it captures only those,
-// leaving every other endpoint's consent untouched by a later Restore —
-// the property that matters when a broader scope (e.g. a package
-// TestMain) has already granted consent this call must not disturb. The
+// leaving every other endpoint untouched by a later Restore — the property
+// that matters when a broader scope (e.g. a package TestMain) has already
+// configured an endpoint this call must not disturb. The
 // client-wide fields (offline, policy, and the data directory) are always
 // captured, regardless of ids.
 func (c *Client) Capture(ids ...EndpointID) Scope {
@@ -69,8 +69,8 @@ func (c *Client) Capture(ids ...EndpointID) Scope {
 }
 
 // Restore puts back every value Capture recorded, on the client it was taken
-// from: the captured endpoints' full configuration (URL, Enabled, DownloadsOK,
-// MaxDownloadSize), offline mode, the download Policy, and the data directory.
+// from: the captured endpoints' full configuration (URL, Enabled), offline
+// mode, the download Policy, and the data directory.
 // Endpoints outside the captured set are never touched.
 //
 // Restore has a value receiver specifically so it can be used directly as
@@ -78,7 +78,7 @@ func (c *Client) Capture(ids ...EndpointID) Scope {
 // restores later with no closure needed.
 //
 // Not safe to use concurrently with anything else mutating the same client
-// (SetURL, EnableDownloads, SetOffline, ...) — the same caveat that already
+// (SetURL, SetPolicy, SetOffline, ...) — the same caveat that already
 // applies to Reset, and why remote-touching tests in this module don't run
 // under t.Parallel.
 func (s Scope) Restore() {

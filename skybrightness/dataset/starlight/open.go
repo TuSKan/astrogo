@@ -62,9 +62,8 @@ const TotalStarlightMap = "starmap-o8-BVRI-total.txt.gz"
 // being the difference between the passband service's Vega calibration and the
 // rounded literal the earlier file rested on.
 //
-// The download is consent-gated like every other bulk fetch: call
-// [remote.EnableDownloads] with [remote.GaiaStarMap] first, or this fails with
-// [remote.ErrDownloadDenied].
+// It downloads the map on first use, asking the download policy like every
+// other bulk fetch; a refusal is [remote.ErrDownloadDenied].
 func Open(ctx context.Context) (*Map, error) {
 	var m *Map
 

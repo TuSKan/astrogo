@@ -37,8 +37,6 @@ func TestGAMBONSGapDecomposition(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	enableStarMapDownload(t)
-
 	grid := skybrightness.DefaultOpticalGrid()
 	band := johnsonVTophat()
 	scene := gambonsScene(t)

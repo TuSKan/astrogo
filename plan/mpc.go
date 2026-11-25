@@ -101,7 +101,7 @@ type MPCObservatory struct {
 //
 // The mutex is held across the fetch so concurrent first calls make one
 // request between them rather than one each, and a failure is not recorded:
-// a load that fails because consent had not been granted, or because the MPC
+// a load that fails because the download policy refused it, or because the MPC
 // was briefly unreachable, must not make the whole register permanently absent
 // while the process looks healthy. The next call tries again.
 var mpcCache struct {
@@ -114,9 +114,9 @@ var mpcCache struct {
 //
 // The list — about 200 KB — is fetched on the first call that needs it, using
 // that caller's context, and kept for the life of the process. It is a
-// [remote.Endpoint.Downloadable] endpoint, so a caller must have granted
-// [remote.EnableDownloads] for [remote.MPCObsCodes] first; without it the error
-// is [remote.ErrDownloadDenied] and says which call grants it.
+// [remote.Endpoint.Downloadable] endpoint, so the download policy set with
+// [remote.SetPolicy] is asked about it; when it refuses, the error is
+// [remote.ErrDownloadDenied].
 //
 // # Recovering a position from the parallax constants
 //
@@ -172,7 +172,7 @@ func MPCObservatories(ctx context.Context) ([]MPCObservatory, error) {
 
 // NewMPCSite resolves an IAU Minor Planet Center observatory code to a [Site],
 // fetching the code list on the first call that needs it (see
-// [MPCObservatories] for the fetch, the consent gate, and how much the recovered
+// [MPCObservatories] for the fetch, the download policy, and how much the recovered
 // position is worth).
 //
 // The code is matched case-insensitively after trimming spaces, so "g37",

@@ -71,9 +71,9 @@ type Spectrum struct {
 
 // Open fetches and parses the CALSPEC solar reference.
 //
-// The download is consent-gated like every other bulk fetch: call
-// [remote.EnableDownloads] with [remote.CALSPEC] first, or this fails with
-// [remote.ErrDownloadDenied]. The file is a few megabytes.
+// It downloads the file on first use, asking the download policy like every
+// other bulk fetch; a refusal is [remote.ErrDownloadDenied]. The file is a few
+// megabytes.
 func Open(ctx context.Context) (*Spectrum, error) {
 	var s *Spectrum
 
@@ -297,7 +297,7 @@ func floatColumn(table *fits.BintableHDU, name string) []float64 {
 // instrument's own calibration chain — constructs the component directly
 // instead.
 //
-// The download is consent-gated like every other bulk fetch; see [Open].
+// It downloads the solar reference on first use; see [Open].
 func NewScatteredMoonlight(ctx context.Context) (*skybrightness.ScatteredMoonlight, error) {
 	spectrum, err := Open(ctx)
 	if err != nil {

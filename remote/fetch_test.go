@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/internal/testutil"
+	"github.com/TuSKan/astrogo/logging"
 	"github.com/TuSKan/astrogo/remote/file"
 )
 
@@ -66,8 +67,6 @@ func TestGetFileImmutableExistenceOnly(t *testing.T) {
 		t.Fatalf("seed source: %v", err)
 	}
 
-	EnableDownloads(0, NAIFSPK)
-
 	fsys, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
@@ -101,8 +100,6 @@ func TestGetFileMutableHeadProbeReuse(t *testing.T) {
 	const payload = "ngc-catalog-v1"
 
 	writeFakeSource(t, OpenNGC, "NGC.csv", payload)
-
-	EnableDownloads(0, OpenNGC)
 
 	fsys, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
@@ -144,8 +141,6 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	cleanRemoteState(t)
 
 	srcFS := fakeSource(t, OpenNGC, "NGC.csv", "ngc-catalog-v1")
-
-	EnableDownloads(0, OpenNGC)
 
 	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
 		t.Fatalf("GetFile: %v", err)
@@ -190,8 +185,6 @@ func TestGetFileWithValidateRejectsCorruptDownload(t *testing.T) {
 
 	writeFakeSource(t, NAIFLSK, "naif0012.tls", "bad-lsk-content")
 
-	EnableDownloads(0, NAIFLSK)
-
 	_, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
 		WithValidate(func(io.Reader) error { return errValidateTest }))
 	if !errors.Is(err, errValidateTest) {
@@ -218,8 +211,6 @@ func TestGetFileWithCacheNameDiffersFromPath(t *testing.T) {
 	// still exercises WithCacheName's actual differing-name behavior.
 	writeFakeSource(t, OpenNGC, "raw-source-name.csv", "ngc-data")
 
-	EnableDownloads(0, OpenNGC)
-
 	_, key, err := GetFile(context.Background(), OpenNGC, "raw-source-name.csv", WithCacheName("NGC.csv"))
 	if err != nil {
 		t.Fatalf("GetFile: %v", err)
@@ -236,8 +227,6 @@ func TestGetFileWithProgressReportsBytesDirectSavePath(t *testing.T) {
 	const payload = "kernel-progress-payload"
 
 	writeFakeSource(t, NAIFSPK, "planets/progress.bsp", payload)
-
-	EnableDownloads(0, NAIFSPK)
 
 	var mu sync.Mutex
 
@@ -284,8 +273,6 @@ func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
 
 	writeFakeSource(t, NAIFLSK, "naif0012.tls", payload)
 
-	EnableDownloads(0, NAIFLSK)
-
 	var last int64
 
 	_, _, err := GetFile(context.Background(), NAIFLSK, "naif0012.tls",
@@ -300,38 +287,54 @@ func TestGetFileWithProgressReportsBytesValidatedPath(t *testing.T) {
 	}
 }
 
-func TestGetFileDoesNotLogDownloadingWhenConsentDenied(t *testing.T) {
+// TestGetFileLogsADownloadAndNothingElse: a download is logged at Warn, which
+// the default logger shows; a refused download and a cache hit log nothing.
+func TestGetFileLogsADownloadAndNothingElse(t *testing.T) {
 	cleanRemoteState(t)
 
 	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
 
-	var logBuf bytes.Buffer
+	var buf bytes.Buffer
 
-	prevOutput := log.Writer()
-	prevFlags := log.Flags()
+	logging.Set(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { logging.Set(nil) })
 
-	log.SetOutput(&logBuf)
-	log.SetFlags(0)
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
-	t.Cleanup(func() {
-		log.SetOutput(prevOutput)
-		log.SetFlags(prevFlags)
-	})
-
-	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
-	if !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("expected ErrDownloadDenied, got %v", err)
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrDownloadDenied) {
+		t.Fatalf("under a refusing policy: %v, want ErrDownloadDenied", err)
 	}
 
-	if strings.Contains(logBuf.String(), "remote: downloading") {
-		t.Errorf("logged a \"downloading\" message despite consent being denied:\n%s", logBuf.String())
+	if strings.Contains(buf.String(), "downloading") {
+		t.Errorf("a refused download was logged:\n%s", buf.String())
+	}
+
+	SetPolicy(nil)
+
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); err != nil {
+		t.Fatalf("GetFile: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "level=WARN msg=downloading") {
+		t.Errorf("the download was not logged at Warn:\n%s", buf.String())
+	}
+
+	before := buf.Len()
+
+	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp"); err != nil {
+		t.Fatalf("GetFile from the cache: %v", err)
+	}
+
+	if strings.Contains(buf.String()[before:], "downloading") {
+		t.Errorf("a cache hit was logged as a download:\n%s", buf.String()[before:])
 	}
 }
 
-func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
+func TestGetFileRefusedByThePolicyWritesNothing(t *testing.T) {
 	cleanRemoteState(t)
 
 	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	_, _, err := GetFile(context.Background(), NAIFSPK, "planets/de442.bsp")
 	if !errors.Is(err, ErrDownloadDenied) {
@@ -348,8 +351,6 @@ func TestGetFileDownloadDeniedWithoutConsent(t *testing.T) {
 
 func TestGetFileRespectsOfflineAndDisable(t *testing.T) {
 	cleanRemoteState(t)
-
-	EnableDownloads(0, NAIFSPK)
 
 	Disable(NAIFSPK)
 
@@ -428,7 +429,6 @@ func TestGetFileServesThePreSeededCacheOffline(t *testing.T) {
 func TestGetFileOfflineStillRefusesAMissOrADisabledEndpoint(t *testing.T) {
 	cleanRemoteState(t)
 
-	EnableDownloads(0, NAIFSPK)
 	seedCache(t, NAIFSPK, "planets/de442.bsp", "pre-seeded")
 	SetOffline(true)
 
@@ -447,8 +447,6 @@ func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 	cleanRemoteState(t)
 
 	writeFakeSource(t, NAIFSPK, "planets/slow.bsp", "too-slow")
-
-	EnableDownloads(0, NAIFSPK)
 
 	// A local file read is effectively instantaneous, so there is no way to
 	// simulate real transport latency the way an artificially slow httptest
@@ -479,8 +477,6 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 	const payload = "random-access-content"
 
 	writeFakeSource(t, NAIFSPK, "planets/de440s.bsp", payload)
-
-	EnableDownloads(0, NAIFSPK)
 
 	fsys, key, err := GetFile(context.Background(), NAIFSPK, "planets/de440s.bsp")
 	if err != nil {
@@ -523,18 +519,18 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 	}
 }
 
-// TestUnreachableSourceStillReportsConsentFirst pins a deliberate ordering that
+// TestUnreachableSourceStillReportsThePolicyFirst pins a deliberate ordering that
 // reads like a bug until you know why.
 //
-// When the source cannot even be opened, a caller who never granted consent is
-// told about consent rather than about the source. That is not hiding the real
-// error: consent is the blocker they can actually act on, it is what the
-// documented contract promises, and reporting the source failure instead would
-// make the message depend on whether the service happened to be up.
+// When the source cannot even be opened, a caller whose policy refuses the
+// download is told about the refusal rather than about the source. That is not
+// hiding the real error: the policy is the blocker they can actually act on,
+// and reporting the source failure instead would make the message depend on
+// whether the service happened to be up.
 //
-// A caller who did grant consent sees the real error, which is the other half
+// A caller whose policy allows it sees the real error, which is the other half
 // and the reason this is an ordering rather than a suppression.
-func TestUnreachableSourceStillReportsConsentFirst(t *testing.T) {
+func TestUnreachableSourceStillReportsThePolicyFirst(t *testing.T) {
 	scope := Capture(NAIFSPK)
 	t.Cleanup(scope.Restore)
 
@@ -544,18 +540,20 @@ func TestUnreachableSourceStillReportsConsentFirst(t *testing.T) {
 		t.Fatalf("SetURL: %v", err)
 	}
 
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
+
 	_, _, err := GetFile(context.Background(), NAIFSPK, "de440s.bsp")
 	if !errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("GetFile without consent against an unopenable source = %v, want ErrDownloadDenied.\n"+
-			"  Consent is the actionable blocker, and which error a caller sees must not "+
+		t.Errorf("GetFile under a refusing policy against an unopenable source = %v, want ErrDownloadDenied.\n"+
+			"  The policy is the actionable blocker, and which error a caller sees must not "+
 			"depend on whether the service was reachable.", err)
 	}
 
-	EnableDownloads(0, NAIFSPK)
+	SetPolicy(nil)
 
 	_, _, err = GetFile(context.Background(), NAIFSPK, "de440s.bsp")
 	if errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("GetFile with consent = %v, want the source's own error", err)
+		t.Errorf("GetFile with downloads allowed = %v, want the source's own error", err)
 	}
 
 	if err == nil {
@@ -587,7 +585,6 @@ func TestAFetchThatLostTheRaceStillReturnsTheObject(t *testing.T) {
 	t.Cleanup(scope.Restore)
 
 	SetDataDir(testutil.FileURL(t, t.TempDir()))
-	EnableDownloads(0, NAIFSPK)
 
 	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
 	if err != nil {
@@ -647,25 +644,25 @@ func TestAFailedFetchWithNothingCachedStillFails(t *testing.T) {
 	}
 
 	SetDataDir(testutil.FileURL(t, t.TempDir()))
-	EnableDownloads(0, NAIFSPK)
 
 	if _, _, err := GetFile(context.Background(), NAIFSPK, "planets/absent.bsp"); err == nil {
 		t.Fatal("a failed download with nothing in the cache reported success")
 	}
 }
 
-// TestGetFileWithoutConsentDoesNotWaitForAForeignLock: a cache miss that may
+// TestGetFileUnderARefusingPolicyDoesNotWaitForAForeignLock: a cache miss that may
 // not download has nothing to wait for, so another process's lock on the
-// entry must not hold it up. Consent used to be checked after the lock, and
+// entry must not hold it up. The policy used to be asked after the lock, and
 // a lock left by a crashed process held every caller until it went stale half
 // an hour later — the lazy EOP load among them, with its mutex held and every
 // Earth-orientation lookup in the process queued behind it (#424). With the
 // old order this waits out its context and fails with a deadline rather than
 // ErrDownloadDenied.
-func TestGetFileWithoutConsentDoesNotWaitForAForeignLock(t *testing.T) {
+func TestGetFileUnderARefusingPolicyDoesNotWaitForAForeignLock(t *testing.T) {
 	cleanRemoteState(t)
 
 	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
 	if err != nil {
@@ -681,14 +678,14 @@ func TestGetFileWithoutConsentDoesNotWaitForAForeignLock(t *testing.T) {
 	defer cancel()
 
 	if _, _, err := GetFile(ctx, NAIFSPK, "planets/de442.bsp"); !errors.Is(err, ErrDownloadDenied) {
-		t.Fatalf("GetFile with a foreign lock and no consent: %v, want ErrDownloadDenied at once", err)
+		t.Fatalf("GetFile with a foreign lock under a refusing policy: %v, want ErrDownloadDenied at once", err)
 	}
 }
 
 // TestGetFileStealsALockOlderThanTwiceItsTimeout: every holder of a cache
 // entry's lock downloads under the same timeout, so a lock older than twice it
 // was left by a crashed process. GetFile used to honor any lock for 30 minutes
-// whatever the download, and the lazy EOP load, with consent, waited that out
+// whatever the download, and the lazy EOP load waited that out
 // for a 3.8 MB bulletin with a 30 s timeout, holding its mutex (#445). Here a
 // minute-old lock on an entry fetched with a 10 s timeout is stolen at once.
 func TestGetFileStealsALockOlderThanTwiceItsTimeout(t *testing.T) {
@@ -701,7 +698,6 @@ func TestGetFileStealsALockOlderThanTwiceItsTimeout(t *testing.T) {
 	SetDataDir(testutil.FileURL(t, dir))
 
 	writeFakeSource(t, NAIFSPK, "planets/de442.bsp", "kernel-bytes")
-	EnableDownloads(0, NAIFSPK)
 
 	cacheFS, prefix, err := CacheDir(context.Background(), NAIFSPK)
 	if err != nil {

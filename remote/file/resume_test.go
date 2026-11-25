@@ -17,7 +17,7 @@ var errValidationFailed = errors.New("staged content is not what was expected")
 // remote.GetFile.
 //
 // Reaching it through GetFile means a failure arrives as "the fetch went wrong"
-// with the registry, the consent gate and a live source between the assertion
+// with the registry, the download policy and a live source between the assertion
 // and the defect. These functions take a filesystem and a key and nothing else, so
 // they can be asked directly what they do — and the questions worth asking are
 // about a partial nobody wrote, a partial that no longer matches its source,

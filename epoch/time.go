@@ -313,7 +313,7 @@ func (t Time) String() string {
 //
 // Converting a UT1-scale Time needs DUT1, so it can trigger epoch's lazy
 // Earth-orientation load. That path
-// degrades rather than fails (disk cache, then a consent-gated fetch, then
+// degrades rather than fails (disk cache, then a fetch, then
 // zero EOP with a warning), and |DUT1| < 0.9 s bounds the error even when it
 // degrades. UTC, TAI, TT and TDB convert by arithmetic alone and reach no
 // data at all. Printing the right instant is worth the one scale that has to
@@ -1324,9 +1324,8 @@ func (t Time) TCB() Time {
 // This conversion requires IERS Earth Orientation Parameters for DUT1,
 // which are loaded automatically and lazily on first need once
 // [github.com/TuSKan/astrogo/remote/eop] is imported: a pre-seeded on-disk
-// cache file, then (if [github.com/TuSKan/astrogo/remote.EnableDownloads]
-// was called for [github.com/TuSKan/astrogo/remote.IERSFinals2000A]) a
-// network fetch.
+// cache file, then a network fetch unless the download policy set with
+// [github.com/TuSKan/astrogo/remote.SetPolicy] refuses it.
 //
 // Past the bulletin's end it answers with ΔT held at its value on the
 // bulletin's last day, the forecast every conversion uses there, and the

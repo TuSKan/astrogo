@@ -5,8 +5,8 @@
 // A preset names a configuration of components; it does not carry the data
 // those components read. Gathering that data means a star map, a dust map, an
 // airglow spectrum, a passband and — for the module's own model — a solar
-// spectrum, each from a different service with its own client, its own cache
-// and its own consent. Assembled by hand that is a page of code before the
+// spectrum, each from a different service with its own client and its own
+// cache. Assembled by hand that is a page of code before the
 // first sky brightness is computed, and the page is the same page every time.
 //
 // [Inputs] is that page. One call, one error to check, and the result goes
@@ -20,18 +20,14 @@
 // dataset, a different grid per component, or a source this does not offer;
 // nothing here is a wrapper that hides them.
 //
+// # What it downloads
+//
+// On a cold cache the first [Inputs] downloads about 145 MB, each file logged,
+// and every later one reads the cache. [Endpoints] reports what a preset will
+// fetch and the largest single file, for a caller that bounds downloads with
+// [remote.SetPolicy] first.
+//
 // # What it will not decide for you
-//
-// Downloads are not consented to here. [Endpoints] reports what a preset will
-// fetch and how much it moves, so the grant stays where every other bulk fetch
-// in this module puts it — an explicit [remote.EnableDownloads] at the call
-// site:
-//
-//	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
-//	remote.EnableDownloads(size, ids...)
-//
-// A convenience that granted its own consent would be a convenience that
-// downloaded 145 MB because somebody typed a preset name.
 //
 // Ground emitters are not sourced either. [skybrightness.Observatory] needs an
 // inventory of artificial light around the site, and satellite radiance alone
@@ -195,13 +191,13 @@ type Spec struct {
 // Endpoints reports the remote endpoints a preset's data comes from, and the
 // largest single fetch among them.
 //
-// The size is the per-download cap [remote.EnableDownloads] wants, not the
-// total moved: consent is checked against one object at a time. The largest
-// here is one hemisphere of the SFD dust map.
+// The size is what a policy capping each download must allow, not the total
+// moved: the policy is asked about one object at a time. The largest here is
+// one hemisphere of the SFD dust map.
 //
 // Only endpoints that actually move a file are listed. The passband and
-// airglow services answer queries rather than serving objects, so they need no
-// consent and appear nowhere in the grant.
+// airglow services answer queries rather than serving objects, so they are not
+// downloads and the policy is never asked about them.
 func Endpoints(p skybrightness.Preset) (ids []remote.EndpointID, maxSize int64) {
 	ids = []remote.EndpointID{remote.GaiaStarMap, remote.SFDDustMap}
 
@@ -230,8 +226,8 @@ func Endpoints(p skybrightness.Preset) (ids []remote.EndpointID, maxSize int64) 
 // MapBand, which only the star map can answer; a spec it cannot satisfy is
 // refused with [ErrSpec].
 //
-// Returns [remote.ErrDownloadDenied] when consent has not been granted — see
-// [Endpoints] for what to grant.
+// Returns [remote.ErrDownloadDenied] when the download policy refuses a fetch
+// — see [Endpoints] for what it fetches.
 func Inputs(ctx context.Context, spec Spec) (skybrightness.PresetInputs, error) {
 	var zero skybrightness.PresetInputs
 

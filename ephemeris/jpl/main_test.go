@@ -2,7 +2,6 @@ package jpl_test
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -10,25 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/ephemeris/core"
 	"github.com/TuSKan/astrogo/ephemeris/jpl"
 	"github.com/TuSKan/astrogo/internal/testutil"
-	"github.com/TuSKan/astrogo/remote"
 )
-
-// TestMain grants download consent for the whole package's default test
-// suite. These tests construct real jpl.Provider values against the
-// planetary de440s kernel and, for two small-body tests, live Horizons SPK
-// generation — a network/cache dependency that predates remote's
-// consent-gating (kernels landing in the shared user cache dir made it
-// invisible before). Rather than silently break every test in this file,
-// grant the same access explicitly here; TODO: replace with committed
-// offline SPK fixtures and move the network-dependent cases to
-// //go:build network per CLAUDE.md's test-tag convention.
-func TestMain(m *testing.M) {
-	remote.EnableDownloads(0, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
-
-	os.Exit(m.Run())
-}
 
 // testKernel is the planetary kernel every test in this package uses: the
 // small DE440 variant, 32 MB against de440's 115, covering 1849-2150. Every
@@ -119,8 +100,8 @@ func warmKernelCache(t *testing.T) {
 
 	if errWarm != nil {
 		// Only an outage skips: a timeout, a 5xx, a rate limit. Anything
-		// else — a kernel name that does not exist, a corrupt file, a denied
-		// consent — is a real defect, and skipping on it would turn the whole
+		// else — a kernel name that does not exist, a corrupt file, a refused
+		// download — is a real defect, and skipping on it would turn the whole
 		// package green while testing nothing. Skip is not pass.
 		testutil.SkipOnUpstreamFailure(t, errWarm)
 		t.Fatalf("could not obtain kernel %q within %v: %v", testKernel, kernelFetchTimeout, errWarm)

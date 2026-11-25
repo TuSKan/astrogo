@@ -72,8 +72,6 @@ func TestGetFileRefusesWhatItCannotFetch(t *testing.T) {
 				SetDataDir(c.dataDir)
 			}
 
-			EnableDownloads(0, NAIFSPK)
-
 			if _, _, err := GetFile(context.Background(), c.id, c.file); !errors.Is(err, c.sentinel) {
 				t.Errorf("GetFile(%q, %q): err %v, want %v", c.id, c.file, err, c.sentinel)
 			}

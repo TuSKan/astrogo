@@ -2,8 +2,8 @@
 // and the Jupiter-Venus conjunction of 2 BC.
 //
 // Requires DE441 for deep historical epoch coverage (13200 BC – AD 17191).
-// The kernel (~3 GB) downloads on first run, but only once you grant
-// consent — see README "Data downloads & offline usage".
+// The kernel (~3 GB) downloads on first run — see README "Data downloads
+// & offline usage".
 package main
 
 import (
@@ -15,7 +15,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
@@ -24,17 +23,13 @@ import (
 )
 
 func main() {
-	// de441 parts are multi-GB each; unlimited here since that's the whole
+	// de441 parts are multi-GB each and download on first run, which is the
 	// point of this example. naif0012.tls (leap seconds) is ~5 KB.
-	remote.EnableDownloads(0, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
 	// Earth orientation: like every online example, this one imports
-	// remote/eop and consents to the IERS bulletin. No bulletin covers the
-	// first century, though (it begins in 1973), so astrogo uses zero EOP
-	// here and says so once. What sets the accuracy is Delta T, the drift of
-	// the Earth's rotation, from the Espenak & Meeus (2006) model.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-
+	// remote/eop. No bulletin covers the first century, though (it begins
+	// in 1973), so astrogo uses zero EOP here and says so once. What sets
+	// the accuracy is Delta T, the drift of the Earth's rotation, from the
+	// Espenak & Meeus (2006) model.
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de441_part-1")
 	if err != nil {
 		panic(err)

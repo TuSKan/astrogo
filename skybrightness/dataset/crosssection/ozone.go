@@ -29,9 +29,9 @@ const OzoneTemperatureK = 223
 
 // Ozone fetches the ozone absorption cross section.
 //
-// The download is consent-gated like every other bulk fetch: call
-// [remote.EnableDownloads] with [remote.MPIMainzCrossSections] first, or this
-// fails with [remote.ErrDownloadDenied]. The file is about 1.9 MB and covers
+// It downloads the file on first use, asking the download policy like every
+// other bulk fetch; a refusal is [remote.ErrDownloadDenied]. The file is
+// about 1.9 MB and covers
 // 213 to 1100 nm, which spans the optical grid with no extrapolation at
 // either end.
 //

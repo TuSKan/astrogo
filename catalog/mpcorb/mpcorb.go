@@ -64,10 +64,10 @@ import (
 // name is the file under the MPC's MPCORB directory — "MPCORB.DAT",
 // "NEA.txt", "Distant.txt", "PHA.txt", "Unusual.txt", or "CometEls.txt" for
 // the comets. It is
-// [remote.Endpoint.Downloadable], so the caller must have granted
-// [remote.EnableDownloads] for [remote.MPCORB]; because the sizes span two
-// orders of magnitude the endpoint declares [remote.SizeVaries], which means
-// the grant's own byte budget is what decides.
+// [remote.Endpoint.Downloadable], so the download policy set with
+// [remote.SetPolicy] is asked about it; because the sizes span two orders of
+// magnitude the endpoint declares [remote.SizeVaries], which means a policy's
+// size cap is judged against the size the source reports.
 //
 // The fetch happens here, so an unreachable endpoint or a denied download is
 // an error from this call rather than a surprise on the first iteration. The

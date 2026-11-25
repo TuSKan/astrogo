@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// A caller without download consent can be given only what is already cached,
-// so GetFile asks no source on its behalf (#964). It used to ask a mutable
-// source whether the cached copy was current first: a request the caller never
-// agreed to, and against a source that did not answer, the whole of its
-// timeout.
+// A caller whose download policy refuses can be given only what is already
+// cached, so GetFile asks no source on its behalf (#964). It used to ask a
+// mutable source whether the cached copy was current first: a request the
+// caller had refused, and against a source that did not answer, the whole of
+// its timeout.
 
 // countingSource serves body under any name at id's URL and counts every
 // request it is sent, a HEAD probe as much as a download.
@@ -38,32 +38,30 @@ func countingSource(t *testing.T, id EndpointID, body []byte) *atomic.Int32 {
 	return &requests
 }
 
-// TestGetFileWithoutConsentServesTheCacheUnasked: a mutable endpoint's object,
-// cached while consent was given, is served after consent is withdrawn without
-// a request to the source, as offline mode serves it.
-func TestGetFileWithoutConsentServesTheCacheUnasked(t *testing.T) {
+// TestGetFileUnderARefusingPolicyServesTheCacheUnasked: a mutable endpoint's
+// object, cached while downloads were allowed, is served under a policy that
+// refuses them without a request to the source, as offline mode serves it.
+func TestGetFileUnderARefusingPolicyServesTheCacheUnasked(t *testing.T) {
 	cleanRemoteState(t)
 
 	body := []byte("v1 rows")
 	requests := countingSource(t, OpenNGC, body)
 
-	EnableDownloads(0, OpenNGC)
-
 	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
-		t.Fatalf("GetFile with consent: %v", err)
+		t.Fatalf("GetFile with downloads allowed: %v", err)
 	}
 
 	if requests.Load() == 0 {
 		t.Fatal("the source was never asked: the cache was not seeded from it")
 	}
 
-	DisableDownloads(OpenNGC)
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
 
 	before := requests.Load()
 
 	fsys, key, err := GetFile(context.Background(), OpenNGC, "NGC.csv")
 	if err != nil {
-		t.Fatalf("GetFile without consent, with a cached copy: %v", err)
+		t.Fatalf("GetFile under a refusing policy, with a cached copy: %v", err)
 	}
 
 	got, err := fs.ReadFile(fsys, key)
@@ -72,47 +70,48 @@ func TestGetFileWithoutConsentServesTheCacheUnasked(t *testing.T) {
 	}
 
 	if n := requests.Load() - before; n != 0 {
-		t.Errorf("the source was sent %d requests without consent, want 0", n)
+		t.Errorf("the source was sent %d requests under a refusing policy, want 0", n)
 	}
 }
 
-// TestGetFileWithoutConsentAndNoCacheAsksNothing: with nothing cached there is
-// nothing to serve, and the answer is consent's refusal, again unasked.
-func TestGetFileWithoutConsentAndNoCacheAsksNothing(t *testing.T) {
+// TestGetFileUnderARefusingPolicyWithNoCacheAsksNothing: with nothing cached
+// there is nothing to serve, and the answer is the policy's refusal, again
+// unasked.
+func TestGetFileUnderARefusingPolicyWithNoCacheAsksNothing(t *testing.T) {
 	cleanRemoteState(t)
 
 	requests := countingSource(t, OpenNGC, []byte("v1 rows"))
 
+	SetPolicy(func(Endpoint, int64) error { return errCustomPolicyForTest })
+
 	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); !errors.Is(err, ErrDownloadDenied) {
-		t.Errorf("GetFile without consent or a cache = %v, want ErrDownloadDenied", err)
+		t.Errorf("GetFile under a refusing policy with no cache = %v, want ErrDownloadDenied", err)
 	}
 
 	if n := requests.Load(); n != 0 {
-		t.Errorf("the source was sent %d requests without consent, want 0", n)
+		t.Errorf("the source was sent %d requests under a refusing policy, want 0", n)
 	}
 }
 
-// TestGetFileWithConsentStillAsksAMutableSource: with consent a mutable
-// endpoint's cache is still revalidated, which is the request a caller who
-// can download is asked for and one who cannot is now spared.
-func TestGetFileWithConsentStillAsksAMutableSource(t *testing.T) {
+// TestGetFileWithDownloadsAllowedStillAsksAMutableSource: a caller who may
+// download still has a mutable endpoint's cache revalidated, which is the
+// request one whose policy refuses is spared.
+func TestGetFileWithDownloadsAllowedStillAsksAMutableSource(t *testing.T) {
 	cleanRemoteState(t)
 
 	requests := countingSource(t, OpenNGC, []byte("v1 rows"))
 
-	EnableDownloads(0, OpenNGC)
-
 	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
-		t.Fatalf("GetFile with consent: %v", err)
+		t.Fatalf("GetFile with downloads allowed: %v", err)
 	}
 
 	before := requests.Load()
 
 	if _, _, err := GetFile(context.Background(), OpenNGC, "NGC.csv"); err != nil {
-		t.Fatalf("GetFile again with consent: %v", err)
+		t.Fatalf("GetFile again with downloads allowed: %v", err)
 	}
 
 	if requests.Load() == before {
-		t.Error("with consent, a mutable endpoint's cache was served without asking the source whether it is current")
+		t.Error("with downloads allowed, a mutable endpoint's cache was served without asking the source whether it is current")
 	}
 }

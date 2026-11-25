@@ -12,7 +12,7 @@ import (
 //
 // [Default] is the zero-configuration provider — SOFA's analytical series for
 // the Sun, Moon and the eight major planets. It needs no kernel, no download
-// consent and no network, which is what makes it usable in an example that
+// and no network, which is what makes it usable in an example that
 // runs on every `go test`. For arcsecond work over long spans, swap in a JPL
 // SPK-backed provider from ephemeris/jpl; the interface is the same.
 //

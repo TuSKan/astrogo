@@ -1,45 +1,14 @@
 package validation_test
 
-import (
-	"os"
-	"testing"
-
-	"github.com/TuSKan/astrogo/remote"
-	_ "github.com/TuSKan/astrogo/remote/eop" // registers the IERS EOP loader; see the consent note below
-)
-
-// TestMain grants download consent for this package's network/validation
-// test suites, which construct real jpl.Provider instances against
-// planetary and small-body kernels — a network/cache dependency that
-// predates remote's consent-gating (see ephemeris/jpl's own TestMain for
-// the same rationale). This file carries no build tag so it always
-// compiles; granting consent here is harmless when no network/validation
-// test actually runs (default go test ./... has nothing in this package
-// to execute without those tags).
-//
-// Consent for IERSFinals2000A is granted here too: regression_test.go's
-// TestScientificStability (validation-tagged) compares topocentric
-// alt/az against a static Horizons corpus at sub-arcsecond tolerance,
-// which needs real DUT1/polar motion, not the zero-EOP fallback. The blank
-// import above is what makes that possible at all: without it no loader is
-// registered and every epoch here silently uses zero DUT1 and polar motion,
-// which measured on this corpus moves the topocentric gap from a p50 of
-// 1.4 arcsec against a 3 arcsec contract to a max of 8.8 arcsec — a failure
+// TestScientificStability (validation-tagged) compares topocentric alt/az
+// against a static Horizons corpus at sub-arcsecond tolerance, which needs real
+// DUT1 and polar motion, not the zero-EOP fallback. Without this import no
+// loader is registered and every epoch here silently uses zero DUT1 and polar
+// motion, which measured on this corpus moves the topocentric gap from a p50
+// of 1.4 arcsec against a 3 arcsec contract to a max of 8.8 arcsec — a failure
 // that looks like a physics regression and is a missing import.
 //
-// Beyond that no explicit fetch call is needed — the first Time.EOP()/UTC()/UT1() query
-// any test in this package makes now triggers epoch's automatic lazy load
-// (disk cache, then this granted consent, then zero-EOP degradation),
-// exactly as if a real coord.Context construction had asked for it
-// directly. A lazy-load failure (offline, unreachable) only degrades to
-// zero EOP with a one-time warning; the accuracy-sensitive tests still
-// run and may fail on tolerance in that case, same as running without
-// network access ever did.
-func TestMain(m *testing.M) {
-	remote.EnableDownloads(0, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
-	remote.EnableDownloads(0, remote.JPLHorizonsSPK)
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-
-	os.Exit(m.Run())
-}
+// No explicit fetch call is needed: the first Time.EOP()/UTC()/UT1() query any
+// test here makes triggers epoch's lazy load (disk cache, then the download,
+// then zero-EOP degradation with a one-time warning).
+import _ "github.com/TuSKan/astrogo/remote/eop"

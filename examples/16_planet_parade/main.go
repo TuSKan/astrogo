@@ -25,7 +25,6 @@ import (
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/examples/internal/show"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 
 	// The kernel-backed sources register their backend rather than being
@@ -44,13 +43,10 @@ func main() {
 		"Seven planets in the evening sky from Quinta Calixto")
 
 	// ── Setup: JPL DE442 ──────────────────────────────────────────────
-	// Kernel downloads are opt-in — see README "Data downloads & offline
-	// usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
-	remote.EnableDownloads(200<<20, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
+	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
+	// download on first run and are cached.
 	// Earth orientation, for where the site is on the turning Earth:
 	// the IERS bulletin, which the remote/eop import above fetches.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
 
 	prov, err := eph.NewProvider(context.Background(), eph.Planets, "de442")
 	if err != nil {

@@ -28,10 +28,6 @@ import (
 func Example() {
 	ctx := context.Background()
 
-	// Consent first, and only for what this preset actually fetches.
-	ids, size := dataset.Endpoints(skybrightness.GAMBONSWeb)
-	remote.EnableDownloads(size, ids...)
-
 	in, err := dataset.Inputs(ctx, dataset.Spec{Preset: skybrightness.GAMBONSWeb})
 	if err != nil {
 		panic(err)
@@ -45,7 +41,7 @@ func Example() {
 	fmt.Println(model.Version())
 }
 
-// Endpoints names what a preset will download, and the cap consent needs.
+// Endpoints names what a preset will download, and the largest single file.
 //
 // A caller has to be able to see the cost before agreeing to it, which is the
 // whole reason this is separate from Inputs.
@@ -65,11 +61,11 @@ func TestEndpointsCoverWhatEachPresetFetches(t *testing.T) {
 		}
 
 		if size <= 0 {
-			t.Errorf("%s: consent cap is %d; a zero cap denies every download", p, size)
+			t.Errorf("%s: largest file is %d bytes; a policy capping downloads at it would refuse every one", p, size)
 		}
 
-		// The cap has to clear the largest registered object, or consent is
-		// granted for less than the fetch actually moves and every run fails
+		// The size has to clear the largest registered object, or a policy
+		// capping downloads at it allows less than the fetch actually moves and every run fails
 		// on a size check rather than on anything real.
 		for _, id := range ids {
 			e, ok := remote.Lookup(id)

@@ -107,8 +107,6 @@ func TestGetFileResumesFromPartial(t *testing.T) {
 		t.Fatalf("Stat: %v", err)
 	}
 
-	EnableDownloads(0, NAIFSPK)
-
 	seededPrefix := strings.Repeat("X", done)
 	seedPartial(t, seededPrefix, file.ETag(info))
 
@@ -141,7 +139,6 @@ func TestGetFileRestartsWhenValidatorStale(t *testing.T) {
 
 	fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
 
-	EnableDownloads(0, NAIFSPK)
 	seedPartial(t, "STALE-BYTES", `"stale-etag-does-not-match-anything"`)
 
 	fsys, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
@@ -173,7 +170,6 @@ func TestGetFileIgnoresPartialWithoutValidator(t *testing.T) {
 
 	fakeSource(t, NAIFSPK, "kernel.bsp", resumeBody)
 
-	EnableDownloads(0, NAIFSPK)
 	seedPartial(t, strings.Repeat("X", 10), "") // wrong-prefix body, no validator
 
 	fsys, key, err := GetFile(context.Background(), NAIFSPK, "kernel.bsp")
@@ -193,10 +189,10 @@ func TestGetFileIgnoresPartialWithoutValidator(t *testing.T) {
 	assertPartialCleared(t, fsys, key)
 }
 
-// TestGetFileResumeRespectsConsentSize verifies the consent gate is applied
-// to the file's FULL size, not just the remaining leg — otherwise resuming
-// would be a way to slip past a MaxDownloadSize cap a few bytes at a time.
-func TestGetFileResumeRespectsConsentSize(t *testing.T) {
+// TestGetFileResumeShowsThePolicyTheFullSize verifies the download policy is
+// asked about the file's FULL size, not just the remaining leg — otherwise
+// resuming would be a way to slip past a size cap a few bytes at a time.
+func TestGetFileResumeShowsThePolicyTheFullSize(t *testing.T) {
 	cleanRemoteState(t)
 
 	const done = 25 // only 5 bytes remain, but the file is 30
@@ -209,7 +205,13 @@ func TestGetFileResumeRespectsConsentSize(t *testing.T) {
 	}
 
 	// Cap below the full size but above the remaining bytes.
-	EnableDownloads(10, NAIFSPK)
+	SetPolicy(func(_ Endpoint, size int64) error {
+		if size > 10 {
+			return errCustomPolicyForTest
+		}
+
+		return nil
+	})
 	seedPartial(t, resumeBody[:done], file.ETag(info))
 
 	_, _, err = GetFile(context.Background(), NAIFSPK, "kernel.bsp")

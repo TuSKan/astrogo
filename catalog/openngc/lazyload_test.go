@@ -9,6 +9,7 @@ import (
 	"github.com/TuSKan/astrogo/catalog/resolve"
 	"github.com/TuSKan/astrogo/remote"
 
+	"github.com/TuSKan/astrogo/internal/remotetest"
 	"github.com/TuSKan/astrogo/internal/testutil"
 )
 
@@ -20,7 +21,6 @@ func TestNewDoesNoIO(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 	remote.SetOffline(true)
 
@@ -31,7 +31,7 @@ func TestNewDoesNoIO(t *testing.T) {
 
 // TestFailedLoadIsRetried is the second half of the change. A load failure used
 // to be recorded at construction and replayed for the life of the provider, so
-// a consent gate granted a moment later — or an endpoint that came back — never
+// a download allowed a moment later — or an endpoint that came back — never
 // took effect. The same provider must be able to answer once the reason for the
 // failure is gone.
 func TestFailedLoadIsRetried(t *testing.T) {
@@ -40,21 +40,23 @@ func TestFailedLoadIsRetried(t *testing.T) {
 	fakeSources(t)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
-	// Downloads not enabled yet: the catalog is unreachable.
+	// Downloads refused for now: the catalog is unreachable.
+	remotetest.RefuseDownloads(t, remote.OpenNGC)
+
 	p := New()
 
 	if _, err := p.Resolve(context.Background(), "M42"); err == nil {
-		t.Fatal("Resolve without download consent: want an error, got none")
+		t.Fatal("Resolve under a refusing policy: want an error, got none")
 	} else if errors.Is(err, resolve.ErrNotFound) {
 		t.Errorf("an unreachable catalog reported as a missing object: %v", err)
 	}
 
-	// Grant consent on the same provider and ask again.
-	remote.EnableDownloads(0, remote.OpenNGC)
+	// Allow downloads, and ask the same provider again.
+	remote.SetPolicy(nil)
 
 	got, err := p.Resolve(context.Background(), "M42")
 	if err != nil {
-		t.Fatalf("Resolve after consent was granted: %v", err)
+		t.Fatalf("Resolve after downloads were allowed: %v", err)
 	}
 
 	if got.ID != "NGC1976" {
@@ -70,7 +72,6 @@ func TestLoadHappensOnce(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	p := New()
@@ -92,7 +93,6 @@ func TestLoadHonorsContext(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -112,7 +112,7 @@ func TestSearchBrightReportsLoadFailure(t *testing.T) {
 
 	fakeSources(t)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
-	// Downloads deliberately left disabled.
+	remotetest.RefuseDownloads(t, remote.OpenNGC)
 
 	var (
 		n      int
@@ -139,7 +139,6 @@ func TestConcurrentFirstQueriesLoadOnce(t *testing.T) {
 	t.Cleanup(remote.Capture().Restore)
 
 	fakeSources(t)
-	remote.EnableDownloads(0, remote.OpenNGC)
 	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
 
 	p := New()

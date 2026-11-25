@@ -5,5 +5,5 @@
 // and the [Cache] for persisting resolved results locally. Providers reach
 // remote services through [github.com/TuSKan/astrogo/remote.Client] and its
 // endpoint registry — see that package for HTTP transport, retry, and
-// download-consent configuration.
+// download-policy configuration.
 package resolve

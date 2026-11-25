@@ -13,7 +13,6 @@ import (
 	eph "github.com/TuSKan/astrogo/ephemeris"
 	"github.com/TuSKan/astrogo/epoch"
 	"github.com/TuSKan/astrogo/plan"
-	"github.com/TuSKan/astrogo/remote"
 	_ "github.com/TuSKan/astrogo/remote/eop"
 	"github.com/TuSKan/astrogo/unit"
 
@@ -23,18 +22,10 @@ import (
 )
 
 func main() {
-	// Consent first, before anything reads a time: NewContext below reads
-	// the instant's Earth orientation, and with an empty cache an EOP load
-	// that runs before this consent is denied for the whole run (#1178).
-	//
-	// JPL kernel downloads are opt-in — see README "Data downloads &
-	// offline usage". de442 is ~115 MB; naif0012.tls (leap seconds) ~5 KB.
-	remote.EnableDownloads(200<<20, remote.NAIFSPK)
-	remote.EnableDownloads(0, remote.NAIFLSK)
+	// de442 is ~115 MB and naif0012.tls (leap seconds) ~5 KB; both
+	// download on first run and are cached.
 	// Earth orientation, for where the site is on the turning Earth:
 	// the IERS bulletin, which the remote/eop import above fetches.
-	remote.EnableDownloads(0, remote.IERSFinals2000A)
-
 	loc, err := coord.NewGeodetic(angle.LatDeg(-23.5505), angle.LonDeg(-46.6333), unit.Meters(760.0))
 	if err != nil {
 		log.Fatalf("failed to create location: %v", err)
