@@ -66,6 +66,10 @@ func simbadAndGaiaControl(t *testing.T) func() error {
 	}
 }
 
+// errNoGaiaField is TestResolverMergesGaiaForMovingStarsLive's failure, put
+// to Gaia's control before it is reported.
+var errNoGaiaField = errors.New("no field came from Gaia")
+
 // TestResolverMergesGaiaForMovingStarsLive is #627 against the live
 // services: a SIMBAD star's Gaia DR3 row is merged into its group however
 // fast the star moves. Before #627 none of these but HD 209458, at 35
@@ -88,7 +92,13 @@ func TestResolverMergesGaiaForMovingStarsLive(t *testing.T) {
 			}
 
 			if got.Provenance["Parallax"] != "gaia" && got.Provenance["Coord"] != "gaia" && got.Provenance["PmRA"] != "gaia" {
-				t.Errorf("no field came from Gaia; provenance %v", got.Provenance)
+				// The Resolver asks Gaia for this star's row best-effort and,
+				// once SIMBAD has answered, reports nothing of a Gaia failure:
+				// the question was answered. So a Gaia that stopped answering
+				// between two stars looks like the merge going wrong (#627),
+				// and only Gaia's own control, asked now, can tell them apart.
+				testutil.SkipOnDegradedService(t, errNoGaiaField, simbadAndGaiaControl(t))
+				t.Errorf("%v; provenance %v", errNoGaiaField, got.Provenance)
 			}
 		})
 	}
