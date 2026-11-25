@@ -45,17 +45,17 @@ func build(ctx context.Context, req core.KernelRequest) (core.Provider, error) {
 
 	p, err := NewProvider(ctx, req.Source, req.Kernel, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("ephemeris: new provider: %w", err)
+		return nil, fmt.Errorf("jpl: new provider: %w", err)
 	}
 
 	for _, extra := range req.ExtraKernels {
 		k, err := spk.CacheDownload(ctx, "planets/"+extra+".bsp")
 		if err != nil {
-			return nil, fmt.Errorf("ephemeris: cache kernel %s: %w", extra, err)
+			return nil, fmt.Errorf("jpl: cache kernel %s: %w", extra, err)
 		}
 
 		if err := p.AddKernel(k); err != nil {
-			return nil, fmt.Errorf("ephemeris: add kernel: %w", err)
+			return nil, fmt.Errorf("jpl: add kernel: %w", err)
 		}
 	}
 
