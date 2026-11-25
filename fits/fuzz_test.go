@@ -23,8 +23,6 @@ import (
 // registered endpoint — CLAUDE.md carves fits.Open out as a deliberate os.*
 // exception for exactly that reason.
 
-// block pads s to a full 2880-byte FITS block with spaces, the way a real
-// file is laid out.
 // readLazily opens data as ReadAt does, sizing nothing by what a header
 // declares, and takes a section of every image it finds: at most 64 pixels
 // along the fastest axis and one along every other, so the box stays small
@@ -55,6 +53,8 @@ func readLazily(data []byte) {
 	}
 }
 
+// block pads s to a full 2880-byte FITS block with spaces, the way a real
+// file is laid out.
 func block(s string) []byte {
 	buf := bytes.Repeat([]byte{' '}, fits.BlockSize)
 	copy(buf, s)
