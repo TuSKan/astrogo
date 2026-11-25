@@ -1,0 +1,8 @@
+[project]
+name = "astrogo-ltt-fixture"
+version = "1.0.0"
+description = "Generates the Astropy reference table for astrogo's barycentric light-travel delay"
+requires-python = ">=3.11"
+dependencies = [
+    "astropy>=7.0",
+]

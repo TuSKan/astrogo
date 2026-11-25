@@ -75,6 +75,15 @@ var (
 
 	// ErrStepNotPositive indicates a non-positive time step.
 	ErrStepNotPositive = errors.New("step must be positive")
+
+	// ErrInvalidEphemeris indicates a transit ephemeris no transit can be
+	// predicted from: a period that is not positive, a duration not shorter
+	// than the period, a negative uncertainty or a correlation outside [-1, 1].
+	ErrInvalidEphemeris = errors.New("plan: invalid transit ephemeris")
+
+	// ErrInvalidTransitWindow indicates a transit window with a negative
+	// baseline or margin, or a margin that grows by a period or more a cycle.
+	ErrInvalidTransitWindow = errors.New("plan: invalid transit window")
 	// ErrStepTooLarge indicates a step that risks missing short visibility windows.
 	ErrStepTooLarge = errors.New("step exceeds maximum: large steps risk missing short visibility windows")
 	// ErrNotObservable indicates the object does not implement Observable.
