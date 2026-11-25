@@ -30,10 +30,9 @@ type tformField struct {
 	// hasNull distinguishes a declared sentinel of zero from no declaration,
 	// which are different things.
 	null    int64
+	repeat  int
 	hasNull bool
-
-	repeat int
-	code   byte
+	code    byte
 }
 
 // parseTForm splits a TFORM value such as "1E", "20A" or "J" into its repeat

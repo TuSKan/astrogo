@@ -314,21 +314,6 @@ type Endpoint struct {
 	// fails to resolve. See TestKeyParamServesOneObjectUnderAnyName and
 	// TestWithoutKeyParamANameResolvesUnderneath in remote/file.
 	URL string
-	// Mirrors are other base URLs serving the same API (KindAPI), tried in
-	// order when the host at URL is not serving it: it gives no answer, which
-	// [ErrUnreachable] marks, or it answers 404, or a 5xx once its retries are
-	// spent. Any other answer is the answer, so a mirror is never asked to
-	// settle a request the primary refused as malformed. Register mirrors only
-	// for an API where a 404 means the service is not there, as for a TAP sync
-	// endpoint, never for one where it means "no such object".
-	//
-	// A mirror is asked through the endpoint's own transport, so an endpoint
-	// that carries a token (TokenEnv) has none: the token would go to the
-	// mirror's host.
-	//
-	// [SetURL] clears them, since a URL the caller chose is the one it wants,
-	// and [Reset] restores them.
-	Mirrors []string
 	// Kind is KindAPI or KindFile.
 	Kind Kind
 	// Subsystem names the astrogo package family using this endpoint. For
@@ -338,46 +323,6 @@ type Endpoint struct {
 	// Description says what the endpoint provides, including the real
 	// service host when URL does not name it directly.
 	Description string
-	// ApproxSize is the typical bytes moved per fetch; SizeVaries means it
-	// varies too much to state.
-	ApproxSize int64
-	// Enabled gates all access to the endpoint.
-	Enabled bool
-	// DownloadsOK is the file-download consent flag, false by default.
-	// See EnableDownloads.
-	DownloadsOK bool
-	// MaxDownloadSize caps a single download in bytes once DownloadsOK is
-	// set; 0 means unlimited.
-	MaxDownloadSize int64
-	// Timeout is the API request timeout (KindAPI). Zero means
-	// DefaultAPITimeout.
-	Timeout time.Duration
-	// IdempotentPost declares that a POST to this endpoint (KindAPI) is a
-	// query: sent again, it gets the same document back and changes nothing
-	// on the server, as a TAP sync query or a JSON search does. Such a POST is
-	// retried under the client's RetryPolicy, as a GET is. False sends a POST
-	// once, which is right where a POST creates something: GaiaAIPAsync's UWS
-	// job, which a blind retry could start twice.
-	IdempotentPost bool
-	// DownloadTimeout is the whole-transfer timeout (KindFile). Zero means
-	// DefaultDownloadTimeout.
-	DownloadTimeout time.Duration
-	// Mutable marks a KindFile endpoint whose upstream content can change
-	// (IERS, OpenNGC): a cached copy is revalidated against the source's
-	// current ETag before reuse. false means versioned/immutable content
-	// (JPL kernels), reused on existence alone.
-	Mutable bool
-	// Files lists the fixed set of names a KindFile endpoint serves, when
-	// its content is a known manifest rather than caller-named objects.
-	// Nil where the caller names the object (JPL kernels).
-	Files []string
-	// Downloadable reports whether EnableDownloads means anything for this
-	// endpoint — true for every KindFile endpoint, and for JPLHorizonsSPK,
-	// whose KindAPI response carries a whole kernel. A KindAPI endpoint
-	// returning only small payloads leaves this false and has no consent
-	// gate at all.
-	Downloadable bool
-
 	// TokenEnv names the environment variable holding an API token for this
 	// service, or is empty when the service needs none.
 	//
@@ -391,7 +336,6 @@ type Endpoint struct {
 	// A token is an optimization, never a requirement: every endpoint that
 	// declares one must still work without it.
 	TokenEnv string
-
 	// InsecureReason explains why this endpoint is addressed over cleartext
 	// http:// rather than https://, and must be non-empty whenever it is.
 	//
@@ -407,6 +351,60 @@ type Endpoint struct {
 	// be re-examined: an upstream that gains TLS makes its exemption stale,
 	// and there is no way to notice that if the justification is prose.
 	InsecureReason string
+	// Mirrors are other base URLs serving the same API (KindAPI), tried in
+	// order when the host at URL is not serving it: it gives no answer, which
+	// [ErrUnreachable] marks, or it answers 404, or a 5xx once its retries are
+	// spent. Any other answer is the answer, so a mirror is never asked to
+	// settle a request the primary refused as malformed. Register mirrors only
+	// for an API where a 404 means the service is not there, as for a TAP sync
+	// endpoint, never for one where it means "no such object".
+	//
+	// A mirror is asked through the endpoint's own transport, so an endpoint
+	// that carries a token (TokenEnv) has none: the token would go to the
+	// mirror's host.
+	//
+	// [SetURL] clears them, since a URL the caller chose is the one it wants,
+	// and [Reset] restores them.
+	Mirrors []string
+	// Files lists the fixed set of names a KindFile endpoint serves, when
+	// its content is a known manifest rather than caller-named objects.
+	// Nil where the caller names the object (JPL kernels).
+	Files []string
+	// ApproxSize is the typical bytes moved per fetch; SizeVaries means it
+	// varies too much to state.
+	ApproxSize int64
+	// MaxDownloadSize caps a single download in bytes once DownloadsOK is
+	// set; 0 means unlimited.
+	MaxDownloadSize int64
+	// Timeout is the API request timeout (KindAPI). Zero means
+	// DefaultAPITimeout.
+	Timeout time.Duration
+	// DownloadTimeout is the whole-transfer timeout (KindFile). Zero means
+	// DefaultDownloadTimeout.
+	DownloadTimeout time.Duration
+	// Enabled gates all access to the endpoint.
+	Enabled bool
+	// DownloadsOK is the file-download consent flag, false by default.
+	// See EnableDownloads.
+	DownloadsOK bool
+	// IdempotentPost declares that a POST to this endpoint (KindAPI) is a
+	// query: sent again, it gets the same document back and changes nothing
+	// on the server, as a TAP sync query or a JSON search does. Such a POST is
+	// retried under the client's RetryPolicy, as a GET is. False sends a POST
+	// once, which is right where a POST creates something: GaiaAIPAsync's UWS
+	// job, which a blind retry could start twice.
+	IdempotentPost bool
+	// Mutable marks a KindFile endpoint whose upstream content can change
+	// (IERS, OpenNGC): a cached copy is revalidated against the source's
+	// current ETag before reuse. false means versioned/immutable content
+	// (JPL kernels), reused on existence alone.
+	Mutable bool
+	// Downloadable reports whether EnableDownloads means anything for this
+	// endpoint — true for every KindFile endpoint, and for JPLHorizonsSPK,
+	// whose KindAPI response carries a whole kernel. A KindAPI endpoint
+	// returning only small payloads leaves this false and has no consent
+	// gate at all.
+	Downloadable bool
 }
 
 // SizeVaries marks an endpoint whose per-fetch size cannot be usefully

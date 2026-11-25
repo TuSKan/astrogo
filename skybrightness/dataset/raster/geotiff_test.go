@@ -19,22 +19,22 @@ import (
 // top-left corner of pixel (0,0) at (originLon, originLat) and square pixels of
 // pxSize degrees.
 type synthTIFF struct {
+	noData *float64
+	pixels []float32 // row-major, length width*height (mcd/m²)
+	// geoKeys, when set, is written as the GeoKey directory (tag 34735).
+	geoKeys       []uint16
 	width, height int
-	pixels        []float32 // row-major, length width*height (mcd/m²)
-	rowsPerStrip  int       // 0 ⇒ single strip
-	tiled         bool
+	rowsPerStrip  int // 0 ⇒ single strip
 	tileW, tileH  int
+	originLon     float64
+	originLat     float64
+	pxSize        float64
+	tiled         bool
 	deflate       bool
 	lzw           bool // mutually exclusive with deflate
 	// floatPredictor emits TIFF predictor 3, applying the same byte-plane
 	// shuffle + differencing a real writer would before compressing.
 	floatPredictor bool
-	noData         *float64
-	// geoKeys, when set, is written as the GeoKey directory (tag 34735).
-	geoKeys   []uint16
-	originLon float64
-	originLat float64
-	pxSize    float64
 }
 
 // packBlock applies the configured predictor and compression to one strip or

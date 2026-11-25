@@ -20,10 +20,10 @@ import (
 type Satellite struct {
 	provider   eph.Provider
 	name       string
-	id         eph.ID
 	stdMag     float64
 	convention mag.StdMagConvention
 	phaseModel mag.SatPhaseModel
+	id         eph.ID
 	hasStdMag  bool
 }
 
