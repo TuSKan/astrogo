@@ -42,30 +42,33 @@ func (remoteLoader) Cached(ctx context.Context) (Data, error) {
 	}
 
 	if err != nil {
-		return Data{}, fmt.Errorf("iers: stat %s: %w", key, err)
+		return Data{}, fmt.Errorf("stat %s: %w", key, err)
 	}
 
 	raw, err := fs.ReadFile(fsys, key)
 	if err != nil {
-		return Data{}, fmt.Errorf("iers: read %s: %w", key, err)
+		return Data{}, fmt.Errorf("read %s: %w", key, err)
 	}
 
 	return Data{Raw: raw, ModTime: info.ModTime()}, nil
 }
 
 // Fetch downloads finals2000A.all, subject to the download policy.
+//
+// Its errors, and Cached's, name the step that failed and leave the "iers:"
+// prefix to the lazy load and Load, which wrap them in the step they took.
 func (remoteLoader) Fetch(ctx context.Context) (Data, error) {
 	// The network step, and offline mode and the policy decide it before
 	// anything else does. Either way remote.GetFile would serve a cached
 	// bulletin instead (#964), which is the one Cached has just read and found
 	// wanting, and the lazy load would record it as fetched from the network.
 	if _, err := remote.URL(remote.IERSFinals2000A); err != nil {
-		return Data{}, fmt.Errorf("iers: fetch EOP data: %w", err)
+		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
 	}
 
 	ep, _ := remote.Lookup(remote.IERSFinals2000A)
 	if err := remote.CheckDownload(remote.IERSFinals2000A, "finals2000A.all", ep.ApproxSize); err != nil {
-		return Data{}, fmt.Errorf("iers: fetch EOP data: %w", err)
+		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
 	}
 
 	// remote.GetFile reuses the cache untouched when the source's current ETag
@@ -98,7 +101,7 @@ func (remoteLoader) Fetch(ctx context.Context) (Data, error) {
 
 	if _, _, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
 		remote.WithCacheName(cacheName), remote.WithRead(read)); err != nil {
-		return Data{}, fmt.Errorf("iers: fetch EOP data: %w", err)
+		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
 	}
 
 	return Data{Raw: raw}, nil
