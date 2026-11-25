@@ -283,7 +283,8 @@ tables you can check against published references.
 
 ### FITS & World Coordinate System (`fits`)
 - Read standard FITS files (Image, BinTable, ASCII Table HDUs)
-- Gzip-compressed streams (`.fits.gz`), memory-mapped access (`OpenMmap`)
+- Gzip-compressed streams (`.fits.gz`)
+- Images larger than memory, read a box at a time: `fits.ReadAt` over any `io.ReaderAt` (a file, a memory mapping through `OpenMmap`, or a `remote.File`) leaves each image's pixels where they are, and `ImageHDU.Section` reads only the bytes the box covers
 - Apache Arrow columnar export for catalog-scale table HDUs
 - **WCS** — pixel-to-sky mapping with TAN (Gnomonic) projection and `ExtractWCS` header parser
 

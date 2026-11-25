@@ -51,10 +51,9 @@ var (
 	// whose declared axes disagree with the data it carries.
 	ErrNotWritable = errors.New("fits: HDU cannot be written")
 
-	// ErrInvalidWhence indicates an invalid whence argument to Seek.
-	ErrInvalidWhence = errors.New("mmapSeeker: invalid whence")
-	// ErrNegativeOffset indicates a negative offset in Seek.
-	ErrNegativeOffset = errors.New("mmapSeeker: negative offset")
+	// ErrInvalidSection indicates an image section that is not a non-empty box
+	// inside the image, or a section of an image that holds no pixels.
+	ErrInvalidSection = errors.New("fits: invalid image section")
 
 	// ErrWCSDimension indicates unexpected dimensional input to a WCS transform.
 	ErrWCSDimension = errors.New("wcs: unexpected dimensional input")

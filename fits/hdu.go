@@ -1,7 +1,5 @@
 package fits
 
-import "io"
-
 // HDUType represents the standard classifications of FITS Header Data Units.
 type HDUType int
 
@@ -24,16 +22,11 @@ type HDU interface {
 
 	// Type identifies the underlying payload kind (Image, Binary Table, etc.).
 	Type() HDUType
-
-	// Load parses the heavy binary payload into memory using the given Reader at the stored offset.
-	Load(r io.ReaderAt) error
 }
 
 type basicHDU struct {
-	header      *Header
-	hType       HDUType
-	DataOffset  int64
-	PayloadSize int64
+	header *Header
+	hType  HDUType
 }
 
 // Header returns the HDU's header, creating an empty one on first use.
@@ -49,5 +42,4 @@ func (h *basicHDU) Header() *Header {
 
 	return h.header
 }
-func (h *basicHDU) Type() HDUType            { return h.hType }
-func (h *basicHDU) Load(_ io.ReaderAt) error { return nil } // Stub
+func (h *basicHDU) Type() HDUType { return h.hType }

@@ -286,14 +286,25 @@ func isUnsignedOffset(bitpix int, bzero float64) bool {
 // The tensor's buffer is copied rather than swapped in place: it belongs to
 // the caller, who did not ask for their image to be byte-reversed as a side
 // effect of writing it.
+//
+// An image with axes but no tensor is refused rather than written as a header
+// alone, which would describe pixels the file does not carry. That is what an
+// image read by ReadAt is: its pixels are in its source, and a Section of it
+// is what can be written.
 func imagePayload(h *ImageHDU, pixelBytes int, unsignedOffset float64) ([]byte, error) {
-	if h.Tensor == nil {
-		return nil, nil
-	}
-
 	want := int64(1)
 	for _, n := range h.Axes {
 		want *= n
+	}
+
+	if h.Tensor == nil {
+		if len(h.Axes) > 0 && want > 0 {
+			return nil, fmt.Errorf("%w: axes describe %d pixels but the image holds no tensor; "+
+				"an image read by ReadAt or OpenMmap holds them in its source, and a Section of it can be written",
+				ErrNotWritable, want)
+		}
+
+		return nil, nil
 	}
 
 	buffers := h.Tensor.Data().Buffers()

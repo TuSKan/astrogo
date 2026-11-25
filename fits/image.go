@@ -24,9 +24,16 @@ const (
 )
 
 // ImageHDU represents a FITS image matrix (N-dimensional).
+//
+// Axes holds the extents slowest-varying first, the reverse of NAXISn, which
+// is the order Tensor and [ImageHDU.Section] index in.
 type ImageHDU struct {
 	basicHDU
 
+	// Tensor holds the pixels of an image read by [Read], [Open] or
+	// [ReadImage], or built by a caller to write. It is nil for an image read
+	// by [ReadAt] or [OpenMmap], whose pixels stay in the source until
+	// [ImageHDU.Section] reads them.
 	Tensor   tensor.Interface
 	Axes     []int64
 	Bitpix   int
@@ -34,18 +41,81 @@ type ImageHDU struct {
 	BZero    float64
 	Blank    int64
 	HasBlank bool
+
+	// src holds a lazily read image's pixels from srcOffset on, stored as
+	// format says. It is nil for an image whose pixels are in Tensor.
+	src       io.ReaderAt
+	srcOffset int64
+	format    pixelFormat
 }
 
 // ReadImage reads an N-dimensional FITS image payload mapped directly into an Arrow Tensor representation.
 func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
-	bitpix, err := requiredInt(h, "BITPIX")
+	hdu, totalPixels, err := newImageHDU(h)
 	if err != nil {
 		return nil, err
 	}
 
-	fitsAxes, totalPixels, err := dataAxes(h)
+	if totalPixels == 0 {
+		return hdu, nil
+	}
+
+	format, err := imageFormat(hdu.Bitpix, hdu.BZero)
 	if err != nil {
 		return nil, err
+	}
+
+	totalPayloadBytes, err := mulSize(totalPixels, format.bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// FITS mandates big-endian byte order for all data.
+	// Arrow tensors expect native byte order. Read the raw stream, then
+	// convert big-endian → native for multi-byte pixel types.
+	rawBytes, err := readDeclared(r, totalPayloadBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image payload: %w", err)
+	}
+
+	buf := memory.NewBufferBytes(rawBytes)
+
+	format.decode(rawBytes)
+
+	// After reading the payload, discard the padding to reach 2880 byte bounds
+	paddingBytes := int(totalPayloadBytes) % BlockSize
+	if paddingBytes != 0 {
+		padLen := BlockSize - paddingBytes
+
+		padBuf := make([]byte, padLen)
+		if _, err := io.ReadFull(r, padBuf); err != nil {
+			return nil, fmt.Errorf("failed to read padding block: %w", err)
+		}
+	}
+
+	// Tensor instantiation
+	// A new buffer needs to be mapped to the native tensor wrapper.
+	data := array.NewData(format.dt, int(totalPixels), []*memory.Buffer{nil, buf}, nil, 0, 0)
+	defer data.Release()
+
+	// Assign raw tensor instance mapping the memory view
+	hdu.Tensor = tensor.New(data, hdu.Axes, nil, nil)
+
+	return hdu, nil
+}
+
+// newImageHDU reads what an image HDU's header says about its pixels: the
+// axes, BITPIX and the calibration keywords. It returns the HDU without
+// pixels, and how many pixels the header declares.
+func newImageHDU(h *Header) (*ImageHDU, int64, error) {
+	bitpix, err := requiredInt(h, "BITPIX")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	fitsAxes, totalPixels, err := dataAxes(h)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	// FITS axis order is Fortran-contiguous (fastest varying index first).
@@ -65,14 +135,14 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 	if v, err := h.GetFloat("BSCALE"); err == nil {
 		bscale = v
 	} else if !errors.Is(err, ErrKeyNotFound) {
-		return nil, fmt.Errorf("invalid BSCALE: %w", err)
+		return nil, 0, fmt.Errorf("invalid BSCALE: %w", err)
 	}
 
 	bzero := 0.0
 	if v, err := h.GetFloat("BZERO"); err == nil {
 		bzero = v
 	} else if !errors.Is(err, ErrKeyNotFound) {
-		return nil, fmt.Errorf("invalid BZERO: %w", err)
+		return nil, 0, fmt.Errorf("invalid BZERO: %w", err)
 	}
 
 	var (
@@ -84,10 +154,10 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		blank = int64(v)
 		hasBlank = true
 	} else if !errors.Is(err, ErrKeyNotFound) {
-		return nil, fmt.Errorf("invalid BLANK: %w", err)
+		return nil, 0, fmt.Errorf("invalid BLANK: %w", err)
 	}
 
-	hdu := &ImageHDU{
+	return &ImageHDU{
 		header: h, hType: HDUTypeImage,
 		Bitpix:   bitpix,
 		Axes:     axes,
@@ -95,102 +165,63 @@ func ReadImage(h *Header, r io.Reader) (*ImageHDU, error) {
 		BZero:    bzero,
 		Blank:    blank,
 		HasBlank: hasBlank,
-	}
+	}, totalPixels, nil
+}
 
-	if totalPixels == 0 {
-		return hdu, nil
-	}
+// pixelFormat is how an image's pixels are stored and the Arrow type that
+// holds them once read.
+type pixelFormat struct {
+	dt       arrow.DataType
+	bytes    int64
+	unsigned bool
+}
 
-	// Calculate total bytes
-	var (
-		pixelBytes int64
-		dt         arrow.DataType
-	)
-
-	// FITS stores unsigned integers wider than a byte as the signed type of
-	// the same width, offset by BZERO = 2^(n-1) (FITS 4.0 section 5.2.5). A
-	// reader that ignores that hands back negative pixels for the upper half
-	// of an unsigned image — 40000 read as -25536 — which is a plausible
-	// number in the wrong place rather than an error anyone notices.
+// imageFormat returns the pixel format of BITPIX bitpix with offset bzero.
+//
+// FITS stores unsigned integers wider than a byte as the signed type of the
+// same width, offset by BZERO = 2^(n-1) (FITS 4.0 section 5.2.5). A reader that
+// ignores that hands back negative pixels for the upper half of an unsigned
+// image — 40000 read as -25536 — which is a plausible number in the wrong
+// place rather than an error anyone notices.
+func imageFormat(bitpix int, bzero float64) (pixelFormat, error) {
 	unsigned := isUnsignedOffset(bitpix, bzero)
 
 	switch {
 	case bitpix == BitpixUint8:
-		pixelBytes = 1
-		dt = arrow.PrimitiveTypes.Uint8
+		return pixelFormat{arrow.PrimitiveTypes.Uint8, 1, false}, nil
 	case bitpix == BitpixInt16 && unsigned:
-		pixelBytes = 2
-		dt = arrow.PrimitiveTypes.Uint16
+		return pixelFormat{arrow.PrimitiveTypes.Uint16, 2, true}, nil
 	case bitpix == BitpixInt16:
-		pixelBytes = 2
-		dt = arrow.PrimitiveTypes.Int16
+		return pixelFormat{arrow.PrimitiveTypes.Int16, 2, false}, nil
 	case bitpix == BitpixInt32 && unsigned:
-		pixelBytes = 4
-		dt = arrow.PrimitiveTypes.Uint32
+		return pixelFormat{arrow.PrimitiveTypes.Uint32, 4, true}, nil
 	case bitpix == BitpixInt32:
-		pixelBytes = 4
-		dt = arrow.PrimitiveTypes.Int32
+		return pixelFormat{arrow.PrimitiveTypes.Int32, 4, false}, nil
 	case bitpix == BitpixInt64 && unsigned:
-		pixelBytes = 8
-		dt = arrow.PrimitiveTypes.Uint64
+		return pixelFormat{arrow.PrimitiveTypes.Uint64, 8, true}, nil
 	case bitpix == BitpixInt64:
-		pixelBytes = 8
-		dt = arrow.PrimitiveTypes.Int64
+		return pixelFormat{arrow.PrimitiveTypes.Int64, 8, false}, nil
 	case bitpix == BitpixFloat32:
-		pixelBytes = 4
-		dt = arrow.PrimitiveTypes.Float32
+		return pixelFormat{arrow.PrimitiveTypes.Float32, 4, false}, nil
 	case bitpix == BitpixFloat64:
-		pixelBytes = 8
-		dt = arrow.PrimitiveTypes.Float64
+		return pixelFormat{arrow.PrimitiveTypes.Float64, 8, false}, nil
 	default:
-		return nil, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
+		return pixelFormat{}, fmt.Errorf("%w: %d", ErrInvalidBitpix, bitpix)
 	}
+}
 
-	totalPayloadBytes, err := mulSize(totalPixels, pixelBytes)
-	if err != nil {
-		return nil, err
+// decode turns stored pixels into the values an Arrow tensor of f.dt holds,
+// in place: big-endian to native order, and for unsigned data the BZERO added
+// back. The stored values are signed; adding BZERO back is what makes them the
+// unsigned values they were written from. Done here, on the raw buffer,
+// rather than left to PhysicalValue, so the tensor a caller receives has the
+// type and the values the file describes.
+func (f pixelFormat) decode(raw []byte) {
+	swapBigEndianToNative(raw, int(f.bytes))
+
+	if f.unsigned {
+		offsetToUnsigned(raw, int(f.bytes))
 	}
-
-	// FITS mandates big-endian byte order for all data.
-	// Arrow tensors expect native byte order. Read the raw stream, then
-	// convert big-endian → native for multi-byte pixel types.
-	rawBytes, err := readDeclared(r, totalPayloadBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read image payload: %w", err)
-	}
-
-	buf := memory.NewBufferBytes(rawBytes)
-
-	swapBigEndianToNative(rawBytes, int(pixelBytes))
-
-	// The stored values are signed; adding BZERO back is what makes them the
-	// unsigned values they were written from. Done here, on the raw buffer,
-	// rather than left to PhysicalValue, so the tensor a caller receives has
-	// the type and the values the file describes.
-	if unsigned {
-		offsetToUnsigned(rawBytes, int(pixelBytes))
-	}
-
-	// After reading the payload, discard the padding to reach 2880 byte bounds
-	paddingBytes := int(totalPayloadBytes) % BlockSize
-	if paddingBytes != 0 {
-		padLen := BlockSize - paddingBytes
-
-		padBuf := make([]byte, padLen)
-		if _, err := io.ReadFull(r, padBuf); err != nil {
-			return nil, fmt.Errorf("failed to read padding block: %w", err)
-		}
-	}
-
-	// Tensor instantiation
-	// A new buffer needs to be mapped to the native tensor wrapper.
-	data := array.NewData(dt, int(totalPixels), []*memory.Buffer{nil, buf}, nil, 0, 0)
-	defer data.Release()
-
-	// Assign raw tensor instance mapping the memory view
-	hdu.Tensor = tensor.New(data, axes, nil, nil)
-
-	return hdu, nil
 }
 
 // swapBigEndianToNative converts a byte buffer from big-endian to native byte order in-place.

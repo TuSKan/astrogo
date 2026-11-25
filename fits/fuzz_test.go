@@ -25,6 +25,36 @@ import (
 
 // block pads s to a full 2880-byte FITS block with spaces, the way a real
 // file is laid out.
+// readLazily opens data as ReadAt does, sizing nothing by what a header
+// declares, and takes a section of every image it finds: at most 64 pixels
+// along the fastest axis and one along every other, so the box stays small
+// however many axes or pixels the header claims.
+func readLazily(data []byte) {
+	file, err := fits.ReadAt(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return
+	}
+
+	for _, hdu := range file.HDUs {
+		img, ok := hdu.(*fits.ImageHDU)
+		if !ok || len(img.Axes) == 0 {
+			continue
+		}
+
+		lower, upper := make([]int64, len(img.Axes)), make([]int64, len(img.Axes))
+		for i := range upper {
+			upper[i] = 1
+		}
+
+		last := len(img.Axes) - 1
+		upper[last] = min(img.Axes[last], 64)
+
+		if sec, err := img.Section(lower, upper); err == nil {
+			sec.Release()
+		}
+	}
+}
+
 func block(s string) []byte {
 	buf := bytes.Repeat([]byte{' '}, fits.BlockSize)
 	copy(buf, s)
@@ -89,6 +119,8 @@ func FuzzReadHeader(f *testing.F) {
 	f.Add(bytes.Repeat([]byte{0}, fits.BlockSize))
 
 	f.Fuzz(func(_ *testing.T, data []byte) {
+		readLazily(data)
+
 		br := fits.NewBlockReader(bytes.NewReader(data))
 
 		h, err := fits.ReadHeader(br)
@@ -176,6 +208,8 @@ func FuzzRead(f *testing.F) {
 	f.Add([]byte{})
 
 	f.Fuzz(func(_ *testing.T, data []byte) {
+		readLazily(data)
+
 		// Read walks every HDU and dispatches on the header's own type
 		// keywords, so this reaches the image, ASCII-table and bintable paths
 		// as the fuzzer learns to produce their XTENSION cards.
