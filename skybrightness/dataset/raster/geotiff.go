@@ -161,28 +161,24 @@ func clampPos64(u uint64) int64 {
 // reads only the strip/tile covering a requested pixel (with a one-entry cache),
 // so a multi-gigabyte atlas is never loaded whole.
 type Reader struct {
-	r  io.ReaderAt
-	bo binary.ByteOrder
-
-	width, height int
-	bits          int
-	sampleFormat  int
-	compression   int
-	predictor     int
-
-	tiled                 bool
+	r                     io.ReaderAt
+	bo                    binary.ByteOrder
+	blockOffsets          []int64
+	blockByteCounts       []int64
+	cache                 []float64
+	gt                    GeoTransform
+	width, height         int
+	bits                  int
+	sampleFormat          int
+	compression           int
+	predictor             int
 	rowsPerStrip          int
 	tileWidth, tileHeight int
 	blockBytes            int // the most bytes a block decodes to; see blockSize
-	blockOffsets          []int64
-	blockByteCounts       []int64
-
-	gt        GeoTransform
-	noData    float64
-	hasNoData bool
-
-	cacheIdx int
-	cache    []float64
+	noData                float64
+	cacheIdx              int
+	tiled                 bool
+	hasNoData             bool
 }
 
 // readChunk is the first allocation readAt makes. It doubles from there as

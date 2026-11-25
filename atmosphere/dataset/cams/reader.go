@@ -754,20 +754,18 @@ func nonNegUint64(n int) uint64 {
 
 // Var represents one CAMS data variable, opened against its parent File.
 type Var struct {
-	file      *File
-	ds        *hdf5.Dataset
-	name      string
-	axisNames []string // on-disk axis order, e.g. ["time","level","latitude","longitude"]
-
+	file                     *File
+	ds                       *hdf5.Dataset
+	name                     string
 	units, longName          string
+	axisNames                []string // on-disk axis order, e.g. ["time","level","latitude","longitude"]
+	plane                    []float64
 	fillValue, missingVal    float64
+	planeTime                int
+	planeLevel               int
+	planeMu                  sync.Mutex
 	hasFillValue, hasMissing bool
-
-	planeMu     sync.Mutex
-	planeTime   int
-	planeLevel  int
-	planeCached bool
-	plane       []float64
+	planeCached              bool
 }
 
 // Name returns the variable's name (e.g. "aermr01").

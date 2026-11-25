@@ -30,9 +30,9 @@ import (
 // stubProvider answers one body with a fixed state and refuses everything
 // else, so a test can tell whether a call reached the base provider.
 type stubProvider struct {
-	id     core.ID
 	pos    [3]float64
 	calls  int
+	id     core.ID
 	closed bool
 }
 

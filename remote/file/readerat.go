@@ -133,10 +133,10 @@ type ReaderAt struct {
 // channel is closed, which put every reader of a hot chunk back on one lock.
 // A WaitGroup is also part of the chunk rather than an allocation beside it.
 type chunk struct {
+	err     error
+	data    []byte
 	reading sync.WaitGroup
 	done    atomic.Bool
-	data    []byte
-	err     error
 	ref     atomic.Bool // read since the CLOCK hand last passed it
 }
 

@@ -97,16 +97,13 @@ type Component interface {
 // point: a component that says nothing about its uncertainty reports an
 // unknown one, never a perfectly certain one.
 type Contribution struct {
-	// Flags are the quality flags that apply to what was just computed.
-	Flags Flag
-
+	// Source names what dominates Relative, as [Uncertainty.Source] does.
+	Source string
 	// Relative is the 1-sigma relative standard uncertainty on the radiance
 	// just added, integrated over the grid. It is meaningful only when Known.
 	Relative float64
-
-	// Source names what dominates Relative, as [Uncertainty.Source] does.
-	Source string
-
+	// Flags are the quality flags that apply to what was just computed.
+	Flags Flag
 	// Known reports whether the component could establish Relative at all.
 	Known bool
 }

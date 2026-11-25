@@ -28,11 +28,11 @@ type Asteroid struct {
 	G1          float64
 	G2          float64
 	oblat       float64
+	diameter    unit.Length
+	albedo      float64
 	id          eph.ID
 	hasG1G2     bool
-	diameter    unit.Length
 	hasDiameter bool
-	albedo      float64
 	hasAlbedo   bool
 }
 
