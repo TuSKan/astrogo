@@ -313,6 +313,37 @@ func TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin(t *testing.T) {
 	}
 }
 
+// TestLoaderErrorsNameEachStepOnce: the lazy load and Load wrap the remote
+// loader's errors in the step they took, so the loader's own errors name only
+// theirs. Moving the loader into this package made it wrap its errors in the
+// same words, and a failed fetch read "iers: fetch EOP data: iers: fetch EOP
+// data: ...".
+func TestLoaderErrorsNameEachStepOnce(t *testing.T) {
+	installLoader(t, nil)
+	t.Cleanup(remote.Capture().Restore)
+	remote.SetDataDir(testutil.FileURL(t, t.TempDir()))
+	remote.SetOffline(true)
+
+	for _, c := range []struct {
+		call  string
+		err   error
+		steps []string
+	}{
+		{"EnsureLoaded", EnsureLoaded(41684), []string{"fetch EOP data"}},
+		{"Load", Load(context.Background()), []string{"fetch EOP data", "read cached EOP data"}},
+	} {
+		if c.err == nil {
+			t.Fatalf("%s offline with nothing cached returned no error", c.call)
+		}
+
+		for _, step := range c.steps {
+			if n := strings.Count(c.err.Error(), step); n != 1 {
+				t.Errorf("%s's error names %q %d times, want once:\n  %v", c.call, step, n, c.err)
+			}
+		}
+	}
+}
+
 // TestEOPLoaderDoesNotAccumulateCacheFiles guards against a cache that
 // grows one object per fetch.
 func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {
