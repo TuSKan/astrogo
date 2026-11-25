@@ -83,7 +83,8 @@ type Client struct {
 	// [Client.SetAPIOptions].
 	apiOpts []APIOption
 
-	// offline cuts every endpoint access at the gate.
+	// offline cuts, at the gate, every access to an endpoint whose URL
+	// reaches the network.
 	offline bool
 
 	mu sync.RWMutex

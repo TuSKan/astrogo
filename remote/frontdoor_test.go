@@ -54,6 +54,19 @@ func TestAPIClientGatesEveryRequest(t *testing.T) {
 		SetOffline(true)
 		t.Cleanup(func() { SetOffline(false) })
 
+		// A server on this machine is not the network, so offline mode leaves
+		// it reachable; that is how a test serves its fixtures while offline.
+		body, err := client.Get(t.Context(), SIMBAD, "", nil)
+		if err != nil {
+			t.Fatalf("Get of a loopback server while offline: %v", err)
+		}
+
+		_ = body.Close()
+
+		if err := SetURL(SIMBAD, offlineHost); err != nil {
+			t.Fatalf("SetURL: %v", err)
+		}
+
 		if _, err := client.Get(t.Context(), SIMBAD, "", nil); !errors.Is(err, ErrOffline) {
 			t.Errorf("Get while offline = %v, want ErrOffline.\n"+
 				"  The client was built while online; resolution has to happen per "+

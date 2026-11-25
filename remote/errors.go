@@ -9,8 +9,9 @@ import (
 // Sentinel errors returned by the registry gate and download pipeline.
 // Match with errors.Is.
 var (
-	// ErrOffline is returned by URL (and everything built on it) while
-	// global offline mode is active — see SetOffline.
+	// ErrOffline is returned by URL (and everything built on it) for an
+	// endpoint whose URL reaches the network while offline mode is active —
+	// see SetOffline.
 	ErrOffline = errors.New("remote: offline mode enabled")
 
 	// ErrEndpointDisabled is returned when the requested endpoint has been
