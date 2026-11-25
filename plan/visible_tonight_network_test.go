@@ -158,8 +158,8 @@ func acceptOnlySBDBsCut(t *testing.T, call string, err error) {
 // than leaving it unlimited like the sibling test above: unlike a per-body Horizons SPK (KB-MB scale) or even de440s
 // (~32 MB), the full planetaryMoons set spans six kernels totaling ~2.4 GB
 // (Jupiter's alone is ~1.1 GB), which would make this an unreasonably
-// expensive test to run routinely. Denied-by-cap kernels are skipped by
-// gatherPlanetaryMoons exactly like a denied-by-policy one, so this still
+// expensive test to run routinely. A kernel the policy refuses is skipped by
+// gatherPlanetaryMoons, so this still
 // exercises the real fetch-and-compute path for Phobos/Deimos/Triton
 // without paying for Jupiter/Saturn/Uranus/Pluto's far larger kernels every
 // run.
@@ -209,8 +209,15 @@ func TestVisibleTonight_PlanetaryMoons(t *testing.T) {
 		// Every reason has to be the cap this test set. A kernel that failed
 		// to parse, or a site that could not be resolved, is precisely what
 		// this test would otherwise stop reporting.
+		//
+		// A policy's refusal wraps two errors, remote.ErrDownloadDenied and
+		// the policy's own reason, and flattenReasons takes any error with
+		// several wrapped errors apart. So each refused kernel arrives as two
+		// siblings, the sentinel and errOverMoonBudget, and the second does
+		// not match the first: asking for ErrDownloadDenied alone failed on
+		// every refusal.
 		for _, reason := range flattenReasons(err) {
-			if !errors.Is(reason, remote.ErrDownloadDenied) {
+			if !errors.Is(reason, remote.ErrDownloadDenied) && !errors.Is(reason, errOverMoonBudget) {
 				t.Fatalf("VisibleTonight reported a skip this test did not cause: %v", reason)
 			}
 		}
