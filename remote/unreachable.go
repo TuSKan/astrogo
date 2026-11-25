@@ -87,6 +87,29 @@ func (c *Client) answering(host string) error {
 		ErrUnreachable, host, since.Round(time.Second), (c.cooldown - since).Round(time.Second), last.err)
 }
 
+// heardFile is [Client.heard] for a request to a file source: it remembers host
+// when err is a transport failure with no answer, a refused connection or a
+// timeout, and forgets it on any answer. The http backend reports a status as
+// an error of its own, so the transport failure is told apart by its type, the
+// *url.Error net/http returns for a request that got no response, rather than
+// by api.ErrNoResponse. Not by net.Error: syscall.Errno satisfies it, and a
+// file:// source's missing file would then be a host that gave no answer.
+func (c *Client) heardFile(ctx context.Context, host string, err error) {
+	var transport *url.Error
+
+	silent := err != nil && errors.As(err, &transport)
+
+	c.noAnswerMu.Lock()
+	defer c.noAnswerMu.Unlock()
+
+	switch {
+	case !silent:
+		delete(c.noAnswer, host)
+	case ctx.Err() == nil && c.cooldown > 0:
+		c.noAnswer[host] = noAnswer{at: time.Now(), err: err}
+	}
+}
+
 // heard records how a request to host ended, and returns its error, wrapped
 // in [ErrUnreachable] when the host gave no answer. Any answer, an
 // [HTTPError] included, clears what c remembers about the host. A request the

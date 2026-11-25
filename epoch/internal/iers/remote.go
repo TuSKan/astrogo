@@ -58,19 +58,6 @@ func (remoteLoader) Cached(ctx context.Context) (Data, error) {
 // Its errors, and Cached's, name the step that failed and leave the "iers:"
 // prefix to the lazy load and Load, which wrap them in the step they took.
 func (remoteLoader) Fetch(ctx context.Context) (Data, error) {
-	// The network step, and offline mode and the policy decide it before
-	// anything else does. Either way remote.GetFile would serve a cached
-	// bulletin instead (#964), which is the one Cached has just read and found
-	// wanting, and the lazy load would record it as fetched from the network.
-	if _, err := remote.URL(remote.IERSFinals2000A); err != nil {
-		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
-	}
-
-	ep, _ := remote.Lookup(remote.IERSFinals2000A)
-	if err := remote.CheckDownload(remote.IERSFinals2000A, "finals2000A.all", ep.ApproxSize); err != nil {
-		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
-	}
-
 	// remote.GetFile reuses the cache untouched when the source's current ETag
 	// shows the IERS bulletin has not changed since it was last
 	// downloaded — a content check rather than a wall-clock expiry, since
@@ -99,8 +86,13 @@ func (remoteLoader) Fetch(ctx context.Context) (Data, error) {
 		return nil
 	}
 
+	// The network step, so it takes only a copy the source served or
+	// confirmed current. Offline, under a refusing policy, or with the source
+	// not answering, GetFile would otherwise serve the cached bulletin, the
+	// one Cached has just read and found wanting, and the lazy load would
+	// record it as fetched from the network (#964, #1279).
 	if _, _, err := remote.GetFile(ctx, remote.IERSFinals2000A, "finals2000A.all",
-		remote.WithCacheName(cacheName), remote.WithRead(read)); err != nil {
+		remote.WithCacheName(cacheName), remote.WithRead(read), remote.WithoutCacheFallback()); err != nil {
 		return Data{}, fmt.Errorf("download finals2000A.all: %w", err)
 	}
 

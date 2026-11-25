@@ -533,6 +533,9 @@ remote.SetOffline(true)
 p, err := eph.NewProvider(ctx, eph.Planets, "de442") // the pre-seeded kernel, no network
 ```
 
+Without `SetOffline` a cached copy is still served when the network cannot be reached, after one
+timeout spent asking for a newer one; with it, nothing is asked.
+
 With no kernel at all, `ephemeris.Default()` answers from SOFA: planning-grade, to 90″
 for Saturn and 3′ for Pluto ([what you give up](docs/ephemeris.md#11-without-a-kernel)).
 
