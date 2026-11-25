@@ -77,10 +77,9 @@ func TestAcquireLockStealsAbandonedLock(t *testing.T) {
 		t.Fatalf("seed lock file: %v", err)
 	}
 
-	// Back-date it past staleLockAge instead of waiting 30 real minutes.
-	// fileblob has no metadata setter for mtime through the Bucket API, so
-	// this drops to the raw OS path exactly as AcquireLock's own
-	// Attributes(ctx, lockKey).ModTime check does under the hood.
+	// Back-date it past staleLockAge instead of waiting 30 real minutes. io/fs
+	// cannot set a modification time, so this drops to the OS path, whose
+	// mtime is what AcquireLock's fs.Stat staleness check reads.
 	stale := time.Now().Add(-(staleLockAge + time.Minute))
 	if err := os.Chtimes(filepath.Join(dir, cacheKey+".lock"), stale, stale); err != nil {
 		t.Fatalf("backdate lock file: %v", err)

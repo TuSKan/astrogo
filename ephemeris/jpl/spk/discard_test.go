@@ -25,11 +25,6 @@ func seedKernel(t *testing.T) (remote.FS, string) {
 
 	const key = "jpl/planets/de440s.bsp"
 
-	// file.Save rather than fsys.WriteAll: these tests are t.Parallel and
-	// each has its own t.TempDir fsys, but fileblob stages every write in
-	// os.TempDir under a name built from the key's basename and a Windows
-	// clock that does not move — so separate buckets writing "de440s.bsp"
-	// still collide. Save holds the staging lock that prevents it (#241).
 	if err := remote.WriteFile(t.Context(), fsys, key, strings.NewReader("kernel bytes")); err != nil {
 		t.Fatalf("seed kernel: %v", err)
 	}

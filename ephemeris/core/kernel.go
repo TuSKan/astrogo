@@ -17,10 +17,8 @@ import (
 // network stack the answer never touches: jpl imports remote, which imports
 // net/http and crypto/tls. Measured with go1.27 on windows/amd64 that is
 // 11.0 MB and 231 packages against 4.6 MB and 107 for the pure-SOFA build.
-// When #112 introduced the registration the storage layer was gocloud.dev, and
-// the gap was 14 MB and 424 packages, gRPC and OpenTelemetry among them. A
-// pure-SOFA call — no kernel, no network, no file — paid for all of it because
-// one branch of one factory mentioned the type.
+// A pure-SOFA call — no kernel, no network, no file — would pay for all of it
+// because one branch of one factory mentioned the type.
 //
 // The same pattern remote/eop uses: a subpackage that is nothing but a
 // registration, blank-imported by a build that needs the capability. See #112.

@@ -134,7 +134,7 @@ func TestDefaultEndpointsCacheDirsMatchOnDiskLayout(t *testing.T) {
 // is a real configuration error a developer needs to see. It never reaches the
 // classifier: SkipOnUpstreamFailure matches errors carrying an HTTPStatus, and
 // only remote/api's HTTPError has one — a blob-backed endpoint's failures come
-// from gocloud and the AWS SDK instead. So the invariant is specifically that
+// from its storage backend instead. So the invariant is specifically that
 // no *KindAPI* endpoint requires a credential.
 func TestNoAPIEndpointRequiresACredential(t *testing.T) {
 	// Every KindAPI endpoint that declares a token, and why it is optional

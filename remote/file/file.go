@@ -53,15 +53,13 @@ import (
 // io.Copy rather than io.ReadAll because a DE440 kernel is three gigabytes and
 // astrogo's whole download path exists so that one never has to fit in memory.
 //
-// On a copy failure Close is deliberately not called, and this is the same
-// hazard the gocloud implementation documented: an io.WriteCloser's Close does
-// not know whether an earlier Write failed, and a staged writer's Close commits
-// by renaming into place regardless — so closing after a failed copy replaces a
-// good object with a truncated one. This package's own backends handle it
-// properly: every writer here implements [AbortWriter], so a failed copy throws
-// the staged write away and releases its handles. A backend that does not is
-// left unclosed, which is what the gocloud implementation did on every backend
-// and which leaks rather than corrupts.
+// On a copy failure Close is deliberately not called. An io.WriteCloser's
+// Close does not know whether an earlier Write failed, and a staged writer's
+// Close commits by renaming into place regardless, so closing after a failed
+// copy would replace a good object with a truncated one. Every writer this
+// package's backends return implements [AbortWriter], so a failed copy throws
+// the staged write away and releases its handles. A writer that does not is
+// left unclosed, which leaks its handles rather than corrupting the object.
 func WriteFile(ctx context.Context, fsys fs.FS, name string, r io.Reader) error {
 	cfs, ok := WithContext(ctx, fsys).(CreateFS)
 	if !ok {
@@ -89,10 +87,10 @@ func WriteFile(ctx context.Context, fsys fs.FS, name string, r io.Reader) error 
 // abort throws away a write in progress.
 //
 // A writer that can be aborted is, which releases its handles and leaves the
-// destination untouched. One that cannot is simply not closed — the gocloud-era
-// behavior, and the reason [AbortWriter] exists: skipping Close is the only
-// way to avoid committing a truncated object, and it leaks whatever the writer
-// was holding.
+// destination untouched. One that cannot is simply not closed: skipping Close
+// is the only way to avoid committing a truncated object, and it leaks
+// whatever the writer was holding. That leak is the reason [AbortWriter]
+// exists.
 func abort(w io.WriteCloser) {
 	if aw, ok := w.(AbortWriter); ok {
 		_ = aw.Abort()

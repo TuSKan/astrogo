@@ -86,8 +86,8 @@ const AODVariable = "aod550"
 // interpolation, the variable mapping — works against a file already in the
 // cache or any other filesystem a caller hands [Open].
 //
-// The backend went with gocloud.dev; see docs/storage.md for why it has not
-// been replaced yet and what replacing it involves. This package knows nothing
+// No s3:// backend is registered; see docs/storage.md for why none has been
+// written yet and what writing one involves. This package knows nothing
 // about S3 either way, which is the point: pulling the AWS SDK into every build
 // that merely reads a NetCDF file would be the wrong trade.
 func AOD550(ctx context.Context, site *coord.Geodetic, when time.Time) (float64, error) {

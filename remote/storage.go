@@ -78,8 +78,6 @@ func (c *Client) DataDirURL() string {
 // Writes stage inside the cache directory and are renamed into place, under
 // names unique by process id and counter, so a multi-gigabyte kernel never
 // crosses a volume and concurrent writers of one key cannot collide (#315).
-// The no_tmp_dir=1 parameter this comment used to weigh was gocloud's
-// fileblob's, and the file:// backend ignores it.
 func defaultDataDirURL() string {
 	base, err := os.UserCacheDir()
 	if err != nil {

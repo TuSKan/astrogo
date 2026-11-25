@@ -119,7 +119,7 @@ func TestGetFileMutableHeadProbeReuse(t *testing.T) {
 	}
 
 	// Second call: the source is untouched (same mtime/size, so the same
-	// fileblob-derived ETag), so the cache must be reused untouched —
+	// file.ETag validator), so the cache must be reused untouched —
 	// proved by the cache object's own ModTime staying identical, which
 	// only happens if fetchInto/writeResumable's promote step never ran
 	// a second time.
@@ -149,13 +149,14 @@ func TestGetFileMutableHeadProbeChanged(t *testing.T) {
 	// The two versions differ in length, and that is load-bearing rather
 	// than incidental.
 	//
-	// fileblob derives an ETag from the file's (ModTime, Size), and the
-	// Windows system clock is coarse enough that two writes either side of a
-	// local file copy can land on one tick. Both versions used to be
-	// fourteen bytes, so when that happened the source's ETag was byte-for-
-	// byte identical before and after the edit and unchanged correctly
-	// reported no change — this test failed about one run in fifteen,
-	// asserting something fileblob's own metadata cannot express.
+	// A local source's ETag is file.ETag's validator, built from its size and
+	// modification time, and the Windows system clock is coarse enough that
+	// two writes either side of a local file copy can land on one tick. Both
+	// versions used to be fourteen bytes, so when that happened the source's
+	// ETag was byte-for-byte identical before and after the edit and
+	// unchanged correctly reported no change — this test failed about one run
+	// in fifteen, asserting something a size-and-mtime validator cannot
+	// express.
 	//
 	// A differing length makes the change visible whichever branch of
 	// unchanged is taken, so what is under test is the refresh behavior
@@ -459,8 +460,8 @@ func TestGetFileWithDownloadTimeoutOverridesEndpointDefault(t *testing.T) {
 	// and a local Attributes call can win — the test failed about one run in
 	// fifteen. A non-positive duration is different in kind, not degree:
 	// context.WithDeadline cancels immediately when the deadline has already
-	// passed, so the context handed to srcFS.Attributes/NewRangeReader
-	// inside fetchInto is done before either call is made.
+	// passed, so the context bound to the source's Stat and Open inside
+	// fetchInto is done before either call is made.
 	//
 	// Note this reaches fetchInto at all only because a negative duration
 	// survives the cmp.Or in GetFile, which treats zero — and only zero — as
@@ -515,7 +516,7 @@ func TestGetFileReturnsUsableBucketForAllReadModes(t *testing.T) {
 	}
 
 	if string(buf) != payload {
-		t.Errorf("NewRangeReader content = %q, want %q", buf, payload)
+		t.Errorf("ReadAt content = %q, want %q", buf, payload)
 	}
 }
 

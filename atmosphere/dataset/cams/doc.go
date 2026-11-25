@@ -19,7 +19,7 @@
 // bucket/key through the filesystem it is given rather than assuming a particular
 // backend: bucket is normally the local cache remote.GetFile already
 // produced, but this package never special-cases that — the same Open
-// call works for any *file.Bucket (local, S3, ...), since scigolib/hdf5's
+// call works for any remote.FS, since scigolib/hdf5's
 // on-disk format needs true random access to the file it decodes,
 // forcing a scratch temp-file staging step Open performs generically
 // (see Open's own doc comment for exactly why and how).

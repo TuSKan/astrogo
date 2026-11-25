@@ -22,13 +22,12 @@ const resumeBody = "0123456789abcdefghijABCDEFGHIJ"
 // stand-in for an HTTP source now that GetFile can't reach an http://
 // URL at all (no httpblob driver registered yet; see remote/file's
 // package doc). fetchInto/freshInCache/unchanged/ResumePoint/
-// writeResumable are all fully generic over any Bucket, so exercising
-// them against a real local Bucket here tests the exact same policy
-// code an HTTP-backed endpoint will take once that driver exists — only
-// the literal HTTP Range/If-Range wire format is untestable until then.
-// fileblob's own Attributes derives a real, content-sensitive ETag from
-// (ModTime, Size), so the unchanged()/resume validator-comparison logic
-// gets genuine, non-trivial coverage, not a stub.
+// writeResumable are all fully generic over any FS, so exercising them
+// against a local one here tests the same policy code an HTTP-backed
+// endpoint takes; the HTTP backend's Range requests are tested in
+// remote/file's httpfs_test.go. A local file's ETag is file.ETag's
+// size-and-mtime validator, so the unchanged()/resume validator-comparison
+// logic gets genuine, non-trivial coverage, not a stub.
 func fakeSource(t *testing.T, id EndpointID, name, content string) FS {
 	t.Helper()
 
@@ -69,9 +68,8 @@ func seedPartial(t *testing.T, content, validator string) {
 	pKey := file.PartialKey(prefix + name)
 
 	// The partial body and the ETag sidecar that records which source it came
-	// from — two ordinary writes, where file.SavePartial used to carry the ETag
-	// as gocloud object metadata. io/fs has no metadata; see
-	// file.SourceETagSuffix.
+	// from — two ordinary writes, since io/fs has no object metadata to carry
+	// the ETag in; see file.SourceETagSuffix.
 	if err := WriteFile(context.Background(), fsys, pKey, strings.NewReader(content)); err != nil {
 		t.Fatalf("seed partial: %v", err)
 	}
@@ -222,9 +220,8 @@ func TestGetFileResumeShowsThePolicyTheFullSize(t *testing.T) {
 
 // assertPartialCleared verifies a completed download leaves nothing behind.
 //
-// Two objects now rather than one: the ETag used to ride as gocloud metadata on
-// the partial key, so a single check covered both. It is a sidecar now, and a
-// sidecar that outlives its partial is exactly the leftover this asserts
+// Two objects: the partial and the ETag sidecar beside it. A sidecar that
+// outlives its partial is exactly the leftover this asserts
 // against — ResumePoint would read it, find no body, and start over, but the
 // file would sit in the cache forever.
 func assertPartialCleared(t *testing.T, fsys FS, cacheKey string) {
