@@ -1,6 +1,8 @@
 package examples_test
 
 import (
+	"context"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TuSKan/astrogo/internal/testutil"
 	"github.com/TuSKan/astrogo/remote"
 )
 
@@ -28,6 +31,70 @@ var networkExamples = map[string][]remote.EndpointID{
 	"25_sky_brightness_compare": {
 		remote.GaiaStarMap, remote.SFDDustMap, remote.CALSPEC, remote.IERSFinals2000A,
 	},
+}
+
+// control builds a request to the service at base, the endpoint's URL as remote
+// resolves it, with mirrors its mirrors, that cannot be wrong.
+type control func(ctx context.Context, base string, mirrors []string) func() error
+
+// controls holds a control for each API service an example reaches.
+// TestNetworkExamplesRun asks the services of an example that failed: one
+// that fails its control too is degraded, and the failure is not evidence
+// against the example. TestEveryAPIServiceHasAControl holds networkExamples to
+// it.
+var controls = map[remote.EndpointID]control{
+	remote.SIMBAD: func(ctx context.Context, base string, mirrors []string) func() error {
+		return testutil.TAPControl(ctx, base, "basic", "main_id", mirrors...)
+	},
+	remote.MAST: getControl(url.Values{
+		"request": {`{"service":"Mast.Name.Lookup","params":{"input":"M31","format":"json"}}`},
+	}, `"canonicalName"`),
+	remote.CelesTrak:      getControl(url.Values{"CATNR": {"25544"}, "FORMAT": {"JSON"}}, `"OBJECT_NAME":"ISS (ZARYA)"`),
+	remote.JPLSBDB:        getControl(url.Values{"sstr": {"1"}}, "Ceres"),
+	remote.JPLSBDBQuery:   getControl(url.Values{"fields": {"full_name"}, "limit": {"1"}}, "Ceres"),
+	remote.JPLHorizonsSPK: getControl(url.Values{"format": {"text"}, "COMMAND": {"'499'"}, "MAKE_EPHEM": {"'NO'"}}, "Mars"),
+}
+
+// getControl is a control asking the service for query and passing an answer
+// that holds want, through testutil.HTTPControl, for a service with no mirrors.
+func getControl(query url.Values, want string) control {
+	return func(ctx context.Context, base string, _ []string) func() error {
+		return testutil.HTTPControl(ctx, base+"?"+query.Encode(), want)
+	}
+}
+
+// TestEveryAPIServiceHasAControl holds controls to networkExamples: every API
+// service an example reaches has a control, so its outage skips the example
+// rather than failing the nightly run, and every control is for a service an
+// example reaches. CelesTrak answered 503 on 2026-11-25 and failed two
+// examples, since only SIMBAD had one. File endpoints are left out: the nightly
+// run keeps their cached copies, which remote serves when the source cannot
+// answer.
+func TestEveryAPIServiceHasAControl(t *testing.T) {
+	t.Parallel()
+
+	reached := map[remote.EndpointID]bool{}
+
+	for name, ids := range networkExamples {
+		for _, id := range ids {
+			reached[id] = true
+
+			ep, ok := remote.Lookup(id)
+			if !ok || ep.Kind != remote.KindAPI {
+				continue
+			}
+
+			if _, ok := controls[id]; !ok {
+				t.Errorf("%s reaches the API service %q, which has no control", name, id)
+			}
+		}
+	}
+
+	for id := range controls {
+		if !reached[id] {
+			t.Errorf("controls holds %q, which no example reaches", id)
+		}
+	}
 }
 
 // exampleRow matches a row of the README's examples table, capturing the

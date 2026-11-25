@@ -12,8 +12,12 @@ import (
 	"testing"
 )
 
-// errControlRejected is a TAP service refusing a control query.
+// errControlRejected is a service refusing a control request.
 var errControlRejected = errors.New("the service rejected the control query")
+
+// controlBodyLimit is how much of an answer a control reads. What it looks for
+// comes at the start of every answer it has.
+const controlBodyLimit = 64 << 10
 
 // votableField captures the name of each FIELD a VOTable declares.
 var votableField = regexp.MustCompile(`(?i)<FIELD\b[^>]*\bname\s*=\s*"([^"]*)"`)
@@ -143,7 +147,7 @@ func tapControlAt(ctx context.Context, syncURL, query, column string) (bool, err
 
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, controlBodyLimit))
 	if err != nil {
 		return false, fmt.Errorf("control query to %s: reading the response: %w", syncURL, err)
 	}
@@ -163,6 +167,48 @@ func tapControlAt(ctx context.Context, syncURL, query, column string) (bool, err
 	}
 
 	return true, nil
+}
+
+// HTTPControl returns a control for [SkipOnDegradedService] against a service
+// answering a plain GET: rawURL is a request whose answer has held want for as
+// long as anyone has asked. want is a value only that answer holds, as
+// CelesTrak's elements for catalog number 25544 name the ISS "ISS (ZARYA)", or
+// a key every answer of its kind carries.
+//
+// The service passes only by answering: a 200 whose body holds want. A web
+// page served with a 200 does not hold it, so it fails, as a page naming no
+// column fails [TAPControl]. It is a plain net/http request for the reason
+// TAPControl is one, and it asks one host, so it is for an endpoint with no
+// mirrors.
+func HTTPControl(ctx context.Context, rawURL, want string) func() error {
+	return func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			return fmt.Errorf("control request: %w", err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("control request to %s: %w", rawURL, err)
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		body, err := io.ReadAll(io.LimitReader(resp.Body, controlBodyLimit))
+		if err != nil {
+			return fmt.Errorf("control request to %s: reading the response: %w", rawURL, err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%w: %s: HTTP %d: %s", errControlRejected, rawURL, resp.StatusCode, firstLine(body))
+		}
+
+		if !strings.Contains(string(body), want) {
+			return fmt.Errorf("%w: %s: HTTP 200 without %q: %s", errControlRejected, rawURL, want, firstLine(body))
+		}
+
+		return nil
+	}
 }
 
 // namesColumn reports whether body is a TAP answer naming column: a VOTable
