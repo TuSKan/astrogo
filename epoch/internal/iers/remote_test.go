@@ -287,6 +287,32 @@ func TestEOPLoaderCachedReportsNoDataWhenEmpty(t *testing.T) {
 	}
 }
 
+// TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin holds #509's
+// distinction at the remote loader: a bulletin that is there and cannot be
+// read is not one never seeded, since only the second is fixed by seeding it.
+// The loader that drew the distinction, FSLoader, went with epoch's loader
+// API, and this one answered ErrNoEOPData for both. A directory where the
+// bulletin goes is the unreadable one here: it stats, and does not read.
+func TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin(t *testing.T) {
+	scratchCache(t)
+
+	ctx := context.Background()
+
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatalf("remote.CacheDir: %v", err)
+	}
+
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName+"/inside", strings.NewReader("x")); err != nil {
+		t.Fatalf("make a directory where the bulletin goes: %v", err)
+	}
+
+	_, err = remoteLoader{}.Cached(ctx)
+	if err == nil || errors.Is(err, ErrNoEOPData) {
+		t.Errorf("Cached with an unreadable bulletin = %v, want its own error, not ErrNoEOPData", err)
+	}
+}
+
 // TestEOPLoaderDoesNotAccumulateCacheFiles guards against a cache that
 // grows one object per fetch.
 func TestEOPLoaderDoesNotAccumulateCacheFiles(t *testing.T) {

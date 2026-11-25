@@ -3,6 +3,7 @@ package iers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 
@@ -23,6 +24,10 @@ type remoteLoader struct{}
 // which a hand-pre-seeded file never has. Reading the cache object
 // directly is what finds a file copied in by hand for an offline or
 // air-gapped deployment.
+//
+// No bulletin is [ErrNoEOPData], an ordinary state. One that is there and
+// cannot be read is returned as itself, so it is not mistaken for one never
+// seeded: only the second is the operator's to fix by seeding it (#509).
 func (remoteLoader) Cached(ctx context.Context) (Data, error) {
 	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
 	if err != nil {
@@ -32,13 +37,17 @@ func (remoteLoader) Cached(ctx context.Context) (Data, error) {
 	key := prefix + cacheName
 
 	info, err := fs.Stat(fsys, key)
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return Data{}, ErrNoEOPData
+	}
+
+	if err != nil {
+		return Data{}, fmt.Errorf("iers: stat %s: %w", key, err)
 	}
 
 	raw, err := fs.ReadFile(fsys, key)
 	if err != nil {
-		return Data{}, ErrNoEOPData
+		return Data{}, fmt.Errorf("iers: read %s: %w", key, err)
 	}
 
 	return Data{Raw: raw, ModTime: info.ModTime()}, nil
