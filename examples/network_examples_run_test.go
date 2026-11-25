@@ -96,19 +96,18 @@ func TestNetworkExamplesRun(t *testing.T) {
 }
 
 // degraded returns why a service the example name uses is degraded: the
-// error of a control request it rejected, for each endpoint that has one.
-// It returns nil when every such service answers its control, so a failure is
-// the example's.
+// error of the control request it rejected, from controls. It returns nil when
+// every service answers its control, so a failure is the example's.
 func degraded(t *testing.T, name string) error {
 	t.Helper()
 
 	for _, id := range networkExamples[name] {
-		control, ok := tapControls[id]
+		control, ok := controls[id]
 		if !ok {
 			continue
 		}
 
-		syncURL, err := remote.URL(id)
+		base, err := remote.URL(id)
 		if err != nil {
 			t.Fatalf("endpoint %q: %v", id, err)
 		}
@@ -118,7 +117,7 @@ func degraded(t *testing.T, name string) error {
 		ep, _ := remote.Lookup(id)
 
 		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-		err = testutil.TAPControl(ctx, syncURL, control.from, control.column, ep.Mirrors...)()
+		err = control(ctx, base, ep.Mirrors)()
 
 		cancel()
 
@@ -128,12 +127,6 @@ func degraded(t *testing.T, name string) error {
 	}
 
 	return nil
-}
-
-// tapControls names, for each TAP service an example uses, a table and column
-// it has served for decades, for testutil.TAPControl.
-var tapControls = map[remote.EndpointID]struct{ from, column string }{
-	remote.SIMBAD: {"basic", "main_id"},
 }
 
 // endpointHost returns the host and port the endpoint id is served from, as

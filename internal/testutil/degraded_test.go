@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,6 +134,72 @@ func TestTAPControlPassesOnlyAnAnswerNamingTheColumn(t *testing.T) {
 		if (err == nil) != tc.pass {
 			t.Errorf("%s: control error %v, want pass=%v", tc.name, err, tc.pass)
 		}
+	}
+}
+
+// TestHTTPControlPassesOnlyAnAnswerHoldingTheValue: the control is the GET it
+// is given, and only a 200 holding the value passes. A page served with a 200,
+// an error status and a host that does not answer all fail it.
+func TestHTTPControlPassesOnlyAnAnswerHoldingTheValue(t *testing.T) {
+	t.Parallel()
+
+	const want = `"OBJECT_NAME":"ISS (ZARYA)"`
+
+	closed := httptest.NewServer(http.NotFoundHandler())
+	unreachable := closed.URL
+	closed.Close()
+
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+		pass   bool
+	}{
+		{"the answer", http.StatusOK, `[{"OBJECT_NAME":"ISS (ZARYA)","NORAD_CAT_ID":25544}]`, true},
+		{"a maintenance page", http.StatusOK, "<html><body>Down for maintenance.</body></html>", false},
+		{"an empty answer", http.StatusOK, "[]", false},
+		{"the answer under an error status", http.StatusServiceUnavailable, `[{"OBJECT_NAME":"ISS (ZARYA)"}]`, false},
+		{"a 404", http.StatusNotFound, "not found", false},
+	} {
+		var sent Recorded[string]
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sent.Set(r.Method + " " + r.URL.RequestURI())
+			w.WriteHeader(tc.status)
+			_, _ = w.Write([]byte(tc.body))
+		}))
+
+		err := HTTPControl(context.Background(), srv.URL+"/gp.php?CATNR=25544&FORMAT=JSON", want)()
+
+		srv.Close()
+
+		if (err == nil) != tc.pass {
+			t.Errorf("%s: control error %v, want pass=%v", tc.name, err, tc.pass)
+		}
+
+		if got := sent.Get(); got != "GET /gp.php?CATNR=25544&FORMAT=JSON" {
+			t.Errorf("%s: sent %q, want the GET it was given", tc.name, got)
+		}
+	}
+
+	if err := HTTPControl(context.Background(), unreachable+"/gp.php", want)(); err == nil {
+		t.Error("a host that does not answer passed the control")
+	}
+
+	if err := HTTPControl(context.Background(), "://no scheme", want)(); err == nil {
+		t.Error("a URL that cannot be requested passed the control")
+	}
+
+	// An answer that ends before the length it declared, though what arrived
+	// holds the value: a body that could not be read whole is not an answer.
+	cut := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "1000")
+		_, _ = w.Write([]byte(`[{"OBJECT_NAME":"ISS (ZARYA)"`))
+	}))
+	t.Cleanup(cut.Close)
+
+	if err := HTTPControl(context.Background(), cut.URL, want)(); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("an answer cut short: err %v, want io.ErrUnexpectedEOF", err)
 	}
 }
 
