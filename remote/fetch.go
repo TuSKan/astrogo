@@ -20,6 +20,9 @@ type readConfig struct {
 	read      func(fsys FS, key string) error
 	timeout   time.Duration
 	progress  func(downloaded, total int64)
+
+	// noFallback is [WithoutCacheFallback].
+	noFallback bool
 }
 
 // ReadOption customizes a single GetFile call.
@@ -87,6 +90,18 @@ func WithDownloadTimeout(d time.Duration) ReadOption {
 	return func(c *readConfig) { c.timeout = d }
 }
 
+// WithoutCacheFallback has GetFile return a Mutable endpoint's cached copy
+// only when the source confirms it is current. Without it, a cached copy is
+// served unconfirmed when the source cannot be asked: offline, under a
+// download policy that refuses, or when the source gives no usable answer.
+// With it, each of those fails with its own reason. It is for a caller that
+// reads the cache itself and has to know whether a copy came from the source.
+// An immutable endpoint's cached copy is current by definition and is served
+// either way.
+func WithoutCacheFallback() ReadOption {
+	return func(c *readConfig) { c.noFallback = true }
+}
+
 // WithProgress registers a callback invoked as a download progresses, with
 // the bytes transferred so far and the total (0 if unknown). Never called
 // for a cache hit.
@@ -106,7 +121,11 @@ func WithProgress(f func(downloaded, total int64)) ReadOption {
 // same.
 //
 // In offline mode ([SetOffline]) a cached entry is served without contacting
-// the source, Mutable or not, and only a miss fails, with ErrOffline.
+// the source, Mutable or not, and only a miss fails, with ErrOffline. So is a
+// Mutable entry whose source cannot be asked whether it is current: one that
+// gives no answer within the endpoint's download timeout, or answers with an
+// error. The source is asked once, under that timeout. [WithoutCacheFallback]
+// turns these fallbacks off.
 func GetFile(ctx context.Context, id EndpointID, name string, opts ...ReadOption) (fsys FS, key string, err error) {
 	return Default().GetFile(ctx, id, name, opts...)
 }
@@ -241,8 +260,9 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 	// source is unreachable — no network, no credentials, no driver.
 	// Offline, a Mutable endpoint's cached object is served too: it cannot
 	// be revalidated without the source, and offline mode is the caller
-	// saying there is none to ask.
-	if !ep.Mutable || offline {
+	// saying there is none to ask. Unless the caller wants only a copy the
+	// source confirmed (WithoutCacheFallback).
+	if !ep.Mutable || (offline && !cfg.noFallback) {
 		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
 			return cacheFS, cacheKey, fetched{}, nil
 		}
@@ -270,8 +290,10 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 	// stale after half an hour, all of it to be refused at the end (#424).
 	// fetchInto checks again, on the size the source reports.
 	if err := c.CheckDownload(id, name, ep.ApproxSize); err != nil {
-		if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
-			return cacheFS, cacheKey, fetched{}, nil
+		if !cfg.noFallback {
+			if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
+				return cacheFS, cacheKey, fetched{}, nil
+			}
 		}
 
 		return nil, "", fetched{}, err
@@ -282,7 +304,53 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 		return nil, "", fetched{}, fmt.Errorf("remote: open source %s: %w", ep.URL, err)
 	}
 
-	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
+
+	// Every question to the source is asked under the timeout the download it
+	// may lead to has. Only the download used to be, and a source that drops
+	// packets cost a lookup four connect timeouts, three of them outside the
+	// endpoint's download timeout (#1279).
+	probe := func() (bool, error) {
+		pctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		return freshInCache(pctx, ep, srcFS, cacheFS, name, cacheKey)
+	}
+
+	// A host that gave no answer is not asked again inside the client's
+	// cooldown, for a file as for an API call: one outage costs a program one
+	// timeout, not one per file. OpenNGC's two CSVs waited one out each.
+	host := hostOf(ep.URL)
+
+	if silent := c.answering(host); silent != nil {
+		if !cfg.noFallback {
+			if exists, existsErr := file.Exists(ctx, cacheFS, cacheKey); existsErr == nil && exists {
+				return cacheFS, cacheKey, fetched{}, nil
+			}
+		}
+
+		return nil, "", fetched{}, fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, silent)
+	}
+
+	fresh, freshErr := probe()
+	if errors.Is(freshErr, errSourceUnasked) {
+		c.heardFile(ctx, host, freshErr)
+	}
+
+	switch {
+	case freshErr == nil && fresh:
+		return cacheFS, cacheKey, fetched{}, nil
+	case errors.Is(freshErr, errSourceUnasked) && ctx.Err() == nil:
+		// A source that could not be asked whether the cached copy is current
+		// has not said it is stale. The copy is served as offline mode and a
+		// refusing policy serve it, and the source is not asked again: one that
+		// did not answer this question will not answer the download's. A
+		// cached OpenNGC catalog was refused on a machine with no network,
+		// and a stale IERS bulletin cost the lazy load 84 s (#1279).
+		if cfg.noFallback {
+			return nil, "", fetched{}, fmt.Errorf("%w: %s: %w", ErrDownloadFailed, name, freshErr)
+		}
+
 		return cacheFS, cacheKey, fetched{}, nil
 	}
 
@@ -295,8 +363,6 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 	// than twice it is not downloading: it crashed, and its lock is stolen
 	// rather than waited out — for the IERS bulletin's 30 s, after a minute
 	// instead of half an hour, the lazy EOP load's mutex held the while (#445).
-	timeout := cmp.Or(cfg.timeout, ep.DownloadTimeout, DefaultDownloadTimeout)
-
 	release, err := file.AcquireLock(ctx, cacheFS, cacheKey, 2*timeout)
 	if err != nil {
 		//nolint:wrapcheck // pure delegation to remote/file, internal to this package; its errors are already prefixed
@@ -306,11 +372,13 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 	defer release()
 
 	// Whoever held the lock before us may have filled the entry already.
-	if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+	if fresh, freshErr := probe(); freshErr == nil && fresh {
 		return cacheFS, cacheKey, fetched{}, nil
 	}
 
 	sourceETag, err := c.fetchInto(ctx, id, ep, srcFS, cacheFS, name, cacheKey, timeout, cfg)
+	c.heardFile(ctx, host, err)
+
 	if err != nil {
 		// A failed fetch is not the same as a missing file. Before failing,
 		// this asks the question the caller asked once more: is the object
@@ -324,7 +392,7 @@ func (c *Client) getFile(ctx context.Context, id EndpointID, name string, cfg re
 		// The exclusive lock and the pid-named staging file have closed that
 		// race; the check stays because it is the right question, not a
 		// workaround.
-		if fresh, freshErr := freshInCache(ctx, ep, srcFS, cacheFS, name, cacheKey); freshErr == nil && fresh {
+		if fresh, freshErr := probe(); freshErr == nil && fresh {
 			return cacheFS, cacheKey, fetched{}, nil
 		}
 
@@ -368,7 +436,9 @@ func (c *Client) Exists(ctx context.Context, id EndpointID, name string) (bool, 
 }
 
 // freshInCache reports whether cacheKey already holds current content for
-// ep+name, so GetFile can skip the transfer entirely.
+// ep+name, so GetFile can skip the transfer entirely. A Mutable copy whose
+// source could not be asked is not fresh, and the error wraps
+// [errSourceUnasked].
 func freshInCache(ctx context.Context, ep Endpoint, srcFS, cacheFS FS, name, cacheKey string) (bool, error) {
 	exists, err := file.Exists(ctx, cacheFS, cacheKey)
 	if err != nil {
@@ -383,13 +453,18 @@ func freshInCache(ctx context.Context, ep Endpoint, srcFS, cacheFS FS, name, cac
 		return true, nil
 	}
 
-	return unchanged(ctx, srcFS, cacheFS, name, cacheKey), nil
+	return unchanged(ctx, srcFS, cacheFS, name, cacheKey)
 }
 
+// errSourceUnasked is a Mutable copy's freshness check that got no usable
+// answer from the source: no answer within the timeout, or an error status.
+var errSourceUnasked = errors.New("remote: the source could not be asked whether the cached copy is current")
+
 // unchanged compares the source ETag recorded beside the cached object at
-// fetch time against the source's current one. Any failure — an erroring
-// probe, offline mode — reports "changed", so GetFile falls through to its
-// normal download path.
+// fetch time against the source's current one. A source that no longer has
+// the object has answered, and the copy is not current. One that could not be
+// asked at all is reported as [errSourceUnasked], which is not the same: it
+// has not said the copy is stale.
 //
 // The recorded ETag is deliberately not the cached object's own. A local
 // copy's identity, its modification time and size, has nothing to do with the
@@ -403,22 +478,26 @@ func freshInCache(ctx context.Context, ep Endpoint, srcFS, cacheFS FS, name, cac
 // IERS bulletin every process start and re-downloading it when it actually
 // grows, and an endpoint whose content changes without changing size is one
 // astrogo would need a checksum for regardless.
-func unchanged(ctx context.Context, srcFS, cacheFS FS, name, cacheKey string) bool {
+func unchanged(ctx context.Context, srcFS, cacheFS FS, name, cacheKey string) (bool, error) {
 	want, err := fs.Stat(cacheFS, cacheKey)
 	if err != nil {
-		return false
+		return false, nil //nolint:nilerr // a cached copy that cannot be stated is not current, and is fetched again
 	}
 
 	got, err := fs.Stat(file.WithContext(ctx, srcFS), name)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+
 	if err != nil {
-		return false
+		return false, fmt.Errorf("%w: %w", errSourceUnasked, err)
 	}
 
 	if recorded, current := file.RecordedETag(ctx, cacheFS, cacheKey), file.ETag(got); recorded != "" && current != "" {
-		return recorded == current
+		return recorded == current, nil
 	}
 
-	return want.Size() > 0 && want.Size() == got.Size()
+	return want.Size() > 0 && want.Size() == got.Size(), nil
 }
 
 // fetchInto performs the transfer from srcFS/name into cacheFS/cacheKey. It

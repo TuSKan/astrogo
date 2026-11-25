@@ -104,6 +104,13 @@
 // refused only when nothing is: it could not download a newer copy, so asking
 // the source whether there is one would only cost it.
 //
+// A Mutable copy whose source cannot be asked whether it is current, because
+// the source gives no answer within the endpoint's download timeout or
+// answers with an error, is served the same way, after that one question.
+// A machine with a cache and no network therefore works without
+// [SetOffline], at the cost of one timeout per question; SetOffline asks
+// nothing. [WithoutCacheFallback] turns all of these fallbacks off.
+//
 // # Offline and air-gapped deployments
 //
 // Pre-seed the cache with the objects you need, then:

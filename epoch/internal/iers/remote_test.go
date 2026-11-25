@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -310,6 +312,52 @@ func TestEOPLoaderCachedTellsAbsenceFromAnUnreadableBulletin(t *testing.T) {
 	_, err = remoteLoader{}.Cached(ctx)
 	if err == nil || errors.Is(err, ErrNoEOPData) {
 		t.Errorf("Cached with an unreadable bulletin = %v, want its own error, not ErrNoEOPData", err)
+	}
+}
+
+// TestFetchTakesNoBulletinItsSourceDidNotConfirm: with a bulletin cached that
+// does not reach the epoch asked for, and a source that answers every request
+// with an error, the network step fails rather than hand back the cached
+// copy. remote.GetFile serves such a copy to other callers (#1279); this one
+// has already read the cache, and taking the copy again would record it as
+// fetched from the network.
+func TestFetchTakesNoBulletinItsSourceDidNotConfirm(t *testing.T) {
+	installLoader(t, nil)
+	scratchCache(t)
+
+	ctx := context.Background()
+
+	fsys, prefix, err := remote.CacheDir(ctx, remote.IERSFinals2000A)
+	if err != nil {
+		t.Fatalf("remote.CacheDir: %v", err)
+	}
+
+	if err := remote.WriteFile(ctx, fsys, prefix+cacheName, strings.NewReader(sampleFinals2000A)); err != nil {
+		t.Fatalf("pre-seed: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+
+	if err := remote.SetURL(remote.IERSFinals2000A, srv.URL+"/"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The cached copy was written just now, and its age seeds the retry
+	// cooldown, which would keep the lazy load from the network step at all.
+	SetRetryCooldown(0)
+	t.Cleanup(func() { SetRetryCooldown(5 * time.Minute) })
+
+	// Past the sample's two days, so the cached read cannot cover it and the
+	// lazy load goes on to the network step.
+	if err := EnsureLoaded(41700); err == nil {
+		t.Error("EnsureLoaded with the source failing returned no error")
+	}
+
+	if got := EOPSource(); got != SourceCache {
+		t.Errorf("EOPSource = %q, want %q: the cached bulletin is what was loaded", got, SourceCache)
 	}
 }
 
