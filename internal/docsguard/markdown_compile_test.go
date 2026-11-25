@@ -132,8 +132,9 @@ func TestMarkdownCodeBlocksCompile(t *testing.T) {
 
 		blocks := goBlock.FindAllStringSubmatch(string(raw), -1)
 		// The README held 11 blocks until #1264 removed the remote/eop import
-		// and the filesystem EOP loader; it has 9.
-		if name == "README.md" && len(blocks) < 8 {
+		// and the filesystem EOP loader, and its downloads section was then cut
+		// to the table and three examples; it has 5.
+		if name == "README.md" && len(blocks) < 4 {
 			t.Fatalf("found %d Go blocks in README.md; the fence format has probably changed", len(blocks))
 		}
 
