@@ -16,8 +16,9 @@ from it stays checkable after both sides have moved on.
 ## Why Python is here at all
 
 This was the first Python in the repository, and the bar for adding it was that
-there is **no route to this reference from Go**. The one other generator,
-`fits/testdata/wcsfixture`, meets the same bar for WCSLIB. Every other reference astrogo
+there is **no route to this reference from Go**. The other generators,
+`fits/testdata/wcsfixture` for WCSLIB and `coord/testdata/lttfixture` for
+Astropy's barycentric light-travel time, meet the same bar. Every other reference astrogo
 validates against has a Go client already — JPL Horizons, USNO, the NASA
 eclipse canons, VizieR, ESO SkyCalc, IRSA. Astropy does not, and
 `SkyCoord.radial_velocity_correction` is the only widely-used independent

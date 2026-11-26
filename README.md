@@ -228,6 +228,7 @@ tables you can check against published references.
 - One-time log warning when IERS data is unavailable (UT1 ≈ UTC fallback)
 - Aberration, light deflection, proper motion, parallax handled natively
 - `coord.SubPoint`/`SmallCircle` — the geodetic point where a distant body (Sun, Moon, planet) is at the zenith, and a spherical small-circle sampler for drawing it (used by `plan.Terminator` below)
+- `coord.Context.BarycentricDelay`/`ArrivalAtObserver` — the light-travel (Rømer) delay between the observer and the solar system barycenter toward a target, and the inverse: a BJD_TDB to the instant the site sees it. Within 0.11 µs of the same projection from Astropy's pieces over 175 sites, dates and directions
 
 ### Atmospheric Modeling (`atmosphere`)
 - **Refraction to the horizon by default** (ICAO standard atmosphere): SOFA's series above 10° altitude, handed over to Bennett-NA below 5°, within 13.4″ of Hohenkerk & Sinclair's ray tracing on the horizon (held to 15″)
@@ -295,6 +296,7 @@ tables you can check against published references.
 - `plan.AngularDiameter`/`BodyEquatorialRadius` — apparent angular diameter for the Sun, Moon, and planets, auto-populating `TargetDetails.AngularSize`
 - `plan.TargetDetails.RadialVelocity` — auto-populated for any target implementing `MeasuredRadialVelocity` (currently `*Star`, via `WithRadialVelocity`): the topocentric RV an observer would measure right now, alongside the catalog barycentric value, via `coord.Context.ObservedRadialVelocity`
 - `plan.SubsolarPoint`/`SublunarPoint`/`Terminator` — day/night terminator and twilight-circle computation (`TwilightKind`: geometric, apparent, civil, nautical, astronomical)
+- `plan.TransitEphemeris`/`ObserveTransits` — exoplanet and eclipsing-binary transits from a BJD_TDB ephemeris, its uncertainty and epoch–period correlation: the cycles whose observing windows reach into a range, each moved to the site's clock, and which of its window (baselines and a k·σ timing margin included) the constraints leave observable, with the reason each lost stretch is lost: full, partial or unobservable, ingress and egress apart
 - `constellation.List`/`Centroid` — enumerate all 88 IAU constellations and compute a boundary centroid; `plan.Constellation`/`NewConstellation` wraps this into a fixed `Observable` target (e.g. "when is Orion well-placed tonight")
 - **Sub-second boundary refinement** — Chandrupatla (continuous altitude) + bisection (discrete constraints)
 - Observable windows with constraint evaluation
